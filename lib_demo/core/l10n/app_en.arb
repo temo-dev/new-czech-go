@@ -1,0 +1,126 @@
+{
+  "@@locale": "en",
+
+  "appName": "Czech Exam",
+
+  "continueLabel": "Continue",
+  "cancelLabel": "Cancel",
+  "confirmLabel": "Confirm",
+  "retryLabel": "Retry",
+  "loading": "Loading...",
+  "errorGeneric": "Something went wrong. Please try again.",
+  "errorOffline": "No internet connection.",
+  "emptyStateDefault": "Nothing here yet",
+
+  "loginTitle": "Log in",
+  "loginWelcome": "Welcome back",
+  "loginSubtitle": "Log in to review your past mock tests.",
+
+  "signupTitle": "Create account",
+  "signupSubtitle": "Save your results and track your learning progress.",
+
+  "emailLabel": "Email",
+  "passwordLabel": "Password",
+  "fullNameLabel": "Full name",
+  "fullNameHint": "John Smith",
+  "forgotPassword": "Forgot password?",
+  "forgotPasswordTitle": "Forgot password",
+  "forgotPasswordSubtitle": "Enter your registered email. We will send you a password reset link.",
+  "forgotPasswordSuccess": "Password reset email sent. Please check your inbox.",
+  "forgotPasswordCta": "Send reset link",
+  "backToLogin": "Back to login",
+
+  "orContinueWith": "OR CONTINUE WITH",
+  "orSignupWith": "OR SIGN UP WITH",
+
+  "alreadyHaveAccount": "Already have an account? ",
+  "noAccountYet": "Don't have an account? ",
+
+  "termsAgreementPrefix": "I agree to the ",
+  "termsLabel": "Terms of service",
+  "privacyLabel": "Privacy policy",
+  "termsAgreementSuffix": " and ",
+  "termsAgreeError": "Please agree to the terms of service",
+
+  "dashboardTitle": "Dashboard",
+  "dashboardGreeting": "Hello, {name}!",
+  "@dashboardGreeting": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "dashboardReadyPrompt": "Ready for 15 minutes of study today?",
+  "dashboardExamCountdown": "Exam today!",
+  "dashboardDaysLeft": "{days} days left",
+  "@dashboardDaysLeft": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+
+  "skillReading": "Reading",
+  "skillListening": "Listening",
+  "skillWriting": "Writing",
+  "skillSpeaking": "Speaking",
+  "skillGrammar": "Grammar",
+  "skillVocabulary": "Vocabulary",
+
+  "resultPass": "Pass",
+  "resultFail": "Needs work",
+  "resultPassBadge": "Pass",
+  "resultFailBadge": "Fail",
+
+  "labelLatestExam": "LATEST EXAM",
+  "labelNeedImprovement": "NEEDS IMPROVEMENT",
+  "labelToday": "TODAY",
+  "labelBonus": "BONUS POINTS",
+  "labelWeeklyRank": "WEEKLY RANK",
+  "labelRecommended": "RECOMMENDED FOR YOU",
+
+  "actionContinueLearning": "Continue learning",
+  "actionStartNewTest": "New practice test",
+  "actionRetakeExam": "Retake exam",
+  "actionStartLearn": "Start now",
+  "actionStart": "Start",
+
+  "dailyGoalComplete": "Complete!",
+  "dailyGoalIncomplete": "Keep going!",
+
+  "emptyNoExamYet": "Take your first mock test",
+  "emptyNoExamSubtitle": "Check your level and get a personalized study plan.",
+
+  "leaderboardTitle": "Weekly leaderboard",
+  "leaderboardSeeAll": "See all",
+  "leaderboardEmpty": "No data for this week.",
+  "leaderboardMyRank": "Your rank: #{rank}",
+  "@leaderboardMyRank": {
+    "placeholders": {
+      "rank": { "type": "int" }
+    }
+  },
+
+  "practiceProgressLabel": "LESSON PROGRESS",
+  "practiceAnswerCorrect": "Correct!",
+  "practiceAnswerWrong": "Incorrect",
+  "practiceCheckAnswer": "Check",
+  "practiceExplanationTitle": "Explanation",
+  "practiceCorrectAnswerLabel": "CORRECT ANSWER",
+  "practiceYourAnswerLabel": "YOUR ANSWER",
+  "practiceExplanationLabel": "EXPLANATION",
+
+  "coursesTitle": "Courses",
+  "practiceTitle": "Practice",
+  "progressTitle": "Progress",
+  "profileTitle": "Profile",
+
+  "streakLabel": "{days} day streak",
+  "@streakLabel": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+
+  "startMockTest": "Start free mock test",
+  "upgradeLabel": "Upgrade",
+  "subscribeTitle": "Choose your plan"
+}
