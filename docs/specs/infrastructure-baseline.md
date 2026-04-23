@@ -42,6 +42,7 @@ The keyword is `baseline`, not `target architecture for all future scale`. This 
 - deploy `Next.js CMS` as one separate web app
 - use direct object storage uploads from clients via presigned URLs
 - process attempts asynchronously inside the same backend service or via one lightweight worker mode of the same codebase
+- ship the backend and CMS as Docker images so local compose, ECS tasks, and small-host deployments reuse the same runtime artifact
 
 This means V1 does **not** require:
 - microservices
@@ -82,10 +83,15 @@ Acceptable hosting options, in order of pragmatism:
 V1 recommendation:
 - choose the option you can deploy in hours, not days
 - if no existing preference exists, a small VM or a single small EC2 instance is the safest baseline
+- if using one EC2 host with multiple apps, a shared reverse proxy such as `nginx-proxy` plus Docker networking is still within baseline as long as the backend stays one long-running service
 
 Why:
 - constant background processing for transcription polling and scoring is easier in a long-running service than in a serverless design
 - operational debugging is simpler with one persistent service
+
+Packaging note:
+- keep one production `Dockerfile` in `backend/`
+- local `docker compose` may run `Postgres` beside it, but production should point `DATABASE_URL` at `RDS`
 
 ## CMS
 Recommended baseline:
@@ -99,6 +105,11 @@ Acceptable options:
 V1 recommendation:
 - if using Vercel keeps the CMS out of the backend path, that is a good trade
 - do not force the CMS into the same deploy unit if that slows iteration
+
+Packaging note:
+- keep one production `Dockerfile` in `cms/`
+- pass `API_BASE_URL` and `CMS_ADMIN_TOKEN` to the container at runtime
+- if the CMS is public on the internet, also set `CMS_BASIC_AUTH_USER` and `CMS_BASIC_AUTH_PASSWORD` so the admin desk is not public-open
 
 ## Data Baseline
 
@@ -220,6 +231,11 @@ V1 needs:
 Recommended:
 - one stable domain for API, for example `api.<project-domain>`
 - one stable domain for CMS, for example `cms.<project-domain>`
+
+Pragmatic alternative when the host already runs `nginxproxy/nginx-proxy`:
+- publish backend and CMS on separate hostnames
+- route by `VIRTUAL_HOST` instead of introducing `ALB`
+- let the app containers join the shared proxy Docker network
 
 ## Security Baseline
 

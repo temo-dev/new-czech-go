@@ -1,5 +1,16 @@
 # macOS
 .DS_Store
+._*
+.env
+.env.*
+!.env.compose.example
+!.env.ec2.example
+dist/
+*.pem
+__pycache__/
+*.pyc
+/example.m4a
+/sample.m4a
 
 # Node / Next.js
 cms/node_modules/
@@ -14,4 +25,3 @@ flutter_app/build/
 flutter_app/.flutter-plugins
 flutter_app/.flutter-plugins-dependencies
 flutter_app/ios/Flutter/ephemeral/
-

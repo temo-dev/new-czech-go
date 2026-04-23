@@ -23,12 +23,12 @@ class ApiClient {
 
   Future<List<dynamic>> getModules() async {
     final payload = await _authed('GET', '/v1/modules');
-    return payload['data'] as List<dynamic>;
+    return payload['data'] as List<dynamic>? ?? const [];
   }
 
   Future<List<dynamic>> getExercises(String moduleId) async {
     final payload = await _authed('GET', '/v1/modules/$moduleId/exercises');
-    return payload['data'] as List<dynamic>;
+    return payload['data'] as List<dynamic>? ?? const [];
   }
 
   Future<Map<String, dynamic>> getExercise(String exerciseId) async {
@@ -63,8 +63,8 @@ class ApiClient {
     required String mimeType,
     required int fileSizeBytes,
     int durationMs = 25000,
-    int sampleRateHz = 44100,
-    int channels = 1,
+    int? sampleRateHz,
+    int? channels,
   }) async {
     final uploadPayload = await _authed(
       'POST',
@@ -86,26 +86,127 @@ class ApiClient {
       fileSizeBytes: fileSizeBytes,
     );
     final fileName = audioPath.split(Platform.pathSeparator).last;
+    final uploadCompleteBody = <String, dynamic>{
+      'storage_key':
+          upload['storage_key'] as String? ??
+          'device-local/$attemptId/$fileName',
+      'mime_type': mimeType,
+      'duration_ms': durationMs,
+      'file_size_bytes': fileSizeBytes,
+      'stored_file_path': binaryUploadResult['stored_file_path'] as String?,
+    };
+    if (sampleRateHz != null && sampleRateHz > 0) {
+      uploadCompleteBody['sample_rate_hz'] = sampleRateHz;
+    }
+    if (channels != null && channels > 0) {
+      uploadCompleteBody['channels'] = channels;
+    }
+
     await _authed(
       'POST',
       '/v1/attempts/$attemptId/upload-complete',
-      body: {
-        'storage_key':
-            upload['storage_key'] as String? ??
-            'device-local/$attemptId/$fileName',
-        'mime_type': mimeType,
-        'duration_ms': durationMs,
-        'sample_rate_hz': sampleRateHz,
-        'channels': channels,
-        'file_size_bytes': fileSizeBytes,
-        'stored_file_path': binaryUploadResult['stored_file_path'] as String?,
-      },
+      body: uploadCompleteBody,
     );
   }
 
   Future<Map<String, dynamic>> getAttempt(String attemptId) async {
     final payload = await _authed('GET', '/v1/attempts/$attemptId');
     return payload['data'] as Map<String, dynamic>;
+  }
+
+  Future<List<dynamic>> getAttempts() async {
+    final payload = await _authed('GET', '/v1/attempts');
+    return payload['data'] as List<dynamic>? ?? const [];
+  }
+
+  Future<Map<String, dynamic>> getAttemptReview(String attemptId) async {
+    final payload = await _authed('GET', '/v1/attempts/$attemptId/review');
+    return payload['data'] as Map<String, dynamic>;
+  }
+
+  Future<File> downloadAttemptAudio(
+    String attemptId, {
+    required String destinationPath,
+  }) async {
+    if (_token == null) {
+      throw const HttpException('Not authenticated.');
+    }
+
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(attemptAudioUri(attemptId));
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $_token');
+      final response = await request.close();
+      if (response.statusCode >= 400) {
+        throw HttpException(
+          'Attempt audio download failed with status ${response.statusCode}.',
+        );
+      }
+
+      final file = File(destinationPath);
+      await file.parent.create(recursive: true);
+      final sink = file.openWrite();
+      try {
+        await response.pipe(sink);
+      } finally {
+        await sink.close();
+      }
+      return file;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<File> downloadAttemptReviewAudio(
+    String attemptId, {
+    required String destinationPath,
+  }) async {
+    if (_token == null) {
+      throw const HttpException('Not authenticated.');
+    }
+
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(attemptReviewAudioUri(attemptId));
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $_token');
+      final response = await request.close();
+      if (response.statusCode >= 400) {
+        throw HttpException(
+          'Attempt review audio download failed with status ${response.statusCode}.',
+        );
+      }
+
+      final file = File(destinationPath);
+      await file.parent.create(recursive: true);
+      final sink = file.openWrite();
+      try {
+        await response.pipe(sink);
+      } finally {
+        await sink.close();
+      }
+      return file;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Uri attemptAudioUri(String attemptId) {
+    return Uri.parse('$baseUrl/v1/attempts/$attemptId/audio/file');
+  }
+
+  Uri attemptReviewAudioUri(String attemptId) {
+    return Uri.parse('$baseUrl/v1/attempts/$attemptId/review/audio/file');
+  }
+
+  Uri exerciseAssetUri(String exerciseId, String assetId) {
+    return Uri.parse('$baseUrl/v1/exercises/$exerciseId/assets/$assetId/file');
+  }
+
+  Map<String, String> authHeaders() {
+    if (_token == null) {
+      return const {};
+    }
+    return {'Authorization': 'Bearer $_token'};
   }
 
   Future<Map<String, dynamic>> _authed(

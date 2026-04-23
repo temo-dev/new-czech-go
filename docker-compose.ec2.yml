@@ -1,0 +1,60 @@
+services:
+  backend:
+    image: ${BACKEND_IMAGE_REPO}:${IMAGE_TAG}
+    platform: ${IMAGE_PLATFORM:-linux/arm64}
+    container_name: czech-go-system-backend
+    environment:
+      VIRTUAL_HOST: ${BACKEND_HOST}
+      LETSENCRYPT_HOST: ${BACKEND_HOST}
+      LETSENCRYPT_EMAIL: ${LE_EMAIL}
+      VIRTUAL_PORT: 8080
+      TZ: ${TZ:-Europe/Prague}
+      API_ADDR: :8080
+      DATABASE_URL: ${DATABASE_URL}
+      TRANSCRIBER_PROVIDER: ${TRANSCRIBER_PROVIDER:-dev}
+      REQUIRE_REAL_TRANSCRIPT: ${REQUIRE_REAL_TRANSCRIPT:-false}
+      ATTEMPT_UPLOAD_PROVIDER: ${ATTEMPT_UPLOAD_PROVIDER:-local}
+      TTS_PROVIDER: ${TTS_PROVIDER:-dev}
+      POLLY_VOICE_ID: ${POLLY_VOICE_ID:-Jitka}
+      POLLY_SAMPLE_RATE: ${POLLY_SAMPLE_RATE:-22050}
+      AWS_REGION: ${AWS_REGION:-}
+      ATTEMPT_AUDIO_S3_BUCKET: ${ATTEMPT_AUDIO_S3_BUCKET:-}
+      ATTEMPT_AUDIO_S3_PREFIX: ${ATTEMPT_AUDIO_S3_PREFIX:-attempt-audio}
+      ATTEMPT_UPLOAD_URL_TTL: ${ATTEMPT_UPLOAD_URL_TTL:-15m}
+      TRANSCRIBE_OUTPUT_BUCKET: ${TRANSCRIBE_OUTPUT_BUCKET:-}
+      TRANSCRIBE_OUTPUT_PREFIX: ${TRANSCRIBE_OUTPUT_PREFIX:-}
+      TRANSCRIBE_LANGUAGE_CODE: ${TRANSCRIBE_LANGUAGE_CODE:-cs-CZ}
+      TRANSCRIBE_POLL_INTERVAL: ${TRANSCRIBE_POLL_INTERVAL:-5s}
+      TRANSCRIBE_TIMEOUT: ${TRANSCRIBE_TIMEOUT:-2m}
+    expose:
+      - "8080"
+    restart: unless-stopped
+    networks:
+      - default
+      - proxy
+
+  cms:
+    image: ${CMS_IMAGE_REPO}:${IMAGE_TAG}
+    platform: ${IMAGE_PLATFORM:-linux/arm64}
+    container_name: czech-go-system-cms
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-http://backend:8080}
+      CMS_ADMIN_TOKEN: ${CMS_ADMIN_TOKEN:-dev-admin-token}
+      CMS_BASIC_AUTH_USER: ${CMS_BASIC_AUTH_USER:-}
+      CMS_BASIC_AUTH_PASSWORD: ${CMS_BASIC_AUTH_PASSWORD:-}
+      VIRTUAL_HOST: ${CMS_HOST}
+      LETSENCRYPT_HOST: ${CMS_HOST}
+      LETSENCRYPT_EMAIL: ${LE_EMAIL}
+      VIRTUAL_PORT: 3000
+      TZ: ${TZ:-Europe/Prague}
+    expose:
+      - "3000"
+    restart: unless-stopped
+    networks:
+      - default
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK}

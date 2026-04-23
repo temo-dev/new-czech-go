@@ -27,6 +27,7 @@ make dev-backend
 Expected result:
 - backend listens on `http://localhost:8080`
 - health endpoint responds at `http://localhost:8080/healthz`
+- if `TRANSCRIBER_PROVIDER` is left at `dev`, the backend now logs a warning that transcript and feedback are synthetic and do not reflect the spoken audio
 
 ## Terminal 2: CMS
 From the repo root:
@@ -79,6 +80,85 @@ make dev-check
 This checks:
 - backend health on `:8080`
 - CMS response on `:3000`
+
+## Container Workflow
+Use this when you want a deploy-shaped local stack for `backend + cms + postgres`.
+
+1. Copy the compose env template:
+
+```bash
+cp .env.compose.example .env
+```
+
+2. Build and start the stack:
+
+```bash
+make compose-up
+```
+
+Expected result:
+- backend listens on `http://localhost:8080`
+- CMS listens on `http://localhost:3000`
+- Postgres listens on `localhost:5432`
+
+Useful commands:
+
+```bash
+make compose-logs
+make compose-down
+make compose-config
+make smoke-attempt-flow
+```
+
+Notes:
+- this local stack uses containerized `Postgres` to mirror the production shape where the backend will point at `RDS`
+- the CMS now calls the backend through same-origin Next.js API routes, and the container reads `API_BASE_URL` plus `CMS_ADMIN_TOKEN` at runtime
+- if `CMS_BASIC_AUTH_USER` and `CMS_BASIC_AUTH_PASSWORD` are set, the CMS web layer will prompt for `HTTP Basic Auth` while leaving `/api/healthz` open for health checks
+- `Flutter` still runs outside compose and can continue talking to `http://localhost:8080` during simulator-based development
+- the backend now also reads `TTS_PROVIDER`; leave it at `dev` for a local debug WAV output, or switch to `amazon_polly` when you want the review-artifact model answer to use real Czech TTS
+- for the EC2 host pattern that uses shared `nginx-proxy` and `acme-companion`, use [deploy-ec2-nginx-proxy.md](/Users/daniel.dev/Desktop/czech-go-system/docs/deploy-ec2-nginx-proxy.md) instead of the local compose file
+- the EC2 path now includes helper targets such as `make release-images` and `make compose-ec2-up`
+- pass extra smoke-test flags with `SMOKE_ATTEMPT_ARGS`, for example `make smoke-attempt-flow SMOKE_BASE_URL=https://apicz.hadoo.eu SMOKE_ATTEMPT_ARGS="--audio-file /absolute/path/to/sample.m4a"`
+- when you need proof that the stack is returning real transcript data, add `--require-real-transcript`; the smoke script now fails if the backend still reports `is_synthetic=true`
+
+### Real Transcript Dev Mode
+If you want local or compose-based testing to use real transcript data instead of the synthetic dev transcript:
+
+1. set `ATTEMPT_UPLOAD_PROVIDER=s3`
+2. set `TRANSCRIBER_PROVIDER=amazon_transcribe`
+3. fill the AWS bucket and Transcribe env vars
+4. set `REQUIRE_REAL_TRANSCRIPT=true`
+5. decide whether review-artifact model audio should stay on `TTS_PROVIDER=dev` or move to `TTS_PROVIDER=amazon_polly`
+
+For local `docker compose`, also make sure the backend container can see AWS credentials:
+
+1. set `AWS_PROFILE=<your-profile>` in `.env`
+2. or pass `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` directly
+3. keep `AWS_EC2_METADATA_DISABLED=true` on local machines so the container does not waste 5 seconds trying `EC2 IMDS`
+
+The local compose file now mounts `${HOME}/.aws` into the backend container as read-only, so profile-based auth works as long as the profile is valid on your Mac.
+
+In the current architecture, `REQUIRE_REAL_TRANSCRIPT=true` is the guard that prevents the backend from silently falling back to the synthetic `DevTranscriber` path.
+
+Current TTS behavior:
+- `TTS_PROVIDER=dev` writes one local debug WAV for the review-artifact model answer
+- `TTS_PROVIDER=amazon_polly` uses `AWS_REGION` plus optional `POLLY_VOICE_ID` and `POLLY_SAMPLE_RATE`
+- review-artifact TTS failure does not block the main attempt from reaching `completed`
+
+If you leave `TRANSCRIBER_PROVIDER=dev`, the app still works, but transcript and feedback are only suitable for contract/UI testing, not serious scoring validation.
+
+Suggested smoke check once the stack is up:
+
+```bash
+make smoke-attempt-flow \
+  SMOKE_BASE_URL=http://localhost:8080 \
+  SMOKE_ATTEMPT_ARGS="--audio-file /absolute/path/to/sample.m4a --require-real-transcript"
+```
+
+Current known local-compose behavior:
+- `upload-url` and `upload-complete` can now succeed in `s3` mode on a local Mac if the backend container can read valid AWS credentials from `${HOME}/.aws` or direct env vars
+- if the backend log shows `AccessDeniedException` on `transcribe:StartTranscriptionJob`, the `S3` upload path is already working and the remaining blocker is IAM for the local AWS identity
+- in local `s3` mode, `GET /v1/attempts/:attempt_id/audio/file` may still return `404` because the current playback route is strongest for backend-stored local files, not for audio that only lives in `S3`
 
 ## Recommended Daily Flow
 1. `make dev-backend`

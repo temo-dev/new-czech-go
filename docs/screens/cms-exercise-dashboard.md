@@ -8,19 +8,23 @@
 - [cms/components/exercise-dashboard.tsx](/Users/daniel.dev/Desktop/czech-go-system/cms/components/exercise-dashboard.tsx)
 
 ## Graph Notes
-Graph inspection shows the CMS dashboard is currently a compact single-component screen with two internal action functions:
+Graph inspection shows the CMS dashboard is currently a compact single-component screen with a few key internal action functions:
 - `loadExercises`
 - `handleSubmit`
+- `startEditing`
+- `handleDelete`
 
 This is consistent with the intended V1 shape of a thin content desk rather than a fully segmented admin product.
 
 ## Purpose
-This screen is the first CMS control surface. It lets the team inspect existing exercises and create a new `Uloha 1` draft.
+This screen is the CMS control surface for the oral-task content desk. It lets the team inspect existing exercises and create, edit, or delete drafts for all four V1 oral tasks.
 
 ## What The User Sees
 - CMS hero panel with intro copy and lightweight summary cards
-- create form for a `Uloha 1` exercise
+- task-specific form for `Uloha 1` through `Uloha 4`
 - existing exercise list
+- edit and delete actions per exercise card
+- cancel-edit state when the admin backs out of changes
 - refresh action
 - loading and error states
 
@@ -32,11 +36,15 @@ This screen is the first CMS control surface. It lets the team inspect existing 
 
 ## Actions
 - create exercise
+- update exercise
+- delete exercise
 - refresh the exercise list
 
 ## Data Dependencies
 - `GET /v1/admin/exercises`
 - `POST /v1/admin/exercises`
+- `PATCH /v1/admin/exercises/:exercise_id`
+- `DELETE /v1/admin/exercises/:exercise_id`
 
 ## Main States
 - loading
@@ -45,11 +53,11 @@ This screen is the first CMS control surface. It lets the team inspect existing 
 - loaded
 
 ## Current Limitations
-- no dedicated edit page
+- edit happens inline in the same dashboard form, not in a dedicated detail screen
 - no publish/archive controls in UI
 - no asset upload UI
 - admin auth is a local hard-coded token
 - the summary cards are static product cues, not analytics backed by a metrics model
 
 ## Next Step
-Add edit support and task-specific forms so the CMS can manage all four oral task types.
+Add asset upload plus richer content preview so the inline dashboard can stay useful without becoming bloated.

@@ -1,0 +1,48 @@
+services:
+  proxy:
+    image: nginxproxy/nginx-proxy:alpine
+    container_name: proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      ENABLE_IPV6: "false"
+      SSL_POLICY: Mozilla-Modern
+      TZ: ${TZ:-Europe/Prague}
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - certs:/etc/nginx/certs
+      - html:/usr/share/nginx/html
+      - vhost:/etc/nginx/vhost.d
+    restart: unless-stopped
+    networks:
+      - proxy
+
+  acme:
+    image: nginxproxy/acme-companion
+    container_name: acme
+    depends_on:
+      - proxy
+    environment:
+      DEFAULT_EMAIL: ${LE_EMAIL}
+      NGINX_PROXY_CONTAINER: proxy
+      TZ: ${TZ:-Europe/Prague}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - certs:/etc/nginx/certs
+      - html:/usr/share/nginx/html
+      - acme:/etc/acme.sh
+      - vhost:/etc/nginx/vhost.d
+    restart: unless-stopped
+    networks:
+      - proxy
+
+volumes:
+  certs:
+  html:
+  acme:
+  vhost:
+
+networks:
+  proxy:
+    name: ${PROXY_NETWORK}

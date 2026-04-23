@@ -26,6 +26,7 @@ That is acceptable for the first slice, but it will likely want extraction once 
 This screen renders one exercise and drives the first speaking attempt flow.
 
 ## What The User Sees
+- recent-attempt summary cards on the learner shell before entering a module
 - exercise type
 - learner instruction
 - prompt questions for `Uloha 1` in separate card rows
@@ -35,9 +36,15 @@ This screen renders one exercise and drives the first speaking attempt flow.
 - progress bar against the current recording timer
 - action buttons for start and stop
 - local recording file status after capture starts or finishes
+- local playback controls for the just-recorded file before the next retry
 - transcript and feedback result card when the attempt completes
-- uploaded audio metadata card inside the result state
+- uploaded audio metadata plus backend playback card inside the result state
 - grouped feedback sections for strengths, improvements, and retry guidance
+- a dedicated `Repair and shadowing` block after completed attempts
+- pending review state while the backend is still generating the repair artifact
+- corrected transcript, model answer, diff hints, and speaking-focus cards when the review artifact is ready
+- backend-backed playback for the model-answer audio used for shadowing
+- a `Retry with this model` CTA that clears the completed result and returns the learner to the same exercise in a fresh `ready` state
 
 ## Visual Direction
 - single-task learner screen with generous whitespace
@@ -49,14 +56,19 @@ This screen renders one exercise and drives the first speaking attempt flow.
 ## Actions
 - start practice
 - stop and analyze
+- retry with this model
 
 ## Data Dependencies
+- `GET /v1/attempts`
 - `GET /v1/exercises/:exercise_id`
 - `POST /v1/attempts`
 - `POST /v1/attempts/:attempt_id/recording-started`
 - `POST /v1/attempts/:attempt_id/upload-url`
 - `POST /v1/attempts/:attempt_id/upload-complete`
 - `GET /v1/attempts/:attempt_id`
+- `GET /v1/attempts/:attempt_id/audio/file`
+- `GET /v1/attempts/:attempt_id/review`
+- `GET /v1/attempts/:attempt_id/review/audio/file`
 
 ## Main States
 - ready
@@ -73,7 +85,11 @@ This screen renders one exercise and drives the first speaking attempt flow.
 - transcript is mocked
 - result polling assumes a simple success path
 - the timer still depends on the UI ticker rather than measured recorder duration
-- there is no playback control for the recorded file yet
+- remote attempt playback now downloads the completed-attempt audio into app temp storage before playback, because direct authenticated URL playback was not reliable on iOS
+- cloud-backed remote attempt playback may still need a provider-aware implementation once audio no longer resolves through backend-local storage
+- recent-attempt history currently opens the exercise again rather than a dedicated attempt-detail screen
+- the new review block is currently strongest for `Uloha 1`; `Uloha 2` is planned next and `Uloha 3/4` are still out of this first coaching slice
+- review-audio playback now uses the same temp-file caching pattern as completed-attempt audio, so provider-aware cloud replay for review audio is still a later refinement
 
 ## Next Step
-Keep the local recording flow, then replace the dev-host binary upload target with durable storage and real transcript processing.
+Keep the retry loop on the same screen, then add a compare view in history so a new attempt can be read against the previous review artifact later.

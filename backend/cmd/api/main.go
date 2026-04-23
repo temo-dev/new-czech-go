@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/danieldev/czech-go-system/backend/internal/httpapi"
+	"github.com/danieldev/czech-go-system/backend/internal/processing"
 	"github.com/danieldev/czech-go-system/backend/internal/store"
 )
 
@@ -15,8 +17,42 @@ func main() {
 		addr = ":8080"
 	}
 
-	repo := store.NewMemoryStore()
-	handler := httpapi.NewServer(repo)
+	var attemptStore store.AttemptStore
+	var exerciseStore store.ExerciseStore
+	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+		persistentAttemptStore, err := store.NewPostgresAttemptStore(databaseURL)
+		if err != nil {
+			log.Fatalf("could not initialize postgres attempt store: %v", err)
+		}
+		persistentExerciseStore, err := store.NewPostgresExerciseStore(databaseURL)
+		if err != nil {
+			log.Fatalf("could not initialize postgres exercise store: %v", err)
+		}
+		attemptStore = persistentAttemptStore
+		exerciseStore = persistentExerciseStore
+		log.Printf("attempt and exercise persistence enabled with Postgres")
+	}
+
+	repo := store.NewMemoryStoreWithStores(attemptStore, exerciseStore)
+	transcriber, err := processing.NewConfiguredTranscriber(context.Background())
+	if err != nil {
+		log.Fatalf("could not configure transcriber: %v", err)
+	}
+	if provider := processing.ConfiguredTranscriberProvider(); provider == "dev" {
+		log.Printf("warning: backend is using synthetic transcript mode; transcript and feedback will not reflect the learner's real audio. Set ATTEMPT_UPLOAD_PROVIDER=s3, TRANSCRIBER_PROVIDER=amazon_transcribe, and REQUIRE_REAL_TRANSCRIPT=true for real transcript testing.")
+	} else {
+		log.Printf("transcriber provider enabled: %s", provider)
+	}
+	ttsProvider, err := processing.NewConfiguredTTSProvider()
+	if err != nil {
+		log.Fatalf("could not configure tts provider: %v", err)
+	}
+	log.Printf("tts provider enabled: %s", processing.ConfiguredTTSProvider())
+	uploadProvider, err := httpapi.NewConfiguredUploadTargetProvider(context.Background())
+	if err != nil {
+		log.Fatalf("could not configure upload target provider: %v", err)
+	}
+	handler := httpapi.NewServer(repo, processing.NewProcessor(repo, transcriber, ttsProvider), uploadProvider)
 
 	log.Printf("backend listening on %s", addr)
 	if err := http.ListenAndServe(addr, handler); err != nil {

@@ -17,11 +17,13 @@ Use this index when you want to orient quickly in the docs tree and choose the r
 Start here if you want to understand what we are building and why.
 
 - [Idea One-Pager](/Users/daniel.dev/Desktop/czech-go-system/docs/ideas/a2-mluveni-sprint.md)
+- [Attempt Repair And Shadowing](/Users/daniel.dev/Desktop/czech-go-system/docs/ideas/attempt-repair-and-shadowing.md)
 
 ### 2. Delivery Plan
 Read this next if you want the execution order and scope breakdown.
 
 - [Implementation Plan](/Users/daniel.dev/Desktop/czech-go-system/docs/plans/v1-implementation-plan.md)
+- [Attempt Repair And Shadowing Plan](/Users/daniel.dev/Desktop/czech-go-system/docs/plans/attempt-repair-and-shadowing-plan.md)
 
 ### 3. Technical Source Of Truth
 Read these when you need stable implementation contracts.
@@ -31,6 +33,11 @@ Read these when you need stable implementation contracts.
 - [Attempt State Machine](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/attempt-state-machine.md)
 - [Infrastructure Baseline](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/infrastructure-baseline.md)
 - [Scoring Pipeline](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/scoring-pipeline.md)
+
+### 3b. Build-Ready Extension Specs
+Read these when you are preparing the next major feature slice but do not want to blur today’s shipped contracts.
+
+- [Attempt Repair And Shadowing Spec](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/attempt-repair-and-shadowing.md)
 
 ### 4. Architecture Layer
 Read these when you want a graph-backed view of the codebase and refactor priorities.
@@ -64,6 +71,7 @@ Read these when you want UI-level behavior for Flutter and CMS.
 Read this when you want the fastest repeatable way to run the local stack.
 
 - [Dev Workflow](/Users/daniel.dev/Desktop/czech-go-system/docs/dev-workflow.md)
+- [CI And Release](/Users/daniel.dev/Desktop/czech-go-system/docs/ci-release.md)
 
 ## Docs Tree
 - `docs/ideas/` product direction and one-pagers

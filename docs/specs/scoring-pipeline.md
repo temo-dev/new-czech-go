@@ -360,6 +360,10 @@ Examples:
 - `O bai nay, hay noi ro ban chon phuong an nao truoc`
 - `Hay nhac den ca 4 tranh theo dung thu tu`
 
+Current implementation note:
+- `Uloha 1` retry advice is now tied to the actual missing criterion, such as answering directly, staying on topic, or adding a `protoze` detail.
+- `Uloha 2` retry advice is now tied to question-form coverage, required info slots, and whether the learner added a natural extra question.
+
 ## Stage 8: Sample Answer Handling
 Goal: optionally attach a model answer without making it feel like the learner must match it word-for-word.
 
@@ -474,6 +478,12 @@ Fallback options:
 - template-based feedback from rule results only
 - reduced grammar feedback with generic but safe wording
 - omit rewritten example if confidence is too low
+
+Current implementation note:
+- the repo still uses the template-based rule path only
+- `Uloha 1` summaries now mention the active topic label when it is available
+- `Uloha 2` summaries now mention the scenario title when it is available
+- `Uloha 3` and `Uloha 4` still use the more generic fallback summary path and are the next refinement target
 
 Fallback should still aim to produce:
 - `overall_summary`

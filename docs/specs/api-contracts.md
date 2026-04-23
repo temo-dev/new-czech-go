@@ -32,8 +32,11 @@ This spec does not yet cover:
 
 Current dev implementation note:
 - the learner still requests an upload target through `POST /v1/attempts/:attempt_id/upload-url`
-- the backend currently returns a same-host authenticated `PUT` target for local development
-- this keeps the client flow aligned with the future presigned-upload shape without forcing S3 into V1 yet
+- the backend can return either a same-host authenticated `PUT` target for local development or an `S3` presigned `PUT` target when `ATTEMPT_UPLOAD_PROVIDER=s3`
+- the client upload contract stays the same in both modes: the learner app receives `method`, `url`, `headers`, and `storage_key`
+- `POST /v1/attempts/:attempt_id/upload-complete` must match the `storage_key` from the most recently issued upload target for that attempt
+- transcript payloads now include provenance metadata so the learner app can distinguish synthetic dev transcripts from real provider transcripts
+- the learner-coaching slice now persists backend review artifacts for completed `Uloha 1` attempts and exposes learner-authenticated review endpoints for artifact fetch plus review-audio playback
 
 ## Common Conventions
 
@@ -243,6 +246,9 @@ Returns full learner-facing exercise detail.
 }
 ```
 
+## GET /v1/exercises/:exercise_id/assets/:asset_id/file
+Returns one learner-visible prompt asset file for the exercise, such as a `Uloha 3` story image or a `Uloha 4` choice image.
+
 ## Attempt Endpoints
 
 ## POST /v1/attempts
@@ -371,8 +377,7 @@ Returns current attempt status. Used for polling while transcription and scoring
       "sample_rate_hz": 44100,
       "channels": 1,
       "file_size_bytes": 182044
-    },
-    "recording_uploaded_at": "2026-04-21T08:31:01Z"
+    }
   },
   "meta": {}
 }
@@ -396,7 +401,9 @@ Returns current attempt status. Used for polling while transcription and scoring
     "transcript": {
       "full_text": "Mne se libi teple pocasi, protoze muzu byt venku.",
       "locale": "cs-CZ",
-      "confidence": 0.92
+      "confidence": 0.92,
+      "provider": "amazon_transcribe",
+      "is_synthetic": false
     },
     "feedback": {
       "readiness_level": "almost_ready",
@@ -420,6 +427,9 @@ Returns current attempt status. Used for polling while transcription and scoring
       "retry_advice": [
         "Thu tra loi lai voi 1 ly do cu the"
       ]
+    },
+    "review_artifact": {
+      "status": "pending"
     }
   },
   "meta": {}
@@ -438,6 +448,131 @@ Returns current attempt status. Used for polling while transcription and scoring
   "meta": {}
 }
 ```
+
+## Review Artifact Extension
+This extension now exists at the backend-contract level for the first learner-coaching slice. The current implementation covers persisted `Uloha 1` review artifacts plus learner-authenticated fetch and review-audio playback endpoints.
+
+### Review Artifact Summary On Attempt Payload
+The main attempt payload may expose only a lightweight nested status:
+
+```json
+{
+  "review_artifact": {
+    "status": "pending",
+    "failure_code": null,
+    "generated_at": null,
+    "repair_provider": null
+  }
+}
+```
+
+Rules:
+- keep `AttemptStatus` unchanged
+- do not block the current `completed` result on review generation
+- use `review_artifact.status` values `pending`, `ready`, or `failed`
+
+## GET /v1/attempts/:attempt_id/review
+Returns the full repair-and-shadowing artifact for one learner-owned attempt.
+
+Notes:
+- if the attempt exists but no full artifact has been persisted yet, the backend returns a lightweight `pending` artifact stub
+- if an artifact exists, the backend returns the persisted corrected transcript, model answer, speaking focus items, diff chunks, and optional `tts_audio`
+
+### Response
+```json
+{
+  "data": {
+    "attempt_id": "attempt-123",
+    "status": "ready",
+    "source_transcript_text": "dobry den ja chci listek",
+    "source_transcript_provider": "amazon_transcribe",
+    "corrected_transcript_text": "Dobry den, chtel bych listek.",
+    "model_answer_text": "Dobry den, chtel bych jeden listek, prosim.",
+    "speaking_focus_items": [
+      {
+        "focus_key": "question_form",
+        "label": "Dung mau cau day du",
+        "learner_fragment": "ja chci listek",
+        "target_fragment": "chtel bych jeden listek, prosim",
+        "issue_type": "word_form",
+        "comment_vi": "Thu dung mau lich su hon de cau nghe tu nhien trong bai thi."
+      }
+    ],
+    "diff_chunks": [
+      {
+        "kind": "replaced",
+        "source_text": "ja chci listek",
+        "target_text": "chtel bych jeden listek, prosim"
+      }
+    ],
+    "tts_audio": {
+      "storage_key": "attempt-review/attempt-123/model-answer.mp3",
+      "mime_type": "audio/mpeg"
+    },
+    "repair_provider": "task_aware_repair_v1",
+    "generated_at": "2026-04-23T07:10:00Z"
+  },
+  "meta": {}
+}
+```
+
+## GET /v1/attempts/:attempt_id/review/audio/file
+Returns authenticated playback of the model-answer TTS audio when the review artifact has `tts_audio` metadata.
+
+Notes:
+- this now mirrors the current completed-attempt audio replay pattern for local-backed review audio
+- in the current slice, local/dev review audio is served from backend temp storage using the persisted `tts_audio.storage_key`
+- provider-aware replay for cloud-only review audio is still a follow-up concern
+
+## GET /v1/attempts
+Returns recent attempts for the authenticated learner, newest first.
+
+Notes:
+- learner responses should include only that learner's own attempts
+- admin responses may include the wider attempt list
+
+### Response
+```json
+{
+  "data": [
+    {
+      "id": "attempt-12",
+      "exercise_id": "exercise-uloha1-weather",
+      "status": "completed",
+      "started_at": "2026-04-22T19:48:00Z",
+      "readiness_level": "almost_ready",
+      "transcript": {
+        "full_text": "Mne se libi teple pocasi, protoze muzu byt venku.",
+        "provider": "amazon_transcribe",
+        "is_synthetic": false
+      },
+      "feedback": {
+        "overall_summary": "Ban dang o gan muc on, chi can them vai chi tiet cu the de bai noi thuyet phuc hon."
+      },
+      "review_artifact": {
+        "status": "ready"
+      }
+    }
+  ],
+  "meta": {
+    "next_cursor": null
+  }
+}
+```
+## GET /v1/attempts/:attempt_id/audio/file
+Returns the stored audio file for one uploaded or completed attempt so the learner app can replay the submitted answer from backend storage.
+
+Notes:
+- requires learner auth
+- a learner may only fetch their own attempt audio
+- local dev returns the stored file directly from backend temp storage
+- cloud-backed deployments may satisfy the same endpoint by redirecting or streaming from durable storage
+- the current Flutter learner implementation may download this file into app temp storage before playback instead of streaming the authenticated URL directly
+- local or cloud `s3` upload mode may still return `404` here until backend replay becomes provider-aware, because the current implementation is strongest when the backend also owns a local `stored_file_path`
+
+### Response
+- `200` with binary audio body
+- `Content-Type` matches the stored attempt audio mime type
 
 ## GET /v1/attempts
 Returns learner history.
@@ -651,6 +786,20 @@ Returns the full CMS editing payload for one exercise.
 ## PATCH /v1/admin/exercises/:exercise_id
 Updates common fields, detail fields, or status.
 
+## DELETE /v1/admin/exercises/:exercise_id
+Deletes one exercise from the CMS inventory.
+
+### Response
+```json
+{
+  "data": {
+    "id": "f4c09b2b-55d3-4bc1-a549-d21fa523e47b",
+    "deleted": true
+  },
+  "meta": {}
+}
+```
+
 ## POST /v1/admin/exercises/:exercise_id/assets/upload-url
 Returns a presigned upload target for exercise assets.
 
@@ -739,5 +888,5 @@ Returns the full review payload, including transcript and learner-visible feedba
 
 ## Open Questions
 - Do we want `POST /v1/auth/magic-link` later for pilot onboarding, or is email/password enough for now?
-- Should `GET /v1/attempts/:attempt_id` also return signed playback URLs, or should that be a separate endpoint?
+- Keep `GET /v1/attempts/:attempt_id/audio/file` as the playback surface, or later fold playback URLs into the attempt payload if cloud-only playback becomes simpler?
 - If `Uloha 2` is delayed in implementation, should its API contracts still ship now or be hidden until the task is active?

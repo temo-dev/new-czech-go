@@ -35,6 +35,11 @@ Read these first before making structural changes:
 - `docs/specs/infrastructure-baseline.md`
 - `docs/specs/scoring-pipeline.md`
 
+When working on the next major learner-coaching slice, also read:
+- `docs/ideas/attempt-repair-and-shadowing.md`
+- `docs/specs/attempt-repair-and-shadowing.md`
+- `docs/plans/attempt-repair-and-shadowing-plan.md`
+
 `code-review-graph` is available for this repo and should be used when documenting flows, reviewing structural changes, or checking file/entity relationships.
 
 If code and docs disagree, prefer updating code to match the documented V1 contract unless the human explicitly changes scope.
@@ -46,17 +51,21 @@ If code and docs disagree, prefer updating code to match the documented V1 contr
 - `docs/` product, planning, and technical specs
 
 ## Current Implementation Status
-The repo currently contains a first vertical slice:
-- in-memory Go backend with mock auth, content, attempts, and feedback
-- CMS screen that lists and creates `Uloha 1` exercises
-- Flutter learner shell that logs in, opens an exercise, simulates an attempt, polls result state, and renders transcript plus feedback
+The repo is now beyond the first mock-only slice.
 
-This is intentionally a contract-first slice. It does **not** yet include:
-- real audio recording upload to S3
-- real Postgres persistence
-- real Amazon Transcribe integration
-- real Amazon Polly generation pipeline
-- production scoring workers
+The implemented V1 foundation currently includes:
+- Go backend with real attempt upload flow, learner polling, transcript provenance, and task-aware feedback for `Uloha 1` and `Uloha 2`
+- opt-in `Postgres` persistence for exercises, attempts, transcripts, and feedback
+- opt-in `S3 + Amazon Transcribe` path that has already been verified end-to-end on production
+- CMS CRUD for all four oral task types
+- CMS prompt-asset upload and preview for `Uloha 3` and `Uloha 4`
+- Flutter learner flow for all four oral tasks, including recording, result rendering, recent attempts, and audio replay
+
+Important current limitations:
+- local strict real-transcript mode still depends on valid AWS credentials plus `transcribe:*` IAM on the active local identity
+- completed-attempt audio replay is strongest for backend-owned local files; provider-aware replay for cloud-only audio still needs more work
+- task-aware feedback for `Uloha 3` and `Uloha 4` is not as refined as `Uloha 1` and `Uloha 2`
+- `Attempt Repair And Shadowing` is planned and documented, but not implemented yet
 
 ## Working Rules
 - Build in thin vertical slices.
@@ -64,12 +73,14 @@ This is intentionally a contract-first slice. It does **not** yet include:
 - Prefer simple, obvious code over reusable-looking abstractions.
 - Treat docs as part of the product, not optional garnish.
 - When in doubt, make the learner flow clearer before making the infrastructure fancier.
+- Before starting a new major slice, make sure the matching idea/spec/plan docs exist and are current.
 
 ## Commands
 Use the root `Makefile` when possible:
 - `make install`
 - `make backend-run`
 - `make backend-build`
+- `make backend-test`
 - `make cms-build`
 - `make cms-lint`
 - `make flutter-analyze`
@@ -82,6 +93,10 @@ Use the root `Makefile` when possible:
 - `make dev-stop-backend`
 - `make dev-stop-cms`
 - `make dev-stop`
+- `make compose-up`
+- `make compose-down`
+- `make compose-logs`
+- `make smoke-attempt-flow`
 - `make verify`
 
 For daily local startup, prefer [docs/dev-workflow.md](/Users/daniel.dev/Desktop/czech-go-system/docs/dev-workflow.md).
@@ -132,14 +147,16 @@ If you notice adjacent cleanup, note it separately instead of silently expanding
 
 ## Good Next Steps
 Preferred sequence from the current repo state:
-1. replace mock attempt progression with real recording/upload flow
-2. persist exercises and attempts in Postgres
-3. connect transcription to Amazon Transcribe
-4. move scoring from mock payloads to the real scoring pipeline
-5. expand from `Uloha 1` to the remaining oral tasks
+1. build `Attempt Repair And Shadowing` starting from `Task 1: Define review artifact contracts`
+2. implement the first repair-and-shadowing slice for `Uloha 1`
+3. extend the same repair loop to `Uloha 2`
+4. add provider-aware replay for cloud-only stored audio artifacts where needed
+5. refine `Uloha 3` and `Uloha 4` feedback quality after the new review-artifact layer is stable
 
 ## Avoid
 - adding generic plugin systems
 - abstracting for multiple exam types
 - building a queue-heavy platform before real load exists
 - turning mock APIs into permanent hidden debt without updating the docs
+- blurring `learner transcript`, `corrected transcript`, and `model answer`
+- calling the next coaching slice a full pronunciation engine before the evidence supports that claim

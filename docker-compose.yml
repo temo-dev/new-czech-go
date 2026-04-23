@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-czech_go_system}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      API_ADDR: :8080
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-czech_go_system}?sslmode=disable
+      TRANSCRIBER_PROVIDER: ${TRANSCRIBER_PROVIDER:-dev}
+      REQUIRE_REAL_TRANSCRIPT: ${REQUIRE_REAL_TRANSCRIPT:-false}
+      ATTEMPT_UPLOAD_PROVIDER: ${ATTEMPT_UPLOAD_PROVIDER:-local}
+      TTS_PROVIDER: ${TTS_PROVIDER:-dev}
+      POLLY_VOICE_ID: ${POLLY_VOICE_ID:-Jitka}
+      POLLY_SAMPLE_RATE: ${POLLY_SAMPLE_RATE:-22050}
+      AWS_REGION: ${AWS_REGION:-}
+      AWS_PROFILE: ${AWS_PROFILE:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_SHARED_CREDENTIALS_FILE: ${AWS_SHARED_CREDENTIALS_FILE:-/root/.aws/credentials}
+      AWS_CONFIG_FILE: ${AWS_CONFIG_FILE:-/root/.aws/config}
+      AWS_EC2_METADATA_DISABLED: ${AWS_EC2_METADATA_DISABLED:-true}
+      ATTEMPT_AUDIO_S3_BUCKET: ${ATTEMPT_AUDIO_S3_BUCKET:-}
+      ATTEMPT_AUDIO_S3_PREFIX: ${ATTEMPT_AUDIO_S3_PREFIX:-attempt-audio}
+      ATTEMPT_UPLOAD_URL_TTL: ${ATTEMPT_UPLOAD_URL_TTL:-15m}
+      TRANSCRIBE_OUTPUT_BUCKET: ${TRANSCRIBE_OUTPUT_BUCKET:-}
+      TRANSCRIBE_OUTPUT_PREFIX: ${TRANSCRIBE_OUTPUT_PREFIX:-}
+      TRANSCRIBE_LANGUAGE_CODE: ${TRANSCRIBE_LANGUAGE_CODE:-cs-CZ}
+      TRANSCRIBE_POLL_INTERVAL: ${TRANSCRIBE_POLL_INTERVAL:-5s}
+      TRANSCRIBE_TIMEOUT: ${TRANSCRIBE_TIMEOUT:-2m}
+    volumes:
+      - ${HOME}/.aws:/root/.aws:ro
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+
+  cms:
+    build:
+      context: ./cms
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-http://backend:8080}
+      CMS_ADMIN_TOKEN: ${CMS_ADMIN_TOKEN:-dev-admin-token}
+      CMS_BASIC_AUTH_USER: ${CMS_BASIC_AUTH_USER:-}
+      CMS_BASIC_AUTH_PASSWORD: ${CMS_BASIC_AUTH_PASSWORD:-}
+    ports:
+      - "${CMS_PORT:-3000}:3000"
+
+volumes:
+  postgres_data:

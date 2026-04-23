@@ -49,6 +49,7 @@ User
          +-- AttemptAudio
          +-- AttemptTranscript
          +-- AttemptFeedback
+         +-- AttemptReviewArtifact
 
 Course
   |
@@ -96,6 +97,7 @@ Course
 - `internal_error`
 
 ### TranscriptSource
+- `dev_stub`
 - `amazon_transcribe`
 - `manual_override`
 
@@ -338,6 +340,46 @@ Stores the learner-visible evaluation result. This should be stable even if the 
 | `sample_answer_audio_asset_id` | `uuid` | no | Optional |
 | `scored_at` | `timestamp` | yes | Audit |
 
+## AttemptReviewArtifact
+Planned extension artifact for the post-attempt `repair and shadowing` loop.
+
+This entity should stay separate from `AttemptFeedback` so the current `completed` attempt flow remains stable even if repair generation runs slightly later.
+
+| Field | Type | Required | Notes |
+|------|------|----------|------|
+| `attempt_id` | `uuid` | yes | PK/FK to `Attempt` |
+| `status` | `string` | yes | `pending`, `ready`, `failed` |
+| `source_transcript_text` | `text` | yes | Snapshot of transcript used for repair |
+| `source_transcript_provider` | `string` | no | Example: `amazon_transcribe`, `dev_stub` |
+| `corrected_transcript_text` | `text` | no | Czech repair close to learner meaning |
+| `model_answer_text` | `text` | no | Slightly stronger answer used for shadowing |
+| `speaking_focus_items` | `SpeakingFocusItem[]` | no | Small learner-facing focus list |
+| `diff_chunks` | `DiffChunk[]` | no | Readable comparison between learner and corrected text |
+| `tts_storage_key` | `string` | no | Stored audio for the model answer |
+| `tts_mime_type` | `string` | no | Example: `audio/mpeg` |
+| `repair_provider` | `string` | no | Which repair engine generated the artifact |
+| `generated_at` | `timestamp` | no | Success audit |
+| `failed_at` | `timestamp` | no | Failure audit |
+| `failure_code` | `string` | no | Example: `repair_generation_failed` |
+
+`SpeakingFocusItem`
+| Field | Type | Required | Notes |
+|------|------|----------|------|
+| `focus_key` | `string` | yes | Stable internal key |
+| `label` | `string` | yes | Short learner-facing label |
+| `learner_fragment` | `string` | no | Learner-side fragment |
+| `target_fragment` | `string` | no | Corrected or model fragment |
+| `issue_type` | `string` | yes | Example: `word_form`, `question_form`, `missing_detail` |
+| `comment_vi` | `string` | yes | Practical explanation in Vietnamese |
+| `confidence_band` | `string` | no | `low`, `medium`, `high` |
+
+`DiffChunk`
+| Field | Type | Required | Notes |
+|------|------|----------|------|
+| `kind` | `string` | yes | `unchanged`, `inserted`, `deleted`, `replaced` |
+| `source_text` | `string` | no | Learner-side text |
+| `target_text` | `string` | no | Corrected-side text |
+
 `TaskCompletionResult`
 | Field | Type | Required | Notes |
 |------|------|----------|------|
@@ -399,6 +441,7 @@ Connects exercises and attempts to a mock exam session.
 - One `Exercise` has one active `ScoringTemplate` in V1.
 - One `User` has many `Attempt` rows.
 - One `Attempt` has exactly one `AttemptAudio`, one `AttemptTranscript`, and one `AttemptFeedback` after successful completion.
+- One `Attempt` may later have one `AttemptReviewArtifact` after the repair-and-shadowing layer runs.
 - One `MockExamSession` has many `MockExamSessionItem` rows.
 
 ## Minimum Validation Rules
@@ -478,6 +521,9 @@ This is the contract the learner app should consume. Internal scoring systems ma
       "Thu tra loi lai trong 20 giay",
       "Them 1 ly do ro rang vao moi cau"
     ]
+  },
+  "review_artifact": {
+    "status": "pending"
   }
 }
 ```

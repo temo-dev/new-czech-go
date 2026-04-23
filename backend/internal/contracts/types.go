@@ -66,21 +66,61 @@ type Uloha1Prompt struct {
 	QuestionPrompts []string `json:"question_prompts"`
 }
 
+type RequiredInfoSlot struct {
+	SlotKey        string `json:"slot_key"`
+	Label          string `json:"label"`
+	SampleQuestion string `json:"sample_question,omitempty"`
+}
+
+type Uloha2Detail struct {
+	ScenarioTitle      string             `json:"scenario_title"`
+	ScenarioPrompt     string             `json:"scenario_prompt"`
+	RequiredInfoSlots  []RequiredInfoSlot `json:"required_info_slots"`
+	CustomQuestionHint string             `json:"custom_question_hint,omitempty"`
+}
+
+type Uloha3Detail struct {
+	StoryTitle           string   `json:"story_title"`
+	ImageAssetIDs        []string `json:"image_asset_ids"`
+	NarrativeCheckpoints []string `json:"narrative_checkpoints"`
+	GrammarFocus         []string `json:"grammar_focus,omitempty"`
+}
+
+type ChoiceOption struct {
+	OptionKey    string `json:"option_key"`
+	Label        string `json:"label"`
+	ImageAssetID string `json:"image_asset_id,omitempty"`
+	Description  string `json:"description,omitempty"`
+}
+
+type Uloha4Detail struct {
+	ScenarioPrompt        string         `json:"scenario_prompt"`
+	Options               []ChoiceOption `json:"options"`
+	ExpectedReasoningAxes []string       `json:"expected_reasoning_axes,omitempty"`
+}
+
 type Attempt struct {
-	ID                  string           `json:"id"`
-	ExerciseID          string           `json:"exercise_id"`
-	ExerciseType        string           `json:"exercise_type,omitempty"`
-	Status              string           `json:"status"`
-	AttemptNo           int              `json:"attempt_no"`
-	StartedAt           string           `json:"started_at"`
-	RecordingStartedAt  string           `json:"recording_started_at,omitempty"`
-	RecordingUploadedAt string           `json:"recording_uploaded_at,omitempty"`
-	CompletedAt         string           `json:"completed_at,omitempty"`
-	FailureCode         string           `json:"failure_code,omitempty"`
-	ReadinessLevel      string           `json:"readiness_level,omitempty"`
-	Audio               *AttemptAudio    `json:"audio,omitempty"`
-	Transcript          *Transcript      `json:"transcript,omitempty"`
-	Feedback            *AttemptFeedback `json:"feedback,omitempty"`
+	ID                      string                        `json:"id"`
+	UserID                  string                        `json:"user_id,omitempty"`
+	ExerciseID              string                        `json:"exercise_id"`
+	ExerciseType            string                        `json:"exercise_type,omitempty"`
+	Status                  string                        `json:"status"`
+	AttemptNo               int                           `json:"attempt_no"`
+	StartedAt               string                        `json:"started_at"`
+	RecordingStartedAt      string                        `json:"recording_started_at,omitempty"`
+	RecordingUploadedAt     string                        `json:"recording_uploaded_at,omitempty"`
+	CompletedAt             string                        `json:"completed_at,omitempty"`
+	FailedAt                string                        `json:"failed_at,omitempty"`
+	FailureCode             string                        `json:"failure_code,omitempty"`
+	ReadinessLevel          string                        `json:"readiness_level,omitempty"`
+	ClientPlatform          string                        `json:"client_platform,omitempty"`
+	AppVersion              string                        `json:"app_version,omitempty"`
+	Audio                   *AttemptAudio                 `json:"audio,omitempty"`
+	Transcript              *Transcript                   `json:"transcript,omitempty"`
+	Feedback                *AttemptFeedback              `json:"feedback,omitempty"`
+	ReviewArtifact          *AttemptReviewArtifactSummary `json:"review_artifact,omitempty"`
+	PendingUploadStorageKey string                        `json:"-"`
+	UploadTargetIssuedAt    string                        `json:"-"`
 }
 
 type AttemptAudio struct {
@@ -94,9 +134,11 @@ type AttemptAudio struct {
 }
 
 type Transcript struct {
-	FullText   string  `json:"full_text"`
-	Locale     string  `json:"locale"`
-	Confidence float64 `json:"confidence,omitempty"`
+	FullText    string  `json:"full_text"`
+	Locale      string  `json:"locale"`
+	Confidence  float64 `json:"confidence,omitempty"`
+	Provider    string  `json:"provider,omitempty"`
+	IsSynthetic bool    `json:"is_synthetic,omitempty"`
 }
 
 type AttemptFeedback struct {
@@ -108,6 +150,50 @@ type AttemptFeedback struct {
 	GrammarFeedback GrammarFeedback `json:"grammar_feedback"`
 	RetryAdvice     []string        `json:"retry_advice"`
 	SampleAnswer    string          `json:"sample_answer_text,omitempty"`
+}
+
+type AttemptReviewArtifactSummary struct {
+	Status         string `json:"status"`
+	FailureCode    string `json:"failure_code,omitempty"`
+	GeneratedAt    string `json:"generated_at,omitempty"`
+	RepairProvider string `json:"repair_provider,omitempty"`
+}
+
+type AttemptReviewArtifact struct {
+	AttemptID                string               `json:"attempt_id"`
+	Status                   string               `json:"status"`
+	SourceTranscriptText     string               `json:"source_transcript_text"`
+	SourceTranscriptProvider string               `json:"source_transcript_provider,omitempty"`
+	CorrectedTranscriptText  string               `json:"corrected_transcript_text,omitempty"`
+	ModelAnswerText          string               `json:"model_answer_text,omitempty"`
+	SpeakingFocusItems       []SpeakingFocusItem  `json:"speaking_focus_items,omitempty"`
+	DiffChunks               []DiffChunk          `json:"diff_chunks,omitempty"`
+	TTSAudio                 *ReviewArtifactAudio `json:"tts_audio,omitempty"`
+	RepairProvider           string               `json:"repair_provider,omitempty"`
+	GeneratedAt              string               `json:"generated_at,omitempty"`
+	FailedAt                 string               `json:"failed_at,omitempty"`
+	FailureCode              string               `json:"failure_code,omitempty"`
+}
+
+type SpeakingFocusItem struct {
+	FocusKey        string `json:"focus_key"`
+	Label           string `json:"label"`
+	LearnerFragment string `json:"learner_fragment,omitempty"`
+	TargetFragment  string `json:"target_fragment,omitempty"`
+	IssueType       string `json:"issue_type"`
+	CommentVI       string `json:"comment_vi"`
+	ConfidenceBand  string `json:"confidence_band,omitempty"`
+}
+
+type DiffChunk struct {
+	Kind       string `json:"kind"`
+	SourceText string `json:"source_text,omitempty"`
+	TargetText string `json:"target_text,omitempty"`
+}
+
+type ReviewArtifactAudio struct {
+	StorageKey string `json:"storage_key"`
+	MimeType   string `json:"mime_type"`
 }
 
 type TaskCompletion struct {

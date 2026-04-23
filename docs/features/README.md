@@ -14,6 +14,9 @@ Use feature docs to answer:
 
 ## Current Feature Docs
 - [Uloha 1 Practice](/Users/daniel.dev/Desktop/czech-go-system/docs/features/uloha-1-practice.md)
+- [Uloha 2 Dialogue Practice](/Users/daniel.dev/Desktop/czech-go-system/docs/features/uloha-2-dialogue-practice.md)
+- [Uloha 3 Story Practice](/Users/daniel.dev/Desktop/czech-go-system/docs/features/uloha-3-story-practice.md)
+- [Uloha 4 Choice Practice](/Users/daniel.dev/Desktop/czech-go-system/docs/features/uloha-4-choice-practice.md)
 - [CMS Exercise Management](/Users/daniel.dev/Desktop/czech-go-system/docs/features/cms-exercise-management.md)
 - [Attempt Lifecycle And Feedback](/Users/daniel.dev/Desktop/czech-go-system/docs/features/attempt-lifecycle-and-feedback.md)
 
