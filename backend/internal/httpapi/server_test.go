@@ -20,7 +20,7 @@ import (
 
 func TestUploadURLUsesLocalUploadProviderByDefault(t *testing.T) {
 	repo := store.NewMemoryStore()
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestUploadURLUsesLocalUploadProviderByDefault(t *testing.T) {
 
 func TestUploadURLUsesInjectedProviderContract(t *testing.T) {
 	repo := store.NewMemoryStore()
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestUploadURLUsesInjectedProviderContract(t *testing.T) {
 
 func TestUploadCompleteRejectsWithoutIssuedTarget(t *testing.T) {
 	repo := store.NewMemoryStore()
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestUploadCompleteRejectsWithoutIssuedTarget(t *testing.T) {
 
 func TestUploadCompleteRejectsMismatchedStorageKey(t *testing.T) {
 	repo := store.NewMemoryStore()
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestUploadCompleteRejectsMismatchedStorageKey(t *testing.T) {
 
 func TestUploadCompleteUsesIssuedStorageKeyWhenBodyOmitsIt(t *testing.T) {
 	repo := store.NewMemoryStore()
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestUploadCompleteUsesIssuedStorageKeyWhenBodyOmitsIt(t *testing.T) {
 
 func TestLocalBinaryUploadUsesExpectedFileExtensionForAudioMP4(t *testing.T) {
 	repo := store.NewMemoryStore()
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestLocalBinaryUploadUsesExpectedFileExtensionForAudioMP4(t *testing.T) {
 
 func TestLearnerCanFetchCompletedAttemptAudioFile(t *testing.T) {
 	repo := store.NewMemoryStore()
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -297,7 +297,7 @@ func TestLearnerCanFetchCompletedAttemptAudioFile(t *testing.T) {
 
 func TestLearnerCanFetchPendingAttemptReviewArtifact(t *testing.T) {
 	repo := store.NewMemoryStore()
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -338,7 +338,7 @@ func TestLearnerCanFetchPendingAttemptReviewArtifact(t *testing.T) {
 
 func TestLearnerCanFetchReadyAttemptReviewArtifact(t *testing.T) {
 	repo := store.NewMemoryStore()
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -397,7 +397,7 @@ func TestLearnerCanFetchReadyAttemptReviewArtifact(t *testing.T) {
 
 func TestAttemptReviewRequiresOwnership(t *testing.T) {
 	repo := store.NewMemoryStore()
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -448,7 +448,7 @@ func TestAttemptReviewNotFoundForMissingAttempt(t *testing.T) {
 
 func TestLearnerCanFetchAttemptReviewAudioFile(t *testing.T) {
 	repo := store.NewMemoryStore()
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -507,7 +507,7 @@ func TestLearnerCanFetchAttemptReviewAudioFile(t *testing.T) {
 
 func TestAttemptReviewAudioReturnsNotFoundWithoutTTSAudio(t *testing.T) {
 	repo := store.NewMemoryStore()
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -544,16 +544,16 @@ func TestAttemptReviewAudioReturnsNotFoundWithoutTTSAudio(t *testing.T) {
 func TestListAttemptsReturnsOnlyCurrentLearnerAndNewestFirst(t *testing.T) {
 	repo := store.NewMemoryStore()
 
-	first, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	first, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
 	time.Sleep(10 * time.Millisecond)
-	second, err := repo.CreateAttempt("user-learner-1", "exercise-uloha2-cinema", "ios", "0.1.0")
+	second, err := repo.CreateAttempt("user-learner-1", "exercise-uloha2-cinema", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
-	if _, err := repo.CreateAttempt("user-learner-2", "exercise-uloha1-weather", "ios", "0.1.0"); err != nil {
+	if _, err := repo.CreateAttempt("user-learner-2", "exercise-uloha1-weather", "ios", "0.1.0", "vi"); err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
 

@@ -28,7 +28,7 @@ type Server struct {
 
 func NewServer(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider) http.Handler {
 	if processor == nil {
-		processor = processing.NewProcessor(repo, nil, nil)
+		processor = processing.NewProcessor(repo, nil, nil, nil, nil)
 	}
 	if uploadProvider == nil {
 		uploadProvider = NewLocalUploadTargetProvider()
@@ -183,6 +183,7 @@ func (s *Server) handleAttempts(w http.ResponseWriter, r *http.Request, user con
 			ExerciseID     string `json:"exercise_id"`
 			ClientPlatform string `json:"client_platform"`
 			AppVersion     string `json:"app_version"`
+			Locale         string `json:"locale"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ExerciseID == "" {
 			writeError(w, http.StatusBadRequest, "validation_error", "Exercise ID is required.", false)
@@ -192,7 +193,12 @@ func (s *Server) handleAttempts(w http.ResponseWriter, r *http.Request, user con
 		if clientPlatform == "" {
 			clientPlatform = "unknown"
 		}
-		attempt, err := s.repo.CreateAttempt(user.ID, req.ExerciseID, clientPlatform, req.AppVersion)
+		locale, ok := contracts.NormalizeLocale(req.Locale)
+		if !ok {
+			writeError(w, http.StatusBadRequest, "invalid_locale", "Unsupported locale.", false)
+			return
+		}
+		attempt, err := s.repo.CreateAttempt(user.ID, req.ExerciseID, clientPlatform, req.AppVersion, locale)
 		if err != nil {
 			writeError(w, http.StatusNotFound, "not_found", "Exercise not found.", false)
 			return

@@ -48,11 +48,20 @@ func main() {
 		log.Fatalf("could not configure tts provider: %v", err)
 	}
 	log.Printf("tts provider enabled: %s", processing.ConfiguredTTSProvider())
+	llmProvider, err := processing.NewConfiguredLLMFeedbackProvider()
+	if err != nil {
+		log.Fatalf("could not configure llm feedback provider: %v", err)
+	}
+	log.Printf("llm feedback provider enabled: %s", processing.ConfiguredLLMFeedbackProvider())
+	reviewProvider, err := processing.NewConfiguredLLMReviewProvider()
+	if err != nil {
+		log.Fatalf("could not configure llm review provider: %v", err)
+	}
 	uploadProvider, err := httpapi.NewConfiguredUploadTargetProvider(context.Background())
 	if err != nil {
 		log.Fatalf("could not configure upload target provider: %v", err)
 	}
-	handler := httpapi.NewServer(repo, processing.NewProcessor(repo, transcriber, ttsProvider), uploadProvider)
+	handler := httpapi.NewServer(repo, processing.NewProcessor(repo, transcriber, ttsProvider, llmProvider, reviewProvider), uploadProvider)
 
 	log.Printf("backend listening on %s", addr)
 	if err := http.ListenAndServe(addr, handler); err != nil {

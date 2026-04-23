@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 
-// Headlines: PlayfairDisplay (serif italic) — replaces EBGaramond from lib_demo
-// Body/labels: system sans — Manrope to be added in Phase 6
 abstract final class AppFonts {
   static const headline = 'PlayfairDisplay';
-  static const body     = null; // system sans until Manrope added
+  static const body     = null;
 }
 
 abstract final class AppTypography {

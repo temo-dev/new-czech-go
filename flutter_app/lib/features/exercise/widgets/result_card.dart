@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../../../shared/widgets/diff_block.dart';
 import '../../../shared/widgets/feedback_card.dart';
@@ -29,6 +30,7 @@ class ResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final feedback = result.feedback;
+    final l = AppLocalizations.of(context);
 
     return Container(
       width: double.infinity,
@@ -43,7 +45,7 @@ class ResultCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text('Kết quả', style: AppTypography.titleLarge),
+              Text(l.resultTitle, style: AppTypography.titleLarge),
               const Spacer(),
               if (result.transcriptIsSynthetic)
                 Container(
@@ -56,7 +58,7 @@ class ResultCard extends StatelessWidget {
                     borderRadius: AppRadius.fullAll,
                   ),
                   child: Text(
-                    'TRANSCRIPT GIẢ LẬP',
+                    l.pillSyntheticTranscript,
                     style: AppTypography.labelUppercase.copyWith(
                       color: AppColors.warning,
                     ),
@@ -68,7 +70,7 @@ class ResultCard extends StatelessWidget {
 
           // Transcript
           if (result.transcript?.isNotEmpty == true) ...[
-            Text('Transcript của bạn', style: AppTypography.titleSmall),
+            Text(l.resultTranscriptTitle, style: AppTypography.titleSmall),
             const SizedBox(height: AppSpacing.x2),
             Container(
               width: double.infinity,
@@ -99,7 +101,7 @@ class ResultCard extends StatelessWidget {
           if (feedback != null) ...[
             if (feedback.readinessLevel.isNotEmpty) ...[
               Text(
-                feedback.readinessLevel.toUpperCase(),
+                _readinessLabel(l, feedback.readinessLevel),
                 style: AppTypography.labelUppercase.copyWith(
                   color: AppColors.primary,
                 ),
@@ -112,7 +114,7 @@ class ResultCard extends StatelessWidget {
             ],
             if (feedback.strengths.isNotEmpty) ...[
               FeedbackCard(
-                title: 'Điểm mạnh',
+                title: l.resultStrengthsTitle,
                 items: feedback.strengths,
                 tone: FeedbackTone.success,
               ),
@@ -120,7 +122,7 @@ class ResultCard extends StatelessWidget {
             ],
             if (feedback.improvements.isNotEmpty) ...[
               FeedbackCard(
-                title: 'Cần cải thiện',
+                title: l.resultImprovementsTitle,
                 items: feedback.improvements,
                 tone: FeedbackTone.primary,
               ),
@@ -128,14 +130,14 @@ class ResultCard extends StatelessWidget {
             ],
             if (feedback.retryAdvice.isNotEmpty) ...[
               FeedbackCard(
-                title: 'Lời khuyên cho lần sau',
+                title: l.resultRetryAdviceTitle,
                 items: feedback.retryAdvice,
                 tone: FeedbackTone.info,
               ),
               const SizedBox(height: AppSpacing.x3),
             ],
             if (feedback.sampleAnswer.isNotEmpty) ...[
-              Text('Câu trả lời mẫu', style: AppTypography.titleSmall),
+              Text(l.resultSampleAnswerTitle, style: AppTypography.titleSmall),
               const SizedBox(height: AppSpacing.x2),
               Container(
                 width: double.infinity,
@@ -165,7 +167,7 @@ class ResultCard extends StatelessWidget {
 
           // Retry CTA
           PrimaryButton(
-            label: 'Thử lại bài này',
+            label: l.resultRetryCta,
             icon: Icons.refresh,
             onPressed: onRetry,
           ),
@@ -235,14 +237,15 @@ class _ReviewArtifactSectionState extends State<_ReviewArtifactSection> {
   @override
   Widget build(BuildContext context) {
     final artifact = _artifact;
+    final l = AppLocalizations.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Sửa & luyện theo mẫu', style: AppTypography.titleMedium),
+        Text(l.reviewArtifactTitle, style: AppTypography.titleMedium),
         const SizedBox(height: AppSpacing.x2),
         Text(
-          'Bản gốc, bản đã sửa, và bản mẫu để shadow theo.',
+          l.reviewArtifactSubtitle,
           style: AppTypography.bodySmall.copyWith(
             color: AppColors.onSurfaceVariant,
           ),
@@ -252,34 +255,44 @@ class _ReviewArtifactSectionState extends State<_ReviewArtifactSection> {
           const Center(child: CircularProgressIndicator())
         else if (_error != null && artifact == null)
           _StatusBlock(
-            title: 'Không tải được review',
+            title: l.reviewLoadError,
             body: _error!,
             isError: true,
           )
         else if (artifact == null || artifact.isPending)
-          const _StatusBlock(
-            title: 'Đang tạo bản sửa và audio mẫu...',
-            body: 'Bạn vẫn có thể đọc feedback phía trên trong lúc chờ.',
+          const _PendingBlock()
+        else if (artifact.isNotApplicable)
+          _StatusBlock(
+            title: l.reviewNotApplicableTitle,
+            body: l.reviewNotApplicableBody,
             isError: false,
           )
         else if (artifact.isFailed)
           _StatusBlock(
-            title: 'Review artifact gặp lỗi',
+            title: l.reviewFailedTitle,
             body: artifact.failureCode.isEmpty
-                ? 'Backend chưa tạo được bản sửa.'
-                : 'failure_code: ${artifact.failureCode}',
+                ? l.reviewFailedBodyUnknown
+                : l.reviewFailedBodyCode(artifact.failureCode),
             isError: true,
           )
         else ...[
-          _TextBlock(title: 'Transcript của bạn', body: _sourceText(artifact)),
+          _TextBlock(title: l.reviewSourceTitle, body: _sourceText(context, artifact)),
           const SizedBox(height: AppSpacing.x3),
           _TextBlock(
-            title: 'Bạn nên nói',
+            title: l.reviewCorrectedTitle,
             body: artifact.correctedTranscriptText,
             highlight: true,
           ),
           const SizedBox(height: AppSpacing.x3),
-          _TextBlock(title: 'Bản mẫu để shadow', body: artifact.modelAnswerText),
+          _TextBlock(title: l.reviewModelTitle, body: artifact.modelAnswerText),
+          if (artifact.ttsAudio != null) ...[
+            const SizedBox(height: AppSpacing.x3),
+            ReviewAudioPlaybackCard(
+              client: widget.client,
+              attemptId: widget.result.id,
+              audio: artifact.ttsAudio!,
+            ),
+          ],
           if (artifact.diffChunks.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.x3),
             DiffBlock(chunks: artifact.diffChunks),
@@ -289,11 +302,20 @@ class _ReviewArtifactSectionState extends State<_ReviewArtifactSection> {
     );
   }
 
-  String _sourceText(AttemptReviewArtifactView a) =>
+  String _sourceText(BuildContext context, AttemptReviewArtifactView a) =>
       a.sourceTranscriptText.isEmpty
-          ? (widget.result.transcript ?? 'Transcript chưa sẵn sàng.')
+          ? (widget.result.transcript ??
+              AppLocalizations.of(context).reviewSourceFallback)
           : a.sourceTranscriptText;
 }
+
+String _readinessLabel(AppLocalizations l, String level) => switch (level) {
+      'ready_for_mock' || 'exam_ready' => l.pillReadinessReady,
+      'almost_ready' => l.pillReadinessAlmost,
+      'needs_work' => l.pillReadinessNeedsWork,
+      'not_ready' => l.pillReadinessNotReady,
+      _ => level.toUpperCase(),
+    };
 
 class _TextBlock extends StatelessWidget {
   const _TextBlock({
@@ -325,6 +347,52 @@ class _TextBlock extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.x2),
           Text(body, style: AppTypography.bodyMedium),
+        ],
+      ),
+    );
+  }
+}
+
+class _PendingBlock extends StatelessWidget {
+  const _PendingBlock();
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.x4),
+      decoration: BoxDecoration(
+        color: AppColors.infoContainer,
+        borderRadius: AppRadius.mdAll,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: AppSpacing.x3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l.reviewPendingTitle,
+                  style: AppTypography.titleSmall.copyWith(
+                    color: AppColors.info,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.x1),
+                Text(
+                  l.reviewPendingBody,
+                  style: AppTypography.bodySmall,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

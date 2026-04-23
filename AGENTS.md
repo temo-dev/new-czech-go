@@ -40,6 +40,11 @@ When working on the next major learner-coaching slice, also read:
 - `docs/specs/attempt-repair-and-shadowing.md`
 - `docs/plans/attempt-repair-and-shadowing-plan.md`
 
+When working on the i18n slice, also read:
+- `docs/ideas/i18n-multi-language-support.md`
+- `docs/specs/i18n-spec.md`
+- `docs/plans/i18n-implementation-plan.md`
+
 `code-review-graph` is available for this repo and should be used when documenting flows, reviewing structural changes, or checking file/entity relationships.
 
 If code and docs disagree, prefer updating code to match the documented V1 contract unless the human explicitly changes scope.
@@ -54,18 +59,22 @@ If code and docs disagree, prefer updating code to match the documented V1 contr
 The repo is now beyond the first mock-only slice.
 
 The implemented V1 foundation currently includes:
-- Go backend with real attempt upload flow, learner polling, transcript provenance, and task-aware feedback for `Uloha 1` and `Uloha 2`
+- Go backend with real attempt upload flow, learner polling, transcript provenance, and task-aware feedback for all four oral task types
 - opt-in `Postgres` persistence for exercises, attempts, transcripts, and feedback
 - opt-in `S3 + Amazon Transcribe` path that has already been verified end-to-end on production
+- opt-in `LLMFeedbackProvider` backed by Claude (`LLM_PROVIDER=claude`, `ANTHROPIC_API_KEY`); falls back to rule-based feedback automatically on error or when unset
+- opt-in `LLMReviewProvider` that generates corrected transcript + model answer per exercise + learner response (`LLM_REVIEW_PROVIDER`, falls back to `LLM_PROVIDER` then to echo)
+- opt-in `Amazon Polly` TTS for model-answer audio in review artifacts (`TTS_PROVIDER=amazon_polly`)
 - CMS CRUD for all four oral task types
 - CMS prompt-asset upload and preview for `Uloha 3` and `Uloha 4`
-- Flutter learner flow for all four oral tasks, including recording, result rendering, recent attempts, and audio replay
+- Flutter learner flow for all four oral tasks: recording with split Stop/Analyze, dedicated `AnalysisScreen` spinner, result rendering, recent attempts, audio replay, review artifact display with TTS audio playback
+- Flutter i18n (Vietnamese + English) via ARB + generated `AppLocalizations`, with in-app locale selector persisted via `SharedPreferences`
+- Flutter bottom navigation with separate `Home` and `History` tabs
 
 Important current limitations:
 - local strict real-transcript mode still depends on valid AWS credentials plus `transcribe:*` IAM on the active local identity
 - completed-attempt audio replay is strongest for backend-owned local files; provider-aware replay for cloud-only audio still needs more work
 - task-aware feedback for `Uloha 3` and `Uloha 4` is not as refined as `Uloha 1` and `Uloha 2`
-- `Attempt Repair And Shadowing` is planned and documented, but not implemented yet
 
 ## Working Rules
 - Build in thin vertical slices.
@@ -147,11 +156,10 @@ If you notice adjacent cleanup, note it separately instead of silently expanding
 
 ## Good Next Steps
 Preferred sequence from the current repo state:
-1. build `Attempt Repair And Shadowing` starting from `Task 1: Define review artifact contracts`
-2. implement the first repair-and-shadowing slice for `Uloha 1`
-3. extend the same repair loop to `Uloha 2`
-4. add provider-aware replay for cloud-only stored audio artifacts where needed
-5. refine `Uloha 3` and `Uloha 4` feedback quality after the new review-artifact layer is stable
+1. add provider-aware replay for cloud-only stored audio artifacts
+2. refine `Uloha 3` and `Uloha 4` task-aware feedback to match `Uloha 1` / `Uloha 2` quality
+3. tighten LLM prompt and schema coverage for shadowing on `Uloha 3` (story ordering) and `Uloha 4` (choice reasoning)
+4. expand i18n coverage to any remaining untranslated strings and add the next learner-locale if scope changes
 
 ## Avoid
 - adding generic plugin systems

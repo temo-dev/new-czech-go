@@ -1,27 +1,50 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/api/api_client.dart';
-import 'core/router/app_router.dart';
+import 'core/locale/locale_provider.dart';
+import 'core/locale/locale_scope.dart';
 import 'core/theme/app_theme.dart';
+import 'l10n/generated/app_localizations.dart';
 import 'features/exercise/screens/exercise_screen.dart' as exercise_feature;
+import 'features/history/screens/history_screen.dart';
 import 'features/home/screens/home_screen.dart';
 import 'models/models.dart';
+import 'shared/widgets/app_bottom_nav.dart';
 
-void main() {
-  runApp(const MluveniSprintApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final localeProvider = await LocaleProvider.load();
+  runApp(MluveniSprintApp(localeProvider: localeProvider));
 }
 
 class MluveniSprintApp extends StatelessWidget {
-  const MluveniSprintApp({super.key});
+  const MluveniSprintApp({super.key, required this.localeProvider});
+
+  final LocaleProvider localeProvider;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'A2 Mluveni Sprint',
-      theme: AppTheme.light,
-      routerConfig: appRouter,
+    return LocaleScope(
+      notifier: localeProvider,
+      child: AnimatedBuilder(
+        animation: localeProvider,
+        builder: (context, _) => MaterialApp(
+          title: 'A2 Mluveni Sprint',
+          theme: AppTheme.light,
+          home: const LearnerShell(),
+          locale: Locale(localeProvider.code),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+        ),
+      ),
     );
   }
 }
@@ -41,6 +64,7 @@ class _LearnerShellState extends State<LearnerShell> {
   List<ModuleSummary> _modules = const [];
   Map<String, List<ExerciseSummary>> _exercisesByModule = const {};
   List<AttemptResult> _recentAttempts = const [];
+  int _tabIndex = 0;
 
   @override
   void initState() {
@@ -136,37 +160,61 @@ class _LearnerShellState extends State<LearnerShell> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    Widget body;
+    if (_loading) {
+      body = const Center(child: CircularProgressIndicator());
+    } else if (_error != null) {
+      body = Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_error!, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: _bootstrap,
+                child: Text(l.retry),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else if (_tabIndex == 1) {
+      body = HistoryScreen(
+        attempts: _recentAttempts,
+        exercisesByModule: _exercisesByModule,
+        onOpenAttemptExercise: (a) => _openAttemptExercise(context, a),
+      );
+    } else {
+      body = HomeScreen(
+        learnerName: _learnerName,
+        modules: _modules,
+        exercisesByModule: _exercisesByModule,
+        onOpenExercise: (e) => _openExercise(context, e),
+      );
+    }
     return Scaffold(
-      body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(_error!, textAlign: TextAlign.center),
-                          const SizedBox(height: 12),
-                          FilledButton(
-                            onPressed: _bootstrap,
-                            child: const Text('Retry'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : HomeScreen(
-                    learnerName: _learnerName,
-                    modules: _modules,
-                    exercisesByModule: _exercisesByModule,
-                    recentAttempts: _recentAttempts,
-                    onOpenExercise: (e) => _openExercise(context, e),
-                    onOpenAttemptExercise: (a) =>
-                        _openAttemptExercise(context, a),
-                  ),
-      ),
+      body: SafeArea(child: body),
+      bottomNavigationBar: (_loading || _error != null)
+          ? null
+          : AppBottomNav(
+              selectedIndex: _tabIndex,
+              onSelected: (i) => setState(() => _tabIndex = i),
+              items: [
+                AppBottomNavItem(
+                  icon: Icons.home_outlined,
+                  selectedIcon: Icons.home_rounded,
+                  label: l.bottomNavHome,
+                ),
+                AppBottomNavItem(
+                  icon: Icons.history_outlined,
+                  selectedIcon: Icons.history_rounded,
+                  label: l.bottomNavHistory,
+                ),
+              ],
+            ),
     );
   }
 }

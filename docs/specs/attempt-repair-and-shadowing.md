@@ -1,11 +1,16 @@
 # Spec: Attempt Repair And Shadowing
 
 ## Status
-In progress. Tasks 1-5 are partially landed:
+Tasks 1-5 are landed for `Uloha 1` and `Uloha 2`:
 - contract types and persistence exist
-- `Uloha 1` and `Uloha 2` review artifacts already generate corrected text, model answer text, diff chunks, and speaking-focus items
-- backend now generates one model-answer audio artifact through a pluggable `TTSProvider`
-- learner-facing review endpoints, Flutter rendering, and `Retry with this model` are landed for the shared result screen
+- `Uloha 1` and `Uloha 2` review artifacts generate corrected text, model answer text, diff chunks, and speaking-focus items
+- backend generates one model-answer audio artifact through a pluggable `TTSProvider`
+- learner-facing review endpoints, Flutter rendering, and `Retry with this model` are live on the shared result screen
+- opt-in `LLMReviewProvider` (Claude) replaces the rule-based echo repair with a task-aware corrected transcript + model answer; falls back to rule-based on error
+
+Follow-up work:
+- expand review artifact generation to `Uloha 3` and `Uloha 4`
+- provider-aware replay for cloud-only audio artifacts
 
 ## Purpose
 This spec defines a post-attempt repair-and-shadowing layer for `A2 Mluveni Sprint`.
@@ -34,7 +39,8 @@ Current generation notes:
 - `TTS_PROVIDER=dev` writes a local debug WAV under backend temp storage
 - `TTS_PROVIDER=amazon_polly` synthesizes `model_answer_text` through `Amazon Polly` and stores the returned audio in backend temp storage
 - TTS failure does not erase the text review artifact or block the attempt from staying `completed`
-- `Uloha 2` now uses `required_info_slots` plus the extra-question hint to keep corrected/model output in question form instead of turning the review into a statement paragraph
+- `Uloha 2` uses `required_info_slots` plus the extra-question hint to keep corrected/model output in question form instead of turning the review into a statement paragraph
+- when `LLM_REVIEW_PROVIDER=claude` (or `LLM_PROVIDER=claude` is set as the default), `corrected_transcript_text` and `model_answer_text` come from Claude, scoped to the exercise + learner transcript. Diff chunks are recomputed from the LLM-corrected text. Rule-based output is used as fallback
 
 ## Graph Notes
 `code-review-graph` confirms the current attempt flow is concentrated in:

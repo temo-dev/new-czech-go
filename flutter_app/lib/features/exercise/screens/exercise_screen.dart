@@ -7,15 +7,17 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/locale/locale_scope.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../../../shared/widgets/info_pill.dart';
 import '../widgets/uloha_prompt.dart';
 import '../widgets/recording_card.dart';
-import '../widgets/result_card.dart';
+import 'analysis_screen.dart';
 
 /// Full exercise flow: prompt → record → feedback.
 /// Works for all 4 Uloha types — prompt section adapts via UlohaPrompt.
@@ -42,8 +44,6 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   String? _recordingPath;
   int _seconds = 0;
   Timer? _ticker;
-  Timer? _poller;
-  AttemptResult? _result;
   String? _error;
   String? _playbackPath;
   String? _playbackError;
@@ -77,14 +77,14 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     });
     _errSub = _player.errorStream.listen((e) {
       if (!mounted) return;
-      setState(() => _playbackError = 'Playback gặp lỗi: ${e.message}');
+      final l = AppLocalizations.of(context);
+      setState(() => _playbackError = l.playbackErrorPrefix(e.message ?? ''));
     });
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
-    _poller?.cancel();
     _stateSub?.cancel();
     _posSub?.cancel();
     _durSub?.cancel();
@@ -99,11 +99,12 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   Future<void> _startRecording() async {
     setState(() {
       _error = null;
-      _result = null;
       _seconds = 0;
       _status = 'starting';
       _playbackError = null;
+      _playbackPath = null;
     });
+    final locale = LocaleScope.of(context).code;
     try {
       await _player.stop();
       await _player.seek(Duration.zero);
@@ -111,7 +112,10 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       if (!hasPermission) {
         throw const FileSystemException('Microphone permission was not granted.');
       }
-      final attempt = await widget.client.createAttempt(widget.detail.id);
+      final attempt = await widget.client.createAttempt(
+        widget.detail.id,
+        locale: locale,
+      );
       _attemptId = attempt['id'] as String;
       _recordingPath = await _buildRecordingPath(_attemptId!);
       await _recorder.start(
@@ -140,7 +144,6 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   Future<void> _stopRecording() async {
     if (_attemptId == null) return;
     _ticker?.cancel();
-    setState(() => _status = 'uploading');
     try {
       final recordedPath = await _recorder.stop();
       final audioPath = recordedPath ?? _recordingPath;
@@ -151,39 +154,50 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       if (!await audioFile.exists()) {
         throw FileSystemException('Recording file not found.', audioPath);
       }
-      final fileSizeBytes = await audioFile.length();
       await _prepareLocalPlayback(audioPath);
-      await widget.client.submitRecordedAudio(
-        _attemptId!,
-        audioPath: audioPath,
-        mimeType: 'audio/m4a',
-        fileSizeBytes: fileSizeBytes,
-        durationMs: _seconds * 1000,
-      );
+      if (!mounted) return;
       setState(() {
-        _status = 'processing';
+        _status = 'stopped';
         _recordingPath = audioPath;
       });
-      _poller?.cancel();
-      _poller = Timer.periodic(const Duration(seconds: 2), (_) async {
-        final attempt = AttemptResult.fromJson(
-          await widget.client.getAttempt(_attemptId!),
-        );
-        if (!mounted) return;
-        setState(() {
-          _result = attempt;
-          _status = attempt.status;
-        });
-        if (attempt.status == 'completed' || attempt.status == 'failed') {
-          _poller?.cancel();
-        }
-      });
     } catch (err) {
+      if (!mounted) return;
       setState(() {
         _status = 'ready';
         _error = err.toString();
       });
     }
+  }
+
+  Future<void> _analyze() async {
+    final attemptId = _attemptId;
+    final audioPath = _recordingPath;
+    if (attemptId == null || audioPath == null) return;
+    final audioFile = File(audioPath);
+    if (!await audioFile.exists()) return;
+    final fileSizeBytes = await audioFile.length();
+    final durationMs = _seconds * 1000;
+
+    await _player.stop();
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    await navigator.push(
+      MaterialPageRoute(
+        builder: (_) => AnalysisScreen(
+          client: widget.client,
+          attemptId: attemptId,
+          audioPath: audioPath,
+          fileSizeBytes: fileSizeBytes,
+          durationMs: durationMs,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _reset();
+  }
+
+  Future<void> _rerecord() async {
+    await _reset();
   }
 
   // ── Local playback ─────────────────────────────────────────────────────────
@@ -200,9 +214,10 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       });
     } catch (e) {
       if (!mounted) return;
+      final l = AppLocalizations.of(context);
       setState(() {
         _playbackPath = audioPath;
-        _playbackError = 'Không mở được bản ghi để nghe lại.';
+        _playbackError = l.playbackOpenError;
       });
     }
   }
@@ -231,7 +246,6 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
   Future<void> _reset() async {
     _ticker?.cancel();
-    _poller?.cancel();
     await _player.stop();
     await _player.seek(Duration.zero);
     if (!mounted) return;
@@ -240,7 +254,6 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       _attemptId = null;
       _recordingPath = null;
       _seconds = 0;
-      _result = null;
       _error = null;
       _playbackPath = null;
       _playbackError = null;
@@ -284,17 +297,11 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             error: _error,
             onStart: _startRecording,
             onStop: _stopRecording,
+            onAnalyze: _analyze,
+            onRerecord: _rerecord,
             onTogglePlayback: _togglePlayback,
             onSeek: (v) => unawaited(_seekPlayback(v)),
           ),
-          if (_result != null) ...[
-            const SizedBox(height: AppSpacing.x4),
-            ResultCard(
-              client: widget.client,
-              result: _result!,
-              onRetry: _reset,
-            ),
-          ],
         ],
       ),
     );
@@ -322,7 +329,7 @@ class _PromptCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InfoPill(
-            label: _exerciseTypeLabel(detail.exerciseType),
+            label: _exerciseTypeLabel(AppLocalizations.of(context), detail.exerciseType),
             tone: PillTone.primary,
           ),
           const SizedBox(height: AppSpacing.x4),
@@ -343,6 +350,7 @@ class _CoachNoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.x4),
@@ -354,12 +362,12 @@ class _CoachNoteCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Coach note',
+            l.coachNoteTitle,
             style: AppTypography.titleSmall.copyWith(color: AppColors.info),
           ),
           const SizedBox(height: AppSpacing.x2),
           Text(
-            _coachNote(exerciseType),
+            _coachNote(l, exerciseType),
             style: AppTypography.bodyMedium,
           ),
         ],
@@ -368,20 +376,16 @@ class _CoachNoteCard extends StatelessWidget {
   }
 }
 
-String _exerciseTypeLabel(String type) => switch (type) {
-      'uloha_2_dialogue_questions' => 'ÚLOHA 2 · HỘI THOẠI',
-      'uloha_3_story_narration'   => 'ÚLOHA 3 · KỂ CHUYỆN',
-      'uloha_4_choice_reasoning'  => 'ÚLOHA 4 · CHỌN & GIẢI THÍCH',
-      _                           => 'ÚLOHA 1 · TRẢ LỜI CHỦ ĐỀ',
+String _exerciseTypeLabel(AppLocalizations l, String type) => switch (type) {
+      'uloha_2_dialogue_questions' => l.exerciseUloha2Label,
+      'uloha_3_story_narration'   => l.exerciseUloha3Label,
+      'uloha_4_choice_reasoning'  => l.exerciseUloha4Label,
+      _                           => l.exerciseUloha1Label,
     };
 
-String _coachNote(String type) => switch (type) {
-      'uloha_2_dialogue_questions' =>
-        'Hỏi đủ thông tin trong scenario. Dùng câu hỏi đơn giản, rõ ràng.',
-      'uloha_3_story_narration' =>
-        'Kể theo thứ tự: nejdřív, pak, nakonec. Không cần câu hoàn hảo — cần đủ mốc.',
-      'uloha_4_choice_reasoning' =>
-        'Chọn một phương án và giải thích lý do. Dùng "protože" hoặc "protože mi líbí".',
-      _ =>
-        'Nói ngắn, rõ ý, dùng câu đơn giản trước. Ưu tiên trả lời đúng task hơn là cố nói phức tạp.',
+String _coachNote(AppLocalizations l, String type) => switch (type) {
+      'uloha_2_dialogue_questions' => l.coachNoteUloha2,
+      'uloha_3_story_narration'   => l.coachNoteUloha3,
+      'uloha_4_choice_reasoning'  => l.coachNoteUloha4,
+      _                           => l.coachNoteUloha1,
     };

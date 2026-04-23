@@ -367,6 +367,7 @@ class AttemptReviewArtifactView {
   bool get isPending => status == 'pending';
   bool get isReady => status == 'ready';
   bool get isFailed => status == 'failed';
+  bool get isNotApplicable => status == 'not_applicable';
 
   factory AttemptReviewArtifactView.fromJson(Map<String, dynamic> json) {
     return AttemptReviewArtifactView(

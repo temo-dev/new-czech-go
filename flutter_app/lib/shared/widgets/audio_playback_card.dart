@@ -181,6 +181,173 @@ class _AttemptAudioPlaybackCardState
   }
 }
 
+/// Audio playback card for the TTS model-answer audio in a review artifact.
+class ReviewAudioPlaybackCard extends StatefulWidget {
+  const ReviewAudioPlaybackCard({
+    super.key,
+    required this.client,
+    required this.attemptId,
+    required this.audio,
+  });
+
+  final ApiClient client;
+  final String attemptId;
+  final ReviewArtifactAudioView audio;
+
+  @override
+  State<ReviewAudioPlaybackCard> createState() => _ReviewAudioPlaybackCardState();
+}
+
+class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
+  final AudioPlayer _player = AudioPlayer();
+  Duration _position = Duration.zero;
+  Duration? _duration;
+  String? _error;
+  bool _loading = true;
+  StreamSubscription<PlayerState>? _stateSub;
+  StreamSubscription<Duration>? _posSub;
+  StreamSubscription<Duration?>? _durSub;
+  StreamSubscription<PlayerException>? _errSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _stateSub = _player.playerStateStream.listen((s) {
+      if (!mounted) return;
+      if (s.processingState == ProcessingState.completed) {
+        _player.seek(Duration.zero);
+        setState(() => _position = Duration.zero);
+      } else {
+        setState(() {});
+      }
+    });
+    _posSub = _player.positionStream.listen((p) {
+      if (!mounted) return;
+      setState(() => _position = p);
+    });
+    _durSub = _player.durationStream.listen((d) {
+      if (!mounted) return;
+      setState(() => _duration = d);
+    });
+    _errSub = _player.errorStream.listen((e) {
+      if (!mounted) return;
+      setState(() => _error = 'Không mở được audio mẫu: ${e.message}');
+    });
+    unawaited(_prepare());
+  }
+
+  @override
+  void dispose() {
+    _stateSub?.cancel();
+    _posSub?.cancel();
+    _durSub?.cancel();
+    _errSub?.cancel();
+    unawaited(_player.dispose());
+    super.dispose();
+  }
+
+  Future<void> _prepare() async {
+    try {
+      final tmp = await getTemporaryDirectory();
+      final ext = _audioExtension(widget.audio.storageKey, widget.audio.mimeType);
+      final file = await widget.client.downloadAttemptReviewAudio(
+        widget.attemptId,
+        destinationPath: '${tmp.path}/review_${widget.attemptId}.$ext',
+      );
+      final dur = await _player.setFilePath(file.path);
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _duration = dur ?? _player.duration;
+        _position = Duration.zero;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Không tải được audio mẫu.';
+      });
+    }
+  }
+
+  Future<void> _toggle() async {
+    if (_loading || _error != null) return;
+    final dur = _duration ?? _player.duration;
+    if (_player.playing) {
+      await _player.pause();
+      return;
+    }
+    if (dur != null && _position >= dur) await _player.seek(Duration.zero);
+    await _player.play();
+  }
+
+  Future<void> _seek(double ms) async {
+    final dur = _duration;
+    if (dur == null) return;
+    final target = Duration(milliseconds: ms.round());
+    await _player.seek(target > dur ? dur : target);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.x4),
+      decoration: BoxDecoration(
+        color: AppColors.primaryFixed,
+        borderRadius: AppRadius.lgAll,
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Nghe audio mẫu để shadow', style: AppTypography.titleSmall),
+          const SizedBox(height: AppSpacing.x3),
+          if (_error != null)
+            Text(_error!, style: TextStyle(color: AppColors.error))
+          else ...[
+            Row(
+              children: [
+                FilledButton.tonal(
+                  onPressed: _loading ? null : _toggle,
+                  child: _loading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(_player.playing ? Icons.pause : Icons.play_arrow),
+                ),
+                const SizedBox(width: AppSpacing.x3),
+                Text(
+                  '${_fmt(_position)} / ${_fmt(_duration ?? Duration.zero)}',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.x2),
+            Slider(
+              min: 0,
+              max: ((_duration ?? Duration.zero).inMilliseconds.toDouble())
+                  .clamp(1, double.infinity),
+              value: _duration == null
+                  ? 0
+                  : _position.inMilliseconds
+                      .clamp(0, _duration!.inMilliseconds)
+                      .toDouble(),
+              onChanged: (_duration == null || _loading)
+                  ? null
+                  : (v) => unawaited(_seek(v)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 String _fmt(Duration d) {
   final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
   final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');

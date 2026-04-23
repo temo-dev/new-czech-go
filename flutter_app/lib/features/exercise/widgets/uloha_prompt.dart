@@ -5,6 +5,7 @@ import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/api/api_client.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../../../shared/widgets/info_pill.dart';
 
@@ -77,6 +78,7 @@ class _Uloha2Prompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -88,7 +90,7 @@ class _Uloha2Prompt extends StatelessWidget {
           _hintCard(detail.scenarioPrompt),
           const SizedBox(height: AppSpacing.x4),
         ],
-        Text('Thông tin bạn cần hỏi', style: AppTypography.titleSmall),
+        Text(l.promptRequiredInfoTitle, style: AppTypography.titleSmall),
         const SizedBox(height: AppSpacing.x3),
         for (final slot in detail.requiredInfoSlots) ...[
           _sectionCard(
@@ -99,7 +101,7 @@ class _Uloha2Prompt extends StatelessWidget {
                 if (slot.sampleQuestion.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.x2),
                   Text(
-                    'Gợi ý: ${slot.sampleQuestion}',
+                    l.promptHintPrefix(slot.sampleQuestion),
                     style: AppTypography.bodyMedium.copyWith(
                       color: AppColors.onSurfaceVariant,
                     ),
@@ -111,7 +113,7 @@ class _Uloha2Prompt extends StatelessWidget {
           const SizedBox(height: AppSpacing.x2),
         ],
         if (detail.customQuestionHint.isNotEmpty) ...[
-          _hintCard('Câu hỏi bổ sung: ${detail.customQuestionHint}',
+          _hintCard(l.promptCustomQuestion(detail.customQuestionHint),
               tone: PillTone.primary),
         ],
       ],
@@ -128,6 +130,7 @@ class _Uloha3Prompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final images = detail.storyImageAssets;
     final missingCount = detail.imageAssetIds.length - images.length;
 
@@ -146,7 +149,7 @@ class _Uloha3Prompt extends StatelessWidget {
               itemCount: images.length,
               separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.x3),
               itemBuilder: (_, i) => _StoryImageCard(
-                label: 'Hình ${i + 1}',
+                label: l.promptStoryImageLabel(i + 1),
                 imageUrl: client
                     .exerciseAssetUri(detail.id, images[i].id)
                     .toString(),
@@ -157,20 +160,20 @@ class _Uloha3Prompt extends StatelessWidget {
           const SizedBox(height: AppSpacing.x4),
         ],
         if (detail.imageAssetIds.isEmpty)
-          _hintCard('Chưa có ảnh — bài vẫn có thể luyện theo checkpoint văn bản.'),
+          _hintCard(l.promptStoryNoImages),
         if (missingCount > 0)
           _hintCard(
-            'Đã tải ${images.length}/${detail.imageAssetIds.length} ảnh.',
+            l.promptStoryImagesLoaded(images.length, detail.imageAssetIds.length),
             tone: PillTone.warning,
           ),
         _hintCard(
           detail.imageAssetIds.isEmpty
-              ? 'Kể câu chuyện theo thứ tự: nejdřív, pak, nakonec.'
-              : 'Hãy kể câu chuyện theo ${detail.imageAssetIds.length} bức tranh.',
+              ? l.promptStoryHintOrder
+              : l.promptStoryHintByImages(detail.imageAssetIds.length),
         ),
         const SizedBox(height: AppSpacing.x4),
         if (detail.narrativeCheckpoints.isNotEmpty) ...[
-          Text('Các mốc cần nhắc đến', style: AppTypography.titleSmall),
+          Text(l.promptStoryCheckpointsTitle, style: AppTypography.titleSmall),
           const SizedBox(height: AppSpacing.x3),
           for (final cp in detail.narrativeCheckpoints) ...[
             _sectionCard(child: Text(cp, style: AppTypography.bodyMedium)),
@@ -179,7 +182,7 @@ class _Uloha3Prompt extends StatelessWidget {
         ],
         if (detail.grammarFocus.isNotEmpty)
           _hintCard(
-            'Ngữ pháp nên ưu tiên: ${detail.grammarFocus.join(', ')}',
+            l.promptStoryGrammarFocus(detail.grammarFocus.join(', ')),
             tone: PillTone.primary,
           ),
       ],
@@ -253,6 +256,7 @@ class _Uloha4Prompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -260,7 +264,7 @@ class _Uloha4Prompt extends StatelessWidget {
           _hintCard(detail.choiceScenarioPrompt),
           const SizedBox(height: AppSpacing.x4),
         ],
-        Text('Các lựa chọn', style: AppTypography.titleSmall),
+        Text(l.promptChoiceOptionsTitle, style: AppTypography.titleSmall),
         const SizedBox(height: AppSpacing.x3),
         for (final option in detail.choiceOptions) ...[
           _ChoiceOptionCard(option: option, detail: detail, client: client),
@@ -268,7 +272,7 @@ class _Uloha4Prompt extends StatelessWidget {
         ],
         if (detail.expectedReasoningAxes.isNotEmpty)
           _hintCard(
-            'Gợi ý lý do: ${detail.expectedReasoningAxes.join(', ')}',
+            l.promptChoiceReasoningHint(detail.expectedReasoningAxes.join(', ')),
             tone: PillTone.primary,
           ),
       ],

@@ -36,16 +36,19 @@ class ApiClient {
     return payload['data'] as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> createAttempt(String exerciseId) async {
-    final payload = await _authed(
-      'POST',
-      '/v1/attempts',
-      body: {
-        'exercise_id': exerciseId,
-        'client_platform': 'ios',
-        'app_version': '0.1.0',
-      },
-    );
+  Future<Map<String, dynamic>> createAttempt(
+    String exerciseId, {
+    String? locale,
+  }) async {
+    final body = <String, dynamic>{
+      'exercise_id': exerciseId,
+      'client_platform': 'ios',
+      'app_version': '0.1.0',
+    };
+    if (locale != null && locale.isNotEmpty) {
+      body['locale'] = locale;
+    }
+    final payload = await _authed('POST', '/v1/attempts', body: body);
     return payload['data']['attempt'] as Map<String, dynamic>;
   }
 

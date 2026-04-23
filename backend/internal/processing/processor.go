@@ -19,19 +19,27 @@ type attemptRepository interface {
 }
 
 type Processor struct {
-	repo        attemptRepository
-	transcriber Transcriber
-	ttsProvider TTSProvider
+	repo           attemptRepository
+	transcriber    Transcriber
+	ttsProvider    TTSProvider
+	llmProvider    LLMFeedbackProvider
+	reviewProvider LLMReviewProvider
 }
 
-func NewProcessor(repo attemptRepository, transcriber Transcriber, ttsProvider TTSProvider) *Processor {
+func NewProcessor(repo attemptRepository, transcriber Transcriber, ttsProvider TTSProvider, llmProvider LLMFeedbackProvider, reviewProvider LLMReviewProvider) *Processor {
 	if transcriber == nil {
 		transcriber = DevTranscriber{}
 	}
 	if ttsProvider == nil {
 		ttsProvider = DevTTSProvider{}
 	}
-	return &Processor{repo: repo, transcriber: transcriber, ttsProvider: ttsProvider}
+	if llmProvider == nil {
+		llmProvider = DevLLMFeedbackProvider{}
+	}
+	if reviewProvider == nil {
+		reviewProvider = DevLLMReviewProvider{}
+	}
+	return &Processor{repo: repo, transcriber: transcriber, ttsProvider: ttsProvider, llmProvider: llmProvider, reviewProvider: reviewProvider}
 }
 
 func (p *Processor) ProcessAttempt(attemptID string) error {
@@ -66,7 +74,11 @@ func (p *Processor) ProcessAttempt(attemptID string) error {
 
 	p.repo.SetAttemptStatus(attemptID, "scoring")
 
-	feedback, ok := buildFeedback(exercise, transcript, reliability)
+	locale := attempt.Locale
+	if locale == "" {
+		locale = contracts.DefaultLocale
+	}
+	feedback, ok := p.buildFeedbackWithLLM(attemptID, exercise, transcript, reliability, locale)
 	if !ok {
 		log.Printf("attempt %s scoring failed: transcript was not usable for feedback generation", attemptID)
 		p.repo.FailAttempt(attemptID, "scoring_failed")
@@ -74,8 +86,15 @@ func (p *Processor) ProcessAttempt(attemptID string) error {
 	}
 
 	p.repo.CompleteAttempt(attemptID, transcript, feedback)
-	if artifact, ok := buildReviewArtifact(exercise, transcript, feedback); ok {
+	artifact, artifactOk := buildReviewArtifact(exercise, transcript, feedback)
+	if !artifactOk {
+		artifact = contracts.AttemptReviewArtifact{
+			AttemptID: attemptID,
+			Status:    "not_applicable",
+		}
+	} else {
 		artifact.GeneratedAt = time.Now().UTC().Format(time.RFC3339)
+		p.applyLLMReviewOverride(attemptID, exercise, transcript, feedback, &artifact, locale)
 		if artifact.ModelAnswerText != "" {
 			audio, err := p.ttsProvider.Generate(attemptID, artifact.ModelAnswerText)
 			if err != nil {
@@ -84,11 +103,30 @@ func (p *Processor) ProcessAttempt(attemptID string) error {
 				artifact.TTSAudio = audio
 			}
 		}
-		if _, stored := p.repo.UpsertReviewArtifact(attemptID, artifact); !stored {
-			log.Printf("attempt %s review artifact persistence failed after completion", attemptID)
-		}
+	}
+	if _, stored := p.repo.UpsertReviewArtifact(attemptID, artifact); !stored {
+		log.Printf("attempt %s review artifact persistence failed after completion", attemptID)
 	}
 	return nil
+}
+
+func (p *Processor) applyLLMReviewOverride(attemptID string, exercise contracts.Exercise, transcript contracts.Transcript, feedback contracts.AttemptFeedback, artifact *contracts.AttemptReviewArtifact, locale string) {
+	if p.reviewProvider == nil {
+		return
+	}
+	rv, err := p.reviewProvider.GenerateReview(exercise, transcript, feedback, locale)
+	if err != nil {
+		log.Printf("attempt %s llm review unavailable, keeping rule-based: %v", attemptID, err)
+		return
+	}
+	artifact.CorrectedTranscriptText = rv.CorrectedTranscript
+	artifact.ModelAnswerText = rv.ModelAnswer
+	artifact.DiffChunks = buildReadableDiffChunks(
+		normalizeTranscript(artifact.SourceTranscriptText),
+		normalizeTranscript(rv.CorrectedTranscript),
+	)
+	artifact.RepairProvider = "llm_review_claude_v1"
+	log.Printf("attempt %s llm review applied", attemptID)
 }
 
 type transcriptReliability string
@@ -98,6 +136,61 @@ const (
 	reliabilityUsableWithWarnings transcriptReliability = "usable_with_warnings"
 	reliabilityUnusable           transcriptReliability = "unusable"
 )
+
+func (p *Processor) buildFeedbackWithLLM(attemptID string, exercise contracts.Exercise, transcript contracts.Transcript, reliability transcriptReliability, locale string) (contracts.AttemptFeedback, bool) {
+	baseline, ruleOk := buildFeedbackLocalized(exercise, transcript, reliability, locale)
+	if !ruleOk {
+		return contracts.AttemptFeedback{}, false
+	}
+	if p.llmProvider == nil {
+		return baseline, true
+	}
+	llmFb, err := p.llmProvider.GenerateFeedback(exercise, transcript, reliability, locale)
+	if err != nil {
+		log.Printf("attempt %s llm feedback unavailable, using rule-based: %v", attemptID, err)
+		return baseline, true
+	}
+	merged := baseline
+	if llmFb.ReadinessLevel != "" {
+		merged.ReadinessLevel = llmFb.ReadinessLevel
+	}
+	if llmFb.OverallSummary != "" {
+		merged.OverallSummary = llmFb.OverallSummary
+	}
+	if len(llmFb.Strengths) > 0 {
+		merged.Strengths = llmFb.Strengths
+	}
+	if len(llmFb.Improvements) > 0 {
+		merged.Improvements = llmFb.Improvements
+	}
+	if len(llmFb.RetryAdvice) > 0 {
+		merged.RetryAdvice = llmFb.RetryAdvice
+	}
+	if llmFb.SampleAnswer != "" {
+		merged.SampleAnswer = llmFb.SampleAnswer
+	}
+	log.Printf("attempt %s llm feedback applied", attemptID)
+	return merged, true
+}
+
+func buildFeedbackLocalized(exercise contracts.Exercise, transcript contracts.Transcript, reliability transcriptReliability, locale string) (contracts.AttemptFeedback, bool) {
+	fb, ok := buildFeedback(exercise, transcript, reliability)
+	if !ok {
+		return fb, false
+	}
+	if locale == contracts.LocaleEN {
+		fb = localizeFeedbackToEnglish(fb)
+	}
+	return fb, true
+}
+
+func localizeFeedbackToEnglish(fb contracts.AttemptFeedback) contracts.AttemptFeedback {
+	fb.OverallSummary = "Your attempt was recorded. Detailed English coaching will appear when AI feedback is available."
+	fb.Strengths = []string{"You produced a clear spoken response."}
+	fb.Improvements = []string{"Try speaking more slowly and add one concrete detail."}
+	fb.RetryAdvice = []string{"Record again and aim for 20-30 seconds."}
+	return fb
+}
 
 func buildFeedback(exercise contracts.Exercise, transcript contracts.Transcript, reliability transcriptReliability) (contracts.AttemptFeedback, bool) {
 	normalized := normalizeTranscript(transcript.FullText)

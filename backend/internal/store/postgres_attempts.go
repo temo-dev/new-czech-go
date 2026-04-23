@@ -108,13 +108,14 @@ CREATE TABLE IF NOT EXISTS attempt_review_artifacts (
 
 ALTER TABLE attempts ADD COLUMN IF NOT EXISTS pending_upload_storage_key TEXT;
 ALTER TABLE attempts ADD COLUMN IF NOT EXISTS upload_target_issued_at TIMESTAMPTZ;
+ALTER TABLE attempts ADD COLUMN IF NOT EXISTS locale TEXT NOT NULL DEFAULT 'vi';
 ALTER TABLE attempt_transcripts ADD COLUMN IF NOT EXISTS provider TEXT;
 ALTER TABLE attempt_transcripts ADD COLUMN IF NOT EXISTS is_synthetic BOOLEAN NOT NULL DEFAULT FALSE;
 `)
 	return err
 }
 
-func (s *postgresAttemptStore) CreateAttempt(userID, exerciseID, exerciseType, clientPlatform, appVersion string) (*contracts.Attempt, error) {
+func (s *postgresAttemptStore) CreateAttempt(userID, exerciseID, exerciseType, clientPlatform, appVersion, locale string) (*contracts.Attempt, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -144,13 +145,14 @@ func (s *postgresAttemptStore) CreateAttempt(userID, exerciseID, exerciseType, c
 		StartedAt:      now.Format(time.RFC3339),
 		ClientPlatform: clientPlatform,
 		AppVersion:     appVersion,
+		Locale:         locale,
 	}
 
 	_, err = tx.ExecContext(
 		ctx,
 		`INSERT INTO attempts (
-			id, user_id, exercise_id, exercise_type, status, attempt_no, started_at, client_platform, app_version
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+			id, user_id, exercise_id, exercise_type, status, attempt_no, started_at, client_platform, app_version, locale
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 		attempt.ID,
 		attempt.UserID,
 		attempt.ExerciseID,
@@ -160,6 +162,7 @@ func (s *postgresAttemptStore) CreateAttempt(userID, exerciseID, exerciseType, c
 		now,
 		attempt.ClientPlatform,
 		nullIfEmpty(attempt.AppVersion),
+		attempt.Locale,
 	)
 	if err != nil {
 		return nil, err
@@ -519,6 +522,7 @@ SELECT
 	a.app_version,
 	a.pending_upload_storage_key,
 	a.upload_target_issued_at,
+	a.locale,
 	aa.storage_key,
 	aa.mime_type,
 	aa.duration_ms,
@@ -564,6 +568,7 @@ func scanAttemptRow(scan scanFunc) (*contracts.Attempt, error) {
 		appVersion              sql.NullString
 		pendingUploadStorageKey sql.NullString
 		uploadTargetIssuedAt    sql.NullTime
+		locale                  sql.NullString
 		audioStorageKey         sql.NullString
 		audioMimeType           sql.NullString
 		audioDurationMs         sql.NullInt64
@@ -601,6 +606,7 @@ func scanAttemptRow(scan scanFunc) (*contracts.Attempt, error) {
 		&appVersion,
 		&pendingUploadStorageKey,
 		&uploadTargetIssuedAt,
+		&locale,
 		&audioStorageKey,
 		&audioMimeType,
 		&audioDurationMs,
@@ -641,6 +647,7 @@ func scanAttemptRow(scan scanFunc) (*contracts.Attempt, error) {
 		AppVersion:              appVersion.String,
 		PendingUploadStorageKey: pendingUploadStorageKey.String,
 		UploadTargetIssuedAt:    formatNullTime(uploadTargetIssuedAt),
+		Locale:                  localeOrVI(locale.String),
 	}
 
 	if audioStorageKey.Valid {
@@ -803,6 +810,13 @@ func reviewArtifactAudioMimeType(audio *contracts.ReviewArtifactAudio) string {
 		return ""
 	}
 	return audio.MimeType
+}
+
+func localeOrVI(raw string) string {
+	if v, ok := contracts.NormalizeLocale(raw); ok {
+		return v
+	}
+	return contracts.DefaultLocale
 }
 
 func newUUIDLikeID() string {

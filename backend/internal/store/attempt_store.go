@@ -9,7 +9,7 @@ import (
 )
 
 type AttemptStore interface {
-	CreateAttempt(userID, exerciseID, exerciseType, clientPlatform, appVersion string) (*contracts.Attempt, error)
+	CreateAttempt(userID, exerciseID, exerciseType, clientPlatform, appVersion, locale string) (*contracts.Attempt, error)
 	UpdateAttemptRecordingStarted(id string, timestamp string) (*contracts.Attempt, bool)
 	RecordUploadTargetIssued(id, storageKey string) (*contracts.Attempt, bool)
 	MarkUploadComplete(id string, audio contracts.AttemptAudio) (*contracts.Attempt, bool)
@@ -39,7 +39,7 @@ func newMemoryAttemptStore() *memoryAttemptStore {
 	}
 }
 
-func (s *memoryAttemptStore) CreateAttempt(userID, exerciseID, exerciseType, clientPlatform, appVersion string) (*contracts.Attempt, error) {
+func (s *memoryAttemptStore) CreateAttempt(userID, exerciseID, exerciseType, clientPlatform, appVersion, locale string) (*contracts.Attempt, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -59,6 +59,7 @@ func (s *memoryAttemptStore) CreateAttempt(userID, exerciseID, exerciseType, cli
 		StartedAt:      time.Now().UTC().Format(time.RFC3339),
 		ClientPlatform: clientPlatform,
 		AppVersion:     appVersion,
+		Locale:         locale,
 	}
 	s.attempts[id] = attempt
 	return cloneAttempt(attempt), nil

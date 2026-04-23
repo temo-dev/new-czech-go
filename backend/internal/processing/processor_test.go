@@ -15,7 +15,7 @@ func TestProcessorCompletesAttemptWithStructuredFeedback(t *testing.T) {
 
 	processor := NewProcessor(repo, nil, mockTTSProvider{
 		audio: &contracts.ReviewArtifactAudio{StorageKey: "attempt-review/" + attemptID + "/model-answer.wav", MimeType: "audio/wav"},
-	})
+	}, nil, nil)
 	if err := processor.ProcessAttempt(attemptID); err != nil {
 		t.Fatalf("ProcessAttempt returned error: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestProcessorUsesSofterFeedbackForShortRecordings(t *testing.T) {
 
 	processor := NewProcessor(repo, nil, mockTTSProvider{
 		audio: &contracts.ReviewArtifactAudio{StorageKey: "attempt-review/" + attemptID + "/model-answer.wav", MimeType: "audio/wav"},
-	})
+	}, nil, nil)
 	if err := processor.ProcessAttempt(attemptID); err != nil {
 		t.Fatalf("ProcessAttempt returned error: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestProcessorCreatesTextOnlyReviewArtifactForStrongUloha1Attempt(t *testing
 		usable:      true,
 	}, mockTTSProvider{
 		audio: &contracts.ReviewArtifactAudio{StorageKey: "attempt-review/" + attemptID + "/model-answer.wav", MimeType: "audio/wav"},
-	})
+	}, nil, nil)
 	if err := processor.ProcessAttempt(attemptID); err != nil {
 		t.Fatalf("ProcessAttempt returned error: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestProcessorCreatesTextOnlyReviewArtifactForWeakUloha1Attempt(t *testing.T
 		usable:      true,
 	}, mockTTSProvider{
 		audio: &contracts.ReviewArtifactAudio{StorageKey: "attempt-review/" + attemptID + "/model-answer.wav", MimeType: "audio/wav"},
-	})
+	}, nil, nil)
 	if err := processor.ProcessAttempt(attemptID); err != nil {
 		t.Fatalf("ProcessAttempt returned error: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestProcessorCreatesTaskAwareReviewArtifactForUloha2Attempt(t *testing.T) {
 		usable:      true,
 	}, mockTTSProvider{
 		audio: &contracts.ReviewArtifactAudio{StorageKey: "attempt-review/" + attemptID + "/model-answer.wav", MimeType: "audio/wav"},
-	})
+	}, nil, nil)
 	if err := processor.ProcessAttempt(attemptID); err != nil {
 		t.Fatalf("ProcessAttempt returned error: %v", err)
 	}
@@ -337,7 +337,7 @@ func TestProcessorStillCompletesAttemptWhenReviewArtifactPersistenceFails(t *tes
 		usable:      true,
 	}, mockTTSProvider{
 		err: fmt.Errorf("tts offline"),
-	})
+	}, nil, nil)
 	if err := processor.ProcessAttempt(attemptID); err != nil {
 		t.Fatalf("ProcessAttempt returned error: %v", err)
 	}
@@ -375,7 +375,7 @@ func TestProcessorPersistsTTSAudioMetadataOnReadyReviewArtifact(t *testing.T) {
 			StorageKey: "attempt-review/" + attemptID + "/model-answer.wav",
 			MimeType:   "audio/wav",
 		},
-	})
+	}, nil, nil)
 	if err := processor.ProcessAttempt(attemptID); err != nil {
 		t.Fatalf("ProcessAttempt returned error: %v", err)
 	}
@@ -410,7 +410,7 @@ func TestProcessorKeepsTextArtifactWhenTTSGenerationFails(t *testing.T) {
 		usable:      true,
 	}, mockTTSProvider{
 		err: fmt.Errorf("tts provider unavailable"),
-	})
+	}, nil, nil)
 	if err := processor.ProcessAttempt(attemptID); err != nil {
 		t.Fatalf("ProcessAttempt returned error: %v", err)
 	}
@@ -437,12 +437,12 @@ func TestProcessorKeepsTextArtifactWhenTTSGenerationFails(t *testing.T) {
 
 func TestProcessorFailsAttemptWithoutUploadedAudio(t *testing.T) {
 	repo := store.NewMemoryStore()
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
 
-	processor := NewProcessor(repo, nil, mockTTSProvider{})
+	processor := NewProcessor(repo, nil, mockTTSProvider{}, nil, nil)
 	if err := processor.ProcessAttempt(attempt.ID); err != nil {
 		t.Fatalf("ProcessAttempt returned error: %v", err)
 	}
@@ -471,7 +471,7 @@ func TestProcessorUsesInjectedTranscriberOutput(t *testing.T) {
 		},
 		reliability: reliabilityUsable,
 		usable:      true,
-	}, mockTTSProvider{})
+	}, mockTTSProvider{}, nil, nil)
 	if err := processor.ProcessAttempt(attemptID); err != nil {
 		t.Fatalf("ProcessAttempt returned error: %v", err)
 	}
@@ -495,7 +495,7 @@ func TestProcessorFailsWhenTranscriberReturnsUnusableTranscript(t *testing.T) {
 	processor := NewProcessor(repo, mockTranscriber{
 		reliability: reliabilityUnusable,
 		usable:      false,
-	}, mockTTSProvider{})
+	}, mockTTSProvider{}, nil, nil)
 	if err := processor.ProcessAttempt(attemptID); err != nil {
 		t.Fatalf("ProcessAttempt returned error: %v", err)
 	}
@@ -515,7 +515,7 @@ func TestProcessorFailsWhenTranscriberReturnsUnusableTranscript(t *testing.T) {
 func seedUploadedAttempt(t *testing.T, repo *store.MemoryStore, durationMs int) string {
 	t.Helper()
 
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -539,7 +539,7 @@ func seedUploadedAttempt(t *testing.T, repo *store.MemoryStore, durationMs int) 
 func seedUploadedAttemptForExercise(t *testing.T, repo *store.MemoryStore, exerciseID string, durationMs int) string {
 	t.Helper()
 
-	attempt, err := repo.CreateAttempt("user-learner-1", exerciseID, "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", exerciseID, "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}

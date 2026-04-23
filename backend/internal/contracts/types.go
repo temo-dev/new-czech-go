@@ -115,6 +115,7 @@ type Attempt struct {
 	ReadinessLevel          string                        `json:"readiness_level,omitempty"`
 	ClientPlatform          string                        `json:"client_platform,omitempty"`
 	AppVersion              string                        `json:"app_version,omitempty"`
+	Locale                  string                        `json:"locale"`
 	Audio                   *AttemptAudio                 `json:"audio,omitempty"`
 	Transcript              *Transcript                   `json:"transcript,omitempty"`
 	Feedback                *AttemptFeedback              `json:"feedback,omitempty"`

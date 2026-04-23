@@ -158,14 +158,17 @@ func (s *MemoryStore) DeleteExercise(id string) bool {
 	return s.exercises.DeleteExercise(id)
 }
 
-func (s *MemoryStore) CreateAttempt(userID, exerciseID, clientPlatform, appVersion string) (*contracts.Attempt, error) {
+func (s *MemoryStore) CreateAttempt(userID, exerciseID, clientPlatform, appVersion, locale string) (*contracts.Attempt, error) {
 	s.mu.RLock()
 	exercise, ok := s.exercises.Exercise(exerciseID)
 	s.mu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("exercise not found")
 	}
-	return s.attempts.CreateAttempt(userID, exerciseID, exercise.ExerciseType, clientPlatform, appVersion)
+	if locale == "" {
+		locale = contracts.DefaultLocale
+	}
+	return s.attempts.CreateAttempt(userID, exerciseID, exercise.ExerciseType, clientPlatform, appVersion, locale)
 }
 
 func (s *MemoryStore) UpdateAttemptRecordingStarted(id string, timestamp string) (*contracts.Attempt, bool) {

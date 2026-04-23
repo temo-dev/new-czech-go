@@ -9,7 +9,7 @@ import (
 func TestReviewArtifactCanBeCreatedUpdatedAndReadBack(t *testing.T) {
 	repo := NewMemoryStore()
 
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestReviewArtifactCanBeCreatedUpdatedAndReadBack(t *testing.T) {
 func TestCreateAttemptStoresUserAndClientContext(t *testing.T) {
 	repo := NewMemoryStore()
 
-	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
@@ -131,15 +131,15 @@ func TestCreateAttemptStoresUserAndClientContext(t *testing.T) {
 func TestAttemptNumbersAreSequentialPerUserAndExercise(t *testing.T) {
 	repo := NewMemoryStore()
 
-	first, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	first, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
-	second, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0")
+	second, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}
-	otherUser, err := repo.CreateAttempt("user-learner-2", "exercise-uloha1-weather", "ios", "0.1.0")
+	otherUser, err := repo.CreateAttempt("user-learner-2", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
 	if err != nil {
 		t.Fatalf("CreateAttempt returned error: %v", err)
 	}

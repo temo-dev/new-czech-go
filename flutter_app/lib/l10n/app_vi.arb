@@ -1,0 +1,149 @@
+{
+    "@@locale": "vi",
+
+    "appTitle": "A2 Mluvení Sprint",
+
+    "heroPill": "FOCUSED SPEAKING PRACTICE",
+    "heroGreeting": "Xin chào, {name}. Ưu tiên sự rõ ràng, nhẹ nhàng, và tiến độ liên tục — như coach bình tĩnh, không phải bài test đáng sợ.",
+    "@heroGreeting": {
+        "placeholders": { "name": { "type": "String" } }
+    },
+    "heroPillDays": "14 NGÀY",
+    "heroPillTask": "1 TASK / MÀN HÌNH",
+    "heroPillFeedback": "FEEDBACK NGAY SAU MỖI LẦN NÓI",
+
+    "moduleExerciseCount": "{count} bài tập",
+    "@moduleExerciseCount": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+
+    "recentAttemptsTitle": "Lần tập gần đây",
+    "recentAttemptsSubtitle": "Xem transcript và feedback để theo dõi tiến bộ.",
+    "openExercise": "Mở bài tập",
+    "retry": "Thử lại",
+    "bottomNavHome": "Trang chủ",
+    "bottomNavHistory": "Lịch sử",
+    "historyEmpty": "Chưa có lần tập nào. Hãy mở bài tập ở tab Trang chủ để bắt đầu.",
+
+    "pillSyntheticTranscript": "TRANSCRIPT GIẢ LẬP",
+    "pillFailure": "FAILURE: {code}",
+    "@pillFailure": {
+        "placeholders": { "code": { "type": "String" } }
+    },
+    "pillReadinessReady": "SẴN SÀNG",
+    "pillReadinessAlmost": "GẦN ĐỦ",
+    "pillReadinessNeedsWork": "CẦN LUYỆN",
+    "pillReadinessNotReady": "CHƯA SẴN SÀNG",
+    "pillFailed": "FAILED",
+
+    "statusCopyStarting": "Chuẩn bị bắt đầu attempt mới.",
+    "statusCopyRecording": "Tập trung vào sự rõ ràng và trả lời đúng ý chính.",
+    "statusCopyUploading": "Đang đóng gói bản ghi để gửi lên pipeline.",
+    "statusCopyProcessing": "Hệ thống đang transcript và tổng hợp feedback.",
+    "statusCopyCompleted": "Feedback đã sẵn sàng. Hãy đọc kết quả và thử lại ngay.",
+    "statusCopyFailed": "Attempt gặp lỗi. Bạn có thể thử lại với một lần ghi mới.",
+    "statusCopyReady": "Sẵn sàng cho một lần nói mới.",
+
+    "recordStatusReady": "SẴN SÀNG",
+    "recordStatusRecording": "ĐANG GHI",
+    "recordStatusUploading": "ĐANG TẢI LÊN",
+    "recordStatusProcessing": "ĐANG XỬ LÝ",
+    "recordStatusCompleted": "HOÀN THÀNH",
+    "recordStatusFailed": "LỖI",
+    "recordCtaStart": "Bắt đầu luyện",
+    "recordCtaStop": "Dừng",
+    "recordCtaAnalyze": "Phân tích",
+    "recordCtaRerecord": "Ghi lại",
+    "recordStatusStopped": "ĐÃ DỪNG",
+    "recordHintStopped": "Nghe lại bản ghi. Ấn \"Phân tích\" khi ưng ý.",
+    "analysisScreenTitle": "Đang phân tích",
+    "analysisUploading": "Đang tải lên bản ghi...",
+    "analysisProcessing": "AI đang lắng nghe và chấm bài...",
+    "analysisFailedTitle": "Phân tích thất bại",
+    "analysisRetryCta": "Quay lại ghi lại",
+    "recordHintReady": "Nhấn \"Bắt đầu luyện\" khi sẵn sàng.",
+    "recordHintRecording": "Tập trung vào sự rõ ràng và trả lời đúng ý chính.",
+    "recordHintUploading": "Đang đóng gói bản ghi để gửi lên pipeline.",
+    "recordHintProcessing": "Hệ thống đang transcript và tổng hợp feedback.",
+    "recordHintCompleted": "Feedback đã sẵn sàng. Hãy đọc kết quả và thử lại.",
+    "recordHintFailed": "Attempt gặp lỗi. Thử lại với một lần ghi mới.",
+    "playbackTitle": "Nghe lại bản ghi",
+    "playbackErrorPrefix": "Playback gặp lỗi: {message}",
+    "@playbackErrorPrefix": {
+        "placeholders": { "message": { "type": "String" } }
+    },
+    "playbackOpenError": "Không mở được bản ghi để nghe lại.",
+
+    "resultTitle": "Kết quả",
+    "resultTranscriptTitle": "Transcript của bạn",
+    "resultStrengthsTitle": "Điểm mạnh",
+    "resultImprovementsTitle": "Cần cải thiện",
+    "resultRetryAdviceTitle": "Lời khuyên cho lần sau",
+    "resultSampleAnswerTitle": "Câu trả lời mẫu",
+    "resultRetryCta": "Thử lại bài này",
+
+    "reviewArtifactTitle": "Sửa & luyện theo mẫu",
+    "reviewArtifactSubtitle": "Bản gốc, bản đã sửa, và bản mẫu để shadow theo.",
+    "reviewLoadError": "Không tải được review",
+    "reviewNotApplicableTitle": "Bản sửa chưa hỗ trợ cho dạng bài này",
+    "reviewNotApplicableBody": "Tính năng sửa & luyện theo mẫu sẽ sớm có cho Úloha 3 và Úloha 4.",
+    "reviewFailedTitle": "Review artifact gặp lỗi",
+    "reviewFailedBodyUnknown": "Backend chưa tạo được bản sửa.",
+    "reviewFailedBodyCode": "failure_code: {code}",
+    "@reviewFailedBodyCode": {
+        "placeholders": { "code": { "type": "String" } }
+    },
+    "reviewPendingTitle": "Đang tạo bản sửa và audio mẫu...",
+    "reviewPendingBody": "Bạn vẫn có thể đọc feedback phía trên trong lúc chờ.",
+    "reviewSourceTitle": "Transcript của bạn",
+    "reviewCorrectedTitle": "Bạn nên nói",
+    "reviewModelTitle": "Bản mẫu để shadow",
+    "reviewSourceFallback": "Transcript chưa sẵn sàng.",
+
+    "exerciseUloha1Label": "ÚLOHA 1 · TRẢ LỜI CHỦ ĐỀ",
+    "exerciseUloha2Label": "ÚLOHA 2 · HỘI THOẠI",
+    "exerciseUloha3Label": "ÚLOHA 3 · KỂ CHUYỆN",
+    "exerciseUloha4Label": "ÚLOHA 4 · CHỌN & GIẢI THÍCH",
+    "coachNoteTitle": "Coach note",
+    "coachNoteUloha1": "Nói ngắn, rõ ý, dùng câu đơn giản trước. Ưu tiên trả lời đúng task hơn là cố nói phức tạp.",
+    "coachNoteUloha2": "Hỏi đủ thông tin trong scenario. Dùng câu hỏi đơn giản, rõ ràng.",
+    "coachNoteUloha3": "Kể theo thứ tự: nejdřív, pak, nakonec. Không cần câu hoàn hảo — cần đủ mốc.",
+    "coachNoteUloha4": "Chọn một phương án và giải thích lý do. Dùng \"protože\" hoặc \"protože mi líbí\".",
+
+    "promptRequiredInfoTitle": "Thông tin bạn cần hỏi",
+    "promptHintPrefix": "Gợi ý: {text}",
+    "@promptHintPrefix": {
+        "placeholders": { "text": { "type": "String" } }
+    },
+    "promptCustomQuestion": "Câu hỏi bổ sung: {text}",
+    "@promptCustomQuestion": {
+        "placeholders": { "text": { "type": "String" } }
+    },
+    "promptStoryImageLabel": "Hình {index}",
+    "@promptStoryImageLabel": {
+        "placeholders": { "index": { "type": "int" } }
+    },
+    "promptStoryNoImages": "Chưa có ảnh — bài vẫn có thể luyện theo checkpoint văn bản.",
+    "promptStoryImagesLoaded": "Đã tải {loaded}/{total} ảnh.",
+    "@promptStoryImagesLoaded": {
+        "placeholders": {
+            "loaded": { "type": "int" },
+            "total": { "type": "int" }
+        }
+    },
+    "promptStoryHintOrder": "Kể câu chuyện theo thứ tự: nejdřív, pak, nakonec.",
+    "promptStoryHintByImages": "Hãy kể câu chuyện theo {count} bức tranh.",
+    "@promptStoryHintByImages": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "promptStoryCheckpointsTitle": "Các mốc cần nhắc đến",
+    "promptStoryGrammarFocus": "Ngữ pháp nên ưu tiên: {list}",
+    "@promptStoryGrammarFocus": {
+        "placeholders": { "list": { "type": "String" } }
+    },
+    "promptChoiceOptionsTitle": "Các lựa chọn",
+    "promptChoiceReasoningHint": "Gợi ý lý do: {list}",
+    "@promptChoiceReasoningHint": {
+        "placeholders": { "list": { "type": "String" } }
+    }
+}
