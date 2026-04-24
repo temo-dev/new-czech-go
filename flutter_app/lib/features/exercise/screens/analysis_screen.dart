@@ -21,6 +21,7 @@ class AnalysisScreen extends StatefulWidget {
     required this.audioPath,
     required this.fileSizeBytes,
     required this.durationMs,
+    this.onOpenNext,
   });
 
   final ApiClient client;
@@ -28,6 +29,7 @@ class AnalysisScreen extends StatefulWidget {
   final String audioPath;
   final int fileSizeBytes;
   final int durationMs;
+  final VoidCallback? onOpenNext;
 
   @override
   State<AnalysisScreen> createState() => _AnalysisScreenState();
@@ -116,6 +118,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               client: widget.client,
               result: result,
               onRetry: () => Navigator.of(context).pop(),
+              onNext: widget.onOpenNext == null
+                  ? null
+                  : () {
+                      Navigator.of(context).pop();
+                      widget.onOpenNext!();
+                    },
             )
           else if (showFailure)
             _FailureBlock(

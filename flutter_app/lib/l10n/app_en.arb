@@ -61,6 +61,18 @@
     "playbackTitle": "Listen to your recording",
     "playbackErrorPrefix": "Playback error: {message}",
     "playbackOpenError": "Could not open the recording for playback.",
+    "attemptAudioTitle": "Listen to your submitted recording",
+    "attemptAudioLoadError": "Could not load the audio.",
+    "attemptAudioOpenError": "Could not open the audio: {message}",
+    "@attemptAudioOpenError": {
+        "placeholders": { "message": { "type": "String" } }
+    },
+    "reviewAudioTitle": "Listen to the model answer to shadow",
+    "reviewAudioLoadError": "Could not load the model audio.",
+    "reviewAudioOpenError": "Could not open the model audio: {message}",
+    "@reviewAudioOpenError": {
+        "placeholders": { "message": { "type": "String" } }
+    },
 
     "resultTitle": "Result",
     "resultTranscriptTitle": "Your transcript",
@@ -69,6 +81,7 @@
     "resultRetryAdviceTitle": "Advice for next time",
     "resultSampleAnswerTitle": "Sample answer",
     "resultRetryCta": "Retry this exercise",
+    "resultNextExerciseCta": "Next exercise",
 
     "reviewArtifactTitle": "Corrections & shadowing",
     "reviewArtifactSubtitle": "Your original, the corrected version, and a model to shadow.",

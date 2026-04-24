@@ -9,7 +9,6 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
-import '../../../shared/widgets/diff_block.dart';
 import '../../../shared/widgets/feedback_card.dart';
 import '../../../shared/widgets/audio_playback_card.dart';
 import '../../../shared/widgets/primary_button.dart';
@@ -21,11 +20,13 @@ class ResultCard extends StatelessWidget {
     required this.client,
     required this.result,
     required this.onRetry,
+    this.onNext,
   });
 
   final ApiClient client;
   final AttemptResult result;
   final VoidCallback onRetry;
+  final VoidCallback? onNext;
 
   @override
   Widget build(BuildContext context) {
@@ -165,12 +166,25 @@ class ResultCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.x4),
           ],
 
-          // Retry CTA
-          PrimaryButton(
-            label: l.resultRetryCta,
-            icon: Icons.refresh,
-            onPressed: onRetry,
-          ),
+          // Retry + Next CTA
+          if (onNext != null) ...[
+            PrimaryButton(
+              label: l.resultNextExerciseCta,
+              icon: Icons.arrow_forward,
+              onPressed: onNext,
+            ),
+            const SizedBox(height: AppSpacing.x3),
+            SecondaryButton(
+              label: l.resultRetryCta,
+              icon: Icons.refresh,
+              onPressed: onRetry,
+            ),
+          ] else
+            PrimaryButton(
+              label: l.resultRetryCta,
+              icon: Icons.refresh,
+              onPressed: onRetry,
+            ),
         ],
       ),
     );
@@ -292,10 +306,6 @@ class _ReviewArtifactSectionState extends State<_ReviewArtifactSection> {
               attemptId: widget.result.id,
               audio: artifact.ttsAudio!,
             ),
-          ],
-          if (artifact.diffChunks.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.x3),
-            DiffBlock(chunks: artifact.diffChunks),
           ],
         ],
       ],

@@ -129,15 +129,29 @@ class _LearnerShellState extends State<LearnerShell> {
     }
   }
 
+  ExerciseSummary? _nextSibling(String exerciseId) {
+    for (final siblings in _exercisesByModule.values) {
+      final idx = siblings.indexWhere((e) => e.id == exerciseId);
+      if (idx >= 0 && idx + 1 < siblings.length) {
+        return siblings[idx + 1];
+      }
+    }
+    return null;
+  }
+
   Future<void> _openExercise(BuildContext context, ExerciseSummary exercise) async {
     final navigator = Navigator.of(context);
     final detail =
         ExerciseDetail.fromJson(await _client.getExercise(exercise.id));
     if (!mounted) return;
+    final next = _nextSibling(exercise.id);
     await navigator.push(
       MaterialPageRoute(
-        builder: (_) =>
-            exercise_feature.ExerciseScreen(client: _client, detail: detail),
+        builder: (ctx) => exercise_feature.ExerciseScreen(
+          client: _client,
+          detail: detail,
+          onOpenNext: next == null ? null : () => _openExercise(ctx, next),
+        ),
       ),
     );
     await _loadRecentAttempts();
@@ -149,10 +163,14 @@ class _LearnerShellState extends State<LearnerShell> {
     final detail =
         ExerciseDetail.fromJson(await _client.getExercise(attempt.exerciseId));
     if (!mounted) return;
+    final next = _nextSibling(attempt.exerciseId);
     await navigator.push(
       MaterialPageRoute(
-        builder: (_) =>
-            exercise_feature.ExerciseScreen(client: _client, detail: detail),
+        builder: (ctx) => exercise_feature.ExerciseScreen(
+          client: _client,
+          detail: detail,
+          onOpenNext: next == null ? null : () => _openExercise(ctx, next),
+        ),
       ),
     );
     await _loadRecentAttempts();

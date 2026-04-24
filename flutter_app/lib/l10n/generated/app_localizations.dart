@@ -419,6 +419,42 @@ abstract class AppLocalizations {
   /// **'Không mở được bản ghi để nghe lại.'**
   String get playbackOpenError;
 
+  /// No description provided for @attemptAudioTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nghe lại audio đã nộp'**
+  String get attemptAudioTitle;
+
+  /// No description provided for @attemptAudioLoadError.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không tải được audio.'**
+  String get attemptAudioLoadError;
+
+  /// No description provided for @attemptAudioOpenError.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không mở được audio: {message}'**
+  String attemptAudioOpenError(String message);
+
+  /// No description provided for @reviewAudioTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nghe audio mẫu để shadow'**
+  String get reviewAudioTitle;
+
+  /// No description provided for @reviewAudioLoadError.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không tải được audio mẫu.'**
+  String get reviewAudioLoadError;
+
+  /// No description provided for @reviewAudioOpenError.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không mở được audio mẫu: {message}'**
+  String reviewAudioOpenError(String message);
+
   /// No description provided for @resultTitle.
   ///
   /// In vi, this message translates to:
@@ -460,6 +496,12 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Thử lại bài này'**
   String get resultRetryCta;
+
+  /// No description provided for @resultNextExerciseCta.
+  ///
+  /// In vi, this message translates to:
+  /// **'Sang bài tiếp theo'**
+  String get resultNextExerciseCta;
 
   /// No description provided for @reviewArtifactTitle.
   ///

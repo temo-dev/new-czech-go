@@ -26,10 +26,12 @@ class ExerciseScreen extends StatefulWidget {
     super.key,
     required this.client,
     required this.detail,
+    this.onOpenNext,
   });
 
   final ApiClient client;
   final ExerciseDetail detail;
+  final VoidCallback? onOpenNext;
 
   @override
   State<ExerciseScreen> createState() => _ExerciseScreenState();
@@ -181,6 +183,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     await _player.stop();
     if (!mounted) return;
     final navigator = Navigator.of(context);
+    final onOpenNext = widget.onOpenNext;
     await navigator.push(
       MaterialPageRoute(
         builder: (_) => AnalysisScreen(
@@ -189,6 +192,12 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           audioPath: audioPath,
           fileSizeBytes: fileSizeBytes,
           durationMs: durationMs,
+          onOpenNext: onOpenNext == null
+              ? null
+              : () {
+                  navigator.pop();
+                  onOpenNext();
+                },
         ),
       ),
     );

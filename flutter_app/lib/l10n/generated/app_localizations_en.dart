@@ -179,6 +179,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playbackOpenError => 'Could not open the recording for playback.';
 
   @override
+  String get attemptAudioTitle => 'Listen to your submitted recording';
+
+  @override
+  String get attemptAudioLoadError => 'Could not load the audio.';
+
+  @override
+  String attemptAudioOpenError(String message) {
+    return 'Could not open the audio: $message';
+  }
+
+  @override
+  String get reviewAudioTitle => 'Listen to the model answer to shadow';
+
+  @override
+  String get reviewAudioLoadError => 'Could not load the model audio.';
+
+  @override
+  String reviewAudioOpenError(String message) {
+    return 'Could not open the model audio: $message';
+  }
+
+  @override
   String get resultTitle => 'Result';
 
   @override
@@ -198,6 +220,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get resultRetryCta => 'Retry this exercise';
+
+  @override
+  String get resultNextExerciseCta => 'Next exercise';
 
   @override
   String get reviewArtifactTitle => 'Corrections & shadowing';

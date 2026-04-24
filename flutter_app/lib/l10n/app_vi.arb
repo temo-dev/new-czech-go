@@ -73,6 +73,18 @@
         "placeholders": { "message": { "type": "String" } }
     },
     "playbackOpenError": "Không mở được bản ghi để nghe lại.",
+    "attemptAudioTitle": "Nghe lại audio đã nộp",
+    "attemptAudioLoadError": "Không tải được audio.",
+    "attemptAudioOpenError": "Không mở được audio: {message}",
+    "@attemptAudioOpenError": {
+        "placeholders": { "message": { "type": "String" } }
+    },
+    "reviewAudioTitle": "Nghe audio mẫu để shadow",
+    "reviewAudioLoadError": "Không tải được audio mẫu.",
+    "reviewAudioOpenError": "Không mở được audio mẫu: {message}",
+    "@reviewAudioOpenError": {
+        "placeholders": { "message": { "type": "String" } }
+    },
 
     "resultTitle": "Kết quả",
     "resultTranscriptTitle": "Transcript của bạn",
@@ -81,6 +93,7 @@
     "resultRetryAdviceTitle": "Lời khuyên cho lần sau",
     "resultSampleAnswerTitle": "Câu trả lời mẫu",
     "resultRetryCta": "Thử lại bài này",
+    "resultNextExerciseCta": "Sang bài tiếp theo",
 
     "reviewArtifactTitle": "Sửa & luyện theo mẫu",
     "reviewArtifactSubtitle": "Bản gốc, bản đã sửa, và bản mẫu để shadow theo.",

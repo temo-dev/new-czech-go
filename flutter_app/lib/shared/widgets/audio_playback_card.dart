@@ -9,6 +9,7 @@ import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/api/api_client.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../../models/models.dart';
 
 /// Audio playback card for a submitted attempt.
@@ -64,7 +65,8 @@ class _AttemptAudioPlaybackCardState
     });
     _errSub = _player.errorStream.listen((e) {
       if (!mounted) return;
-      setState(() => _error = 'Không mở được audio: ${e.message}');
+      final l = AppLocalizations.of(context);
+      setState(() => _error = l.attemptAudioOpenError(e.message ?? ''));
     });
     unawaited(_prepare());
   }
@@ -96,9 +98,10 @@ class _AttemptAudioPlaybackCardState
       });
     } catch (e) {
       if (!mounted) return;
+      final l = AppLocalizations.of(context);
       setState(() {
         _loading = false;
-        _error = 'Không tải được audio.';
+        _error = l.attemptAudioLoadError;
       });
     }
   }
@@ -134,7 +137,10 @@ class _AttemptAudioPlaybackCardState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Nghe lại audio đã nộp', style: AppTypography.titleSmall),
+          Text(
+            AppLocalizations.of(context).attemptAudioTitle,
+            style: AppTypography.titleSmall,
+          ),
           const SizedBox(height: AppSpacing.x3),
           if (_error != null)
             Text(_error!, style: TextStyle(color: AppColors.error))
@@ -231,7 +237,8 @@ class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
     });
     _errSub = _player.errorStream.listen((e) {
       if (!mounted) return;
-      setState(() => _error = 'Không mở được audio mẫu: ${e.message}');
+      final l = AppLocalizations.of(context);
+      setState(() => _error = l.reviewAudioOpenError(e.message ?? ''));
     });
     unawaited(_prepare());
   }
@@ -263,9 +270,10 @@ class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
       });
     } catch (e) {
       if (!mounted) return;
+      final l = AppLocalizations.of(context);
       setState(() {
         _loading = false;
-        _error = 'Không tải được audio mẫu.';
+        _error = l.reviewAudioLoadError;
       });
     }
   }
@@ -301,7 +309,10 @@ class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Nghe audio mẫu để shadow', style: AppTypography.titleSmall),
+          Text(
+            AppLocalizations.of(context).reviewAudioTitle,
+            style: AppTypography.titleSmall,
+          ),
           const SizedBox(height: AppSpacing.x3),
           if (_error != null)
             Text(_error!, style: TextStyle(color: AppColors.error))

@@ -182,10 +182,12 @@ func buildLLMSystemPrompt(locale string) string {
 		audienceClause = "You are an expert Czech language coach for English-speaking learners preparing for the Czech \"trvaly pobyt A2\" oral exam."
 	}
 	languageClause := fmt.Sprintf("CRITICAL LANGUAGE RULE: overall_summary, strengths, improvements, retry_advice MUST be written ENTIRELY in %s. DO NOT write these fields in Czech. DO NOT mix languages. The ONLY field allowed to contain Czech is sample_answer (which must be natural Czech). If you quote a Czech word/phrase from the learner to explain an error, embed it inside a %s sentence (e.g. in %s: \"the phrase X is wrong — use Y\").", targetLanguage, targetLanguage, targetLanguage)
+	pointOfViewClause := "CRITICAL POINT-OF-VIEW RULE: address the learner DIRECTLY in the second person (\"you\", \"your\" / \"bạn\", \"của bạn\"). DO NOT refer to the learner in the third person (do NOT write \"the learner\", \"the student\", \"they\", \"he/she\", \"người học\"). Write feedback AS IF you are speaking TO the learner, not describing them to someone else."
 	return strings.Join([]string{
 		audienceClause,
 		"Evaluate the learner's response and return ONLY valid JSON — no markdown, no explanation, no prose outside the JSON object.",
 		languageClause,
+		pointOfViewClause,
 		"readiness_level MUST be one of: not_ready, almost_ready, ready_for_mock, exam_ready.",
 		fmt.Sprintf("strengths, improvements, retry_advice: arrays of 1-3 CONCISE %s strings each (one actionable idea per string, keep each string under 200 characters).", targetLanguage),
 		"overall_summary: one concise paragraph, under 400 characters.",

@@ -179,6 +179,28 @@ class AppLocalizationsVi extends AppLocalizations {
   String get playbackOpenError => 'Không mở được bản ghi để nghe lại.';
 
   @override
+  String get attemptAudioTitle => 'Nghe lại audio đã nộp';
+
+  @override
+  String get attemptAudioLoadError => 'Không tải được audio.';
+
+  @override
+  String attemptAudioOpenError(String message) {
+    return 'Không mở được audio: $message';
+  }
+
+  @override
+  String get reviewAudioTitle => 'Nghe audio mẫu để shadow';
+
+  @override
+  String get reviewAudioLoadError => 'Không tải được audio mẫu.';
+
+  @override
+  String reviewAudioOpenError(String message) {
+    return 'Không mở được audio mẫu: $message';
+  }
+
+  @override
   String get resultTitle => 'Kết quả';
 
   @override
@@ -198,6 +220,9 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get resultRetryCta => 'Thử lại bài này';
+
+  @override
+  String get resultNextExerciseCta => 'Sang bài tiếp theo';
 
   @override
   String get reviewArtifactTitle => 'Sửa & luyện theo mẫu';
