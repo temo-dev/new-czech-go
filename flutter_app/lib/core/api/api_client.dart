@@ -26,6 +26,11 @@ class ApiClient {
     return payload['data'] as List<dynamic>? ?? const [];
   }
 
+  Future<Map<String, dynamic>> getPlan() async {
+    final payload = await _authed('GET', '/v1/plan');
+    return payload['data'] as Map<String, dynamic>;
+  }
+
   Future<List<dynamic>> getExercises(String moduleId) async {
     final payload = await _authed('GET', '/v1/modules/$moduleId/exercises');
     return payload['data'] as List<dynamic>? ?? const [];
@@ -122,83 +127,47 @@ class ApiClient {
     return payload['data'] as List<dynamic>? ?? const [];
   }
 
+  Future<Map<String, dynamic>> createMockExam() async {
+    final payload = await _authed('POST', '/v1/mock-exams');
+    return payload['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getMockExam(String id) async {
+    final payload = await _authed('GET', '/v1/mock-exams/$id');
+    return payload['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> advanceMockExam(
+    String id, {
+    required String attemptId,
+  }) async {
+    final payload = await _authed(
+      'POST',
+      '/v1/mock-exams/$id/advance',
+      body: {'attempt_id': attemptId},
+    );
+    return payload['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> completeMockExam(String id) async {
+    final payload = await _authed('POST', '/v1/mock-exams/$id/complete');
+    return payload['data'] as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> getAttemptReview(String attemptId) async {
     final payload = await _authed('GET', '/v1/attempts/$attemptId/review');
     return payload['data'] as Map<String, dynamic>;
   }
 
-  Future<File> downloadAttemptAudio(
-    String attemptId, {
-    required String destinationPath,
-  }) async {
-    if (_token == null) {
-      throw const HttpException('Not authenticated.');
-    }
-
-    final client = HttpClient();
-    try {
-      final request = await client.getUrl(attemptAudioUri(attemptId));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $_token');
-      final response = await request.close();
-      if (response.statusCode >= 400) {
-        throw HttpException(
-          'Attempt audio download failed with status ${response.statusCode}.',
-        );
-      }
-
-      final file = File(destinationPath);
-      await file.parent.create(recursive: true);
-      final sink = file.openWrite();
-      try {
-        await response.pipe(sink);
-      } finally {
-        await sink.close();
-      }
-      return file;
-    } finally {
-      client.close(force: true);
-    }
+  Future<AudioStreamInfo> getAttemptAudioUrl(String attemptId) async {
+    final payload = await _authed('GET', '/v1/attempts/$attemptId/audio/url');
+    return AudioStreamInfo.fromJson(payload['data'] as Map<String, dynamic>);
   }
 
-  Future<File> downloadAttemptReviewAudio(
-    String attemptId, {
-    required String destinationPath,
-  }) async {
-    if (_token == null) {
-      throw const HttpException('Not authenticated.');
-    }
-
-    final client = HttpClient();
-    try {
-      final request = await client.getUrl(attemptReviewAudioUri(attemptId));
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $_token');
-      final response = await request.close();
-      if (response.statusCode >= 400) {
-        throw HttpException(
-          'Attempt review audio download failed with status ${response.statusCode}.',
-        );
-      }
-
-      final file = File(destinationPath);
-      await file.parent.create(recursive: true);
-      final sink = file.openWrite();
-      try {
-        await response.pipe(sink);
-      } finally {
-        await sink.close();
-      }
-      return file;
-    } finally {
-      client.close(force: true);
-    }
-  }
-
-  Uri attemptAudioUri(String attemptId) {
-    return Uri.parse('$baseUrl/v1/attempts/$attemptId/audio/file');
-  }
-
-  Uri attemptReviewAudioUri(String attemptId) {
-    return Uri.parse('$baseUrl/v1/attempts/$attemptId/review/audio/file');
+  Future<AudioStreamInfo> getAttemptReviewAudioUrl(String attemptId) async {
+    final payload =
+        await _authed('GET', '/v1/attempts/$attemptId/review/audio/url');
+    return AudioStreamInfo.fromJson(payload['data'] as Map<String, dynamic>);
   }
 
   Uri exerciseAssetUri(String exerciseId, String assetId) {
@@ -291,4 +260,30 @@ class ApiClient {
       client.close(force: true);
     }
   }
+}
+
+class AudioStreamInfo {
+  AudioStreamInfo({
+    required this.url,
+    required this.mimeType,
+    required this.expiresAt,
+  });
+
+  factory AudioStreamInfo.fromJson(Map<String, dynamic> json) {
+    final expiresRaw = json['expires_at'] as String?;
+    return AudioStreamInfo(
+      url: Uri.parse(json['url'] as String),
+      mimeType: (json['mime_type'] as String?) ?? '',
+      expiresAt: expiresRaw == null || expiresRaw.isEmpty
+          ? DateTime.now().add(const Duration(minutes: 10))
+          : DateTime.parse(expiresRaw),
+    );
+  }
+
+  final Uri url;
+  final String mimeType;
+  final DateTime expiresAt;
+
+  bool get isExpiringSoon =>
+      expiresAt.difference(DateTime.now()).inSeconds < 60;
 }

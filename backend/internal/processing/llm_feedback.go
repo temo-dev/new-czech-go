@@ -279,14 +279,20 @@ func describeExercisePrompt(exercise contracts.Exercise) string {
 				fmt.Fprintf(&b, "Story: %s\n", d.StoryTitle)
 			}
 			if len(d.NarrativeCheckpoints) > 0 {
-				b.WriteString("Narrative checkpoints the learner should cover:\n")
-				for _, c := range d.NarrativeCheckpoints {
-					fmt.Fprintf(&b, "- %s\n", c)
+				b.WriteString("Narrative checkpoints the learner should cover (in order):\n")
+				for i, c := range d.NarrativeCheckpoints {
+					fmt.Fprintf(&b, "%d. %s\n", i+1, c)
 				}
 			}
 			if len(d.GrammarFocus) > 0 {
 				b.WriteString("Grammar focus: " + strings.Join(d.GrammarFocus, ", ") + "\n")
 			}
+			b.WriteString("TASK RUBRIC for Uloha 3 (story narration):\n")
+			b.WriteString("- Coverage: how many listed checkpoints did the learner actually narrate? Name specific missing beats in improvements.\n")
+			b.WriteString("- Sequence: does the story flow in correct order? Check for ordering markers (nejdriv, pak, potom, nakonec). If missing, suggest inserting them.\n")
+			b.WriteString("- Past tense: stories require past tense (byl/byla/sli/videli/koupili...). Flag present-tense slips.\n")
+			b.WriteString("- Connectives: praise or suggest 'a pak', 'potom', 'kdyz', 'protoze', 'takze' to link beats.\n")
+			b.WriteString("- sample_answer: write 2-3 Czech sentences covering at least 3 checkpoints in order, with explicit past-tense verbs and at least one ordering marker.\n")
 			return b.String()
 		}
 	case "uloha_4_choice_reasoning":
@@ -304,6 +310,12 @@ func describeExercisePrompt(exercise contracts.Exercise) string {
 			if len(d.ExpectedReasoningAxes) > 0 {
 				b.WriteString("Expected reasoning axes: " + strings.Join(d.ExpectedReasoningAxes, ", ") + "\n")
 			}
+			b.WriteString("TASK RUBRIC for Uloha 4 (choice + reasoning):\n")
+			b.WriteString("- Clear choice: did the learner pick exactly one of the listed options and name it? Expected opening: 'Vybiram...', 'Volim...', 'Chci...'. If missing, flag it explicitly.\n")
+			b.WriteString("- Reason given: at least one 'protoze' (or equivalent 'nebot', 'kvuli') clause. Count clauses: 1 weak, 2 acceptable, 3+ strong.\n")
+			b.WriteString("- Reason matches choice: the reason must connect to the chosen option, not a different option. Call out mismatches specifically.\n")
+			b.WriteString("- Reasoning axes coverage: does the learner's reason touch the expected axes above? Name which axes are covered vs missed.\n")
+			b.WriteString("- sample_answer: one Czech sentence with 'Vybiram [option]' + 'protoze [reason touching one expected axis]'.\n")
 			return b.String()
 		}
 	}

@@ -17,6 +17,32 @@
         "placeholders": { "count": { "type": "int" } }
     },
 
+    "planSectionTitle": "Lộ trình 14 ngày",
+    "planSectionSubtitle": "Theo thứ tự. Hoàn thành từng ngày để lên mock exam.",
+    "planDayLabel": "Ngày {day}",
+    "@planDayLabel": {
+        "placeholders": { "day": { "type": "int" } }
+    },
+    "planStatusDone": "ĐÃ XONG",
+    "planStatusCurrent": "HÔM NAY",
+    "planStatusUpcoming": "SẮP TỚI",
+    "planMockExamLabel": "MOCK EXAM",
+    "mockExamTitle": "Mock thi nói",
+    "mockExamIntroTitle": "4 phần, mỗi phần 1 lần",
+    "mockExamIntroBody": "Làm lần lượt từng Uloha. Có kết quả tổng sau khi xong.",
+    "mockExamSectionLabel": "Phần {index}",
+    "@mockExamSectionLabel": {
+        "placeholders": { "index": { "type": "int" } }
+    },
+    "mockExamStatusDone": "XONG",
+    "mockExamStatusPending": "CHỜ",
+    "mockExamActionStart": "Bắt đầu",
+    "mockExamActionDone": "Xong",
+    "mockExamResultTitle": "Kết quả mock exam",
+    "mockExamOverallTitle": "Mức sẵn sàng tổng",
+    "mockExamBackHome": "Về trang chủ",
+    "mockExamOpenCta": "Mở mock exam",
+
     "recentAttemptsTitle": "Lần tập gần đây",
     "recentAttemptsSubtitle": "Xem transcript và feedback để theo dõi tiến bộ.",
     "openExercise": "Mở bài tập",

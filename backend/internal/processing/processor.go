@@ -587,9 +587,9 @@ func firstWordFragment(text string, count int) string {
 func evaluateTaskCompletion(exercise contracts.Exercise, transcript string) ([]contracts.CriterionCheck, string) {
 	switch exercise.ExerciseType {
 	case "uloha_3_story_narration":
-		return evaluateStoryNarration(transcript)
+		return evaluateStoryNarration(exercise, transcript)
 	case "uloha_4_choice_reasoning":
-		return evaluateChoiceReasoning(transcript)
+		return evaluateChoiceReasoning(exercise, transcript)
 	case "uloha_2_dialogue_questions":
 		return evaluateDialogueQuestions(transcript)
 	default:
@@ -641,32 +641,235 @@ func evaluateDialogueQuestions(transcript string) ([]contracts.CriterionCheck, s
 	return criteria, bandFromCriteria(criteria)
 }
 
-func evaluateStoryNarration(transcript string) ([]contracts.CriterionCheck, string) {
-	coveredEvents := countMatches(transcript, []string{"nejdriv", "pak", "nakonec", "potom"}) >= 2
-	hasSequence := containsAny(transcript, []string{"nejdriv", "pak", "nakonec", "potom"})
-	hasStoryLanguage := countMatches(transcript, []string{"byli", "koupili", "odvezli", "jela", "vezli"}) >= 2
+func evaluateStoryNarration(exercise contracts.Exercise, transcript string) ([]contracts.CriterionCheck, string) {
+	sequenceMarkers := []string{"nejdriv", "pak", "nakonec", "potom"}
+	pastVerbs := []string{"byli", "byla", "byl", "koupili", "odvezli", "jela", "vezli", "sli", "udelali", "videli", "rekli"}
+
+	detail, detailOK := extractUloha3Detail(exercise.Detail)
+	checkpoints := detail.NarrativeCheckpoints
+	grammarFocus := detail.GrammarFocus
+
+	coverageRatio := 0.0
+	if detailOK && len(checkpoints) > 0 {
+		coverageRatio = checkpointCoverage(transcript, checkpoints)
+	}
+	coveredEvents := coverageRatio >= 0.5 ||
+		(len(checkpoints) == 0 && countMatches(transcript, sequenceMarkers) >= 2)
+
+	markerHits := countMatches(transcript, sequenceMarkers)
+	hasSequence := markerHits >= 2 ||
+		(markerHits >= 1 && coverageRatio >= 0.5) ||
+		(len(checkpoints) >= 2 && checkpointsInOrder(transcript, checkpoints))
+
+	pastHits := countMatches(transcript, pastVerbs)
+	grammarHit := len(grammarFocus) > 0 && containsAny(transcript, tokenizeAll(grammarFocus))
+	hasStoryLanguage := pastHits >= 2 || (pastHits >= 1 && grammarHit)
+
+	coveredComment := boolComment(coveredEvents,
+		"Ban da nhac den nhieu moc chinh cua cau chuyen.",
+		"Hay nhac them cac buoc quan trong cua cau chuyen.")
+	if !coveredEvents && len(checkpoints) > 0 {
+		missing := missingCheckpoints(transcript, checkpoints, 2)
+		if len(missing) > 0 {
+			coveredComment = "Hay nhac den: " + strings.Join(missing, "; ") + "."
+		}
+	}
 
 	criteria := []contracts.CriterionCheck{
-		{CriterionKey: "covered_story_events", Label: "Bao quat cac su kien chinh", Met: coveredEvents, Comment: boolComment(coveredEvents, "Ban da nhac den nhieu moc chinh cua cau chuyen.", "Hay nhac den them cac buoc quan trong cua cau chuyen.")},
+		{CriterionKey: "covered_story_events", Label: "Bao quat cac su kien chinh", Met: coveredEvents, Comment: coveredComment},
 		{CriterionKey: "narrative_sequence_present", Label: "Co trinh tu ke chuyen", Met: hasSequence, Comment: boolComment(hasSequence, "Ban da ke theo mot trinh tu de theo doi.", "Hay them tu noi thu tu nhu nejdriv, pak, nakonec.")},
-		{CriterionKey: "used_story_language", Label: "Dung ngon ngu ke chuyen", Met: hasStoryLanguage, Comment: boolComment(hasStoryLanguage, "Ban da dung cach noi phu hop de ke chuyen.", "Hay thu dung them cach noi giong mot cau chuyen tron ven.")},
+		{CriterionKey: "used_story_language", Label: "Dung ngon ngu ke chuyen", Met: hasStoryLanguage, Comment: boolComment(hasStoryLanguage, "Ban da dung cach noi phu hop de ke chuyen.", "Hay dung them dong tu o qua khu (byl, sli, videli...).")},
 	}
 
 	return criteria, bandFromCriteria(criteria)
 }
 
-func evaluateChoiceReasoning(transcript string) ([]contracts.CriterionCheck, string) {
-	madeChoice := containsAny(transcript, []string{"vybiram", "volim", "chci", "beru"})
-	gaveReason := strings.Contains(transcript, "protoze")
-	reasonMatchesChoice := madeChoice && gaveReason
+func evaluateChoiceReasoning(exercise contracts.Exercise, transcript string) ([]contracts.CriterionCheck, string) {
+	detail, detailOK := extractUloha4Detail(exercise.Detail)
+	choiceVerbs := []string{"vybiram", "volim", "chci", "beru", "vyberu", "vybral", "vybrala"}
+
+	var identifiedOption *contracts.ChoiceOption
+	if detailOK {
+		for i := range detail.Options {
+			opt := detail.Options[i]
+			if optionMentioned(transcript, opt) {
+				identifiedOption = &detail.Options[i]
+				break
+			}
+		}
+	}
+
+	madeChoice := identifiedOption != nil || containsAny(transcript, choiceVerbs)
+
+	axisHit := false
+	matchedAxis := ""
+	if detailOK {
+		for _, axis := range detail.ExpectedReasoningAxes {
+			tokens := contentTokens(axis)
+			if len(tokens) > 0 && containsAny(transcript, tokens) {
+				axisHit = true
+				matchedAxis = axis
+				break
+			}
+		}
+	}
+	gaveReason := strings.Contains(transcript, "protoze") || axisHit
+
+	reasonMatchesChoice := identifiedOption != nil && gaveReason
+	if reasonMatchesChoice && detailOK && identifiedOption != nil && matchedAxis != "" {
+		reasonMatchesChoice = tokensCoOccur(transcript, contentTokens(identifiedOption.Label), contentTokens(matchedAxis), 12)
+	}
+
+	choiceComment := boolComment(madeChoice,
+		"Ban da noi ro minh chon phuong an nao.",
+		"Hay noi ro ban chon phuong an nao truoc.")
+	if !madeChoice && detailOK && len(detail.Options) > 0 {
+		names := make([]string, 0, len(detail.Options))
+		for _, o := range detail.Options {
+			if o.Label != "" {
+				names = append(names, o.Label)
+			}
+		}
+		if len(names) > 0 {
+			choiceComment = "Hay bat dau bang cau \"Vybiram...\" voi mot trong: " + strings.Join(names, ", ") + "."
+		}
+	}
 
 	criteria := []contracts.CriterionCheck{
-		{CriterionKey: "made_clear_choice", Label: "Dua ra lua chon ro rang", Met: madeChoice, Comment: boolComment(madeChoice, "Ban da noi ro minh chon phuong an nao.", "Hay noi ro ban chon phuong an nao truoc.")},
-		{CriterionKey: "gave_reason", Label: "Dua ra ly do", Met: gaveReason, Comment: boolComment(gaveReason, "Ban da giai thich vi sao minh chon nhu vay.", "Hay them it nhat mot ly do ngan gon.")},
+		{CriterionKey: "made_clear_choice", Label: "Dua ra lua chon ro rang", Met: madeChoice, Comment: choiceComment},
+		{CriterionKey: "gave_reason", Label: "Dua ra ly do", Met: gaveReason, Comment: boolComment(gaveReason, "Ban da giai thich vi sao minh chon nhu vay.", "Hay them it nhat mot ly do voi tu \"protoze\".")},
 		{CriterionKey: "reason_matches_choice", Label: "Ly do khop voi lua chon", Met: reasonMatchesChoice, Comment: boolComment(reasonMatchesChoice, "Ly do cua ban phu hop voi lua chon.", "Hay noi ly do gan sat hon voi phuong an duoc chon.")},
 	}
 
 	return criteria, bandFromCriteria(criteria)
+}
+
+func checkpointCoverage(transcript string, checkpoints []string) float64 {
+	if len(checkpoints) == 0 {
+		return 0
+	}
+	hit := 0
+	for _, cp := range checkpoints {
+		tokens := contentTokens(cp)
+		if len(tokens) == 0 {
+			continue
+		}
+		if containsAny(transcript, tokens) {
+			hit++
+		}
+	}
+	return float64(hit) / float64(len(checkpoints))
+}
+
+func checkpointsInOrder(transcript string, checkpoints []string) bool {
+	pos := 0
+	for _, cp := range checkpoints {
+		tokens := contentTokens(cp)
+		if len(tokens) == 0 {
+			continue
+		}
+		nextPos := -1
+		for _, t := range tokens {
+			idx := strings.Index(transcript[pos:], t)
+			if idx >= 0 && (nextPos < 0 || idx < nextPos) {
+				nextPos = idx
+			}
+		}
+		if nextPos < 0 {
+			return false
+		}
+		pos += nextPos + 1
+	}
+	return true
+}
+
+func missingCheckpoints(transcript string, checkpoints []string, maxCount int) []string {
+	missing := make([]string, 0, maxCount)
+	for _, cp := range checkpoints {
+		tokens := contentTokens(cp)
+		if len(tokens) == 0 {
+			continue
+		}
+		if !containsAny(transcript, tokens) {
+			missing = append(missing, cp)
+			if len(missing) >= maxCount {
+				break
+			}
+		}
+	}
+	return missing
+}
+
+func optionMentioned(transcript string, opt contracts.ChoiceOption) bool {
+	candidates := make([]string, 0, 4)
+	candidates = append(candidates, contentTokens(opt.Label)...)
+	candidates = append(candidates, contentTokens(opt.Description)...)
+	if opt.OptionKey != "" {
+		candidates = append(candidates, strings.ToLower(opt.OptionKey))
+	}
+	return containsAny(transcript, candidates)
+}
+
+var stopwordsCzech = map[string]struct{}{
+	"a": {}, "i": {}, "v": {}, "s": {}, "k": {}, "o": {}, "u": {}, "z": {},
+	"do": {}, "na": {}, "se": {}, "si": {}, "je": {}, "to": {}, "ten": {}, "ta": {},
+	"mi": {}, "my": {}, "ja": {}, "on": {}, "ona": {}, "ho": {}, "by": {},
+	"co": {}, "ze": {}, "az": {}, "za": {}, "po": {}, "pro": {},
+}
+
+func contentTokens(text string) []string {
+	if text == "" {
+		return nil
+	}
+	normalized := normalizeTranscript(text)
+	words := strings.Fields(normalized)
+	tokens := make([]string, 0, len(words))
+	for _, w := range words {
+		if len(w) < 3 {
+			continue
+		}
+		if _, stop := stopwordsCzech[w]; stop {
+			continue
+		}
+		tokens = append(tokens, w)
+	}
+	return tokens
+}
+
+func tokenizeAll(items []string) []string {
+	out := make([]string, 0, len(items)*2)
+	for _, item := range items {
+		out = append(out, contentTokens(item)...)
+	}
+	return out
+}
+
+func tokensCoOccur(transcript string, a, b []string, window int) bool {
+	if len(a) == 0 || len(b) == 0 {
+		return false
+	}
+	words := strings.Fields(transcript)
+	aIdx := firstIndex(words, a)
+	bIdx := firstIndex(words, b)
+	if aIdx < 0 || bIdx < 0 {
+		return false
+	}
+	diff := aIdx - bIdx
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff <= window
+}
+
+func firstIndex(words []string, needles []string) int {
+	for i, w := range words {
+		for _, n := range needles {
+			if strings.Contains(w, n) {
+				return i
+			}
+		}
+	}
+	return -1
 }
 
 func evaluateGrammar(transcript string, reliability transcriptReliability) contracts.GrammarFeedback {

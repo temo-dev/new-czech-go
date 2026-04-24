@@ -34,6 +34,67 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String get planSectionTitle => 'Lộ trình 14 ngày';
+
+  @override
+  String get planSectionSubtitle => 'Theo thứ tự. Hoàn thành từng ngày để lên mock exam.';
+
+  @override
+  String planDayLabel(int day) {
+    return 'Ngày $day';
+  }
+
+  @override
+  String get planStatusDone => 'ĐÃ XONG';
+
+  @override
+  String get planStatusCurrent => 'HÔM NAY';
+
+  @override
+  String get planStatusUpcoming => 'SẮP TỚI';
+
+  @override
+  String get planMockExamLabel => 'MOCK EXAM';
+
+  @override
+  String get mockExamTitle => 'Mock thi nói';
+
+  @override
+  String get mockExamIntroTitle => '4 phần, mỗi phần 1 lần';
+
+  @override
+  String get mockExamIntroBody => 'Làm lần lượt từng Uloha. Có kết quả tổng sau khi xong.';
+
+  @override
+  String mockExamSectionLabel(int index) {
+    return 'Phần $index';
+  }
+
+  @override
+  String get mockExamStatusDone => 'XONG';
+
+  @override
+  String get mockExamStatusPending => 'CHỜ';
+
+  @override
+  String get mockExamActionStart => 'Bắt đầu';
+
+  @override
+  String get mockExamActionDone => 'Xong';
+
+  @override
+  String get mockExamResultTitle => 'Kết quả mock exam';
+
+  @override
+  String get mockExamOverallTitle => 'Mức sẵn sàng tổng';
+
+  @override
+  String get mockExamBackHome => 'Về trang chủ';
+
+  @override
+  String get mockExamOpenCta => 'Mở mock exam';
+
+  @override
   String get recentAttemptsTitle => 'Lần tập gần đây';
 
   @override

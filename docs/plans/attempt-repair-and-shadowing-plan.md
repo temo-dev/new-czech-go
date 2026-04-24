@@ -1,5 +1,7 @@
 # Plan: Attempt Repair And Shadowing
 
+> **Status (2026-04-25):** Phase 1–5 shipped. Backend emits review artifacts with corrected transcript + model answer + Polly TTS, Flutter renders review card with shadow playback. Task 9 shipped: Uloha 3 evaluator uses `NarrativeCheckpoints` coverage + ordering + past-tense detection; Uloha 4 evaluator resolves option via label/key + checks reasoning axes + choice-reason co-occurrence. LLM prompt carries per-task rubric blocks for Uloha 3 and 4.
+
 ## Overview
 This plan covers the first build-ready sequence for a new post-attempt coaching layer:
 - corrected Czech text

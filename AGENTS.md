@@ -70,11 +70,11 @@ The implemented V1 foundation currently includes:
 - Flutter learner flow for all four oral tasks: recording with split Stop/Analyze, dedicated `AnalysisScreen` spinner, result rendering, recent attempts, audio replay, review artifact display with TTS audio playback
 - Flutter i18n (Vietnamese + English) via ARB + generated `AppLocalizations`, with in-app locale selector persisted via `SharedPreferences`
 - Flutter bottom navigation with separate `Home` and `History` tabs
+- Provider-aware audio streaming: `GET /v1/attempts/:id/audio/url` + `.../review/audio/url` return short-lived signed URLs (S3 presigned for cloud, HMAC-signed backend stream for local). Flutter `just_audio` streams directly via `setUrl` instead of downloading.
 
 Important current limitations:
 - local strict real-transcript mode still depends on valid AWS credentials plus `transcribe:*` IAM on the active local identity
-- completed-attempt audio replay is strongest for backend-owned local files; provider-aware replay for cloud-only audio still needs more work
-- task-aware feedback for `Uloha 3` and `Uloha 4` is not as refined as `Uloha 1` and `Uloha 2`
+- task-aware feedback for `Uloha 3` and `Uloha 4` now uses exercise-aware rule evaluation + LLM rubric prompts; coverage still lighter than `Uloha 1` / `Uloha 2`
 
 ## Working Rules
 - Build in thin vertical slices.
@@ -156,10 +156,10 @@ If you notice adjacent cleanup, note it separately instead of silently expanding
 
 ## Good Next Steps
 Preferred sequence from the current repo state:
-1. add provider-aware replay for cloud-only stored audio artifacts
-2. refine `Uloha 3` and `Uloha 4` task-aware feedback to match `Uloha 1` / `Uloha 2` quality
-3. tighten LLM prompt and schema coverage for shadowing on `Uloha 3` (story ordering) and `Uloha 4` (choice reasoning)
-4. expand i18n coverage to any remaining untranslated strings and add the next learner-locale if scope changes
+1. deepen `Uloha 3` and `Uloha 4` feedback further (learner-surface messaging, sample-answer polish) to close the gap with `Uloha 1` / `Uloha 2`
+2. expand i18n coverage to any remaining untranslated strings and add the next learner-locale if scope changes
+3. begin the Flutter UI migration plan (design-system refactor, GoRouter shell)
+4. seed content packs for daily-plan modules and mock-exam pools so learners have meaningful rotation
 
 ## Avoid
 - adding generic plugin systems

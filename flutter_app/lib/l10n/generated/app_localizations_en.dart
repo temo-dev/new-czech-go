@@ -34,6 +34,67 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get planSectionTitle => '14-day plan';
+
+  @override
+  String get planSectionSubtitle => 'Go in order. Finish each day to unlock the mock exam.';
+
+  @override
+  String planDayLabel(int day) {
+    return 'Day $day';
+  }
+
+  @override
+  String get planStatusDone => 'DONE';
+
+  @override
+  String get planStatusCurrent => 'TODAY';
+
+  @override
+  String get planStatusUpcoming => 'UPCOMING';
+
+  @override
+  String get planMockExamLabel => 'MOCK EXAM';
+
+  @override
+  String get mockExamTitle => 'Mock oral exam';
+
+  @override
+  String get mockExamIntroTitle => 'Four sections, one attempt each';
+
+  @override
+  String get mockExamIntroBody => 'Run through each Uloha in order. You get feedback at the end.';
+
+  @override
+  String mockExamSectionLabel(int index) {
+    return 'Section $index';
+  }
+
+  @override
+  String get mockExamStatusDone => 'DONE';
+
+  @override
+  String get mockExamStatusPending => 'PENDING';
+
+  @override
+  String get mockExamActionStart => 'Start';
+
+  @override
+  String get mockExamActionDone => 'Done';
+
+  @override
+  String get mockExamResultTitle => 'Mock exam result';
+
+  @override
+  String get mockExamOverallTitle => 'Overall readiness';
+
+  @override
+  String get mockExamBackHome => 'Back to home';
+
+  @override
+  String get mockExamOpenCta => 'Open mock exam';
+
+  @override
   String get recentAttemptsTitle => 'Recent attempts';
 
   @override

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
@@ -13,7 +12,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../models/models.dart';
 
 /// Audio playback card for a submitted attempt.
-/// Downloads the audio from the backend then plays locally.
+/// Streams from a backend-signed URL — no full download.
 class AttemptAudioPlaybackCard extends StatefulWidget {
   const AttemptAudioPlaybackCard({
     super.key,
@@ -63,7 +62,19 @@ class _AttemptAudioPlaybackCardState
       if (!mounted) return;
       setState(() => _duration = d);
     });
-    _errSub = _player.errorStream.listen((e) {
+    _errSub = _player.errorStream.listen((e) async {
+      if (!mounted) return;
+      if (!_refreshedOnError) {
+        _refreshedOnError = true;
+        try {
+          final info = await widget.client.getAttemptAudioUrl(widget.attemptId);
+          _stream = info;
+          await _player.setUrl(info.url.toString());
+          return;
+        } catch (_) {
+          // fall through to show error
+        }
+      }
       if (!mounted) return;
       final l = AppLocalizations.of(context);
       setState(() => _error = l.attemptAudioOpenError(e.message ?? ''));
@@ -81,15 +92,14 @@ class _AttemptAudioPlaybackCardState
     super.dispose();
   }
 
+  AudioStreamInfo? _stream;
+  bool _refreshedOnError = false;
+
   Future<void> _prepare() async {
     try {
-      final tmp = await getTemporaryDirectory();
-      final ext = _audioExtension(widget.audio.storageKey, widget.audio.mimeType);
-      final file = await widget.client.downloadAttemptAudio(
-        widget.attemptId,
-        destinationPath: '${tmp.path}/attempt_${widget.attemptId}.$ext',
-      );
-      final dur = await _player.setFilePath(file.path);
+      final info = await widget.client.getAttemptAudioUrl(widget.attemptId);
+      _stream = info;
+      final dur = await _player.setUrl(info.url.toString());
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -106,12 +116,27 @@ class _AttemptAudioPlaybackCardState
     }
   }
 
+  Future<void> _refreshStreamOnError() async {
+    if (_refreshedOnError) return;
+    _refreshedOnError = true;
+    try {
+      final info = await widget.client.getAttemptAudioUrl(widget.attemptId);
+      _stream = info;
+      await _player.setUrl(info.url.toString());
+    } catch (_) {
+      // leave _error as-is
+    }
+  }
+
   Future<void> _toggle() async {
     if (_loading || _error != null) return;
     final dur = _duration ?? _player.duration;
     if (_player.playing) {
       await _player.pause();
       return;
+    }
+    if (_stream != null && _stream!.isExpiringSoon) {
+      await _refreshStreamOnError();
     }
     if (dur != null && _position >= dur) await _player.seek(Duration.zero);
     await _player.play();
@@ -235,7 +260,20 @@ class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
       if (!mounted) return;
       setState(() => _duration = d);
     });
-    _errSub = _player.errorStream.listen((e) {
+    _errSub = _player.errorStream.listen((e) async {
+      if (!mounted) return;
+      if (!_refreshedOnError) {
+        _refreshedOnError = true;
+        try {
+          final info =
+              await widget.client.getAttemptReviewAudioUrl(widget.attemptId);
+          _stream = info;
+          await _player.setUrl(info.url.toString());
+          return;
+        } catch (_) {
+          // fall through
+        }
+      }
       if (!mounted) return;
       final l = AppLocalizations.of(context);
       setState(() => _error = l.reviewAudioOpenError(e.message ?? ''));
@@ -253,15 +291,15 @@ class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
     super.dispose();
   }
 
+  AudioStreamInfo? _stream;
+  bool _refreshedOnError = false;
+
   Future<void> _prepare() async {
     try {
-      final tmp = await getTemporaryDirectory();
-      final ext = _audioExtension(widget.audio.storageKey, widget.audio.mimeType);
-      final file = await widget.client.downloadAttemptReviewAudio(
-        widget.attemptId,
-        destinationPath: '${tmp.path}/review_${widget.attemptId}.$ext',
-      );
-      final dur = await _player.setFilePath(file.path);
+      final info =
+          await widget.client.getAttemptReviewAudioUrl(widget.attemptId);
+      _stream = info;
+      final dur = await _player.setUrl(info.url.toString());
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -284,6 +322,14 @@ class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
     if (_player.playing) {
       await _player.pause();
       return;
+    }
+    if (_stream != null && _stream!.isExpiringSoon) {
+      try {
+        final info =
+            await widget.client.getAttemptReviewAudioUrl(widget.attemptId);
+        _stream = info;
+        await _player.setUrl(info.url.toString());
+      } catch (_) {}
     }
     if (dur != null && _position >= dur) await _player.seek(Duration.zero);
     await _player.play();
@@ -365,14 +411,3 @@ String _fmt(Duration d) {
   return '$m:$s';
 }
 
-String _audioExtension(String storageKey, String mimeType) {
-  final dot = storageKey.lastIndexOf('.');
-  if (dot >= 0 && dot < storageKey.length - 1) return storageKey.substring(dot + 1);
-  return switch (mimeType.toLowerCase()) {
-    'audio/m4a' || 'audio/x-m4a' || 'audio/mp4a-latm' => 'm4a',
-    'audio/mp4'  => 'mp4',
-    'audio/mpeg' => 'mp3',
-    'audio/wav' || 'audio/x-wav' || 'audio/wave' => 'wav',
-    _ => 'bin',
-  };
-}

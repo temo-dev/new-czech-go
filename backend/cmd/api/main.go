@@ -61,7 +61,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("could not configure upload target provider: %v", err)
 	}
-	handler := httpapi.NewServer(repo, processing.NewProcessor(repo, transcriber, ttsProvider, llmProvider, reviewProvider), uploadProvider)
+	audioSignSecret := httpapi.AudioSigningSecretFromEnv(log.Printf)
+	audioURLProvider, err := httpapi.NewConfiguredAudioURLProvider(context.Background(), audioSignSecret)
+	if err != nil {
+		log.Fatalf("could not configure audio url provider: %v", err)
+	}
+	handler := httpapi.NewServerWithAudio(repo, processing.NewProcessor(repo, transcriber, ttsProvider, llmProvider, reviewProvider), uploadProvider, audioURLProvider, audioSignSecret)
 
 	log.Printf("backend listening on %s", addr)
 	if err := http.ListenAndServe(addr, handler); err != nil {

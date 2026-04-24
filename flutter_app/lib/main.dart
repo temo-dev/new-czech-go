@@ -11,6 +11,7 @@ import 'l10n/generated/app_localizations.dart';
 import 'features/exercise/screens/exercise_screen.dart' as exercise_feature;
 import 'features/history/screens/history_screen.dart';
 import 'features/home/screens/home_screen.dart';
+import 'features/mock_exam/screens/mock_exam_screen.dart';
 import 'models/models.dart';
 import 'shared/widgets/app_bottom_nav.dart';
 
@@ -64,6 +65,7 @@ class _LearnerShellState extends State<LearnerShell> {
   List<ModuleSummary> _modules = const [];
   Map<String, List<ExerciseSummary>> _exercisesByModule = const {};
   List<AttemptResult> _recentAttempts = const [];
+  LearningPlanView? _plan;
   int _tabIndex = 0;
 
   @override
@@ -83,17 +85,24 @@ class _LearnerShellState extends State<LearnerShell> {
         password: 'demo123',
       );
       final modulesPayload = await _client.getModules();
-      final modules = modulesPayload
+      final allModules = modulesPayload
           .map((item) => ModuleSummary.fromJson(item as Map<String, dynamic>))
           .toList();
 
       final exerciseMap = <String, List<ExerciseSummary>>{};
-      for (final module in modules) {
+      for (final module in allModules) {
         final payload = await _client.getExercises(module.id);
         exerciseMap[module.id] = payload
             .map((item) => ExerciseSummary.fromJson(item as Map<String, dynamic>))
             .toList();
       }
+
+      final modules = allModules
+          .where((m) => (exerciseMap[m.id] ?? const []).isNotEmpty)
+          .toList();
+
+      final planPayload = await _client.getPlan();
+      final plan = LearningPlanView.fromJson(planPayload);
 
       final attemptsPayload = await _client.getAttempts();
       final recentAttempts = attemptsPayload
@@ -106,6 +115,7 @@ class _LearnerShellState extends State<LearnerShell> {
                 'Learner';
         _modules = modules;
         _exercisesByModule = exerciseMap;
+        _plan = plan;
         _recentAttempts = recentAttempts;
       });
     } catch (err) {
@@ -152,6 +162,15 @@ class _LearnerShellState extends State<LearnerShell> {
           detail: detail,
           onOpenNext: next == null ? null : () => _openExercise(ctx, next),
         ),
+      ),
+    );
+    await _loadRecentAttempts();
+  }
+
+  Future<void> _openMockExam(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MockExamScreen(client: _client),
       ),
     );
     await _loadRecentAttempts();
@@ -211,6 +230,8 @@ class _LearnerShellState extends State<LearnerShell> {
         modules: _modules,
         exercisesByModule: _exercisesByModule,
         onOpenExercise: (e) => _openExercise(context, e),
+        plan: _plan,
+        onOpenMockExam: () => _openMockExam(context),
       );
     }
     return Scaffold(
