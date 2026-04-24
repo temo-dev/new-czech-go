@@ -35,13 +35,13 @@ Content model + attempt model
 **Description:** Define the minimal shared model for content, oral tasks, attempts, transcripts, and feedback so backend, Flutter, and CMS can all build against the same shape.
 
 **Acceptance criteria:**
-- [ ] The plan documents the core entities and required fields for `Task`, `Prompt`, `Attempt`, `Transcript`, and `Feedback`.
-- [ ] Each of the four oral task types has a clear content schema.
-- [ ] The result payload shape is stable enough for both learner UI and CMS review.
+- [x] The plan documents the core entities and required fields for `Task`, `Prompt`, `Attempt`, `Transcript`, and `Feedback`.
+- [x] Each of the four oral task types has a clear content schema.
+- [x] The result payload shape is stable enough for both learner UI and CMS review.
 
 **Verification:**
-- [ ] Manual check: the entity list covers learner flow, content ops, and scoring output without undefined gaps.
-- [ ] Manual check: each task type can be represented without custom one-off fields.
+- [x] Manual check: the entity list covers learner flow, content ops, and scoring output without undefined gaps.
+- [x] Manual check: each task type can be represented without custom one-off fields.
 
 **Dependencies:** None
 
@@ -56,13 +56,13 @@ Content model + attempt model
 **Description:** Lock the simplest deployable baseline for storage, backend runtime, audio handling, and environment configuration so implementation does not drift into over-engineered infra.
 
 **Acceptance criteria:**
-- [ ] Backend hosting choice is explicit.
-- [ ] Storage choices for audio and relational data are explicit.
-- [ ] Attempt processing mode is explicit: upload-first or hybrid.
+- [x] Backend hosting choice is explicit.
+- [x] Storage choices for audio and relational data are explicit.
+- [x] Attempt processing mode is explicit: upload-first or hybrid.
 
 **Verification:**
-- [ ] Manual check: every core component has one chosen home and one backup option.
-- [ ] Manual check: the baseline fits the two-week timeline and sub-50-dollar prototype budget.
+- [x] Manual check: every core component has one chosen home and one backup option.
+- [x] Manual check: the baseline fits the two-week timeline and sub-50-dollar prototype budget.
 
 **Dependencies:** Task 1
 
@@ -77,13 +77,13 @@ Content model + attempt model
 **Description:** Specify the request and response contracts for auth, content fetch, attempt creation, audio upload, scoring start, and result fetch.
 
 **Acceptance criteria:**
-- [ ] The learner attempt lifecycle is documented from `attempt_created` to `attempt_completed`.
-- [ ] CMS endpoints for content CRUD are listed.
-- [ ] Error states are named for failed upload, failed transcript, and failed scoring.
+- [x] The learner attempt lifecycle is documented from `attempt_created` to `attempt_completed`.
+- [x] CMS endpoints for content CRUD are listed.
+- [x] Error states are named for failed upload, failed transcript, and failed scoring.
 
 **Verification:**
-- [ ] Manual check: a learner can complete one attempt end-to-end on paper using only the documented APIs.
-- [ ] Manual check: API sequence does not require hidden service behavior.
+- [x] Manual check: a learner can complete one attempt end-to-end on paper using only the documented APIs.
+- [x] Manual check: API sequence does not require hidden service behavior.
 
 **Dependencies:** Tasks 1-2
 
@@ -94,9 +94,9 @@ Content model + attempt model
 **Estimated scope:** Medium: 3-5 files
 
 ### Checkpoint: Foundation
-- [ ] Core entities, infra baseline, and API contracts are documented.
-- [ ] The attempt lifecycle is unambiguous.
-- [ ] The chosen baseline still fits the two-week delivery window.
+- [x] Core entities, infra baseline, and API contracts are documented.
+- [x] The attempt lifecycle is unambiguous.
+- [x] The chosen baseline still fits the two-week delivery window.
 
 ### Phase 2: Core Product Slices
 
@@ -105,13 +105,13 @@ Content model + attempt model
 **Description:** Implement the smallest full path for topic-question speaking practice, including content entry, prompt display, recording, transcript, and feedback.
 
 **Acceptance criteria:**
-- [ ] A CMS admin can create a `Uloha 1` item with prompt text, topic metadata, and feedback template.
-- [ ] A learner can open the item, record an answer, and receive a transcript and feedback.
-- [ ] The result screen shows task-specific guidance rather than generic text.
+- [x] A CMS admin can create a `Uloha 1` item with prompt text, topic metadata, and feedback template.
+- [x] A learner can open the item, record an answer, and receive a transcript and feedback.
+- [x] The result screen shows task-specific guidance rather than generic text.
 
 **Verification:**
-- [ ] Manual check: create one `Uloha 1` exercise in CMS and complete it from the learner app.
-- [ ] Manual check: stored attempt includes audio location, transcript, and feedback payload.
+- [x] Manual check: create one `Uloha 1` exercise in CMS and complete it from the learner app.
+- [x] Manual check: stored attempt includes audio location, transcript, and feedback payload.
 
 **Dependencies:** Tasks 1-3
 
@@ -128,13 +128,13 @@ Content model + attempt model
 **Description:** Extend the first slice to support the four-image storytelling task, including image-driven content, longer recordings, and past-tense oriented feedback.
 
 **Acceptance criteria:**
-- [ ] CMS supports four images plus prompt metadata for `Uloha 3`.
-- [ ] Learner app renders the image set and records one narration attempt.
-- [ ] Feedback includes coverage of all images and narrative coherence checks.
+- [x] CMS supports four images plus prompt metadata for `Uloha 3`.
+- [x] Learner app renders the image set and records one narration attempt.
+- [~] Feedback includes coverage of all images and narrative coherence checks. *(rule-based only; deeper LLM coverage still tracked in attempt-repair plan Task 9.)*
 
 **Verification:**
-- [ ] Manual check: a user can complete a full story narration exercise from the learner app.
-- [ ] Manual check: feedback flags missing image coverage when the answer skips part of the story.
+- [x] Manual check: a user can complete a full story narration exercise from the learner app.
+- [~] Manual check: feedback flags missing image coverage when the answer skips part of the story. *(shallow; to refine)*
 
 **Dependencies:** Task 4
 
@@ -151,13 +151,13 @@ Content model + attempt model
 **Description:** Implement the decision task where the learner must choose from visible options and justify the choice.
 
 **Acceptance criteria:**
-- [ ] CMS supports three options plus prompt framing for `Uloha 4`.
-- [ ] Learner app renders the choices clearly and records one response.
-- [ ] Feedback checks whether the learner made a choice and supported it with a reason.
+- [x] CMS supports three options plus prompt framing for `Uloha 4`.
+- [x] Learner app renders the choices clearly and records one response.
+- [~] Feedback checks whether the learner made a choice and supported it with a reason. *(rule-based keyword match; refinement pending.)*
 
 **Verification:**
-- [ ] Manual check: a learner can complete the exercise and receive a choice-plus-reason assessment.
-- [ ] Manual check: the result distinguishes between missing choice and weak justification.
+- [x] Manual check: a learner can complete the exercise and receive a choice-plus-reason assessment.
+- [~] Manual check: the result distinguishes between missing choice and weak justification. *(shallow signal)*
 
 **Dependencies:** Task 4
 
@@ -170,10 +170,10 @@ Content model + attempt model
 **Estimated scope:** Medium: 3-5 files per app surface
 
 ### Checkpoint: Core Slices
-- [ ] Three exam task types work end-to-end.
-- [ ] CMS can create content for all shipped task types.
-- [ ] Attempt data and feedback are visible and reviewable.
-- [ ] The product already delivers a meaningful speaking workflow even before mock exam mode.
+- [x] Three exam task types work end-to-end.
+- [x] CMS can create content for all shipped task types.
+- [x] Attempt data and feedback are visible and reviewable.
+- [x] The product already delivers a meaningful speaking workflow even before mock exam mode.
 
 ### Phase 3: Exam Flow and Content Ops
 
@@ -182,13 +182,15 @@ Content model + attempt model
 **Description:** Combine shipped task types into one timed oral exam flow that feels like a realistic practice session rather than isolated drills.
 
 **Acceptance criteria:**
-- [ ] A learner can start a guided mock oral exam with multiple sections.
-- [ ] The app preserves section order and timing rules defined for V1.
-- [ ] Final results show per-section feedback and an overall readiness summary.
+- [x] A learner can start a guided mock oral exam with multiple sections.
+- [x] The app preserves section order and timing rules defined for V1.
+- [x] Final results show per-section feedback and an overall readiness summary.
 
 **Verification:**
-- [ ] Manual check: complete one mock oral exam from start to finish.
-- [ ] Manual check: the final result page includes both section-level and overall feedback.
+- [x] Manual check: complete one mock oral exam from start to finish.
+- [x] Manual check: the final result page includes both section-level and overall feedback.
+
+**Shipped:** `POST/GET/advance/complete` routes on `/v1/mock-exams`, MockExamSession in `store.MemoryStore`, Flutter `MockExamScreen` + plan-strip entry.
 
 **Dependencies:** Tasks 4-6
 
@@ -204,13 +206,13 @@ Content model + attempt model
 **Description:** Introduce the simple habit loop that helps users train daily and see progress over time.
 
 **Acceptance criteria:**
-- [ ] Learner app shows a day-by-day practice path.
-- [ ] Completed attempts appear in history with task type, date, and result summary.
-- [ ] The current day is clear without requiring a complex recommendation engine.
+- [x] Learner app shows a day-by-day practice path.
+- [x] Completed attempts appear in history with task type, date, and result summary.
+- [x] The current day is clear without requiring a complex recommendation engine.
 
 **Verification:**
-- [ ] Manual check: a learner can navigate from the plan into an exercise and back into history.
-- [ ] Manual check: history reflects the latest attempt data accurately.
+- [x] Manual check: a learner can navigate from the plan into an exercise and back into history.
+- [x] Manual check: history reflects the latest attempt data accurately.
 
 **Dependencies:** Tasks 4-7
 
@@ -226,13 +228,13 @@ Content model + attempt model
 **Description:** Implement the dialogue task last because it requires the most interaction design and can ship after the other three task types are stable.
 
 **Acceptance criteria:**
-- [ ] CMS supports the dialogue setup, expected question slots, and scoring template.
-- [ ] Learner app can present the scenario and collect the learner's spoken questions.
-- [ ] Feedback distinguishes between missing information requests and acceptable custom questions.
+- [x] CMS supports the dialogue setup, expected question slots, and scoring template.
+- [x] Learner app can present the scenario and collect the learner's spoken questions.
+- [x] Feedback distinguishes between missing information requests and acceptable custom questions.
 
 **Verification:**
-- [ ] Manual check: a dialogue exercise can be completed end-to-end.
-- [ ] Manual check: the result correctly captures whether required information was requested.
+- [x] Manual check: a dialogue exercise can be completed end-to-end.
+- [x] Manual check: the result correctly captures whether required information was requested.
 
 **Dependencies:** Tasks 4-8
 
@@ -245,10 +247,10 @@ Content model + attempt model
 **Estimated scope:** Medium: 3-5 files per app surface
 
 ### Checkpoint: Feature Complete
-- [ ] All four oral task types are available.
-- [ ] Mock oral exam works end-to-end.
-- [ ] 14-day plan and history are visible.
-- [ ] CMS can support all shipped learner content.
+- [x] All four oral task types are available.
+- [x] Mock oral exam works end-to-end.
+- [x] 14-day plan and history are visible.
+- [x] CMS can support all shipped learner content.
 
 ### Phase 4: Hardening and Release Prep
 
@@ -257,13 +259,13 @@ Content model + attempt model
 **Description:** Add the minimal hardening needed for a small real-user release: authentication rules, upload validation, retry handling, and audit-friendly logging.
 
 **Acceptance criteria:**
-- [ ] Invalid audio uploads are rejected safely.
-- [ ] Failed transcript or scoring jobs surface a user-safe retry state.
-- [ ] Basic logs exist for attempt lifecycle debugging.
+- [x] Invalid audio uploads are rejected safely.
+- [x] Failed transcript or scoring jobs surface a user-safe retry state.
+- [x] Basic logs exist for attempt lifecycle debugging.
 
 **Verification:**
-- [ ] Manual check: simulated upload and transcript failures result in recoverable UI states.
-- [ ] Manual check: logs are sufficient to trace one attempt through the system.
+- [x] Manual check: simulated upload and transcript failures result in recoverable UI states.
+- [x] Manual check: logs are sufficient to trace one attempt through the system.
 
 **Dependencies:** Tasks 4-9
 
@@ -279,13 +281,13 @@ Content model + attempt model
 **Description:** Create the minimum content pack and release checklist needed to test the product with real learners.
 
 **Acceptance criteria:**
-- [ ] At least one complete content set exists for each shipped task type.
-- [ ] The release checklist covers environments, secrets, seed content, smoke tests, and rollback basics.
-- [ ] The team can onboard one new learner without ad hoc setup work.
+- [x] At least one complete content set exists for each shipped task type. *(seeded fixtures in `backend/internal/store/exercise_store.go`; richer pack tracked in `docs/content/seed-plan.md`.)*
+- [x] The release checklist covers environments, secrets, seed content, smoke tests, and rollback basics.
+- [~] The team can onboard one new learner without ad hoc setup work. *(still needs real seed content per `seed-plan.md` targets.)*
 
 **Verification:**
-- [ ] Manual check: a fresh environment can be seeded and used for one learner smoke test.
-- [ ] Manual check: launch checklist can be followed step by step without missing prerequisites.
+- [x] Manual check: a fresh environment can be seeded and used for one learner smoke test.
+- [x] Manual check: launch checklist can be followed step by step without missing prerequisites.
 
 **Dependencies:** Tasks 7-10
 
@@ -297,10 +299,10 @@ Content model + attempt model
 **Estimated scope:** Small: 1-2 files plus content entries
 
 ### Checkpoint: Ready for Build Execution
-- [ ] Every task has acceptance criteria and a verification path.
-- [ ] The riskiest areas are front-loaded.
-- [ ] The product can be built as a sequence of working slices rather than one large merge.
-- [ ] Scope still matches a first release rather than a platform rewrite.
+- [x] Every task has acceptance criteria and a verification path.
+- [x] The riskiest areas are front-loaded.
+- [x] The product can be built as a sequence of working slices rather than one large merge.
+- [x] Scope still matches a first release rather than a platform rewrite.
 
 ## Risks and Mitigations
 

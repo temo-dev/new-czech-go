@@ -18,6 +18,131 @@ class ModuleSummary {
   }
 }
 
+class PlanDay {
+  const PlanDay({
+    required this.day,
+    required this.label,
+    required this.description,
+    required this.status,
+    required this.moduleId,
+    required this.moduleKind,
+  });
+
+  final int day;
+  final String label;
+  final String description;
+  final String status;
+  final String moduleId;
+  final String moduleKind;
+
+  bool get isDone => status == 'done';
+  bool get isCurrent => status == 'current';
+  bool get isMockExam => moduleKind == 'mock_exam';
+
+  factory PlanDay.fromJson(Map<String, dynamic> json) {
+    return PlanDay(
+      day: (json['day'] as num).toInt(),
+      label: json['label'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      status: json['status'] as String? ?? 'upcoming',
+      moduleId: json['module_id'] as String? ?? '',
+      moduleKind: json['module_kind'] as String? ?? 'daily_plan',
+    );
+  }
+}
+
+class MockExamSection {
+  const MockExamSection({
+    required this.sequenceNo,
+    required this.exerciseId,
+    required this.exerciseType,
+    required this.attemptId,
+    required this.status,
+  });
+
+  final int sequenceNo;
+  final String exerciseId;
+  final String exerciseType;
+  final String attemptId;
+  final String status;
+
+  bool get isPending => status == 'pending';
+  bool get isCompleted => status == 'completed';
+
+  factory MockExamSection.fromJson(Map<String, dynamic> json) {
+    return MockExamSection(
+      sequenceNo: (json['sequence_no'] as num).toInt(),
+      exerciseId: json['exercise_id'] as String? ?? '',
+      exerciseType: json['exercise_type'] as String? ?? '',
+      attemptId: json['attempt_id'] as String? ?? '',
+      status: json['status'] as String? ?? 'pending',
+    );
+  }
+}
+
+class MockExamSessionView {
+  const MockExamSessionView({
+    required this.id,
+    required this.status,
+    required this.overallReadinessLevel,
+    required this.overallSummary,
+    required this.sections,
+  });
+
+  final String id;
+  final String status;
+  final String overallReadinessLevel;
+  final String overallSummary;
+  final List<MockExamSection> sections;
+
+  bool get isCompleted => status == 'completed';
+  MockExamSection? get nextPending {
+    for (final s in sections) {
+      if (s.isPending) return s;
+    }
+    return null;
+  }
+
+  factory MockExamSessionView.fromJson(Map<String, dynamic> json) {
+    final raw = json['sections'] as List<dynamic>? ?? const [];
+    return MockExamSessionView(
+      id: json['id'] as String? ?? '',
+      status: json['status'] as String? ?? 'created',
+      overallReadinessLevel: json['overall_readiness_level'] as String? ?? '',
+      overallSummary: json['overall_summary'] as String? ?? '',
+      sections: raw
+          .map((item) => MockExamSection.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class LearningPlanView {
+  const LearningPlanView({
+    required this.currentDay,
+    required this.startDate,
+    required this.status,
+    required this.days,
+  });
+
+  final int currentDay;
+  final String startDate;
+  final String status;
+  final List<PlanDay> days;
+
+  factory LearningPlanView.fromJson(Map<String, dynamic> json) {
+    final rawDays = json['days'] as List<dynamic>? ?? const [];
+    return LearningPlanView(
+      currentDay: (json['current_day'] as num?)?.toInt() ?? 1,
+      startDate: json['start_date'] as String? ?? '',
+      status: json['status'] as String? ?? 'active',
+      days: rawDays
+          .map((item) => PlanDay.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
 class ExerciseSummary {
   const ExerciseSummary({
     required this.id,

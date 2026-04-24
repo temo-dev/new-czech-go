@@ -9,8 +9,9 @@ class LocaleSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = LocaleScope.of(context);
+    final tooltip = provider.code == AppLocale.en ? 'Language' : 'Ngôn ngữ';
     return PopupMenuButton<String>(
-      tooltip: 'Language',
+      tooltip: tooltip,
       icon: const Icon(Icons.language),
       initialValue: provider.code,
       onSelected: provider.setLocale,

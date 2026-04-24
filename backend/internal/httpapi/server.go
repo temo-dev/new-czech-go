@@ -20,24 +20,41 @@ import (
 )
 
 type Server struct {
-	repo           *store.MemoryStore
-	processor      *processing.Processor
-	uploadProvider UploadTargetProvider
-	mux            *http.ServeMux
+	repo             *store.MemoryStore
+	processor        *processing.Processor
+	uploadProvider   UploadTargetProvider
+	audioURLProvider AudioURLProvider
+	audioSignSecret  []byte
+	mux              *http.ServeMux
 }
 
 func NewServer(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider) http.Handler {
+	return NewServerWithAudio(repo, processor, uploadProvider, nil, nil)
+}
+
+// NewServerWithAudio is the full constructor that takes an explicit
+// AudioURLProvider and signing secret. NewServer delegates here with defaults
+// sourced from env.
+func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider, audioURLProvider AudioURLProvider, audioSignSecret []byte) http.Handler {
 	if processor == nil {
 		processor = processing.NewProcessor(repo, nil, nil, nil, nil)
 	}
 	if uploadProvider == nil {
 		uploadProvider = NewLocalUploadTargetProvider()
 	}
+	if len(audioSignSecret) == 0 {
+		audioSignSecret = AudioSigningSecretFromEnv(log.Printf)
+	}
+	if audioURLProvider == nil {
+		audioURLProvider = NewLocalSignedAudioURLProvider(audioSignSecret)
+	}
 	s := &Server{
-		repo:           repo,
-		processor:      processor,
-		uploadProvider: uploadProvider,
-		mux:            http.NewServeMux(),
+		repo:             repo,
+		processor:        processor,
+		uploadProvider:   uploadProvider,
+		audioURLProvider: audioURLProvider,
+		audioSignSecret:  audioSignSecret,
+		mux:              http.NewServeMux(),
 	}
 	s.routes()
 	return s.withRequestLog(s.withCORS(s.mux))
@@ -54,6 +71,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/exercises/", s.withAuth(s.handleExercise))
 	s.mux.HandleFunc("/v1/attempts", s.withAuth(s.handleAttempts))
 	s.mux.HandleFunc("/v1/attempts/", s.withAuth(s.handleAttemptByID))
+	s.mux.HandleFunc("/v1/attempt-audio/stream", s.handleAttemptAudioStream)
 	s.mux.HandleFunc("/v1/mock-exams", s.withAuth(s.handleMockExams))
 	s.mux.HandleFunc("/v1/mock-exams/", s.withAuth(s.handleMockExamByID))
 	s.mux.HandleFunc("/v1/admin/exercises", s.withRole("admin", s.handleAdminExercises))
@@ -114,17 +132,52 @@ func (s *Server) handleCourse(w http.ResponseWriter, _ *http.Request, _ contract
 }
 
 func (s *Server) handlePlan(w http.ResponseWriter, _ *http.Request, _ contracts.User) {
+	plan := s.repo.Plan()
+	dailyModules := s.repo.Modules("daily_plan")
+	mockModules := s.repo.Modules("mock_exam")
+
+	days := make([]map[string]any, 0, len(dailyModules)+len(mockModules))
+	for _, m := range dailyModules {
+		days = append(days, map[string]any{
+			"day":         m.SequenceNo,
+			"label":       m.Title,
+			"description": m.Description,
+			"status":      planDayStatus(m.SequenceNo, plan.CurrentDay),
+			"module_id":   m.ID,
+			"module_kind": m.ModuleKind,
+		})
+	}
+	for _, m := range mockModules {
+		days = append(days, map[string]any{
+			"day":         m.SequenceNo,
+			"label":       m.Title,
+			"description": m.Description,
+			"status":      planDayStatus(m.SequenceNo, plan.CurrentDay),
+			"module_id":   m.ID,
+			"module_kind": m.ModuleKind,
+		})
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"current_day": s.repo.Plan().CurrentDay,
-			"days": []map[string]any{
-				{"day": 1, "label": "Lam quen voi cau hoi theo chu de", "status": "current", "module_id": "module-day-1"},
-				{"day": 2, "label": "Ke chuyen theo tranh", "status": "upcoming", "module_id": "module-day-2"},
-				{"day": 3, "label": "Mock oral exam", "status": "upcoming", "module_id": "module-mock"},
-			},
+			"current_day": plan.CurrentDay,
+			"start_date":  plan.StartDate,
+			"status":      plan.Status,
+			"days":        days,
 		},
 		"meta": map[string]any{},
 	})
+}
+
+func planDayStatus(seqNo, currentDay int) string {
+	switch {
+	case seqNo < currentDay:
+		return "done"
+	case seqNo == currentDay:
+		return "current"
+	default:
+		return "upcoming"
+	}
 }
 
 func (s *Server) handleModules(w http.ResponseWriter, r *http.Request, _ contracts.User) {
@@ -235,6 +288,10 @@ func (s *Server) visibleAttemptsForUser(user contracts.User) []contracts.Attempt
 
 func (s *Server) handleAttemptByID(w http.ResponseWriter, r *http.Request, user contracts.User) {
 	path := strings.TrimPrefix(r.URL.Path, "/v1/attempts/")
+	if strings.HasSuffix(path, "/review/audio/url") {
+		s.handleAttemptReviewAudioURL(w, r, user, strings.TrimSuffix(path, "/review/audio/url"))
+		return
+	}
 	if strings.HasSuffix(path, "/review/audio/file") {
 		s.handleAttemptReviewAudioFile(w, r, user, strings.TrimSuffix(path, "/review/audio/file"))
 		return
@@ -245,6 +302,10 @@ func (s *Server) handleAttemptByID(w http.ResponseWriter, r *http.Request, user 
 	}
 	if strings.HasSuffix(path, "/recording-started") {
 		s.handleRecordingStarted(w, r, strings.TrimSuffix(path, "/recording-started"))
+		return
+	}
+	if strings.HasSuffix(path, "/audio/url") {
+		s.handleAttemptAudioURL(w, r, user, strings.TrimSuffix(path, "/audio/url"))
 		return
 	}
 	if strings.HasSuffix(path, "/audio/file") {
@@ -344,6 +405,176 @@ func (s *Server) handleAttemptReviewAudioFile(w http.ResponseWriter, r *http.Req
 	}
 	defer file.Close()
 
+	if audio.MimeType != "" {
+		w.Header().Set("Content-Type", audio.MimeType)
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, file)
+}
+
+func (s *Server) handleAttemptAudioURL(w http.ResponseWriter, r *http.Request, user contracts.User, attemptID string) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	attempt, ok := s.authorizedAttemptForUser(w, user, attemptID)
+	if !ok {
+		return
+	}
+	if attempt.Audio == nil {
+		writeError(w, http.StatusNotFound, "audio_missing", "No audio stored for this attempt.", false)
+		return
+	}
+	signed, err := s.audioURLProvider.SignedAudioURL(r.Context(), AudioURLInput{
+		AttemptID:  attemptID,
+		Scope:      ScopeAttemptAudio,
+		StorageKey: attempt.Audio.StorageKey,
+		MimeType:   attempt.Audio.MimeType,
+		BaseURL:    buildAbsoluteURL(r, ""),
+		ExpiresIn:  10 * time.Minute,
+	})
+	if err != nil {
+		log.Printf("attempt audio url sign failed: attempt_id=%s error=%v", attemptID, err)
+		writeError(w, http.StatusBadGateway, "audio_url_provider_failed", "Could not sign audio URL.", true)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"url":        signed.URL,
+			"mime_type":  signed.MimeType,
+			"expires_at": signed.ExpiresAt.Format(time.RFC3339),
+		},
+		"meta": map[string]any{},
+	})
+}
+
+func (s *Server) handleAttemptReviewAudioURL(w http.ResponseWriter, r *http.Request, user contracts.User, attemptID string) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	if _, ok := s.authorizedAttemptForUser(w, user, attemptID); !ok {
+		return
+	}
+	artifact, ok := s.repo.ReviewArtifact(attemptID)
+	if !ok || artifact.TTSAudio == nil {
+		writeError(w, http.StatusNotFound, "audio_missing", "No review audio available.", false)
+		return
+	}
+	signed, err := s.audioURLProvider.SignedAudioURL(r.Context(), AudioURLInput{
+		AttemptID:  attemptID,
+		Scope:      ScopeReviewAudio,
+		StorageKey: artifact.TTSAudio.StorageKey,
+		MimeType:   artifact.TTSAudio.MimeType,
+		BaseURL:    buildAbsoluteURL(r, ""),
+		ExpiresIn:  10 * time.Minute,
+	})
+	if err != nil {
+		log.Printf("review audio url sign failed: attempt_id=%s error=%v", attemptID, err)
+		writeError(w, http.StatusBadGateway, "audio_url_provider_failed", "Could not sign audio URL.", true)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"url":        signed.URL,
+			"mime_type":  signed.MimeType,
+			"expires_at": signed.ExpiresAt.Format(time.RFC3339),
+		},
+		"meta": map[string]any{},
+	})
+}
+
+func (s *Server) handleAttemptAudioStream(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		writeMethodNotAllowed(w)
+		return
+	}
+	q := r.URL.Query()
+	attemptID := strings.TrimSpace(q.Get("aid"))
+	scope := AudioURLScope(strings.TrimSpace(q.Get("scope")))
+	expRaw := strings.TrimSpace(q.Get("exp"))
+	sig := strings.TrimSpace(q.Get("sig"))
+
+	if attemptID == "" || scope == "" || expRaw == "" || sig == "" {
+		writeError(w, http.StatusUnauthorized, "audio_url_invalid", "Missing token parameters.", false)
+		return
+	}
+	expiry, err := strconv.ParseInt(expRaw, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "audio_url_invalid", "Invalid expiry.", false)
+		return
+	}
+
+	if err := verifyAudioToken(s.audioSignSecret, attemptID, scope, expiry, sig); err != nil {
+		switch err {
+		case errAudioURLExpired:
+			writeError(w, http.StatusUnauthorized, "audio_url_expired", "Audio URL has expired.", false)
+		case errAudioURLInvalidSig, errAudioURLBadPayload:
+			writeError(w, http.StatusUnauthorized, "audio_url_invalid", "Invalid audio URL signature.", false)
+		default:
+			writeError(w, http.StatusUnauthorized, "audio_url_invalid", "Invalid audio URL.", false)
+		}
+		return
+	}
+
+	switch scope {
+	case ScopeAttemptAudio:
+		s.streamAttemptAudio(w, r, attemptID)
+	case ScopeReviewAudio:
+		s.streamReviewAudio(w, r, attemptID)
+	default:
+		writeError(w, http.StatusUnauthorized, "audio_url_invalid", "Unknown scope.", false)
+	}
+}
+
+func (s *Server) streamAttemptAudio(w http.ResponseWriter, r *http.Request, attemptID string) {
+	attempt, ok := s.repo.Attempt(attemptID)
+	if !ok || attempt.Audio == nil {
+		writeNotFound(w)
+		return
+	}
+	audio := attempt.Audio
+	if strings.HasPrefix(audio.StorageKey, "http://") || strings.HasPrefix(audio.StorageKey, "https://") {
+		http.Redirect(w, r, audio.StorageKey, http.StatusTemporaryRedirect)
+		return
+	}
+	if strings.TrimSpace(audio.StoredFilePath) == "" {
+		writeNotFound(w)
+		return
+	}
+	file, err := os.Open(audio.StoredFilePath)
+	if err != nil {
+		log.Printf("stream attempt audio open failed: attempt_id=%s path=%q error=%v", attemptID, audio.StoredFilePath, err)
+		writeNotFound(w)
+		return
+	}
+	defer file.Close()
+	if audio.MimeType != "" {
+		w.Header().Set("Content-Type", audio.MimeType)
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, file)
+}
+
+func (s *Server) streamReviewAudio(w http.ResponseWriter, r *http.Request, attemptID string) {
+	artifact, ok := s.repo.ReviewArtifact(attemptID)
+	if !ok || artifact.TTSAudio == nil {
+		writeNotFound(w)
+		return
+	}
+	audio := artifact.TTSAudio
+	if strings.HasPrefix(audio.StorageKey, "http://") || strings.HasPrefix(audio.StorageKey, "https://") {
+		http.Redirect(w, r, audio.StorageKey, http.StatusTemporaryRedirect)
+		return
+	}
+	filePath := processing.ReviewAudioLocalPath(audio.StorageKey)
+	file, err := os.Open(filePath)
+	if err != nil {
+		log.Printf("stream review audio open failed: attempt_id=%s path=%q error=%v", attemptID, filePath, err)
+		writeNotFound(w)
+		return
+	}
+	defer file.Close()
 	if audio.MimeType != "" {
 		w.Header().Set("Content-Type", audio.MimeType)
 	}
@@ -617,21 +848,83 @@ func (s *Server) handleMockExams(w http.ResponseWriter, r *http.Request, _ contr
 		writeMethodNotAllowed(w)
 		return
 	}
+	session, err := s.repo.CreateMockExam()
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": map[string]any{"code": "mock_exam_create_failed", "message": err.Error()},
+		})
+		return
+	}
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"data": map[string]any{"session": s.repo.MockExam()},
+		"data": session,
 		"meta": map[string]any{},
 	})
 }
 
 func (s *Server) handleMockExamByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
-	if r.Method != http.MethodGet {
+	path := strings.TrimPrefix(r.URL.Path, "/v1/mock-exams/")
+	switch {
+	case strings.HasSuffix(path, "/advance"):
+		s.handleMockExamAdvance(w, r, strings.TrimSuffix(path, "/advance"))
+	case strings.HasSuffix(path, "/complete"):
+		s.handleMockExamComplete(w, r, strings.TrimSuffix(path, "/complete"))
+	default:
+		if r.Method != http.MethodGet {
+			writeMethodNotAllowed(w)
+			return
+		}
+		session, ok := s.repo.MockExamByID(path)
+		if !ok {
+			writeNotFound(w)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})
+	}
+}
+
+func (s *Server) handleMockExamAdvance(w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodPost {
 		writeMethodNotAllowed(w)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": s.repo.MockExam(),
-		"meta": map[string]any{},
-	})
+	var req struct {
+		AttemptID string `json:"attempt_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.AttemptID) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": map[string]any{"code": "invalid_request", "message": "attempt_id required"},
+		})
+		return
+	}
+	if _, ok := s.repo.Attempt(req.AttemptID); !ok {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": map[string]any{"code": "attempt_not_found", "message": "attempt not found"},
+		})
+		return
+	}
+	session, err := s.repo.AdvanceMockExam(id, req.AttemptID)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": map[string]any{"code": "mock_exam_advance_failed", "message": err.Error()},
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})
+}
+
+func (s *Server) handleMockExamComplete(w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	session, err := s.repo.CompleteMockExam(id)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": map[string]any{"code": "mock_exam_complete_failed", "message": err.Error()},
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})
 }
 
 func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ contracts.User) {

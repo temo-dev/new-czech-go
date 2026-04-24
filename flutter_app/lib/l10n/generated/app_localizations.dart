@@ -137,6 +137,120 @@ abstract class AppLocalizations {
   /// **'{count} bài tập'**
   String moduleExerciseCount(int count);
 
+  /// No description provided for @planSectionTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lộ trình 14 ngày'**
+  String get planSectionTitle;
+
+  /// No description provided for @planSectionSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Theo thứ tự. Hoàn thành từng ngày để lên mock exam.'**
+  String get planSectionSubtitle;
+
+  /// No description provided for @planDayLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ngày {day}'**
+  String planDayLabel(int day);
+
+  /// No description provided for @planStatusDone.
+  ///
+  /// In vi, this message translates to:
+  /// **'ĐÃ XONG'**
+  String get planStatusDone;
+
+  /// No description provided for @planStatusCurrent.
+  ///
+  /// In vi, this message translates to:
+  /// **'HÔM NAY'**
+  String get planStatusCurrent;
+
+  /// No description provided for @planStatusUpcoming.
+  ///
+  /// In vi, this message translates to:
+  /// **'SẮP TỚI'**
+  String get planStatusUpcoming;
+
+  /// No description provided for @planMockExamLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'MOCK EXAM'**
+  String get planMockExamLabel;
+
+  /// No description provided for @mockExamTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Mock thi nói'**
+  String get mockExamTitle;
+
+  /// No description provided for @mockExamIntroTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'4 phần, mỗi phần 1 lần'**
+  String get mockExamIntroTitle;
+
+  /// No description provided for @mockExamIntroBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Làm lần lượt từng Uloha. Có kết quả tổng sau khi xong.'**
+  String get mockExamIntroBody;
+
+  /// No description provided for @mockExamSectionLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phần {index}'**
+  String mockExamSectionLabel(int index);
+
+  /// No description provided for @mockExamStatusDone.
+  ///
+  /// In vi, this message translates to:
+  /// **'XONG'**
+  String get mockExamStatusDone;
+
+  /// No description provided for @mockExamStatusPending.
+  ///
+  /// In vi, this message translates to:
+  /// **'CHỜ'**
+  String get mockExamStatusPending;
+
+  /// No description provided for @mockExamActionStart.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bắt đầu'**
+  String get mockExamActionStart;
+
+  /// No description provided for @mockExamActionDone.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xong'**
+  String get mockExamActionDone;
+
+  /// No description provided for @mockExamResultTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kết quả mock exam'**
+  String get mockExamResultTitle;
+
+  /// No description provided for @mockExamOverallTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Mức sẵn sàng tổng'**
+  String get mockExamOverallTitle;
+
+  /// No description provided for @mockExamBackHome.
+  ///
+  /// In vi, this message translates to:
+  /// **'Về trang chủ'**
+  String get mockExamBackHome;
+
+  /// No description provided for @mockExamOpenCta.
+  ///
+  /// In vi, this message translates to:
+  /// **'Mở mock exam'**
+  String get mockExamOpenCta;
+
   /// No description provided for @recentAttemptsTitle.
   ///
   /// In vi, this message translates to:
