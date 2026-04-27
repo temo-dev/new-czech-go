@@ -109,12 +109,6 @@ func (p *Processor) ProcessWritingAttempt(attemptID string, sub contracts.Writin
 	log.Printf("writing attempt %s completed (readiness=%s)", attemptID, feedback.ReadinessLevel)
 }
 
-// ProcessObjectiveAttempt scores a listening or reading attempt by comparing
-// learner answers to correct answers. Full implementation in objective_scorer.go (L2).
-func (p *Processor) ProcessObjectiveAttempt(attemptID string, sub contracts.AnswerSubmission) (*contracts.Attempt, error) {
-	return nil, fmt.Errorf("objective scoring not yet implemented")
-}
-
 // buildWritingReviewArtifact constructs the review artifact for a writing attempt.
 // Reuses AttemptReviewArtifact — SourceTranscriptText carries the learner text,
 // CorrectedTranscriptText carries the LLM correction. TTSAudio is always nil.
