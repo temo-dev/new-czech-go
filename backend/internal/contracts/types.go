@@ -217,6 +217,60 @@ type ExerciseAudio struct {
 	GeneratedAt string `json:"generated_at"`
 }
 
+// --- Reading (V4) ---
+
+type ReadingItem struct {
+	ItemNo  int    `json:"item_no"`
+	AssetID string `json:"asset_id,omitempty"` // image asset for cteni_1
+	Text    string `json:"text,omitempty"`     // short message text for cteni_1
+}
+
+type TextItem struct {
+	ItemNo int    `json:"item_no"`
+	Text   string `json:"text"`
+}
+
+type ReadingQuestion struct {
+	QuestionNo int                    `json:"question_no"`
+	Prompt     string                 `json:"prompt"`
+	Options    []MultipleChoiceOption `json:"options"`
+}
+
+// Cteni1Detail — match 5 images/messages → A-H (3 extra, 5 pts).
+type Cteni1Detail struct {
+	Items          []ReadingItem     `json:"items"`   // 5 items
+	Options        []TextOption      `json:"options"` // A-H (8)
+	CorrectAnswers map[string]string `json:"correct_answers"`
+}
+
+// Cteni2Detail — read text → choose A-D (5 questions, 5 pts).
+type Cteni2Detail struct {
+	Text           string            `json:"text"`
+	Questions      []ReadingQuestion `json:"questions"` // 5
+	CorrectAnswers map[string]string `json:"correct_answers"`
+}
+
+// Cteni3Detail — match 4 texts → persons A-E (1 extra, 4 pts).
+type Cteni3Detail struct {
+	Texts          []TextItem        `json:"texts"`   // 4 texts
+	Persons        []PersonOption    `json:"persons"` // A-E (5)
+	CorrectAnswers map[string]string `json:"correct_answers"`
+}
+
+// Cteni4Detail — choose A-D (6 questions, 6 pts).
+type Cteni4Detail struct {
+	Context        string            `json:"context,omitempty"` // optional reading passage
+	Questions      []ReadingQuestion `json:"questions"`          // 6
+	CorrectAnswers map[string]string `json:"correct_answers"`
+}
+
+// Cteni5Detail — read text → fill info (5 questions, 5 pts).
+type Cteni5Detail struct {
+	Text           string            `json:"text"`
+	Questions      []FillQuestion    `json:"questions"` // 5
+	CorrectAnswers map[string]string `json:"correct_answers"`
+}
+
 // --- Writing (V2) ---
 
 type Psani1Detail struct {
