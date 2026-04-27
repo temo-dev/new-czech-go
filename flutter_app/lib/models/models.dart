@@ -44,7 +44,7 @@ class Skill {
   final int sequenceNo;
   final String status;
 
-  bool get isImplemented => skillKind == 'noi' || skillKind == 'viet';
+  bool get isImplemented => skillKind == 'noi' || skillKind == 'viet' || skillKind == 'nghe';
 
   bool get isWriting => skillKind == 'viet';
 
@@ -335,6 +335,10 @@ class ExerciseDetail {
     this.writingMinWords = 10,
     this.emailPrompt = '',
     this.emailTopics = const [],
+    // listening
+    this.poslechItems = const [],
+    this.poslechOptions = const [],
+    this.poslechQuestions = const [],
   });
 
   final String id;
@@ -358,9 +362,14 @@ class ExerciseDetail {
   final int writingMinWords;
   final String emailPrompt;
   final List<String> emailTopics;
+  final List<PoslechItemView> poslechItems;
+  final List<PoslechOptionView> poslechOptions;
+  final List<FillQuestionView> poslechQuestions;
 
   bool get isPsani1 => exerciseType == 'psani_1_formular';
   bool get isPsani2 => exerciseType == 'psani_2_email';
+  bool get isPoslech => exerciseType.startsWith('poslech_');
+  bool get isPoslech5 => exerciseType == 'poslech_5';
 
   PromptAssetView? assetById(String assetId) {
     for (final asset in assets) {
@@ -446,6 +455,15 @@ class ExerciseDetail {
       writingMinWords: (detail['min_words'] as num?)?.toInt() ?? 10,
       emailPrompt: detail['prompt'] as String? ?? '',
       emailTopics: emailTopics,
+      poslechItems: (detail['items'] as List<dynamic>? ?? const [])
+          .map((e) => PoslechItemView.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      poslechOptions: (detail['options'] as List<dynamic>? ?? const [])
+          .map((e) => PoslechOptionView.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      poslechQuestions: (detail['questions'] as List<dynamic>? ?? const [])
+          .map((e) => FillQuestionView.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 }
@@ -517,6 +535,53 @@ class ChoiceOptionView {
       label: json['label'] as String? ?? '',
       imageAssetId: json['image_asset_id'] as String? ?? '',
       description: json['description'] as String? ?? '',
+    );
+  }
+}
+
+// --- Listening (V3) model views ---
+
+class PoslechOptionView {
+  const PoslechOptionView({required this.key, this.text = '', this.label = '', this.assetId = ''});
+  final String key;
+  final String text;
+  final String label;
+  final String assetId;
+
+  factory PoslechOptionView.fromJson(Map<String, dynamic> json) {
+    return PoslechOptionView(
+      key: json['key'] as String? ?? '',
+      text: json['text'] as String? ?? '',
+      label: json['label'] as String? ?? '',
+      assetId: json['asset_id'] as String? ?? '',
+    );
+  }
+}
+
+class PoslechItemView {
+  const PoslechItemView({required this.questionNo, this.options = const []});
+  final int questionNo;
+  final List<PoslechOptionView> options;
+
+  factory PoslechItemView.fromJson(Map<String, dynamic> json) {
+    return PoslechItemView(
+      questionNo: (json['question_no'] as num?)?.toInt() ?? 0,
+      options: (json['options'] as List<dynamic>? ?? const [])
+          .map((e) => PoslechOptionView.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class FillQuestionView {
+  const FillQuestionView({required this.questionNo, required this.prompt});
+  final int questionNo;
+  final String prompt;
+
+  factory FillQuestionView.fromJson(Map<String, dynamic> json) {
+    return FillQuestionView(
+      questionNo: (json['question_no'] as num?)?.toInt() ?? 0,
+      prompt: json['prompt'] as String? ?? '',
     );
   }
 }
@@ -819,6 +884,47 @@ class CriterionCheckView {
   }
 }
 
+// --- Objective scoring result (V3/V4) ---
+
+class QuestionResult {
+  const QuestionResult({
+    required this.questionNo,
+    required this.learnerAnswer,
+    required this.correctAnswer,
+    required this.isCorrect,
+  });
+  final int questionNo;
+  final String learnerAnswer;
+  final String correctAnswer;
+  final bool isCorrect;
+
+  factory QuestionResult.fromJson(Map<String, dynamic> json) {
+    return QuestionResult(
+      questionNo: (json['question_no'] as num?)?.toInt() ?? 0,
+      learnerAnswer: json['learner_answer'] as String? ?? '',
+      correctAnswer: json['correct_answer'] as String? ?? '',
+      isCorrect: json['is_correct'] as bool? ?? false,
+    );
+  }
+}
+
+class ObjectiveResult {
+  const ObjectiveResult({required this.score, required this.maxScore, required this.breakdown});
+  final int score;
+  final int maxScore;
+  final List<QuestionResult> breakdown;
+
+  factory ObjectiveResult.fromJson(Map<String, dynamic> json) {
+    return ObjectiveResult(
+      score: (json['score'] as num?)?.toInt() ?? 0,
+      maxScore: (json['max_score'] as num?)?.toInt() ?? 0,
+      breakdown: (json['breakdown'] as List<dynamic>? ?? const [])
+          .map((e) => QuestionResult.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
 class AttemptFeedbackView {
   const AttemptFeedbackView({
     required this.readinessLevel,
@@ -828,6 +934,7 @@ class AttemptFeedbackView {
     required this.retryAdvice,
     required this.sampleAnswer,
     this.criteriaResults = const [],
+    this.objectiveResult,
   });
 
   final String readinessLevel;
@@ -837,6 +944,7 @@ class AttemptFeedbackView {
   final List<String> retryAdvice;
   final String sampleAnswer;
   final List<CriterionCheckView> criteriaResults;
+  final ObjectiveResult? objectiveResult;
 
   factory AttemptFeedbackView.fromJson(Map<String, dynamic> json) {
     List<String> toStrings(dynamic value) {
@@ -853,6 +961,8 @@ class AttemptFeedbackView {
         .map((e) => CriterionCheckView.fromJson(e as Map<String, dynamic>))
         .toList();
 
+    final objRaw = json['objective_result'] as Map<String, dynamic>?;
+
     return AttemptFeedbackView(
       readinessLevel: json['readiness_level'] as String? ?? 'needs_work',
       overallSummary: json['overall_summary'] as String? ?? '',
@@ -861,6 +971,7 @@ class AttemptFeedbackView {
       retryAdvice: toStrings(json['retry_advice']),
       sampleAnswer: json['sample_answer_text'] as String? ?? '',
       criteriaResults: criteria,
+      objectiveResult: objRaw != null ? ObjectiveResult.fromJson(objRaw) : null,
     );
   }
 }

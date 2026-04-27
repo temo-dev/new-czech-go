@@ -8,6 +8,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../../exercise/screens/exercise_screen.dart' as exercise_feature;
+import '../../exercise/screens/listening_exercise_screen.dart';
 import '../../exercise/screens/writing_exercise_screen.dart';
 
 class ExerciseListScreen extends StatefulWidget {
@@ -46,6 +47,17 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
   Future<void> _openExercise(BuildContext context, ExerciseSummary exercise) async {
     final detail = ExerciseDetail.fromJson(await widget.client.getExercise(exercise.id));
     if (!mounted) return;
+
+    // Route listening exercises to ListeningExerciseScreen.
+    if (detail.isPoslech) {
+      // ignore: use_build_context_synchronously
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ListeningExerciseScreen(client: widget.client, detail: detail),
+        ),
+      );
+      return;
+    }
 
     // Route writing exercises to WritingExerciseScreen.
     if (detail.isPsani1 || detail.isPsani2) {

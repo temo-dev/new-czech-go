@@ -147,6 +147,32 @@ class ApiClient {
     return payload['data'] as Map<String, dynamic>;
   }
 
+  /// Submit objective answers for poslech_* or cteni_* exercises (sync scoring).
+  Future<Map<String, dynamic>> submitAnswers(
+    String attemptId,
+    Map<String, String> answers,
+  ) async {
+    final payload = await _authed(
+      'POST',
+      '/v1/attempts/$attemptId/submit-answers',
+      body: {'answers': answers},
+    );
+    return payload['data'] as Map<String, dynamic>;
+  }
+
+  /// URI for streaming exercise audio (listening exercises).
+  /// Use with AudioSource.uri(client.exerciseAudioUri(id), headers: client.authHeaders).
+  Uri exerciseAudioUri(String exerciseId) {
+    return Uri.parse('$baseUrl/v1/exercises/$exerciseId/audio');
+  }
+
+  /// Auth headers for use with just_audio AudioSource.uri.
+  Map<String, String> get authHeaders {
+    final t = _token;
+    if (t == null) return const {};
+    return {'Authorization': 'Bearer $t'};
+  }
+
   /// Submit written text for psani_1_formular or psani_2_email.
   /// [answers] = 3 strings for psani_1, [text] = full email for psani_2.
   Future<void> submitText(
@@ -218,13 +244,6 @@ class ApiClient {
 
   Uri exerciseAssetUri(String exerciseId, String assetId) {
     return Uri.parse('$baseUrl/v1/exercises/$exerciseId/assets/$assetId/file');
-  }
-
-  Map<String, String> authHeaders() {
-    if (_token == null) {
-      return const {};
-    }
-    return {'Authorization': 'Bearer $_token'};
   }
 
   Future<Map<String, dynamic>> _authed(

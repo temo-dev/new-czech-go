@@ -153,7 +153,7 @@ class _Uloha3Prompt extends StatelessWidget {
                 imageUrl: client
                     .exerciseAssetUri(detail.id, images[i].id)
                     .toString(),
-                headers: client.authHeaders(),
+                headers: client.authHeaders,
               ),
             ),
           ),
@@ -314,7 +314,7 @@ class _ChoiceOptionCard extends StatelessWidget {
                 aspectRatio: 16 / 9,
                 child: Image.network(
                   client.exerciseAssetUri(detail.id, option.imageAssetId).toString(),
-                  headers: client.authHeaders(),
+                  headers: client.authHeaders,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
                     color: AppColors.surfaceContainerLow,
