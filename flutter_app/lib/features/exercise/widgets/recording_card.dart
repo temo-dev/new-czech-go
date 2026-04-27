@@ -377,7 +377,7 @@ class _CoachTip extends StatelessWidget {
           Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Tip od kouče',
+              Text(AppLocalizations.of(context).recordingCoachTip,
                   style: AppTypography.bodySmall.copyWith(
                       color: AppColors.primary, fontWeight: FontWeight.w700)),
               const SizedBox(height: 2),

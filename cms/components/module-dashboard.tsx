@@ -1,5 +1,6 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
+import { S } from '../lib/strings';
 
 type Course = { id: string; title: string };
 type Module = { id: string; course_id: string; slug: string; title: string; description: string; module_kind: string; sequence_no: number; status: string };
@@ -72,15 +73,15 @@ export function ModuleDashboard() {
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px', fontFamily: 'sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <h1 style={{ margin: 0, fontSize: 22 }}>Modules</h1>
-        <button onClick={openCreate} style={btn('primary')}>+ New module</button>
+        <button onClick={openCreate} style={btn('primary')}>{S.module.newCta}</button>
       </div>
       <div style={{ marginBottom: 16 }}>
-        <label style={{ ...label, marginTop: 0 }}>Filter by course:</label>
+        <label style={{ ...label, marginTop: 0 }}>{S.module.filterLabel}</label>
         <select value={filterCourse} onChange={e => { setFilterCourse(e.target.value); }} style={{ ...input, width: 300 }}>
-          <option value="">All courses</option>
+          <option value="">{S.pick.allCourses}</option>
           {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
         </select>
-        <button onClick={load} style={{ ...btn('secondary'), marginLeft: 8 }}>Filter</button>
+        <button onClick={load} style={{ ...btn('secondary'), marginLeft: 8 }}>{S.module.filterCta}</button>
       </div>
       {error && <p style={{ color: 'red' }}>{error}</p>}
       {!showForm && modules.map(m => (
@@ -93,18 +94,18 @@ export function ModuleDashboard() {
               <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>Course: {courseTitle(m.course_id)} · {m.description}</p>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => openEdit(m)} style={btn('secondary')}>Edit</button>
-              <button onClick={() => del(m.id)} style={btn('danger')}>Delete</button>
+              <button onClick={() => openEdit(m)} style={btn('secondary')}>{S.action.edit}</button>
+              <button onClick={() => del(m.id)} style={btn('danger')}>{S.action.delete}</button>
             </div>
           </div>
         </div>
       ))}
       {showForm && (
         <form onSubmit={submit} style={{ ...card, borderColor: '#3b82f6' }}>
-          <h2 style={{ margin: '0 0 12px', fontSize: 18 }}>{editingId ? 'Edit module' : 'New module'}</h2>
+          <h2 style={{ margin: '0 0 12px', fontSize: 18 }}>{editingId ? S.module.editTitle : S.module.createTitle}</h2>
           <label style={label}>Course *</label>
           <select required value={form.course_id} onChange={e => setForm(f => ({ ...f, course_id: e.target.value }))} style={input}>
-            <option value="">— Pick course —</option>
+            <option value="">{S.pick.course}</option>
             {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
           </select>
           <label style={label}>Title *</label>
@@ -124,8 +125,8 @@ export function ModuleDashboard() {
           </div>
           {error && <p style={{ color: 'red', marginTop: 8 }}>{error}</p>}
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button type="submit" disabled={saving} style={btn('primary')}>{saving ? 'Saving…' : editingId ? 'Save' : 'Create'}</button>
-            <button type="button" onClick={cancel} style={btn('secondary')}>Cancel</button>
+            <button type="submit" disabled={saving} style={btn('primary')}>{saving ? S.action.saving : editingId ? S.action.saveChanges : S.action.create}</button>
+            <button type="button" onClick={cancel} style={btn('secondary')}>{S.action.cancel}</button>
           </div>
         </form>
       )}

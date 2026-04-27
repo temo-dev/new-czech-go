@@ -39,15 +39,15 @@ class HistoryScreen extends StatelessWidget {
       children: [
         // ── Header ─────────────────────────────────────────────────────────
         Text(
-          'LỊCH SỬ',
+          l.historyLabel,
           style: AppTypography.labelUppercase.copyWith(
             color: AppColors.primary, fontSize: 11, letterSpacing: 1.0),
         ),
         const SizedBox(height: AppSpacing.x1),
-        Text('Lịch sử luyện tập',
+        Text(l.historyTitle,
             style: AppTypography.titleLarge.copyWith(fontSize: 26, fontWeight: FontWeight.w700)),
         const SizedBox(height: AppSpacing.x1),
-        Text('Theo dõi tiến độ và kết quả các bài đã nộp.',
+        Text(l.historySubtitle,
             style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant)),
 
         const SizedBox(height: AppSpacing.x4),
@@ -64,7 +64,7 @@ class HistoryScreen extends StatelessWidget {
                   border: Border.all(color: AppColors.outlineVariant),
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Celkem lekcí',
+                  Text(l.historyStatTotal,
                       style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant)),
                   const SizedBox(height: 4),
                   Text('${attempts.length}',
@@ -83,7 +83,7 @@ class HistoryScreen extends StatelessWidget {
                   border: Border.all(color: AppColors.outlineVariant),
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Průměrná úspěšnost',
+                  Text(l.historyStatSuccess,
                       style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant)),
                   const SizedBox(height: 4),
                   Text('$_avgSuccessPct %',

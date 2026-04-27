@@ -225,6 +225,30 @@ class AppLocalizationsVi extends AppLocalizations {
   String get historyEmpty => 'Chưa có lần tập nào. Hãy mở bài tập ở tab Trang chủ để bắt đầu.';
 
   @override
+  String get historyLabel => 'LỊCH SỬ';
+
+  @override
+  String get historyTitle => 'Lịch sử luyện tập';
+
+  @override
+  String get historySubtitle => 'Theo dõi tiến độ và kết quả các bài đã nộp.';
+
+  @override
+  String get historyStatTotal => 'Tổng số bài';
+
+  @override
+  String get historyStatSuccess => 'Tỷ lệ thành công';
+
+  @override
+  String get resultCoachTipLabel => 'NHẬN XÉT HUẤN LUYỆN VIÊN';
+
+  @override
+  String get resultCriteriaLabel => 'TIÊU CHÍ ĐÁNH GIÁ';
+
+  @override
+  String get recordingCoachTip => 'Nhận xét huấn luyện viên';
+
+  @override
   String get pillSyntheticTranscript => 'TRANSCRIPT GIẢ LẬP';
 
   @override

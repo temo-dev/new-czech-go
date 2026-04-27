@@ -93,6 +93,15 @@
     "bottomNavHome": "Home",
     "bottomNavHistory": "History",
     "historyEmpty": "No attempts yet. Open an exercise from the Home tab to begin.",
+    "historyLabel": "HISTORY",
+    "historyTitle": "Practice History",
+    "historySubtitle": "Track your progress and submission results.",
+    "historyStatTotal": "Total attempts",
+    "historyStatSuccess": "Success rate",
+
+    "resultCoachTipLabel": "COACH TIP",
+    "resultCriteriaLabel": "EVALUATION CRITERIA",
+    "recordingCoachTip": "Coach tip",
 
     "pillSyntheticTranscript": "SYNTHETIC TRANSCRIPT",
     "pillFailure": "FAILURE: {code}",

@@ -105,6 +105,15 @@
     "bottomNavHome": "Trang chủ",
     "bottomNavHistory": "Lịch sử",
     "historyEmpty": "Chưa có lần tập nào. Hãy mở bài tập ở tab Trang chủ để bắt đầu.",
+    "historyLabel": "LỊCH SỬ",
+    "historyTitle": "Lịch sử luyện tập",
+    "historySubtitle": "Theo dõi tiến độ và kết quả các bài đã nộp.",
+    "historyStatTotal": "Tổng số bài",
+    "historyStatSuccess": "Tỷ lệ thành công",
+
+    "resultCoachTipLabel": "NHẬN XÉT HUẤN LUYỆN VIÊN",
+    "resultCriteriaLabel": "TIÊU CHÍ ĐÁNH GIÁ",
+    "recordingCoachTip": "Nhận xét huấn luyện viên",
 
     "pillSyntheticTranscript": "TRANSCRIPT GIẢ LẬP",
     "pillFailure": "FAILURE: {code}",

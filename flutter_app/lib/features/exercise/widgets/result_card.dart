@@ -258,7 +258,7 @@ class _FeedbackTab extends StatelessWidget {
                   const Icon(Icons.lightbulb_outline_rounded,
                       color: AppColors.surfaceContainerLow, size: 18),
                   const SizedBox(width: AppSpacing.x2),
-                  Text('TIP OD KOUČE',
+                  Text(l.resultCoachTipLabel,
                       style: AppTypography.labelUppercase.copyWith(
                           color: AppColors.surfaceContainerLow,
                           fontSize: 10,
@@ -622,6 +622,7 @@ class _CriteriaChecklist extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.x4),
       decoration: BoxDecoration(
@@ -639,7 +640,7 @@ class _CriteriaChecklist extends StatelessWidget {
                 size: 14, color: AppColors.onSurfaceVariant),
             const SizedBox(width: 6),
             Text(
-              'TIÊU CHÍ ĐÁNH GIÁ',
+              l.resultCriteriaLabel,
               style: AppTypography.labelUppercase.copyWith(
                 fontSize: 10,
                 color: AppColors.onSurfaceVariant,

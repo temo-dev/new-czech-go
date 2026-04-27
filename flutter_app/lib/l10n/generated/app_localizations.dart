@@ -479,6 +479,54 @@ abstract class AppLocalizations {
   /// **'Chưa có lần tập nào. Hãy mở bài tập ở tab Trang chủ để bắt đầu.'**
   String get historyEmpty;
 
+  /// No description provided for @historyLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'LỊCH SỬ'**
+  String get historyLabel;
+
+  /// No description provided for @historyTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lịch sử luyện tập'**
+  String get historyTitle;
+
+  /// No description provided for @historySubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Theo dõi tiến độ và kết quả các bài đã nộp.'**
+  String get historySubtitle;
+
+  /// No description provided for @historyStatTotal.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tổng số bài'**
+  String get historyStatTotal;
+
+  /// No description provided for @historyStatSuccess.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tỷ lệ thành công'**
+  String get historyStatSuccess;
+
+  /// No description provided for @resultCoachTipLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'NHẬN XÉT HUẤN LUYỆN VIÊN'**
+  String get resultCoachTipLabel;
+
+  /// No description provided for @resultCriteriaLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'TIÊU CHÍ ĐÁNH GIÁ'**
+  String get resultCriteriaLabel;
+
+  /// No description provided for @recordingCoachTip.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nhận xét huấn luyện viên'**
+  String get recordingCoachTip;
+
   /// No description provided for @pillSyntheticTranscript.
   ///
   /// In vi, this message translates to:

@@ -1,6 +1,6 @@
 # i18n Implementation Plan
 
-> **Status (2026-04-25):** Slice 1 shipped end-to-end (backend locale field, HTTP validation, LLM locale plumbing, Flutter provider + selector + persistence). Slice 2 shipped: full ARB catalog for learner screens (home, history, exercise, analysis, mock exam, review). Audit found zero remaining user-facing VI/EN literals on learner surfaces. Only `feedback_card.dart:50` has a `'• '` bullet glyph (non-translatable typographic separator).
+> **Status (2026-04-27):** Slice 1+2 shipped ✅. Flutter i18n now fully clean — 8 post-V5 hardcoded strings (6 Czech) fixed in `history_screen.dart`, `result_card.dart`, `recording_card.dart`; 8 new ARB keys added (EN+VI parity maintained at 175 keys). CMS strings standardised to Vietnamese via `cms/lib/strings.ts` constants file; English button labels replaced in `exercise-dashboard`, `mock-test-dashboard`, `module-dashboard`, `skill-dashboard`. No i18n library added to CMS (admin tool, Vietnamese-only).
 
 ## Goal
 Ship multi-language support (`vi`, `en`) end-to-end: learner-picked interface language drives both UI copy and LLM-generated feedback.

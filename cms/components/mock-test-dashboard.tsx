@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import { S } from '../lib/strings';
 
 type Exercise = {
   id: string;
@@ -215,7 +216,7 @@ export function MockTestDashboard() {
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px', fontFamily: 'sans-serif' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Mock Tests</h1>
-        <button onClick={openCreate} style={btnStyle('primary')}>+ New mock test</button>
+        <button onClick={openCreate} style={btnStyle('primary')}>{S.mockTest.newCta}</button>
       </div>
 
       {error && <p style={{ color: 'red', marginBottom: 16 }}>{error}</p>}
@@ -238,9 +239,9 @@ export function MockTestDashboard() {
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                  <button onClick={() => openEdit(t)} style={btnStyle('secondary')}>Edit</button>
+                  <button onClick={() => openEdit(t)} style={btnStyle('secondary')}>{S.action.edit}</button>
                   {t.status === 'draft' && (
-                    <button onClick={() => handleDelete(t.id)} style={btnStyle('danger')}>Delete</button>
+                    <button onClick={() => handleDelete(t.id)} style={btnStyle('danger')}>{S.action.delete}</button>
                   )}
                 </div>
               </div>
@@ -261,7 +262,7 @@ export function MockTestDashboard() {
       {showForm && (
         <form onSubmit={handleSubmit} style={{ ...cardStyle, borderColor: '#3b82f6' }}>
           <h2 style={{ margin: '0 0 16px', fontSize: 18 }}>
-            {editingId ? 'Edit mock test' : 'New mock test'}
+            {editingId ? S.mockTest.editTitle : S.mockTest.createTitle}
           </h2>
 
           <label style={labelStyle}>Title *</label>
@@ -324,7 +325,7 @@ export function MockTestDashboard() {
                   style={inputStyle}
                   required
                 >
-                  <option value="">— Pick exercise —</option>
+                  <option value="">{S.pick.exercise}</option>
                   {exercises.map(ex => (
                     <option key={ex.id} value={ex.id}>
                       [{EXERCISE_TYPE_LABEL[ex.exercise_type] ?? ex.exercise_type}] {ex.title}
@@ -359,9 +360,9 @@ export function MockTestDashboard() {
 
           <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
             <button type="submit" disabled={saving} style={btnStyle('primary')}>
-              {saving ? 'Saving…' : editingId ? 'Save changes' : 'Create'}
+              {saving ? S.action.saving : editingId ? S.mockTest.updateCta : S.mockTest.createCta}
             </button>
-            <button type="button" onClick={cancelForm} style={btnStyle('secondary')}>Cancel</button>
+            <button type="button" onClick={cancelForm} style={btnStyle('secondary')}>{S.action.cancel}</button>
           </div>
         </form>
       )}

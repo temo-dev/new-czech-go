@@ -225,6 +225,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyEmpty => 'No attempts yet. Open an exercise from the Home tab to begin.';
 
   @override
+  String get historyLabel => 'HISTORY';
+
+  @override
+  String get historyTitle => 'Practice History';
+
+  @override
+  String get historySubtitle => 'Track your progress and submission results.';
+
+  @override
+  String get historyStatTotal => 'Total attempts';
+
+  @override
+  String get historyStatSuccess => 'Success rate';
+
+  @override
+  String get resultCoachTipLabel => 'COACH TIP';
+
+  @override
+  String get resultCriteriaLabel => 'EVALUATION CRITERIA';
+
+  @override
+  String get recordingCoachTip => 'Coach tip';
+
+  @override
   String get pillSyntheticTranscript => 'SYNTHETIC TRANSCRIPT';
 
   @override

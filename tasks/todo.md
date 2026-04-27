@@ -122,3 +122,30 @@
 ---
 
 **Spec:** `docs/specs/v2-ui-spec.md`
+
+---
+
+## i18n Patch
+
+### Slice F — Flutter: fix post-i18n hardcoded strings
+
+> 8 chuỗi hardcoded (6 tiếng Séc) được thêm vào trong UI polish V5.x sau khi i18n slice đóng.
+
+- [x] **F-I1** — Thêm 8 ARB keys vào `app_en.arb` + `app_vi.arb`, chạy `flutter gen-l10n`
+  - Keys: `historyLabel`, `historyTitle`, `historySubtitle`, `historyStatTotal`, `historyStatSuccess`, `resultCoachTipLabel`, `resultCriteriaLabel`, `recordingCoachTip`
+- [x] **F-I2** — `history_screen.dart`: thay 5 hardcoded strings (2 Czech + 3 Vietnamese) bằng `l.*`
+- [x] **F-I3** — `result_card.dart` + `recording_card.dart`: thay 3 hardcoded Czech strings bằng `l.*`
+
+**[CHECKPOINT F]** `make flutter-analyze && make flutter-test` ✅ 11/11 tests pass
+
+---
+
+### Slice C — CMS: chuẩn hoá strings
+
+> CMS strings hiện tại là mixed VI/EN. Approach: constants file, không dùng library.
+
+- [x] **C-I1** — Tạo `cms/lib/strings.ts` với tất cả CMS UI strings chuẩn hoá sang tiếng Việt
+- [x] **C-I2** — Migrate 4 CMS components dùng `S`: `exercise-dashboard`, `mock-test-dashboard`, `module-dashboard`, `skill-dashboard`
+  - Note: `cms-sidebar` labels already Vietnamese; `course-dashboard`, `learners-dashboard` labels already Vietnamese
+
+**[CHECKPOINT C]** `make cms-lint && make cms-build` ✅

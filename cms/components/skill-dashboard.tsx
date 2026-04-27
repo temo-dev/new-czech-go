@@ -1,5 +1,6 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
+import { S } from '../lib/strings';
 
 type Module = { id: string; title: string; course_id: string };
 type Skill = { id: string; module_id: string; skill_kind: string; title: string; sequence_no: number; status: string };
@@ -83,18 +84,18 @@ export function SkillDashboard() {
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px', fontFamily: 'sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <h1 style={{ margin: 0, fontSize: 22 }}>Skills</h1>
-        <button onClick={openCreate} disabled={!filterModule} style={btn('primary')}>+ New skill</button>
+        <button onClick={openCreate} disabled={!filterModule} style={btn('primary')}>{S.skill.newCta}</button>
       </div>
       <div style={{ marginBottom: 16 }}>
-        <label style={{ ...label, marginTop: 0 }}>Filter by module:</label>
+        <label style={{ ...label, marginTop: 0 }}>{S.skill.filterLabel}</label>
         <select value={filterModule} onChange={e => onModuleFilter(e.target.value)} style={{ ...input, width: 400 }}>
-          <option value="">— Pick a module to see its skills —</option>
+          <option value="">{S.pick.moduleForSkills}</option>
           {modules.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
         </select>
       </div>
       {error && <p style={{ color: 'red' }}>{error}</p>}
-      {!filterModule && <p style={{ color: '#9ca3af' }}>Select a module above to manage its skills.</p>}
-      {filterModule && !loading && skills.length === 0 && <p style={{ color: '#9ca3af' }}>No skills for this module yet.</p>}
+      {!filterModule && <p style={{ color: '#9ca3af' }}>{S.skill.emptyModule}</p>}
+      {filterModule && !loading && skills.length === 0 && <p style={{ color: '#9ca3af' }}>{S.skill.emptySkills}</p>}
       {!showForm && skills.map(sk => (
         <div key={sk.id} style={card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -104,20 +105,20 @@ export function SkillDashboard() {
               <span style={{ marginLeft: 8, fontSize: 12, color: '#6b7280' }}>{kindLabel(sk.skill_kind)} · #{sk.sequence_no}</span>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => openEdit(sk)} style={btn('secondary')}>Edit</button>
-              <button onClick={() => del(sk.id)} style={btn('danger')}>Delete</button>
+              <button onClick={() => openEdit(sk)} style={btn('secondary')}>{S.action.edit}</button>
+              <button onClick={() => del(sk.id)} style={btn('danger')}>{S.action.delete}</button>
             </div>
           </div>
         </div>
       ))}
       {showForm && (
         <form onSubmit={submit} style={{ ...card, borderColor: '#3b82f6' }}>
-          <h2 style={{ margin: '0 0 12px', fontSize: 18 }}>{editingId ? 'Edit skill' : 'New skill'}</h2>
-          <label style={label}>Skill kind *</label>
+          <h2 style={{ margin: '0 0 12px', fontSize: 18 }}>{editingId ? S.skill.editTitle : S.skill.createTitle}</h2>
+          <label style={label}>{S.skill.kindLabel}</label>
           <select required value={form.skill_kind} onChange={e => onKindChange(e.target.value)} style={input}>
             {SKILL_KINDS.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
           </select>
-          <label style={label}>Title</label>
+          <label style={label}>{S.skill.titleLabel}</label>
           <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} style={input} />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div><label style={label}>Seq No</label><input type="number" min={1} value={form.sequence_no} onChange={e => setForm(f => ({ ...f, sequence_no: parseInt(e.target.value) || 1 }))} style={input} /></div>
@@ -128,8 +129,8 @@ export function SkillDashboard() {
           </div>
           {error && <p style={{ color: 'red', marginTop: 8 }}>{error}</p>}
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button type="submit" disabled={saving} style={btn('primary')}>{saving ? 'Saving…' : editingId ? 'Save' : 'Create'}</button>
-            <button type="button" onClick={cancel} style={btn('secondary')}>Cancel</button>
+            <button type="submit" disabled={saving} style={btn('primary')}>{saving ? S.action.saving : editingId ? S.action.saveChanges : S.action.create}</button>
+            <button type="button" onClick={cancel} style={btn('secondary')}>{S.action.cancel}</button>
           </div>
         </form>
       )}

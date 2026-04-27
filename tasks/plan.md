@@ -251,3 +251,145 @@ Source: `docs/design/czech-app-2/` — handoff bundle từ claude.ai/design.
 - Activity chart (cần charting lib)
 - Dashboard pipeline sidebar (cần learner analytics API)
 - Mock exam settings CRUD
+
+---
+
+# i18n Patch Plan
+
+## Bối cảnh
+
+Flutter i18n Slice 1+2 đã ship (2026-04-25). Tuy nhiên, UI polish V5.x (history_screen redesign, result_card criteria checklist, recording_card coach tip) thêm vào 8 chuỗi hardcoded — trong đó **6 chuỗi tiếng Séc** — sau khi i18n slice đóng. CMS chưa có i18n; chuỗi UI phân tán giữa tiếng Việt và tiếng Anh.
+
+## Assumptions
+
+1. CMS là tool nội bộ (admin là người Việt) → không cần locale switching, chỉ cần chuẩn hoá sang tiếng Việt qua constants file.
+2. Flutter ARB parity đang tốt (EN = VI = 167 keys, diff = 0); chỉ cần thêm 8 keys mới.
+3. Chuỗi `'• '` trong feedback_card là typographic separator — không dịch, giữ nguyên.
+4. `locale_selector.dart` không dùng AppLocalizations — đúng (tự tham chiếu, hardcode language names là đúng).
+
+## Dependency graph
+
+```
+F-I1 (ARB keys) → F-I2 (history_screen) 
+F-I1 (ARB keys) → F-I3 (result_card + recording_card)
+F-I1, F-I2, F-I3 → [CHECKPOINT F]
+
+C-I1 (strings.ts) → C-I2 (migrate components)
+C-I2 → [CHECKPOINT C]
+```
+
+---
+
+## Slice F — Flutter: fix post-i18n hardcoded strings
+
+### F-I1: Thêm 8 ARB keys (en + vi)
+
+**Files:** `flutter_app/lib/l10n/app_en.arb`, `flutter_app/lib/l10n/app_vi.arb`
+
+**Keys cần thêm:**
+
+| Key | EN | VI |
+|---|---|---|
+| `historyLabel` | `HISTORY` | `LỊCH SỬ` |
+| `historyTitle` | `Practice History` | `Lịch sử luyện tập` |
+| `historySubtitle` | `Track your progress and submission results.` | `Theo dõi tiến độ và kết quả các bài đã nộp.` |
+| `historyStatTotal` | `Total attempts` | `Tổng số bài` |
+| `historyStatSuccess` | `Success rate` | `Tỷ lệ thành công` |
+| `resultCoachTipLabel` | `COACH TIP` | `NHẬN XÉT HUẤN LUYỆN VIÊN` |
+| `resultCriteriaLabel` | `EVALUATION CRITERIA` | `TIÊU CHÍ ĐÁNH GIÁ` |
+| `recordingCoachTip` | `Coach tip` | `Nhận xét huấn luyện viên` |
+
+Run `flutter gen-l10n` sau khi thêm.
+
+**AC:**
+- [ ] Cả 2 ARB files có đủ 8 keys mới
+- [ ] EN + VI key sets vẫn bằng nhau (diff = 0)
+- [ ] `flutter gen-l10n` thành công
+
+### F-I2: Migrate history_screen.dart
+
+**File:** `flutter_app/lib/features/history/screens/history_screen.dart`
+
+Thay 5 hardcoded strings:
+- `'LỊCH SỬ'` → `l.historyLabel`
+- `'Lịch sử luyện tập'` → `l.historyTitle`
+- `'Theo dõi tiến độ và kết quả các bài đã nộp.'` → `l.historySubtitle`
+- `'Celkem lekcí'` → `l.historyStatTotal`
+- `'Průměrná úspěšnost'` → `l.historyStatSuccess`
+
+**AC:**
+- [ ] Không còn chuỗi Czech/Vietnamese hardcoded trong file
+- [ ] Widget dùng `l = AppLocalizations.of(context)` ở đầu build
+
+### F-I3: Migrate result_card.dart + recording_card.dart
+
+**Files:**
+- `flutter_app/lib/features/exercise/widgets/result_card.dart`
+- `flutter_app/lib/features/exercise/widgets/recording_card.dart`
+
+Thay 3 hardcoded strings:
+- `result_card.dart`: `'TIP OD KOUČE'` → `l.resultCoachTipLabel`
+- `result_card.dart`: `'TIÊU CHÍ ĐÁNH GIÁ'` → `l.resultCriteriaLabel`
+- `recording_card.dart`: `'Tip od kouče'` → `l.recordingCoachTip`
+
+**AC:**
+- [ ] Không còn chuỗi Czech hardcoded trong 2 file
+- [ ] `recording_card.dart` nhận `BuildContext` để gọi `AppLocalizations.of(context)` (check xem widget đã có context chưa)
+
+### [CHECKPOINT F]
+
+```
+make flutter-analyze && make flutter-test
+```
+
+Chuyển tiếp device sang EN → kiểm tra history + result + recording hiển thị đúng tiếng Anh.
+
+---
+
+## Slice C — CMS: chuẩn hoá strings
+
+### C-I1: Tạo cms/lib/strings.ts
+
+**File:** `cms/lib/strings.ts` (mới)
+
+Constants file tập trung tất cả CMS UI strings, chuẩn hoá sang tiếng Việt. Không dùng library.
+
+**Nội dung cần cover:**
+- Nav labels (sidebar): Bài tập, Khóa học, Mock Test, Học viên, Module, Kỹ năng
+- Button labels: Tạo mới, Lưu, Xoá, Chỉnh sửa, Huỷ
+- Status labels: Bản nháp, Đã xuất bản
+- Form tabs (exercise-dashboard): Đề bài, Bài mẫu, Siêu dữ liệu
+- Mock test UI: Thêm bài thi mới, Chỉnh sửa bài thi, Thêm phần thi
+- Stats labels (dashboard-stats): đã là tiếng Việt, giữ nguyên hoặc nhất quán hoá
+- Error messages tiếng Anh → tiếng Việt
+
+**AC:**
+- [ ] File export `CMS_STRINGS` const object với đủ keys
+- [ ] TypeScript type-safe (no `any`)
+- [ ] `cms-lint` pass
+
+### C-I2: Migrate CMS components
+
+**Files:**
+- `cms/components/cms-sidebar.tsx` — NAV labels từ constants
+- `cms/components/exercise-dashboard.tsx` — tab labels, button labels
+- `cms/components/mock-test-dashboard.tsx` — button labels, status options
+- `cms/components/learners-dashboard.tsx` — button/filter labels
+- `cms/components/module-dashboard.tsx` — button labels
+- `cms/components/skill-dashboard.tsx` — button labels
+- `cms/components/course-dashboard.tsx` — button labels
+
+Import `CMS_STRINGS` và thay literal strings. Sidebar NAV array: thay inline labels → `CMS_STRINGS.nav.*`.
+
+**AC:**
+- [ ] Không còn English button labels ('Edit', 'Delete', 'New mock test') trong JSX
+- [ ] Tất cả components import từ `cms/lib/strings.ts`
+- [ ] `cms-lint` + `cms-build` pass
+
+### [CHECKPOINT C]
+
+```
+make cms-lint && make cms-build
+```
+
+Spot check: mở `/`, `/mock-tests`, `/exercises` → kiểm tra labels tiếng Việt nhất quán.

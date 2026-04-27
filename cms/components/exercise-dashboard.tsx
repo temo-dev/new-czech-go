@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import { S } from '../lib/strings';
 
 type PromptAsset = {
   id: string;
@@ -664,7 +665,7 @@ export function ExerciseDashboard() {
           <div style={{ display: 'grid', gap: 6 }}>
             <span style={eyebrowStyle}>Content editor</span>
             <h2 style={{ margin: 0, fontSize: 24 }}>
-              {editingId ? 'Edit ' : 'Create '}
+              {editingId ? 'Chỉnh sửa ' : 'Tạo '}
               {form.exerciseType === 'uloha_1_topic_answers'
                 ? '`Uloha 1`'
                 : form.exerciseType === 'uloha_2_dialogue_questions'
@@ -701,7 +702,7 @@ export function ExerciseDashboard() {
             borderRadius: 999,
             marginBottom: 4,
           }}>
-            {['Đề bài', 'Bài mẫu', 'Metadata'].map((tab, i) => (
+            {[S.exercise.tabPrompt, S.exercise.tabSample, S.exercise.tabMetadata].map((tab, i) => (
               <button
                 key={i}
                 type="button"
@@ -807,7 +808,7 @@ export function ExerciseDashboard() {
                   onChange={(e) => handleModuleChange(e.target.value)}
                   style={fieldStyle}
                 >
-                  <option value="">— Pick module —</option>
+                  <option value="">{S.pick.module}</option>
                   {availableModules.map(m => (
                     <option key={m.id} value={m.id}>{m.title}</option>
                   ))}
@@ -822,7 +823,7 @@ export function ExerciseDashboard() {
                   style={fieldStyle}
                   disabled={availableSkills.length === 0}
                 >
-                  <option value="">— Pick skill —</option>
+                  <option value="">{S.pick.skill}</option>
                   {availableSkills.map(s => (
                     <option key={s.id} value={s.id}>{s.title} ({s.skill_kind})</option>
                   ))}
@@ -1173,10 +1174,10 @@ export function ExerciseDashboard() {
             }}
           >
             {saving
-              ? 'Saving...'
+              ? S.action.saving
               : editingId
-                ? 'Update exercise'
-                : 'Create exercise'}
+                ? S.exercise.updateCta
+                : S.exercise.createCta}
           </button>
 
           {editingId ? (
