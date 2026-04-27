@@ -50,7 +50,12 @@ type ExerciseType =
   | 'poslech_2'
   | 'poslech_3'
   | 'poslech_4'
-  | 'poslech_5';
+  | 'poslech_5'
+  | 'cteni_1'
+  | 'cteni_2'
+  | 'cteni_3'
+  | 'cteni_4'
+  | 'cteni_5';
 
 type ExerciseFormState = {
   exerciseType: ExerciseType;
@@ -90,6 +95,12 @@ type ExerciseFormState = {
   poslechAudioReady: boolean;
   // poslech_5 voicemail
   poslechVoicemailText: string;
+  // cteni_* shared
+  cteniText: string;           // main reading passage (cteni_2/4/5)
+  cteniItems: string;          // items (cteni_1: image refs, cteni_3: text blocks) separated by ---
+  cteniOptions: string;        // options A-H / A-E (key | label)
+  cteniQuestions: string;      // questions (cteni_2/4: prompt + A-D options; cteni_5: prompts)
+  cteniCorrectAnswers: string; // 6=A\n7=B\n...
 };
 
 const exerciseTypeOptions: Array<{
@@ -132,6 +143,11 @@ const exerciseTypeOptions: Array<{
   { value: 'poslech_3', label: 'Poslech 3', hint: 'Listening: 5 passages → match A-G (5 pts).' },
   { value: 'poslech_4', label: 'Poslech 4', hint: 'Listening: 5 dialogs → choose image A-F (5 pts).' },
   { value: 'poslech_5', label: 'Poslech 5', hint: 'Listening: voicemail → fill info (5 pts).' },
+  { value: 'cteni_1', label: 'Čtení 1', hint: 'Reading: match 5 images/messages → A-H (5 pts).' },
+  { value: 'cteni_2', label: 'Čtení 2', hint: 'Reading: read text → choose A-D, 5 questions (5 pts).' },
+  { value: 'cteni_3', label: 'Čtení 3', hint: 'Reading: match 4 texts → persons A-E (4 pts).' },
+  { value: 'cteni_4', label: 'Čtení 4', hint: 'Reading: choose A-D, 6 questions (6 pts).' },
+  { value: 'cteni_5', label: 'Čtení 5', hint: 'Reading: read text → fill info, 5 items (5 pts).' },
 ];
 
 function createInitialFormState(): ExerciseFormState {
@@ -176,6 +192,11 @@ function createInitialFormState(): ExerciseFormState {
     poslechGeneratingAudio: false,
     poslechAudioReady: false,
     poslechVoicemailText: 'Ahoj Lído, tady Eva. Dostala jsem lístky na balet.',
+    cteniText: 'Přečtěte si text...',
+    cteniItems: 'Položka 1\n---\nPoložka 2\n---\nPoložka 3\n---\nPoložka 4\n---\nPoložka 5',
+    cteniOptions: 'A | Možnost A\nB | Možnost B\nC | Možnost C\nD | Možnost D',
+    cteniQuestions: 'Otázka 1?\nOtázka 2?\nOtázka 3?\nOtázka 4?\nOtázka 5?',
+    cteniCorrectAnswers: '1=A\n2=B\n3=C\n4=D\n5=A',
   };
 }
 
@@ -308,6 +329,31 @@ function formStateFromExercise(item: Exercise): ExerciseFormState {
         ? (segs as Array<Record<string, unknown>>).map(s => s.text ?? '').join('\n')
         : '';
     })(),
+    cteniText: detail.text as string ?? '',
+    cteniItems: (() => {
+      if (Array.isArray(detail.items)) {
+        return (detail.items as Array<Record<string, unknown>>).map(i => i.text ?? '').join('\n---\n');
+      }
+      if (Array.isArray(detail.texts)) {
+        return (detail.texts as Array<Record<string, unknown>>).map(i => i.text ?? '').join('\n---\n');
+      }
+      return '';
+    })(),
+    cteniOptions: (() => {
+      if (Array.isArray(detail.options)) {
+        return (detail.options as Array<Record<string, unknown>>).map(o => `${o.key ?? ''} | ${o.text ?? o.label ?? ''}`).join('\n');
+      }
+      if (Array.isArray(detail.persons)) {
+        return (detail.persons as Array<Record<string, unknown>>).map(p => `${p.key ?? ''} | ${p.name ?? ''}`).join('\n');
+      }
+      return '';
+    })(),
+    cteniQuestions: Array.isArray(detail.questions)
+      ? (detail.questions as Array<Record<string, unknown>>).map(q => q.prompt ?? '').join('\n')
+      : '',
+    cteniCorrectAnswers: detail.correct_answers
+      ? Object.entries(detail.correct_answers as Record<string, string>).map(([k, v]) => `${k}=${v}`).join('\n')
+      : '',
   };
 }
 
@@ -383,7 +429,54 @@ function buildPoslechPayload(form: ExerciseFormState) {
   };
 }
 
+function parseCteniCorrectAnswers(input: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  input.split('\n').map(l => l.trim()).filter(Boolean).forEach(line => {
+    const [k, v] = line.split('=');
+    if (k && v) result[k.trim()] = v.trim();
+  });
+  return result;
+}
+
+function buildCteniPayload(form: ExerciseFormState) {
+  const correct = parseCteniCorrectAnswers(form.cteniCorrectAnswers);
+  const base = {
+    module_id: form.moduleId, skill_id: form.skillId,
+    exercise_type: form.exerciseType, title: form.title,
+    short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
+    estimated_duration_sec: 2400, sample_answer_enabled: false,
+    status: form.status, pool: form.pool,
+  };
+  if (form.exerciseType === 'cteni_1') {
+    const items = form.cteniItems.split(/\n---\n/).map((b, i) => ({ item_no: i + 1, text: b.trim() }));
+    const options = parsePoslechOptions(form.cteniOptions, 'choice').map(o => ({ key: o.key, text: (o as Record<string, unknown>).text ?? '' }));
+    return { ...base, detail: { items, options, correct_answers: correct } };
+  }
+  if (form.exerciseType === 'cteni_2' || form.exerciseType === 'cteni_4') {
+    const questionPrompts = parseLineList(form.cteniQuestions);
+    const questionOptions = parsePoslechOptions(form.cteniOptions, 'choice');
+    const questions = questionPrompts.map((prompt, i) => ({
+      question_no: i + (form.exerciseType === 'cteni_4' ? 15 : 6),
+      prompt,
+      options: questionOptions,
+    }));
+    return { ...base, detail: { text: form.cteniText.trim(), questions, correct_answers: correct } };
+  }
+  if (form.exerciseType === 'cteni_3') {
+    const texts = form.cteniItems.split(/\n---\n/).map((b, i) => ({ item_no: i + 1, text: b.trim() }));
+    const persons = form.cteniOptions.split('\n').filter(Boolean).map(line => {
+      const [key = '', name = ''] = line.split('|').map(p => p.trim());
+      return { key, name };
+    });
+    return { ...base, detail: { texts, persons, correct_answers: correct } };
+  }
+  // cteni_5
+  const questions = parseLineList(form.cteniQuestions).map((prompt, i) => ({ question_no: i + 21, prompt }));
+  return { ...base, detail: { text: form.cteniText.trim(), questions, correct_answers: correct } };
+}
+
 function buildCreatePayload(form: ExerciseFormState) {
+  if (form.exerciseType.startsWith('cteni_')) return buildCteniPayload(form);
   if (form.exerciseType.startsWith('poslech_')) return buildPoslechPayload(form);
   if (form.exerciseType === 'uloha_1_topic_answers') {
     return {
@@ -515,6 +608,7 @@ function buildCreatePayload(form: ExerciseFormState) {
 }
 
 function buildUpdatePayload(form: ExerciseFormState) {
+  if (form.exerciseType.startsWith('cteni_')) return buildCteniPayload(form);
   if (form.exerciseType.startsWith('poslech_')) return buildPoslechPayload(form);
   if (form.exerciseType === 'uloha_1_topic_answers') {
     return {
@@ -912,6 +1006,7 @@ export function ExerciseDashboard() {
                 : form.exerciseType === 'psani_1_formular' ? '`Psaní 1 — Formulář`'
                 : form.exerciseType === 'psani_2_email' ? '`Psaní 2 — E-mail`'
                 : form.exerciseType.startsWith('poslech_') ? `\`${form.exerciseType.replace('_', ' ').toUpperCase()}\``
+                : form.exerciseType.startsWith('cteni_') ? `\`${form.exerciseType.replace('_', ' ').toUpperCase()}\``
                 : '`Exercise`'}
             </h2>
             <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
@@ -1363,6 +1458,10 @@ export function ExerciseDashboard() {
             />
           ) : null}
 
+          {form.exerciseType.startsWith('cteni_') ? (
+            <CteniFields form={form} setForm={setForm} />
+          ) : null}
+
           {(form.exerciseType === 'uloha_3_story_narration' ||
             form.exerciseType === 'uloha_4_choice_reasoning' ||
             form.exerciseType === 'psani_2_email') ? (
@@ -1647,6 +1746,96 @@ export function ExerciseDashboard() {
         </section>
       </section>
     </main>
+  );
+}
+
+type CteniFieldsProps = {
+  form: ExerciseFormState;
+  setForm: React.Dispatch<React.SetStateAction<ExerciseFormState>>;
+};
+
+function CteniFields({ form, setForm }: CteniFieldsProps) {
+  const isCteni1 = form.exerciseType === 'cteni_1';
+  const isCteni3 = form.exerciseType === 'cteni_3';
+  const isCteni5 = form.exerciseType === 'cteni_5';
+  const needsText = form.exerciseType === 'cteni_2' || form.exerciseType === 'cteni_4' || isCteni5;
+  const needsItems = isCteni1 || isCteni3;
+
+  return (
+    <>
+      {needsText && (
+        <label style={{ display: 'grid', gap: 6 }}>
+          <span style={fieldLabelStyle}>Đoạn văn đọc</span>
+          <textarea
+            rows={8}
+            value={form.cteniText}
+            onChange={e => setForm(f => ({ ...f, cteniText: e.target.value }))}
+            style={fieldStyle}
+            placeholder="Přečtěte si text..."
+          />
+        </label>
+      )}
+
+      {needsItems && (
+        <label style={{ display: 'grid', gap: 6 }}>
+          <span style={fieldLabelStyle}>
+            {isCteni1 ? 'Các ảnh/tin nhắn (phân cách bằng ---)' : 'Các đoạn văn (phân cách bằng ---)'}
+          </span>
+          <textarea
+            rows={8}
+            value={form.cteniItems}
+            onChange={e => setForm(f => ({ ...f, cteniItems: e.target.value }))}
+            style={fieldStyle}
+            placeholder={'Item 1...\n---\nItem 2...\n---\nItem 3...'}
+          />
+          <span style={fieldHintStyle}>
+            {isCteni1 ? 'Cteni 1: 5 items. Dùng asset IDs hoặc text tin nhắn.' : 'Cteni 3: 4 đoạn văn.'}
+          </span>
+        </label>
+      )}
+
+      <label style={{ display: 'grid', gap: 6 }}>
+        <span style={fieldLabelStyle}>
+          {isCteni3 ? 'Nhân vật A-E (key | tên)' : isCteni1 ? 'Options A-H (key | nội dung)' : 'Options A-D (key | nội dung)'}
+        </span>
+        <textarea
+          rows={isCteni1 ? 8 : isCteni3 ? 5 : 4}
+          value={form.cteniOptions}
+          onChange={e => setForm(f => ({ ...f, cteniOptions: e.target.value }))}
+          style={fieldStyle}
+          placeholder={isCteni3 ? 'A | Jana (IT)\nB | Petr (student)' : 'A | Celodenní parkování zdarma.'}
+        />
+      </label>
+
+      {!isCteni1 && !isCteni3 && (
+        <label style={{ display: 'grid', gap: 6 }}>
+          <span style={fieldLabelStyle}>
+            {isCteni5 ? 'Câu hỏi fill-in (1 câu/dòng)' : 'Câu hỏi (1 câu/dòng)'}
+          </span>
+          <textarea
+            rows={6}
+            value={form.cteniQuestions}
+            onChange={e => setForm(f => ({ ...f, cteniQuestions: e.target.value }))}
+            style={fieldStyle}
+            placeholder={isCteni5 ? 'Podle receptu můžeme připravit...\nNa salát potřebujeme...' : 'Kdy se koná slavnostní otevření?\nKdo může zdarma...'}
+          />
+        </label>
+      )}
+
+      <label style={{ display: 'grid', gap: 6 }}>
+        <span style={fieldLabelStyle}>Đáp án đúng (1=A, 2=B, ...)</span>
+        <textarea
+          rows={6}
+          value={form.cteniCorrectAnswers}
+          onChange={e => setForm(f => ({ ...f, cteniCorrectAnswers: e.target.value }))}
+          style={fieldStyle}
+          placeholder={isCteni5 ? '21=bramborový salát\n22=velkou cibuli' : '1=H\n2=A\n3=C\n4=D\n5=F'}
+        />
+        <span style={fieldHintStyle}>
+          {isCteni5 ? 'Fill-in: so khớp substring (không phân biệt hoa/thường).' : 'Multiple choice: exact match key (A/B/C/D).'}
+        </span>
+      </label>
+    </>
   );
 }
 
