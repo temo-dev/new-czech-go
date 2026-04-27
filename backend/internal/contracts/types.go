@@ -117,6 +117,106 @@ type Uloha4Detail struct {
 	ExpectedReasoningAxes []string       `json:"expected_reasoning_axes,omitempty"`
 }
 
+// --- Listening (V3) ---
+
+// AudioSegment is one speaker turn in a dialog or monologue used to generate Polly audio.
+type AudioSegment struct {
+	Speaker string `json:"speaker,omitempty"` // "A" or "B" for dialog
+	Text    string `json:"text"`
+}
+
+// ListeningAudioSource describes where audio comes from: an uploaded asset or text→Polly segments.
+type ListeningAudioSource struct {
+	AssetID  string         `json:"asset_id,omitempty"` // uploaded file
+	Segments []AudioSegment `json:"segments,omitempty"` // text→Polly
+}
+
+type MultipleChoiceOption struct {
+	Key  string `json:"key"`  // "A", "B", ...
+	Text string `json:"text"`
+}
+
+type MatchOption struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+}
+
+type ImageOption struct {
+	Key     string `json:"key"`
+	AssetID string `json:"asset_id"`
+}
+
+type TextOption struct {
+	Key  string `json:"key"`
+	Text string `json:"text"`
+}
+
+type PersonOption struct {
+	Key         string `json:"key"` // "A"–"E"
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+}
+
+type FillQuestion struct {
+	QuestionNo int    `json:"question_no"`
+	Prompt     string `json:"prompt"`
+}
+
+// ListeningItem is one question in a multi-choice listening exercise (poslech_1/2).
+type ListeningItem struct {
+	QuestionNo  int                    `json:"question_no"`
+	AudioSource ListeningAudioSource   `json:"audio_source"`
+	Options     []MultipleChoiceOption `json:"options"`
+}
+
+// DialogItem is one dialog in poslech_4.
+type DialogItem struct {
+	QuestionNo  int                  `json:"question_no"`
+	AudioSource ListeningAudioSource `json:"audio_source"`
+}
+
+// Poslech1Detail — 5 short passages → choose A-D (5 pts).
+type Poslech1Detail struct {
+	Items          []ListeningItem   `json:"items"`           // 5 items
+	CorrectAnswers map[string]string `json:"correct_answers"` // {"1":"B",...}
+}
+
+// Poslech2Detail — same structure as Poslech1Detail.
+type Poslech2Detail struct {
+	Items          []ListeningItem   `json:"items"`
+	CorrectAnswers map[string]string `json:"correct_answers"`
+}
+
+// Poslech3Detail — 5 passages → match A-G (2 extra, 5 pts).
+type Poslech3Detail struct {
+	Items          []ListeningItem   `json:"items"`   // 5 items
+	Options        []MatchOption     `json:"options"` // A-G (7)
+	CorrectAnswers map[string]string `json:"correct_answers"`
+}
+
+// Poslech4Detail — 5 dialogs → choose image A-F (1 extra, 5 pts).
+type Poslech4Detail struct {
+	Items          []DialogItem      `json:"items"`   // 5 dialogs
+	Options        []ImageOption     `json:"options"` // A-F (6)
+	CorrectAnswers map[string]string `json:"correct_answers"`
+}
+
+// Poslech5Detail — listen to voicemail → fill info (5 pts).
+type Poslech5Detail struct {
+	AudioSource    ListeningAudioSource `json:"audio_source"`
+	Questions      []FillQuestion       `json:"questions"` // 5
+	CorrectAnswers map[string]string    `json:"correct_answers"`
+}
+
+// ExerciseAudio stores generated audio metadata for a listening exercise.
+type ExerciseAudio struct {
+	ExerciseID  string `json:"exercise_id"`
+	StorageKey  string `json:"storage_key"`
+	MimeType    string `json:"mime_type"`
+	SourceType  string `json:"source_type"` // "polly" | "upload"
+	GeneratedAt string `json:"generated_at"`
+}
+
 // --- Writing (V2) ---
 
 type Psani1Detail struct {

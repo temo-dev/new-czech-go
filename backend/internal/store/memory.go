@@ -10,16 +10,17 @@ import (
 )
 
 type MemoryStore struct {
-	mu           sync.RWMutex
-	usersByToken map[string]contracts.User
-	plan         contracts.LearningPlan
-	courses      CourseStore
-	modules      ModuleStore
-	skills       SkillStore
-	exercises    ExerciseStore
-	attempts     AttemptStore
-	mockExams    MockExamStore
-	mockTests    MockTestStore
+	mu             sync.RWMutex
+	usersByToken   map[string]contracts.User
+	plan           contracts.LearningPlan
+	courses        CourseStore
+	modules        ModuleStore
+	skills         SkillStore
+	exercises      ExerciseStore
+	attempts       AttemptStore
+	mockExams      MockExamStore
+	mockTests      MockTestStore
+	exerciseAudio  map[string]contracts.ExerciseAudio // exercise_id → audio
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -72,8 +73,9 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 		skills:    newMemorySkillStore(seedSkills(seedDailyPlanModules())),
 		exercises: exercises,
 		attempts:  attempts,
-		mockExams: newMemoryMockExamStore(exercises, attempts),
-		mockTests: newMemoryMockTestStore(),
+		mockExams:     newMemoryMockExamStore(exercises, attempts),
+		mockTests:     newMemoryMockTestStore(),
+		exerciseAudio: map[string]contracts.ExerciseAudio{},
 	}
 }
 
@@ -319,6 +321,25 @@ func (s *MemoryStore) AdvanceMockExam(id, attemptID string) (contracts.MockExamS
 
 func (s *MemoryStore) CompleteMockExam(id string) (contracts.MockExamSession, error) {
 	return s.mockExams.CompleteMockExam(id)
+}
+
+// ExerciseAudio methods
+
+func (s *MemoryStore) ExerciseAudioByExercise(exerciseID string) (*contracts.ExerciseAudio, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	a, ok := s.exerciseAudio[exerciseID]
+	if !ok {
+		return nil, false
+	}
+	cp := a
+	return &cp, true
+}
+
+func (s *MemoryStore) SetExerciseAudio(exerciseID string, audio contracts.ExerciseAudio) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.exerciseAudio[exerciseID] = audio
 }
 
 func rollupReadiness(levels []string) (string, string) {

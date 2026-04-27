@@ -26,6 +26,7 @@ type Server struct {
 	uploadProvider   UploadTargetProvider
 	audioURLProvider AudioURLProvider
 	audioSignSecret  []byte
+	audioGenerator   processing.ExerciseAudioGenerator
 	mux              *http.ServeMux
 }
 
@@ -55,6 +56,7 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 		uploadProvider:   uploadProvider,
 		audioURLProvider: audioURLProvider,
 		audioSignSecret:  audioSignSecret,
+		audioGenerator:   processing.DevExerciseAudioGenerator{},
 		mux:              http.NewServeMux(),
 	}
 	s.routes()
@@ -233,6 +235,10 @@ func (s *Server) handleExercise(w http.ResponseWriter, r *http.Request, _ contra
 			return
 		}
 		s.handleLearnerAssetFile(w, r, exerciseID, assetID)
+		return
+	}
+	if strings.HasSuffix(path, "/audio") {
+		s.handleExerciseAudio(w, r, strings.TrimSuffix(path, "/audio"))
 		return
 	}
 
@@ -911,6 +917,70 @@ func (s *Server) handleUploadComplete(w http.ResponseWriter, r *http.Request, at
 	})
 }
 
+// handleExerciseAudio serves a listening exercise's audio file.
+// GET /v1/exercises/:id/audio
+func (s *Server) handleExerciseAudio(w http.ResponseWriter, r *http.Request, exerciseID string) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	audio, ok := s.repo.ExerciseAudioByExercise(exerciseID)
+	if !ok {
+		writeNotFound(w)
+		return
+	}
+	filePath := localExerciseAudioPath(audio.StorageKey)
+	if _, err := os.Stat(filePath); err != nil {
+		writeNotFound(w)
+		return
+	}
+	w.Header().Set("Content-Type", audio.MimeType)
+	http.ServeFile(w, r, filePath)
+}
+
+// handleAdminGenerateAudio calls Polly TTS to generate audio for a listening exercise.
+// POST /v1/admin/exercises/:id/generate-audio
+func (s *Server) handleAdminGenerateAudio(w http.ResponseWriter, r *http.Request, exerciseID string) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	exercise, ok := s.repo.Exercise(exerciseID)
+	if !ok {
+		writeNotFound(w)
+		return
+	}
+	text := processing.BuildExerciseAudioText(exercise)
+	if text == "" {
+		writeError(w, http.StatusBadRequest, "validation_error", "No text segments found in exercise detail.", false)
+		return
+	}
+	audio, err := s.audioGenerator.GenerateAudio(exerciseID, text)
+	if err != nil {
+		log.Printf("generate-audio exercise %s: %v", exerciseID, err)
+		writeError(w, http.StatusInternalServerError, "internal_error", "Audio generation failed.", true)
+		return
+	}
+	s.repo.SetExerciseAudio(exerciseID, *audio)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"storage_key":  audio.StorageKey,
+			"mime_type":    audio.MimeType,
+			"source_type":  audio.SourceType,
+			"generated_at": audio.GeneratedAt,
+		},
+		"meta": map[string]any{},
+	})
+}
+
+func localExerciseAudioPath(storageKey string) string {
+	base := strings.TrimSpace(os.Getenv("LOCAL_ASSETS_DIR"))
+	if base == "" {
+		base = "/tmp/czech-go-assets"
+	}
+	return filepath.Join(base, storageKey)
+}
+
 func (s *Server) handleSubmitText(w http.ResponseWriter, r *http.Request, user contracts.User, attemptID string) {
 	if r.Method != http.MethodPost {
 		writeMethodNotAllowed(w)
@@ -1296,6 +1366,8 @@ func (s *Server) handleAdminExerciseByID(w http.ResponseWriter, r *http.Request,
 			return
 		}
 		s.handleAdminAssetFile(w, r, exerciseID, assetID)
+	case strings.HasSuffix(path, "/generate-audio"):
+		s.handleAdminGenerateAudio(w, r, strings.TrimSuffix(path, "/generate-audio"))
 	case strings.HasSuffix(path, "/scoring-template"):
 		writeJSON(w, http.StatusOK, map[string]any{
 			"data": map[string]any{"status": "saved"},
