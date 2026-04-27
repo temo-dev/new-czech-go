@@ -9,6 +9,7 @@ export const S = {
     learners:   'Học viên',
     modules:    'Module',
     skills:     'Kỹ năng',
+    guide:      'Hướng dẫn',
   },
 
   // ── Common actions ─────────────────────────────────────────────────────────
