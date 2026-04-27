@@ -7,7 +7,7 @@ Use this in a new chat:
 
 Or the more specific version:
 
-`Tiếp tục dự án ở /Users/daniel.dev/Desktop/czech-go-system. Đọc AGENTS.md và docs/next-session.md trước. V2 UI design system đã apply (Babbel orange, warm cream, teal, Inter font, sidebar CMS). Bước tiếp theo theo tasks/todo.md: V1.1 AnalysisScreen animated progress.`
+`Tiếp tục dự án ở /Users/daniel.dev/Desktop/czech-go-system. Đọc AGENTS.md và docs/next-session.md trước. V2 UI hoàn tất. Postgres DB trống (seedDefaults đã xóa) — cần nhập liệu qua CMS theo docs/admin-guide.md trước khi test Flutter end-to-end.`
 
 ## Current State
 - `Flutter` can record real local audio.
@@ -170,6 +170,7 @@ Or the more specific version:
 
 ## Recommended Reading Order
 1. [AGENTS.md](/Users/daniel.dev/Desktop/czech-go-system/AGENTS.md)
+0. [docs/admin-guide.md](/Users/daniel.dev/Desktop/czech-go-system/docs/admin-guide.md) — nếu cần nhập nội dung
 2. [docs/README.md](/Users/daniel.dev/Desktop/czech-go-system/docs/README.md)
 3. [api-contracts.md](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/api-contracts.md)
 4. [attempt-repair-and-shadowing.md](/Users/daniel.dev/Desktop/czech-go-system/docs/ideas/attempt-repair-and-shadowing.md)
@@ -189,13 +190,22 @@ Or the more specific version:
 - **V2 deep analysis** completed (2026-04-27): gap analysis giữa design files và implementation, product spec viết tại `docs/specs/v2-ui-spec.md`
 - **Flutter V1 polish** done: AnalysisScreen orbiting ring (V1.1), CourseList status badge (V1.3), ModuleDetail 2-col grid (V1.4), ExerciseList filter pills (V1.5)
 
+- **V2 UI Upgrade hoàn tất** (2026-04-27): tất cả tasks V1–V5 done — xem `tasks/todo.md` để kiểm tra
+- **i18n patch** (2026-04-27): Flutter 8 ARB keys thêm, xóa toàn bộ Czech/VI hardcoded strings trên learner surfaces; CMS strings chuẩn hoá sang VI qua `cms/lib/strings.ts`
+- **Postgres DB reset** (2026-04-27): toàn bộ data đã TRUNCATE, schema giữ nguyên
+- **seedDefaults removed**: `postgres_exercises.go` không còn auto-seed exercises khi startup — DB bắt đầu trống, admin nhập liệu thủ công qua CMS
+- **Worktrees disabled globally**: `~/.claude/settings.json` có `"deny": ["EnterWorktree"]` — Claude không tạo worktree nữa
+- **Admin data entry guide**: xem `docs/admin-guide.md` — luồng nhập Course → Module → Skill → Exercise → MockTest
+
 ## Best Next Step
 
-**TIER 1 — Start here:**
+**DB trống — cần nhập nội dung trước khi test Flutter:**
 
-**V4.1** — Verify backend `criteria_results` in API response: grep `types.go` và `server.go`, confirm JSON field tồn tại.  
-**V4.2** — Flutter: add `CriterionCheckView` model + parse trong `AttemptFeedbackView.fromJson` → `flutter_app/lib/models/models.dart`  
-**V1.2** — ResultCard 4-col criteria grid display → `flutter_app/lib/features/exercise/widgets/result_card.dart`
+1. Vào CMS tại `http://localhost:3000`
+2. Tạo Course → Module → Skill theo `docs/admin-guide.md`
+3. Tạo ít nhất 4 exercises (Úloha 1-4, pool=course, status=published)
+4. Tạo 1 MockTest với 4 sections (pool=exam)
+5. Test Flutter: Home → Course → Module → Skill → Exercise → Record → Result
 
 Sau đó: **V3.2** MockTestListScreen rich cards, **V3.3** MockTestIntroScreen 3-stat grid.
 

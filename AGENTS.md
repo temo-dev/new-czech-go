@@ -84,7 +84,8 @@ The implemented V1 foundation currently includes:
 - CMS prompt-asset upload and preview for `Uloha 3` and `Uloha 4`
 - Compose persistence: named volumes `backend_assets` + `backend_attempts` keep prompt assets and local-mode attempt audio across container rebuilds; `AUDIO_SIGN_SECRET` is wired through both compose files for stable signed audio URLs across restarts; `TRANSCRIBE_TIMEOUT` defaults to `3m`
 - Flutter learner flow for all four oral tasks: recording with split Stop/Analyze, dedicated `AnalysisScreen` spinner, result rendering, recent attempts, audio replay, review artifact display with TTS audio playback
-- Flutter i18n (Vietnamese + English) via ARB + generated `AppLocalizations`, with in-app locale selector persisted via `SharedPreferences`
+- Flutter i18n (Vietnamese + English) via ARB + generated `AppLocalizations`, with in-app locale selector persisted via `SharedPreferences`; EN=VI=175 keys, zero hardcoded UI strings on learner surfaces (2026-04-27)
+- CMS strings standardised to Vietnamese via `cms/lib/strings.ts` constants file (no library); English button labels replaced in exercise/mock-test/module/skill dashboards (2026-04-27)
 - Flutter bottom navigation with separate `Home` and `History` tabs
 - Provider-aware audio streaming: `GET /v1/attempts/:id/audio/url` + `.../review/audio/url` return short-lived signed URLs (S3 presigned for cloud, HMAC-signed backend stream for local). Flutter `just_audio` streams directly via `setUrl` instead of downloading.
 - **Mock exam V2** — full real-exam format (Modelový test A2, platný od dubna 2026):
@@ -97,9 +98,14 @@ The implemented V1 foundation currently includes:
   - DB: `mock_tests`, `mock_test_sections` tables; `mock_exam_sessions` extended with `mock_test_id`, `overall_score`, `passed`; `mock_exam_sections` extended with `max_points`, `section_score`
   - Record-all-then-analyse flow: `ExerciseScreen.onRecordingReady` callback lets mock exam collect recordings before any upload; `MockExamScreen` bulk-uploads and polls all attempts after all sections recorded
 
+- **V2 UI Design System** applied (2026-04-27): Babbel orange `#FF6A14` + warm cream `#FBF3E7` + teal `#0F3D3A`; Inter/Fraunces fonts; CMS sidebar layout; Flutter new screens (AnalysisScreen orbiting ring, ResultCard 3 tabs + criteria checklist, ModuleDetail 2-col grid, ExerciseList filter pills, MockList/Intro redesign); CMS new pages (courses 3-col grid, exercise 3-tab editor, learners dashboard, dashboard stats)
+- **`criteria_results`** from `task_completion` now parsed in Flutter `AttemptFeedbackView` as `CriterionCheckView` list; displayed as met/unmet checklist in Feedback tab
+- **Admin content guide**: `docs/admin-guide.md` — luồng nhập Course → Module → Skill → Exercise → MockTest
+
 Important current limitations:
 - local strict real-transcript mode still depends on valid AWS credentials plus `transcribe:*` IAM on the active local identity
 - learner-surface feedback copy and authored `sample_answer_text` coverage for `Uloha 3` and `Uloha 4` are still lighter than `Uloha 1` / `Uloha 2`, even though the review artifact pipeline now covers all four task types
+- **Postgres DB hiện đang trống** — `seedDefaults` đã bị xóa; admin cần nhập nội dung qua CMS trước khi test Flutter end-to-end
 - mock test list is empty until at least one `MockTest` is created and published in the CMS
 
 ## Working Rules
