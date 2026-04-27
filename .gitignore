@@ -27,3 +27,7 @@ flutter_app/.flutter-plugins-dependencies
 flutter_app/ios/Flutter/ephemeral/
 # Added by code-review-graph
 .code-review-graph/
+
+# Claude Code internal state
+.claude/worktrees/
+.claude/plans/
