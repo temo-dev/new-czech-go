@@ -23,6 +23,7 @@ type MockTest = {
   description: string;
   estimated_duration_minutes: number;
   status: 'draft' | 'published';
+  session_type: 'speaking' | 'pisemna' | 'full';
   sections: MockTestSection[];
 };
 
@@ -31,6 +32,10 @@ const DEFAULT_MAX_POINTS: Record<string, number> = {
   uloha_2_dialogue_questions: 12,
   uloha_3_story_narration: 10,
   uloha_4_choice_reasoning: 7,
+  psani_1_formular: 8,
+  psani_2_email: 12,
+  poslech_1: 5, poslech_2: 5, poslech_3: 5, poslech_4: 5, poslech_5: 5,
+  cteni_1: 5, cteni_2: 5, cteni_3: 4, cteni_4: 6, cteni_5: 5,
 };
 
 const EXERCISE_TYPE_LABEL: Record<string, string> = {
@@ -38,6 +43,12 @@ const EXERCISE_TYPE_LABEL: Record<string, string> = {
   uloha_2_dialogue_questions: 'Úloha 2 — Dialogue questions',
   uloha_3_story_narration: 'Úloha 3 — Story narration',
   uloha_4_choice_reasoning: 'Úloha 4 — Choice & reasoning',
+  psani_1_formular: 'Psaní 1 — Formulář',
+  psani_2_email: 'Psaní 2 — E-mail',
+  poslech_1: 'Poslech 1', poslech_2: 'Poslech 2', poslech_3: 'Poslech 3',
+  poslech_4: 'Poslech 4', poslech_5: 'Poslech 5',
+  cteni_1: 'Čtení 1', cteni_2: 'Čtení 2', cteni_3: 'Čtení 3',
+  cteni_4: 'Čtení 4', cteni_5: 'Čtení 5',
 };
 
 const MOCK_TEST_API = '/api/admin/mock-tests';
@@ -48,6 +59,7 @@ type FormState = {
   description: string;
   estimated_duration_minutes: number;
   status: 'draft' | 'published';
+  session_type: 'speaking' | 'pisemna' | 'full';
   sections: MockTestSection[];
 };
 
@@ -56,6 +68,7 @@ const emptyForm = (): FormState => ({
   description: '',
   estimated_duration_minutes: 15,
   status: 'draft',
+  session_type: 'speaking',
   sections: [],
 });
 
@@ -110,6 +123,7 @@ export function MockTestDashboard() {
       description: t.description,
       estimated_duration_minutes: t.estimated_duration_minutes,
       status: t.status,
+      session_type: t.session_type ?? 'speaking',
       sections: [...(t.sections ?? [])],
     });
     setShowForm(true);
@@ -132,6 +146,7 @@ export function MockTestDashboard() {
         description: form.description,
         estimated_duration_minutes: form.estimated_duration_minutes,
         status: form.status,
+        session_type: form.session_type,
         sections: form.sections,
       };
       const url = editingId ? `${MOCK_TEST_API}/${editingId}` : MOCK_TEST_API;
@@ -236,7 +251,10 @@ export function MockTestDashboard() {
                   <p style={{ margin: '4px 0', color: '#6b7280', fontSize: 14 }}>{t.description}</p>
                   <p style={{ margin: '4px 0', fontSize: 13, color: '#9ca3af' }}>
                     {t.estimated_duration_minutes} min · {t.sections?.length ?? 0} sections ·{' '}
-                    {t.sections?.reduce((s, sec) => s + sec.max_points, 0) ?? 0} pts
+                    {t.sections?.reduce((s, sec) => s + sec.max_points, 0) ?? 0} pts ·{' '}
+                    <span style={{ color: t.session_type === 'pisemna' ? '#0f3d3a' : t.session_type === 'full' ? '#3060b8' : '#6b7280' }}>
+                      {t.session_type ?? 'speaking'}
+                    </span>
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
@@ -284,7 +302,7 @@ export function MockTestDashboard() {
             style={{ ...inputStyle, resize: 'vertical' }}
           />
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <div>
               <label style={labelStyle}>Duration (minutes)</label>
               <input
@@ -294,6 +312,18 @@ export function MockTestDashboard() {
                 onChange={e => setForm(f => ({ ...f, estimated_duration_minutes: parseInt(e.target.value) || 15 }))}
                 style={inputStyle}
               />
+            </div>
+            <div>
+              <label style={labelStyle}>Loại kỳ thi</label>
+              <select
+                value={form.session_type}
+                onChange={e => setForm(f => ({ ...f, session_type: e.target.value as FormState['session_type'] }))}
+                style={inputStyle}
+              >
+                <option value="speaking">Mluvení (nói) — 40đ</option>
+                <option value="pisemna">Písemná (đọc+viết+nghe) — 70đ</option>
+                <option value="full">Full exam (cả 2 phần)</option>
+              </select>
             </div>
             <div>
               <label style={labelStyle}>Status</label>
@@ -307,6 +337,17 @@ export function MockTestDashboard() {
               </select>
             </div>
           </div>
+
+          {form.session_type === 'pisemna' && (
+            <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0' }}>
+              Písemná: thêm cteni_* (25đ) + psani_* (20đ) + poslech_* (25đ) sections. Pass ≥42/70.
+            </p>
+          )}
+          {form.session_type === 'full' && (
+            <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0' }}>
+              Full exam: admin tạo 2 MockTest riêng (pisemna + speaking), app ghép khi học viên thi.
+            </p>
+          )}
 
           <div style={{ marginTop: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
