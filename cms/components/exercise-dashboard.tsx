@@ -43,7 +43,9 @@ type ExerciseType =
   | 'uloha_1_topic_answers'
   | 'uloha_2_dialogue_questions'
   | 'uloha_3_story_narration'
-  | 'uloha_4_choice_reasoning';
+  | 'uloha_4_choice_reasoning'
+  | 'psani_1_formular'
+  | 'psani_2_email';
 
 type ExerciseFormState = {
   exerciseType: ExerciseType;
@@ -67,6 +69,13 @@ type ExerciseFormState = {
   sampleAnswerText: string;
   status: string;
   pool: string;
+  // psani_1_formular
+  formularQuestions: string;
+  formularMinWords: number;
+  // psani_2_email
+  emailPrompt: string;
+  emailTopics: string;
+  emailMinWords: number;
 };
 
 const exerciseTypeOptions: Array<{
@@ -93,6 +102,16 @@ const exerciseTypeOptions: Array<{
     value: 'uloha_4_choice_reasoning',
     label: 'Uloha 4',
     hint: 'Choose one option and justify the choice.',
+  },
+  {
+    value: 'psani_1_formular',
+    label: 'Psaní 1 — Formulář',
+    hint: 'Writing: 3 form questions, ≥10 words each (8 pts).',
+  },
+  {
+    value: 'psani_2_email',
+    label: 'Psaní 2 — E-mail',
+    hint: 'Writing: email from 5 image prompts, ≥35 words (12 pts).',
   },
 ];
 
@@ -126,6 +145,11 @@ function createInitialFormState(): ExerciseFormState {
     sampleAnswerText: '',
     status: 'draft',
     pool: 'course',
+    formularQuestions: 'Jak jste získal/a informace o našem e-shopu?\nProč v našem e-shopu nakupujete?\nKteré služby nebo informace vám v našem e-shopu chybí?',
+    formularMinWords: 10,
+    emailPrompt: 'Jste na dovolené a chcete napsat své kamarádce.',
+    emailTopics: 'KDE JSTE?\nJAK DLOUHO TAM JSTE?\nKDE BYDLÍTE?\nCO DĚLÁTE DOPOLEDNE?\nCO DĚLÁTE ODPOLEDNE?',
+    emailMinWords: 35,
   };
 }
 
@@ -229,6 +253,15 @@ function formStateFromExercise(item: Exercise): ExerciseFormState {
     sampleAnswerText: item.sample_answer_text ?? '',
     status: item.status ?? 'draft',
     pool: (item as { pool?: string }).pool ?? 'course',
+    formularQuestions: Array.isArray(detail.questions)
+      ? (detail.questions as unknown[]).map(String).join('\n')
+      : '',
+    formularMinWords: typeof detail.min_words === 'number' ? detail.min_words : 10,
+    emailPrompt: String(detail.prompt ?? ''),
+    emailTopics: Array.isArray(detail.topics)
+      ? (detail.topics as unknown[]).map(String).join('\n')
+      : '',
+    emailMinWords: typeof detail.min_words === 'number' ? detail.min_words : 35,
   };
 }
 
@@ -296,6 +329,48 @@ function buildCreatePayload(form: ExerciseFormState) {
         image_asset_ids: parseLineList(form.imageAssetIds),
         narrative_checkpoints: parseLineList(form.narrativeCheckpoints),
         grammar_focus: parseLineList(form.grammarFocus),
+      },
+    };
+  }
+
+  if (form.exerciseType === 'psani_1_formular') {
+    return {
+      module_id: form.moduleId,
+      skill_id: form.skillId,
+      exercise_type: form.exerciseType,
+      title: form.title,
+      short_instruction: form.shortInstruction,
+      learner_instruction: form.learnerInstruction,
+      estimated_duration_sec: 600,
+      sample_answer_enabled: false,
+      sample_answer_text: form.sampleAnswerText.trim(),
+      status: form.status,
+      pool: form.pool,
+      detail: {
+        questions: parseLineList(form.formularQuestions),
+        min_words: form.formularMinWords,
+      },
+    };
+  }
+
+  if (form.exerciseType === 'psani_2_email') {
+    return {
+      module_id: form.moduleId,
+      skill_id: form.skillId,
+      exercise_type: form.exerciseType,
+      title: form.title,
+      short_instruction: form.shortInstruction,
+      learner_instruction: form.learnerInstruction,
+      estimated_duration_sec: 900,
+      sample_answer_enabled: false,
+      sample_answer_text: form.sampleAnswerText.trim(),
+      status: form.status,
+      pool: form.pool,
+      detail: {
+        prompt: form.emailPrompt.trim(),
+        topics: parseLineList(form.emailTopics),
+        image_asset_ids: parseLineList(form.imageAssetIds),
+        min_words: form.emailMinWords,
       },
     };
   }
@@ -387,6 +462,48 @@ function buildUpdatePayload(form: ExerciseFormState) {
         image_asset_ids: parseLineList(form.imageAssetIds),
         narrative_checkpoints: parseLineList(form.narrativeCheckpoints),
         grammar_focus: parseLineList(form.grammarFocus),
+      },
+    };
+  }
+
+  if (form.exerciseType === 'psani_1_formular') {
+    return {
+      module_id: form.moduleId,
+      skill_id: form.skillId,
+      exercise_type: form.exerciseType,
+      title: form.title,
+      short_instruction: form.shortInstruction,
+      learner_instruction: form.learnerInstruction,
+      estimated_duration_sec: 600,
+      sample_answer_enabled: false,
+      sample_answer_text: form.sampleAnswerText.trim(),
+      status: form.status,
+      pool: form.pool,
+      detail: {
+        questions: parseLineList(form.formularQuestions),
+        min_words: form.formularMinWords,
+      },
+    };
+  }
+
+  if (form.exerciseType === 'psani_2_email') {
+    return {
+      module_id: form.moduleId,
+      skill_id: form.skillId,
+      exercise_type: form.exerciseType,
+      title: form.title,
+      short_instruction: form.shortInstruction,
+      learner_instruction: form.learnerInstruction,
+      estimated_duration_sec: 900,
+      sample_answer_enabled: false,
+      sample_answer_text: form.sampleAnswerText.trim(),
+      status: form.status,
+      pool: form.pool,
+      detail: {
+        prompt: form.emailPrompt.trim(),
+        topics: parseLineList(form.emailTopics),
+        image_asset_ids: parseLineList(form.imageAssetIds),
+        min_words: form.emailMinWords,
       },
     };
   }
@@ -666,13 +783,12 @@ export function ExerciseDashboard() {
             <span style={eyebrowStyle}>{S.exercise.editorEyebrow}</span>
             <h2 style={{ margin: 0, fontSize: 24 }}>
               {editingId ? 'Chỉnh sửa ' : 'Tạo '}
-              {form.exerciseType === 'uloha_1_topic_answers'
-                ? '`Uloha 1`'
-                : form.exerciseType === 'uloha_2_dialogue_questions'
-                  ? '`Uloha 2`'
-                  : form.exerciseType === 'uloha_3_story_narration'
-                    ? '`Uloha 3`'
-                    : '`Uloha 4`'}
+              {form.exerciseType === 'uloha_1_topic_answers' ? '`Uloha 1`'
+                : form.exerciseType === 'uloha_2_dialogue_questions' ? '`Uloha 2`'
+                : form.exerciseType === 'uloha_3_story_narration' ? '`Uloha 3`'
+                : form.exerciseType === 'uloha_4_choice_reasoning' ? '`Uloha 4`'
+                : form.exerciseType === 'psani_1_formular' ? '`Psaní 1 — Formulář`'
+                : '`Psaní 2 — E-mail`'}
             </h2>
             <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
               {S.exercise.editorHint}
@@ -1028,8 +1144,82 @@ export function ExerciseDashboard() {
             </>
           )}
 
+          {form.exerciseType === 'psani_1_formular' ? (
+            <>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Câu hỏi (1 câu/dòng, cần đúng 3 câu)</span>
+                <textarea
+                  rows={5}
+                  value={form.formularQuestions}
+                  onChange={(e) => setForm({ ...form, formularQuestions: e.target.value })}
+                  style={fieldStyle}
+                  placeholder={'Câu hỏi 1\nCâu hỏi 2\nCâu hỏi 3'}
+                />
+                <span style={fieldHintStyle}>Mỗi câu trả lời phải có ít nhất {form.formularMinWords} từ.</span>
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Số từ tối thiểu / câu</span>
+                <input
+                  type="number"
+                  min={5}
+                  max={50}
+                  value={form.formularMinWords}
+                  onChange={(e) => setForm({ ...form, formularMinWords: Number(e.target.value) })}
+                  style={fieldStyle}
+                />
+              </label>
+            </>
+          ) : form.exerciseType === 'psani_2_email' ? (
+            <>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Bối cảnh (context prompt)</span>
+                <textarea
+                  rows={3}
+                  value={form.emailPrompt}
+                  onChange={(e) => setForm({ ...form, emailPrompt: e.target.value })}
+                  style={fieldStyle}
+                  placeholder="Jste na dovolené a chcete napsat své kamarádce."
+                />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Chủ đề theo ảnh (1 chủ đề/dòng, cần 5 dòng)</span>
+                <textarea
+                  rows={6}
+                  value={form.emailTopics}
+                  onChange={(e) => setForm({ ...form, emailTopics: e.target.value })}
+                  style={fieldStyle}
+                  placeholder={'KDE JSTE?\nJAK DLOUHO TAM JSTE?\nKDE BYDLÍTE?\nCO DĚLÁTE DOPOLEDNE?\nCO DĚLÁTE ODPOLEDNE?'}
+                />
+                <span style={fieldHintStyle}>Mỗi dòng tương ứng với 1 ảnh gợi ý.</span>
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Asset IDs ảnh gợi ý (1 id/dòng)</span>
+                <textarea
+                  rows={6}
+                  value={form.imageAssetIds}
+                  onChange={(e) => setForm({ ...form, imageAssetIds: e.target.value })}
+                  style={fieldStyle}
+                  placeholder="Upload ảnh bên dưới rồi copy asset id vào đây."
+                />
+                <span style={fieldHintStyle}>Cần 5 ảnh. Thứ tự tương ứng với thứ tự chủ đề bên trên.</span>
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Số từ tối thiểu tổng cộng</span>
+                <input
+                  type="number"
+                  min={20}
+                  max={100}
+                  value={form.emailMinWords}
+                  onChange={(e) => setForm({ ...form, emailMinWords: Number(e.target.value) })}
+                  style={fieldStyle}
+                />
+              </label>
+            </>
+          ) : null}
+
           {(form.exerciseType === 'uloha_3_story_narration' ||
-            form.exerciseType === 'uloha_4_choice_reasoning') ? (
+            form.exerciseType === 'uloha_4_choice_reasoning' ||
+            form.exerciseType === 'psani_2_email') ? (
             <section
               style={{
                 display: 'grid',
@@ -1043,7 +1233,7 @@ export function ExerciseDashboard() {
               <div style={{ display: 'grid', gap: 4 }}>
                 <span style={fieldLabelStyle}>{S.exercise.fieldPromptAssets}</span>
                 <span style={fieldHintStyle}>
-                  Upload image assets after the draft exists. For `Uloha 3`, uploaded ids are inserted into the image list automatically.
+                  Upload ảnh sau khi đã save draft. Uloha 3: id tự động thêm vào danh sách. Psaní 2: copy id vào trường &quot;Asset IDs&quot;.
                 </span>
               </div>
 
@@ -1126,7 +1316,7 @@ export function ExerciseDashboard() {
                             <span style={badgeStyle}>seq {asset.sequence_no ?? 0}</span>
                           </div>
                           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                            {form.exerciseType === 'uloha_3_story_narration' ? (
+                            {(form.exerciseType === 'uloha_3_story_narration' || form.exerciseType === 'psani_2_email') ? (
                               <button
                                 type="button"
                                 onClick={() =>
