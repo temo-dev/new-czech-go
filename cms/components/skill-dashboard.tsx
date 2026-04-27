@@ -1,6 +1,6 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
-import { S } from '../lib/strings';
+import { useS } from '../lib/i18n';
 
 type Module = { id: string; title: string; course_id: string };
 type Skill = { id: string; module_id: string; skill_kind: string; title: string; sequence_no: number; status: string };
@@ -27,6 +27,7 @@ function btn(v: 'primary' | 'secondary' | 'danger'): React.CSSProperties {
 }
 
 export function SkillDashboard() {
+  const S = useS();
   const [skills, setSkills] = useState<Skill[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);

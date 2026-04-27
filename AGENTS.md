@@ -85,7 +85,7 @@ The implemented V1 foundation currently includes:
 - Compose persistence: named volumes `backend_assets` + `backend_attempts` keep prompt assets and local-mode attempt audio across container rebuilds; `AUDIO_SIGN_SECRET` is wired through both compose files for stable signed audio URLs across restarts; `TRANSCRIBE_TIMEOUT` defaults to `3m`
 - Flutter learner flow for all four oral tasks: recording with split Stop/Analyze, dedicated `AnalysisScreen` spinner, result rendering, recent attempts, audio replay, review artifact display with TTS audio playback
 - Flutter i18n (Vietnamese + English) via ARB + generated `AppLocalizations`, with in-app locale selector persisted via `SharedPreferences`; EN=VI=175 keys, zero hardcoded UI strings on learner surfaces (2026-04-27)
-- CMS strings standardised to Vietnamese via `cms/lib/strings.ts` constants file (no library); English button labels replaced in exercise/mock-test/module/skill dashboards (2026-04-27)
+- CMS full i18n (VI/EN) via `cms/lib/i18n.tsx` React context + localStorage — locale switcher in sidebar footer; all exercise-dashboard, mock-test/module/skill dashboards, sidebar nav labels reactive; `cms/lib/strings.ts` superseded by `i18n.tsx` (2026-04-27)
 - Flutter bottom navigation with separate `Home` and `History` tabs
 - Provider-aware audio streaming: `GET /v1/attempts/:id/audio/url` + `.../review/audio/url` return short-lived signed URLs (S3 presigned for cloud, HMAC-signed backend stream for local). Flutter `just_audio` streams directly via `setUrl` instead of downloading.
 - **Mock exam V2** — full real-exam format (Modelový test A2, platný od dubna 2026):

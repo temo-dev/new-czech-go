@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { S } from '../lib/strings';
+import { useS } from '../lib/i18n';
 
 type PromptAsset = {
   id: string;
@@ -412,6 +412,7 @@ function buildUpdatePayload(form: ExerciseFormState) {
 }
 
 export function ExerciseDashboard() {
+  const S = useS();
   const [items, setItems] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -538,7 +539,7 @@ export function ExerciseDashboard() {
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm('Delete this exercise? This cannot be undone.')) {
+    if (!window.confirm(S.exercise.deleteConfirm)) {
       return;
     }
 
@@ -609,11 +610,10 @@ export function ExerciseDashboard() {
         <div style={{ display: 'grid', gap: 8 }}>
           <p style={eyebrowStyle}>A2 Mluveni CMS</p>
           <h1 style={{ margin: 0, fontSize: 'clamp(2.2rem, 3vw, 3.5rem)', lineHeight: 1.02 }}>
-            Calm content ops for the first oral tasks
+            {S.exercise.heroTitle}
           </h1>
           <p style={{ margin: 0, maxWidth: 760, color: 'var(--text-secondary)', fontSize: 16, lineHeight: 1.55 }}>
-            This desk keeps the speaking workflow light and focused. Right now the admin can create, edit, and delete
-            explicit content for all four oral tasks, while the learner app stays centered on one task at a time.
+            {S.exercise.heroDesc}
           </p>
         </div>
 
@@ -625,19 +625,19 @@ export function ExerciseDashboard() {
           }}
         >
           <div style={metricCardStyle}>
-            <span style={metricLabelStyle}>Current slice</span>
-            <strong style={metricValueStyle}>Full V1 oral set</strong>
-            <span style={metricHintStyle}>Create, edit, and delete exercises</span>
+            <span style={metricLabelStyle}>{S.exercise.metricSliceLabel}</span>
+            <strong style={metricValueStyle}>{S.exercise.metricSliceValue}</strong>
+            <span style={metricHintStyle}>{S.exercise.metricSliceHint}</span>
           </div>
           <div style={metricCardStyle}>
-            <span style={metricLabelStyle}>Content status</span>
+            <span style={metricLabelStyle}>{S.exercise.metricStatusLabel}</span>
             <strong style={metricValueStyle}>{items.length}</strong>
-            <span style={metricHintStyle}>Exercises in admin list</span>
+            <span style={metricHintStyle}>{S.exercise.metricStatusHint}</span>
           </div>
           <div style={metricCardStyle}>
-            <span style={metricLabelStyle}>Working mode</span>
-            <strong style={metricValueStyle}>Task-specific</strong>
-            <span style={metricHintStyle}>No generic schema builder</span>
+            <span style={metricLabelStyle}>{S.exercise.metricModeLabel}</span>
+            <strong style={metricValueStyle}>{S.exercise.metricModeValue}</strong>
+            <span style={metricHintStyle}>{S.exercise.metricModeHint}</span>
           </div>
         </div>
       </section>
@@ -663,7 +663,7 @@ export function ExerciseDashboard() {
           }}
         >
           <div style={{ display: 'grid', gap: 6 }}>
-            <span style={eyebrowStyle}>Content editor</span>
+            <span style={eyebrowStyle}>{S.exercise.editorEyebrow}</span>
             <h2 style={{ margin: 0, fontSize: 24 }}>
               {editingId ? 'Chỉnh sửa ' : 'Tạo '}
               {form.exerciseType === 'uloha_1_topic_answers'
@@ -675,7 +675,7 @@ export function ExerciseDashboard() {
                     : '`Uloha 4`'}
             </h2>
             <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              Keep prompts short, specific, and easy to scan so learners can stay calm inside the speaking flow.
+              {S.exercise.editorHint}
             </p>
           </div>
 
@@ -728,7 +728,7 @@ export function ExerciseDashboard() {
 
           {formTab === 0 && <>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span style={fieldLabelStyle}>Task type</span>
+            <span style={fieldLabelStyle}>{S.exercise.fieldTaskType}</span>
             <select
               value={form.exerciseType}
               onChange={(event) =>
@@ -745,7 +745,7 @@ export function ExerciseDashboard() {
           </label>
 
           <label style={{ display: 'grid', gap: 6 }}>
-            <span style={fieldLabelStyle}>Title</span>
+            <span style={fieldLabelStyle}>{S.exercise.fieldTitle}</span>
             <input
               value={form.title}
               onChange={(event) => setForm({ ...form, title: event.target.value })}
@@ -754,7 +754,7 @@ export function ExerciseDashboard() {
           </label>
 
           <label style={{ display: 'grid', gap: 6 }}>
-            <span style={fieldLabelStyle}>Short instruction</span>
+            <span style={fieldLabelStyle}>{S.exercise.fieldShortInstruction}</span>
             <input
               value={form.shortInstruction}
               onChange={(event) =>
@@ -765,7 +765,7 @@ export function ExerciseDashboard() {
           </label>
 
           <label style={{ display: 'grid', gap: 6 }}>
-            <span style={fieldLabelStyle}>Learner instruction</span>
+            <span style={fieldLabelStyle}>{S.exercise.fieldLearnerInstruction}</span>
             <textarea
               rows={4}
               value={form.learnerInstruction}
@@ -780,7 +780,7 @@ export function ExerciseDashboard() {
 
           {formTab === 1 && <>
           <label style={{ display: 'grid', gap: 6 }}>
-            <span style={fieldLabelStyle}>Sample answer (cau tra loi mau)</span>
+            <span style={fieldLabelStyle}>{S.exercise.fieldSampleAnswer}</span>
             <textarea
               rows={4}
               value={form.sampleAnswerText}
@@ -802,7 +802,7 @@ export function ExerciseDashboard() {
           {form.pool === 'course' && (
             <>
               <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Module</span>
+                <span style={fieldLabelStyle}>{S.exercise.fieldModule}</span>
                 <select
                   value={form.moduleId}
                   onChange={(e) => handleModuleChange(e.target.value)}
@@ -816,7 +816,7 @@ export function ExerciseDashboard() {
                 <span style={fieldHintStyle}>Exercise belongs to this module&apos;s skill.</span>
               </label>
               <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Skill</span>
+                <span style={fieldLabelStyle}>{S.exercise.fieldSkill}</span>
                 <select
                   value={form.skillId}
                   onChange={(e) => handleSkillChange(e.target.value)}
@@ -834,7 +834,7 @@ export function ExerciseDashboard() {
           )}
 
           <label style={{ display: 'grid', gap: 6 }}>
-            <span style={fieldLabelStyle}>Status</span>
+            <span style={fieldLabelStyle}>{S.exercise.fieldStatus}</span>
             <select
               value={form.status}
               onChange={(event) => setForm({ ...form, status: event.target.value })}
@@ -850,7 +850,7 @@ export function ExerciseDashboard() {
           </label>
 
           <label style={{ display: 'grid', gap: 6 }}>
-            <span style={fieldLabelStyle}>Pool</span>
+            <span style={fieldLabelStyle}>{S.exercise.fieldPool}</span>
             <select
               value={form.pool}
               onChange={(event) => setForm({ ...form, pool: event.target.value })}
@@ -868,7 +868,7 @@ export function ExerciseDashboard() {
 
           {formTab === 0 && <>{form.exerciseType === 'uloha_1_topic_answers' ? (
             <label style={{ display: 'grid', gap: 6 }}>
-              <span style={fieldLabelStyle}>Question prompts</span>
+              <span style={fieldLabelStyle}>{S.exercise.fieldQuestionPrompts}</span>
               <textarea
                 rows={6}
                 value={form.questions}
@@ -890,7 +890,7 @@ export function ExerciseDashboard() {
               </label>
 
               <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Scenario prompt</span>
+                <span style={fieldLabelStyle}>{S.exercise.fieldScenarioPrompt}</span>
                 <textarea
                   rows={5}
                   value={form.scenarioPrompt}
@@ -914,7 +914,7 @@ export function ExerciseDashboard() {
               </label>
 
               <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Extra question hint</span>
+                <span style={fieldLabelStyle}>{S.exercise.fieldExtraQuestionHint}</span>
                 <input
                   value={form.customQuestionHint}
                   onChange={(event) =>
@@ -953,7 +953,7 @@ export function ExerciseDashboard() {
               </label>
 
               <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Narrative checkpoints</span>
+                <span style={fieldLabelStyle}>{S.exercise.fieldNarrativeCheckpoints}</span>
                 <textarea
                   rows={6}
                   value={form.narrativeCheckpoints}
@@ -982,7 +982,7 @@ export function ExerciseDashboard() {
           ) : (
             <>
               <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Scenario prompt</span>
+                <span style={fieldLabelStyle}>{S.exercise.fieldScenarioPrompt}</span>
                 <textarea
                   rows={5}
                   value={form.choiceScenarioPrompt}
@@ -1041,7 +1041,7 @@ export function ExerciseDashboard() {
               }}
             >
               <div style={{ display: 'grid', gap: 4 }}>
-                <span style={fieldLabelStyle}>Prompt assets</span>
+                <span style={fieldLabelStyle}>{S.exercise.fieldPromptAssets}</span>
                 <span style={fieldHintStyle}>
                   Upload image assets after the draft exists. For `Uloha 3`, uploaded ids are inserted into the image list automatically.
                 </span>
@@ -1086,7 +1086,7 @@ export function ExerciseDashboard() {
                   <div style={{ display: 'grid', gap: 12 }}>
                     {currentAssets.length === 0 ? (
                       <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
-                        No prompt assets yet for this exercise.
+                        {S.exercise.noAssets}
                       </p>
                     ) : (
                       currentAssets.map((asset) => (
@@ -1194,7 +1194,7 @@ export function ExerciseDashboard() {
                 fontWeight: 700,
               }}
             >
-              Cancel editing
+              {S.exercise.cancelEditing}
             </button>
           ) : null}
         </form>
@@ -1220,15 +1220,15 @@ export function ExerciseDashboard() {
             }}
           >
             <div>
-              <span style={eyebrowStyle}>Current inventory</span>
-              <h2 style={{ margin: '6px 0 0' }}>Exercises</h2>
+              <span style={eyebrowStyle}>{S.exercise.inventoryEyebrow}</span>
+              <h2 style={{ margin: '6px 0 0' }}>{S.exercise.inventoryTitle}</h2>
               <p
                 style={{
                   margin: '6px 0 0',
                   color: 'var(--text-secondary)',
                 }}
               >
-                Pulled from `/v1/admin/exercises`.
+                {S.exercise.inventorySubtitle}
               </p>
             </div>
             <button
@@ -1243,7 +1243,7 @@ export function ExerciseDashboard() {
                 fontWeight: 600,
               }}
             >
-              Refresh
+              {S.exercise.refresh}
             </button>
           </div>
 
@@ -1274,7 +1274,7 @@ export function ExerciseDashboard() {
                   }}
                 >
                   <strong style={{ fontSize: 18 }}>{item.title}</strong>
-                  <span style={badgeStyle}>{item.status ?? 'draft'}</span>
+                  <span style={badgeStyle}>{S.status[item.status as keyof typeof S.status] ?? item.status}</span>
                 </div>
                 <span style={{ color: 'var(--accent)', fontWeight: 700 }}>
                   {item.exercise_type}
@@ -1294,14 +1294,14 @@ export function ExerciseDashboard() {
                     onClick={() => startEditing(item)}
                     style={secondaryActionStyle}
                   >
-                    Edit
+                    {S.action.edit}
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDelete(item.id)}
                     style={dangerActionStyle}
                   >
-                    Delete
+                    {S.action.delete}
                   </button>
                 </div>
                 <code style={{ color: 'var(--text-secondary)' }}>{item.id}</code>

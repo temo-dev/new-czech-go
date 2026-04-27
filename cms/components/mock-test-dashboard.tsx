@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { S } from '../lib/strings';
+import { useS } from '../lib/i18n';
 
 type Exercise = {
   id: string;
@@ -60,6 +60,7 @@ const emptyForm = (): FormState => ({
 });
 
 export function MockTestDashboard() {
+  const S = useS();
   const [tests, setTests] = useState<MockTest[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);

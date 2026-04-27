@@ -192,6 +192,7 @@ Or the more specific version:
 
 - **V2 UI Upgrade hoàn tất** (2026-04-27): tất cả tasks V1–V5 done — xem `tasks/todo.md` để kiểm tra
 - **i18n patch** (2026-04-27): Flutter 8 ARB keys thêm, xóa toàn bộ Czech/VI hardcoded strings trên learner surfaces; CMS strings chuẩn hoá sang VI qua `cms/lib/strings.ts`
+- **CMS i18n VI/EN** (2026-04-27): `cms/lib/i18n.tsx` React context + localStorage; locale switcher 🇻🇳↔🇬🇧 trong sidebar footer; tất cả dashboards + nav labels reactive; in-app admin guide tại `/guide`
 - **Postgres DB reset** (2026-04-27): toàn bộ data đã TRUNCATE, schema giữ nguyên
 - **seedDefaults removed**: `postgres_exercises.go` không còn auto-seed exercises khi startup — DB bắt đầu trống, admin nhập liệu thủ công qua CMS
 - **Worktrees disabled globally**: `~/.claude/settings.json` có `"deny": ["EnterWorktree"]` — Claude không tạo worktree nữa

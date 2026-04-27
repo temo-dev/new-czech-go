@@ -1,6 +1,6 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
-import { S } from '../lib/strings';
+import { useS } from '../lib/i18n';
 
 type Course = { id: string; title: string };
 type Module = { id: string; course_id: string; slug: string; title: string; description: string; module_kind: string; sequence_no: number; status: string };
@@ -18,6 +18,7 @@ function btn(v: 'primary' | 'secondary' | 'danger'): React.CSSProperties {
 }
 
 export function ModuleDashboard() {
+  const S = useS();
   const [modules, setModules] = useState<Module[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);

@@ -1,6 +1,8 @@
 # i18n Implementation Plan
 
-> **Status (2026-04-27):** Slice 1+2 shipped ✅. Flutter i18n now fully clean — 8 post-V5 hardcoded strings (6 Czech) fixed in `history_screen.dart`, `result_card.dart`, `recording_card.dart`; 8 new ARB keys added (EN+VI parity maintained at 175 keys). CMS strings standardised to Vietnamese via `cms/lib/strings.ts` constants file; English button labels replaced in `exercise-dashboard`, `mock-test-dashboard`, `module-dashboard`, `skill-dashboard`. No i18n library added to CMS (admin tool, Vietnamese-only).
+> **Status (2026-04-27):** All slices complete ✅.
+> - Flutter: 8 post-V5 hardcoded strings (6 Czech) fixed; ARB EN=VI=175 keys; zero hardcoded strings on learner surfaces.
+> - CMS: Full VI/EN locale switching via `cms/lib/i18n.tsx` (React context + localStorage, no next-intl — avoids conflict with existing auth middleware). Locale switcher 🇻🇳↔🇬🇧 in sidebar footer. All exercise-dashboard labels (hero, form fields, inventory, status badge), mock-test/module/skill dashboards, and sidebar nav labels are reactive. In-app admin guide at `/guide`.
 
 ## Goal
 Ship multi-language support (`vi`, `en`) end-to-end: learner-picked interface language drives both UI copy and LLM-generated feedback.
