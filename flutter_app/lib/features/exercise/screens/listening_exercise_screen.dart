@@ -20,10 +20,12 @@ class ListeningExerciseScreen extends StatefulWidget {
     super.key,
     required this.client,
     required this.detail,
+    this.onAttemptCompleted,
   });
 
   final ApiClient client;
   final ExerciseDetail detail;
+  final void Function(String attemptId)? onAttemptCompleted;
 
   @override
   State<ListeningExerciseScreen> createState() => _ListeningExerciseScreenState();
@@ -82,6 +84,7 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
       final attempt = await widget.client.createAttempt(widget.detail.id, locale: 'vi');
       final attemptId = attempt['id'] as String;
       final raw = await widget.client.submitAnswers(attemptId, _answers);
+      widget.onAttemptCompleted?.call(attemptId);
       if (!mounted) return;
       setState(() => _result = AttemptResult.fromJson(raw));
     } catch (e) {

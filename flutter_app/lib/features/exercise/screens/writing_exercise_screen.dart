@@ -18,10 +18,13 @@ class WritingExerciseScreen extends StatefulWidget {
     super.key,
     required this.client,
     required this.detail,
+    this.onAttemptCompleted,
   });
 
   final ApiClient client;
   final ExerciseDetail detail;
+  /// Called with the attempt_id after the attempt is submitted successfully.
+  final void Function(String attemptId)? onAttemptCompleted;
 
   @override
   State<WritingExerciseScreen> createState() => _WritingExerciseScreenState();
@@ -92,6 +95,7 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
         );
       }
 
+      widget.onAttemptCompleted?.call(attemptId);
       if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(

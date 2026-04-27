@@ -41,26 +41,33 @@ class _FullExamIntroScreenState extends State<FullExamIntroScreen> {
     if (!mounted) return;
 
     String? attemptId;
+    void onComplete(String id) { attemptId = id; }
+
     if (detail.isCteni) {
       await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => _SectionWrapper(
+        builder: (_) => ReadingExerciseScreen(
+          client: widget.client,
           detail: detail,
-          child: ReadingExerciseScreen(client: widget.client, detail: detail),
-          onComplete: (id) { attemptId = id; },
+          onAttemptCompleted: onComplete,
         ),
       ));
     } else if (detail.isPsani1 || detail.isPsani2) {
       await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => WritingExerciseScreen(client: widget.client, detail: detail),
+        builder: (_) => WritingExerciseScreen(
+          client: widget.client,
+          detail: detail,
+          onAttemptCompleted: onComplete,
+        ),
       ));
     } else if (detail.isPoslech) {
       await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => ListeningExerciseScreen(client: widget.client, detail: detail),
+        builder: (_) => ListeningExerciseScreen(
+          client: widget.client,
+          detail: detail,
+          onAttemptCompleted: onComplete,
+        ),
       ));
     }
-    // Note: for simplicity in V1, we track completion via attempt_id placeholder
-    // A full implementation would intercept the attempt creation to capture IDs.
-    // For now: mark section done with a placeholder so UI unlocks submit.
     if (mounted) {
       setState(() => _attemptIds[section.sequenceNo] = attemptId ?? 'done-${section.sequenceNo}');
     }
@@ -70,10 +77,13 @@ class _FullExamIntroScreenState extends State<FullExamIntroScreen> {
     if (!_allDone || _submitting) return;
     setState(() { _submitting = true; _error = null; });
     try {
+      // Real attempt IDs from exercise screens; fallback placeholder starts with 'done-'.
       final attemptIds = widget.test.sections
           .map((s) => _attemptIds[s.sequenceNo] ?? '')
           .where((id) => id.isNotEmpty && !id.startsWith('done-'))
           .toList();
+      // Note: if some sections used placeholder IDs (e.g. no scoring backend), they
+      // are excluded from the list and their score defaults to 0.
       final maxPts = widget.test.sections.map((s) => s.maxPoints).toList();
       final raw = await widget.client.createFullExam(
         mockTestId: widget.test.id,
@@ -175,18 +185,6 @@ class _FullExamIntroScreenState extends State<FullExamIntroScreen> {
       ),
     );
   }
-}
-
-/// Wraps an exercise screen and intercepts the back navigation to capture attempt ID.
-/// In V1 this is a no-op wrapper — the exercise screen handles its own flow.
-class _SectionWrapper extends StatelessWidget {
-  const _SectionWrapper({required this.detail, required this.child, required this.onComplete});
-  final ExerciseDetail detail;
-  final Widget child;
-  final void Function(String? attemptId) onComplete;
-
-  @override
-  Widget build(BuildContext context) => child;
 }
 
 class _StatChip extends StatelessWidget {
