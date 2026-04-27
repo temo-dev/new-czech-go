@@ -582,4 +582,137 @@ class AppLocalizationsVi extends AppLocalizations {
   String profileVersion(String version) {
     return 'Phiên bản $version';
   }
+
+  @override
+  String get submitAnswersCta => 'Nộp đáp án';
+
+  @override
+  String get submitWritingCta => 'Nộp bài';
+
+  @override
+  String get scoringInProgress => 'Đang chấm bài…';
+
+  @override
+  String get resultScreenTitle => 'Kết quả';
+
+  @override
+  String get retryCta => 'Làm lại';
+
+  @override
+  String get writingTopicsLabel => 'Viết về các chủ đề sau:';
+
+  @override
+  String get writingEmailHint => 'Ahoj Lído, …';
+
+  @override
+  String writingWordCountBadge(int count, int min) {
+    return '$count/$min từ';
+  }
+
+  @override
+  String writingQuestionFallback(int no) {
+    return 'Câu hỏi $no';
+  }
+
+  @override
+  String get audioLoading => 'Đang tải audio…';
+
+  @override
+  String get audioError => 'Không tải được audio';
+
+  @override
+  String get audioHint => 'Audio bài nghe — nghe 2 lần';
+
+  @override
+  String get objectiveBreakdownTitle => 'Chi tiết từng câu';
+
+  @override
+  String objectiveQuestionLabel(int no) {
+    return 'Câu $no:';
+  }
+
+  @override
+  String get objectivePassBadge => 'ĐÚNG';
+
+  @override
+  String get objectiveFailBadge => 'SAI';
+
+  @override
+  String get objectiveNoAnswer => '(không trả lời)';
+
+  @override
+  String objectiveScoreDisplay(int score, int max) {
+    return '$score/$max';
+  }
+
+  @override
+  String get fullExamScreenTitle => 'Bài thi thử';
+
+  @override
+  String get fullExamDurationLabel => 'Thời gian';
+
+  @override
+  String get fullExamMaxPtsLabel => 'Tổng điểm';
+
+  @override
+  String get fullExamPassLabel => 'Điểm đậu';
+
+  @override
+  String get fullExamSectionsTitle => 'Các phần thi';
+
+  @override
+  String get fullExamSubmitCta => 'Nộp bài písemná';
+
+  @override
+  String get fullExamSubmitHint => 'Hoàn thành tất cả phần thi để nộp';
+
+  @override
+  String get fullExamResultTitle => 'Kết quả bài thi';
+
+  @override
+  String get fullExamPisemnaLabel => 'Phần viết (Písemná)';
+
+  @override
+  String get fullExamUstniLabel => 'Phần nói (Ústní)';
+
+  @override
+  String get fullExamPassedBadge => 'ĐẠT';
+
+  @override
+  String get fullExamFailedBadge => 'TRƯỢT';
+
+  @override
+  String get fullExamOverallPassed => 'ĐẠT';
+
+  @override
+  String get fullExamOverallFailed => 'CHƯA ĐẠT';
+
+  @override
+  String get fullExamUstniPending => 'Phần nói (Ústní) chưa hoàn thành. Làm bài thi nói riêng để có kết quả tổng.';
+
+  @override
+  String get fullExamGoHome => 'Về trang chủ';
+
+  @override
+  String get fullExamPisemnaPassHint => 'Písemná đạt — cần hoàn thành phần nói để có kết quả tổng';
+
+  @override
+  String fullExamScoreNeed(int pass) {
+    return 'cần ≥$pass';
+  }
+
+  @override
+  String fullExamMinDuration(int min) {
+    return '$min phút';
+  }
+
+  @override
+  String fullExamPts(int pts) {
+    return '$pts điểm';
+  }
+
+  @override
+  String fullExamPassSymbol(int pass) {
+    return '≥$pass';
+  }
 }

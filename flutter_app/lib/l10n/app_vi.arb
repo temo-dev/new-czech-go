@@ -266,5 +266,73 @@
     "profileVersion": "Phiên bản {version}",
     "@profileVersion": {
         "placeholders": { "version": { "type": "String" } }
+    },
+
+    "submitAnswersCta": "Nộp đáp án",
+    "submitWritingCta": "Nộp bài",
+    "scoringInProgress": "Đang chấm bài…",
+    "resultScreenTitle": "Kết quả",
+    "retryCta": "Làm lại",
+
+    "writingTopicsLabel": "Viết về các chủ đề sau:",
+    "writingEmailHint": "Ahoj Lído, …",
+    "writingWordCountBadge": "{count}/{min} từ",
+    "@writingWordCountBadge": {
+        "placeholders": { "count": { "type": "int" }, "min": { "type": "int" } }
+    },
+    "writingQuestionFallback": "Câu hỏi {no}",
+    "@writingQuestionFallback": {
+        "placeholders": { "no": { "type": "int" } }
+    },
+
+    "audioLoading": "Đang tải audio…",
+    "audioError": "Không tải được audio",
+    "audioHint": "Audio bài nghe — nghe 2 lần",
+
+    "objectiveBreakdownTitle": "Chi tiết từng câu",
+    "objectiveQuestionLabel": "Câu {no}:",
+    "@objectiveQuestionLabel": {
+        "placeholders": { "no": { "type": "int" } }
+    },
+    "objectivePassBadge": "ĐÚNG",
+    "objectiveFailBadge": "SAI",
+    "objectiveNoAnswer": "(không trả lời)",
+    "objectiveScoreDisplay": "{score}/{max}",
+    "@objectiveScoreDisplay": {
+        "placeholders": { "score": { "type": "int" }, "max": { "type": "int" } }
+    },
+
+    "fullExamScreenTitle": "Bài thi thử",
+    "fullExamDurationLabel": "Thời gian",
+    "fullExamMaxPtsLabel": "Tổng điểm",
+    "fullExamPassLabel": "Điểm đậu",
+    "fullExamSectionsTitle": "Các phần thi",
+    "fullExamSubmitCta": "Nộp bài písemná",
+    "fullExamSubmitHint": "Hoàn thành tất cả phần thi để nộp",
+    "fullExamResultTitle": "Kết quả bài thi",
+    "fullExamPisemnaLabel": "Phần viết (Písemná)",
+    "fullExamUstniLabel": "Phần nói (Ústní)",
+    "fullExamPassedBadge": "ĐẠT",
+    "fullExamFailedBadge": "TRƯỢT",
+    "fullExamOverallPassed": "ĐẠT",
+    "fullExamOverallFailed": "CHƯA ĐẠT",
+    "fullExamUstniPending": "Phần nói (Ústní) chưa hoàn thành. Làm bài thi nói riêng để có kết quả tổng.",
+    "fullExamGoHome": "Về trang chủ",
+    "fullExamPisemnaPassHint": "Písemná đạt — cần hoàn thành phần nói để có kết quả tổng",
+    "fullExamScoreNeed": "cần ≥{pass}",
+    "@fullExamScoreNeed": {
+        "placeholders": { "pass": { "type": "int" } }
+    },
+    "fullExamMinDuration": "{min} phút",
+    "@fullExamMinDuration": {
+        "placeholders": { "min": { "type": "int" } }
+    },
+    "fullExamPts": "{pts} điểm",
+    "@fullExamPts": {
+        "placeholders": { "pts": { "type": "int" } }
+    },
+    "fullExamPassSymbol": "≥{pass}",
+    "@fullExamPassSymbol": {
+        "placeholders": { "pass": { "type": "int" } }
     }
 }

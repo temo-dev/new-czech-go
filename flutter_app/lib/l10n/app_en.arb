@@ -221,5 +221,73 @@
     "profileVersion": "Version {version}",
     "@profileVersion": {
         "placeholders": { "version": { "type": "String" } }
+    },
+
+    "submitAnswersCta": "Submit answers",
+    "submitWritingCta": "Submit",
+    "scoringInProgress": "Scoring…",
+    "resultScreenTitle": "Result",
+    "retryCta": "Try again",
+
+    "writingTopicsLabel": "Write about these topics:",
+    "writingEmailHint": "Ahoj Lído, …",
+    "writingWordCountBadge": "{count}/{min} words",
+    "@writingWordCountBadge": {
+        "placeholders": { "count": { "type": "int" }, "min": { "type": "int" } }
+    },
+    "writingQuestionFallback": "Question {no}",
+    "@writingQuestionFallback": {
+        "placeholders": { "no": { "type": "int" } }
+    },
+
+    "audioLoading": "Loading audio…",
+    "audioError": "Audio unavailable",
+    "audioHint": "Listening audio — play twice",
+
+    "objectiveBreakdownTitle": "Question breakdown",
+    "objectiveQuestionLabel": "Q{no}:",
+    "@objectiveQuestionLabel": {
+        "placeholders": { "no": { "type": "int" } }
+    },
+    "objectivePassBadge": "PASS",
+    "objectiveFailBadge": "FAIL",
+    "objectiveNoAnswer": "(no answer)",
+    "objectiveScoreDisplay": "{score}/{max}",
+    "@objectiveScoreDisplay": {
+        "placeholders": { "score": { "type": "int" }, "max": { "type": "int" } }
+    },
+
+    "fullExamScreenTitle": "Mock exam",
+    "fullExamDurationLabel": "Duration",
+    "fullExamMaxPtsLabel": "Total pts",
+    "fullExamPassLabel": "Pass",
+    "fullExamSectionsTitle": "Sections",
+    "fullExamSubmitCta": "Submit písemná",
+    "fullExamSubmitHint": "Complete all sections to submit",
+    "fullExamResultTitle": "Exam result",
+    "fullExamPisemnaLabel": "Written part (Písemná)",
+    "fullExamUstniLabel": "Oral part (Ústní)",
+    "fullExamPassedBadge": "PASS",
+    "fullExamFailedBadge": "FAIL",
+    "fullExamOverallPassed": "PASSED",
+    "fullExamOverallFailed": "NOT PASSED",
+    "fullExamUstniPending": "Oral part not completed. Take the speaking mock test to get the overall result.",
+    "fullExamGoHome": "Go home",
+    "fullExamPisemnaPassHint": "Písemná passed — complete the oral part",
+    "fullExamScoreNeed": "need ≥{pass}",
+    "@fullExamScoreNeed": {
+        "placeholders": { "pass": { "type": "int" } }
+    },
+    "fullExamMinDuration": "{min} min",
+    "@fullExamMinDuration": {
+        "placeholders": { "min": { "type": "int" } }
+    },
+    "fullExamPts": "{pts} pts",
+    "@fullExamPts": {
+        "placeholders": { "pts": { "type": "int" } }
+    },
+    "fullExamPassSymbol": "≥{pass}",
+    "@fullExamPassSymbol": {
+        "placeholders": { "pass": { "type": "int" } }
     }
 }

@@ -4,6 +4,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../../exercise/screens/listening_exercise_screen.dart';
 import '../../exercise/screens/reading_exercise_screen.dart';
@@ -112,7 +113,7 @@ class _FullExamIntroScreenState extends State<FullExamIntroScreen> {
       backgroundColor: AppColors.surface,
       appBar: AppBar(
         backgroundColor: AppColors.surface, elevation: 0,
-        title: Text('Bài thi thử', style: AppTypography.titleMedium),
+        title: Text(AppLocalizations.of(context).fullExamScreenTitle, style: AppTypography.titleMedium),
       ),
       body: SafeArea(
         child: ListView(
@@ -127,16 +128,16 @@ class _FullExamIntroScreenState extends State<FullExamIntroScreen> {
 
             // Stats
             Row(children: [
-              _StatChip(label: 'Thời gian', value: '${test.estimatedDurationMinutes} phút'),
+              _StatChip(label: AppLocalizations.of(context).fullExamDurationLabel, value: AppLocalizations.of(context).fullExamMinDuration(test.estimatedDurationMinutes)),
               const SizedBox(width: AppSpacing.x3),
-              _StatChip(label: 'Tổng điểm', value: '$maxPts điểm'),
+              _StatChip(label: AppLocalizations.of(context).fullExamMaxPtsLabel, value: AppLocalizations.of(context).fullExamPts(maxPts)),
               const SizedBox(width: AppSpacing.x3),
-              _StatChip(label: 'Điểm đậu', value: '≥$passThreshold'),
+              _StatChip(label: AppLocalizations.of(context).fullExamPassLabel, value: AppLocalizations.of(context).fullExamPassSymbol(passThreshold)),
             ]),
             const SizedBox(height: AppSpacing.x6),
 
             // Sections
-            Text('Các phần thi', style: AppTypography.titleSmall),
+            Text(AppLocalizations.of(context).fullExamSectionsTitle, style: AppTypography.titleSmall),
             const SizedBox(height: AppSpacing.x3),
             ...test.sections.map((sec) {
               final done = _attemptIds.containsKey(sec.sequenceNo);
@@ -176,7 +177,7 @@ class _FullExamIntroScreenState extends State<FullExamIntroScreen> {
               child: _submitting
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : Text(
-                      _allDone ? 'Nộp bài písemná' : 'Hoàn thành tất cả phần thi để nộp',
+                      _allDone ? AppLocalizations.of(context).fullExamSubmitCta : AppLocalizations.of(context).fullExamSubmitHint,
                       style: AppTypography.labelLarge.copyWith(color: Colors.white),
                     ),
             ),

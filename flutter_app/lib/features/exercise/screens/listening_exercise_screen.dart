@@ -7,6 +7,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../widgets/fill_in_widget.dart';
 import '../widgets/multiple_choice_widget.dart';
@@ -103,7 +104,7 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
         backgroundColor: AppColors.surface,
         appBar: AppBar(
           backgroundColor: AppColors.surface,
-          title: Text('Kết quả', style: AppTypography.titleMedium),
+          title: Text(AppLocalizations.of(context).resultScreenTitle, style: AppTypography.titleMedium),
           elevation: 0,
         ),
         body: SafeArea(
@@ -166,7 +167,7 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
               ),
               child: _submitting
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text('Nộp đáp án', style: AppTypography.labelLarge.copyWith(color: Colors.white)),
+                  : Text(AppLocalizations.of(context).submitAnswersCta, style: AppTypography.labelLarge.copyWith(color: Colors.white)),
             ),
           ],
         ),
@@ -256,10 +257,10 @@ class _AudioPlayerBarState extends State<_AudioPlayerBar> {
           const SizedBox(width: 10),
           Expanded(
             child: widget.error
-                ? Text('Không tải được audio', style: AppTypography.bodySmall.copyWith(color: AppColors.error))
+                ? Text(AppLocalizations.of(context).audioError, style: AppTypography.bodySmall.copyWith(color: AppColors.error))
                 : widget.loading
-                    ? Text('Đang tải audio...', style: AppTypography.bodySmall)
-                    : Text('Audio bài nghe — nghe 2 lần', style: AppTypography.bodySmall),
+                    ? Text(AppLocalizations.of(context).audioLoading, style: AppTypography.bodySmall)
+                    : Text(AppLocalizations.of(context).audioHint, style: AppTypography.bodySmall),
           ),
           if (!widget.error && !widget.loading) ...[
             IconButton(

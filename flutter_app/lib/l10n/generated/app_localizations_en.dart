@@ -582,4 +582,137 @@ class AppLocalizationsEn extends AppLocalizations {
   String profileVersion(String version) {
     return 'Version $version';
   }
+
+  @override
+  String get submitAnswersCta => 'Submit answers';
+
+  @override
+  String get submitWritingCta => 'Submit';
+
+  @override
+  String get scoringInProgress => 'Scoring…';
+
+  @override
+  String get resultScreenTitle => 'Result';
+
+  @override
+  String get retryCta => 'Try again';
+
+  @override
+  String get writingTopicsLabel => 'Write about these topics:';
+
+  @override
+  String get writingEmailHint => 'Ahoj Lído, …';
+
+  @override
+  String writingWordCountBadge(int count, int min) {
+    return '$count/$min words';
+  }
+
+  @override
+  String writingQuestionFallback(int no) {
+    return 'Question $no';
+  }
+
+  @override
+  String get audioLoading => 'Loading audio…';
+
+  @override
+  String get audioError => 'Audio unavailable';
+
+  @override
+  String get audioHint => 'Listening audio — play twice';
+
+  @override
+  String get objectiveBreakdownTitle => 'Question breakdown';
+
+  @override
+  String objectiveQuestionLabel(int no) {
+    return 'Q$no:';
+  }
+
+  @override
+  String get objectivePassBadge => 'PASS';
+
+  @override
+  String get objectiveFailBadge => 'FAIL';
+
+  @override
+  String get objectiveNoAnswer => '(no answer)';
+
+  @override
+  String objectiveScoreDisplay(int score, int max) {
+    return '$score/$max';
+  }
+
+  @override
+  String get fullExamScreenTitle => 'Mock exam';
+
+  @override
+  String get fullExamDurationLabel => 'Duration';
+
+  @override
+  String get fullExamMaxPtsLabel => 'Total pts';
+
+  @override
+  String get fullExamPassLabel => 'Pass';
+
+  @override
+  String get fullExamSectionsTitle => 'Sections';
+
+  @override
+  String get fullExamSubmitCta => 'Submit písemná';
+
+  @override
+  String get fullExamSubmitHint => 'Complete all sections to submit';
+
+  @override
+  String get fullExamResultTitle => 'Exam result';
+
+  @override
+  String get fullExamPisemnaLabel => 'Written part (Písemná)';
+
+  @override
+  String get fullExamUstniLabel => 'Oral part (Ústní)';
+
+  @override
+  String get fullExamPassedBadge => 'PASS';
+
+  @override
+  String get fullExamFailedBadge => 'FAIL';
+
+  @override
+  String get fullExamOverallPassed => 'PASSED';
+
+  @override
+  String get fullExamOverallFailed => 'NOT PASSED';
+
+  @override
+  String get fullExamUstniPending => 'Oral part not completed. Take the speaking mock test to get the overall result.';
+
+  @override
+  String get fullExamGoHome => 'Go home';
+
+  @override
+  String get fullExamPisemnaPassHint => 'Písemná passed — complete the oral part';
+
+  @override
+  String fullExamScoreNeed(int pass) {
+    return 'need ≥$pass';
+  }
+
+  @override
+  String fullExamMinDuration(int min) {
+    return '$min min';
+  }
+
+  @override
+  String fullExamPts(int pts) {
+    return '$pts pts';
+  }
+
+  @override
+  String fullExamPassSymbol(int pass) {
+    return '≥$pass';
+  }
 }

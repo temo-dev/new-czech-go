@@ -1144,6 +1144,240 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Phiên bản {version}'**
   String profileVersion(String version);
+
+  /// No description provided for @submitAnswersCta.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nộp đáp án'**
+  String get submitAnswersCta;
+
+  /// No description provided for @submitWritingCta.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nộp bài'**
+  String get submitWritingCta;
+
+  /// No description provided for @scoringInProgress.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang chấm bài…'**
+  String get scoringInProgress;
+
+  /// No description provided for @resultScreenTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kết quả'**
+  String get resultScreenTitle;
+
+  /// No description provided for @retryCta.
+  ///
+  /// In vi, this message translates to:
+  /// **'Làm lại'**
+  String get retryCta;
+
+  /// No description provided for @writingTopicsLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Viết về các chủ đề sau:'**
+  String get writingTopicsLabel;
+
+  /// No description provided for @writingEmailHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ahoj Lído, …'**
+  String get writingEmailHint;
+
+  /// No description provided for @writingWordCountBadge.
+  ///
+  /// In vi, this message translates to:
+  /// **'{count}/{min} từ'**
+  String writingWordCountBadge(int count, int min);
+
+  /// No description provided for @writingQuestionFallback.
+  ///
+  /// In vi, this message translates to:
+  /// **'Câu hỏi {no}'**
+  String writingQuestionFallback(int no);
+
+  /// No description provided for @audioLoading.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang tải audio…'**
+  String get audioLoading;
+
+  /// No description provided for @audioError.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không tải được audio'**
+  String get audioError;
+
+  /// No description provided for @audioHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Audio bài nghe — nghe 2 lần'**
+  String get audioHint;
+
+  /// No description provided for @objectiveBreakdownTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chi tiết từng câu'**
+  String get objectiveBreakdownTitle;
+
+  /// No description provided for @objectiveQuestionLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Câu {no}:'**
+  String objectiveQuestionLabel(int no);
+
+  /// No description provided for @objectivePassBadge.
+  ///
+  /// In vi, this message translates to:
+  /// **'ĐÚNG'**
+  String get objectivePassBadge;
+
+  /// No description provided for @objectiveFailBadge.
+  ///
+  /// In vi, this message translates to:
+  /// **'SAI'**
+  String get objectiveFailBadge;
+
+  /// No description provided for @objectiveNoAnswer.
+  ///
+  /// In vi, this message translates to:
+  /// **'(không trả lời)'**
+  String get objectiveNoAnswer;
+
+  /// No description provided for @objectiveScoreDisplay.
+  ///
+  /// In vi, this message translates to:
+  /// **'{score}/{max}'**
+  String objectiveScoreDisplay(int score, int max);
+
+  /// No description provided for @fullExamScreenTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bài thi thử'**
+  String get fullExamScreenTitle;
+
+  /// No description provided for @fullExamDurationLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thời gian'**
+  String get fullExamDurationLabel;
+
+  /// No description provided for @fullExamMaxPtsLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tổng điểm'**
+  String get fullExamMaxPtsLabel;
+
+  /// No description provided for @fullExamPassLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Điểm đậu'**
+  String get fullExamPassLabel;
+
+  /// No description provided for @fullExamSectionsTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Các phần thi'**
+  String get fullExamSectionsTitle;
+
+  /// No description provided for @fullExamSubmitCta.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nộp bài písemná'**
+  String get fullExamSubmitCta;
+
+  /// No description provided for @fullExamSubmitHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hoàn thành tất cả phần thi để nộp'**
+  String get fullExamSubmitHint;
+
+  /// No description provided for @fullExamResultTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kết quả bài thi'**
+  String get fullExamResultTitle;
+
+  /// No description provided for @fullExamPisemnaLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phần viết (Písemná)'**
+  String get fullExamPisemnaLabel;
+
+  /// No description provided for @fullExamUstniLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phần nói (Ústní)'**
+  String get fullExamUstniLabel;
+
+  /// No description provided for @fullExamPassedBadge.
+  ///
+  /// In vi, this message translates to:
+  /// **'ĐẠT'**
+  String get fullExamPassedBadge;
+
+  /// No description provided for @fullExamFailedBadge.
+  ///
+  /// In vi, this message translates to:
+  /// **'TRƯỢT'**
+  String get fullExamFailedBadge;
+
+  /// No description provided for @fullExamOverallPassed.
+  ///
+  /// In vi, this message translates to:
+  /// **'ĐẠT'**
+  String get fullExamOverallPassed;
+
+  /// No description provided for @fullExamOverallFailed.
+  ///
+  /// In vi, this message translates to:
+  /// **'CHƯA ĐẠT'**
+  String get fullExamOverallFailed;
+
+  /// No description provided for @fullExamUstniPending.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phần nói (Ústní) chưa hoàn thành. Làm bài thi nói riêng để có kết quả tổng.'**
+  String get fullExamUstniPending;
+
+  /// No description provided for @fullExamGoHome.
+  ///
+  /// In vi, this message translates to:
+  /// **'Về trang chủ'**
+  String get fullExamGoHome;
+
+  /// No description provided for @fullExamPisemnaPassHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Písemná đạt — cần hoàn thành phần nói để có kết quả tổng'**
+  String get fullExamPisemnaPassHint;
+
+  /// No description provided for @fullExamScoreNeed.
+  ///
+  /// In vi, this message translates to:
+  /// **'cần ≥{pass}'**
+  String fullExamScoreNeed(int pass);
+
+  /// No description provided for @fullExamMinDuration.
+  ///
+  /// In vi, this message translates to:
+  /// **'{min} phút'**
+  String fullExamMinDuration(int min);
+
+  /// No description provided for @fullExamPts.
+  ///
+  /// In vi, this message translates to:
+  /// **'{pts} điểm'**
+  String fullExamPts(int pts);
+
+  /// No description provided for @fullExamPassSymbol.
+  ///
+  /// In vi, this message translates to:
+  /// **'≥{pass}'**
+  String fullExamPassSymbol(int pass);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

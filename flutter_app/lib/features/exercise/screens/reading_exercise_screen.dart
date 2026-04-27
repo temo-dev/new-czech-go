@@ -4,6 +4,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../widgets/fill_in_widget.dart';
 import '../widgets/multiple_choice_widget.dart';
@@ -71,7 +72,7 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
       return Scaffold(
         backgroundColor: AppColors.surface,
         appBar: AppBar(backgroundColor: AppColors.surface, elevation: 0,
-          title: Text('Kết quả', style: AppTypography.titleMedium)),
+          title: Text(AppLocalizations.of(context).resultScreenTitle, style: AppTypography.titleMedium)),
         body: SafeArea(child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpacing.x4),
           child: ObjectiveResultCard(result: _result!, onRetry: () => Navigator.of(context).pop()),
@@ -138,7 +139,7 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
               ),
               child: _submitting
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text('Nộp đáp án', style: AppTypography.labelLarge.copyWith(color: Colors.white)),
+                  : Text(AppLocalizations.of(context).submitAnswersCta, style: AppTypography.labelLarge.copyWith(color: Colors.white)),
             ),
           ],
         ),

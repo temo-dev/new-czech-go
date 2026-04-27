@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 
 /// Shows the result of an objective (listening/reading) attempt.
@@ -61,7 +62,7 @@ class ObjectiveResultCard extends StatelessWidget {
 
         // Per-question breakdown
         if (objResult != null && objResult.breakdown.isNotEmpty) ...[
-          Text('Chi tiết từng câu', style: AppTypography.titleSmall),
+          Text(AppLocalizations.of(context).objectiveBreakdownTitle, style: AppTypography.titleSmall),
           const SizedBox(height: AppSpacing.x2),
           ...objResult.breakdown.map((q) => _QuestionRow(q: q)),
           const SizedBox(height: AppSpacing.x4),
@@ -77,7 +78,7 @@ class ObjectiveResultCard extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            child: Text('Làm lại', style: AppTypography.labelLarge.copyWith(color: AppColors.primary)),
+            child: Text(AppLocalizations.of(context).retryCta, style: AppTypography.labelLarge.copyWith(color: AppColors.primary)),
           ),
         ),
       ],
@@ -115,8 +116,8 @@ class _QuestionRow extends StatelessWidget {
               text: TextSpan(
                 style: AppTypography.bodySmall.copyWith(color: AppColors.onSurface),
                 children: [
-                  TextSpan(text: 'Câu ${q.questionNo}: ', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  TextSpan(text: q.learnerAnswer.isNotEmpty ? q.learnerAnswer : '(không trả lời)'),
+                  TextSpan(text: AppLocalizations.of(context).objectiveQuestionLabel(q.questionNo), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  TextSpan(text: q.learnerAnswer.isNotEmpty ? q.learnerAnswer : AppLocalizations.of(context).objectiveNoAnswer),
                   if (!q.isCorrect) ...[
                     const TextSpan(text: ' → '),
                     TextSpan(

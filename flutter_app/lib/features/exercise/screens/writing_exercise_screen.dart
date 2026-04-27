@@ -1,11 +1,12 @@
-import 'package:flutter/material.dart';
-
 import 'dart:async';
+
+import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../widgets/result_card.dart';
 
@@ -122,7 +123,7 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         title: Text(
-          d.isPsani1 ? 'Psaní 1 — Formulář' : 'Psaní 2 — E-mail',
+          d.isPsani1 ? 'Psaní 1 — Formulář' : 'Psaní 2 — E-mail', // Czech exercise names, not translated
           style: AppTypography.titleMedium,
         ),
       ),
@@ -150,7 +151,7 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
               ),
               child: _submitting
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text('Nộp bài', style: AppTypography.labelLarge.copyWith(color: Colors.white)),
+                  : Text(AppLocalizations.of(context).submitWritingCta, style: AppTypography.labelLarge.copyWith(color: Colors.white)),
             ),
           ],
         ),
@@ -160,7 +161,7 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
 
   List<Widget> _buildPsani1Fields(ExerciseDetail d) {
     final questions = d.writingQuestions.isEmpty
-        ? List.generate(3, (i) => 'Câu hỏi ${i + 1}')
+        ? List.generate(3, (i) => AppLocalizations.of(context).writingQuestionFallback(i + 1))
         : d.writingQuestions;
     return List.generate(questions.length, (i) {
       final words = _wordCount(_controllers[i].text);
@@ -216,7 +217,7 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
         ),
         const SizedBox(height: AppSpacing.x4),
       ],
-      Text('Viết về các chủ đề sau:', style: AppTypography.labelMedium),
+      Text(AppLocalizations.of(context).writingTopicsLabel, style: AppTypography.labelMedium),
       const SizedBox(height: 8),
       ...topics.asMap().entries.map((e) => Padding(
         padding: const EdgeInsets.only(bottom: 4),
@@ -239,7 +240,7 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.white,
-            hintText: 'Ahoj Lído, ...',
+            hintText: AppLocalizations.of(context).writingEmailHint,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             suffixText: '$words/${d.writingMinWords} từ',
             suffixStyle: TextStyle(
@@ -330,7 +331,7 @@ class _WritingResultPollerState extends State<_WritingResultPoller> {
           children: [
             const CircularProgressIndicator(color: AppColors.primary),
             const SizedBox(height: AppSpacing.x4),
-            Text('Đang chấm bài...', style: AppTypography.bodyMedium),
+            Text(AppLocalizations.of(context).scoringInProgress, style: AppTypography.bodyMedium),
           ],
         ),
       ),

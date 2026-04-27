@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 
 /// Shows the result of a full písemná exam session.
@@ -22,7 +23,7 @@ class FullExamResultScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
-        title: Text('Kết quả bài thi', style: AppTypography.titleMedium),
+        title: Text(AppLocalizations.of(context).fullExamResultTitle, style: AppTypography.titleMedium),
         automaticallyImplyLeading: false,
       ),
       body: SafeArea(
@@ -52,7 +53,7 @@ class FullExamResultScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.x3),
                     Text(
-                      session.overallPassed ? 'ĐẠT' : 'CHƯA ĐẠT',
+                      session.overallPassed ? AppLocalizations.of(context).fullExamOverallPassed : AppLocalizations.of(context).fullExamOverallFailed,
                       style: AppTypography.headlineLarge.copyWith(
                         color: session.overallPassed ? AppColors.success : AppColors.error,
                         fontWeight: FontWeight.bold,
@@ -62,7 +63,7 @@ class FullExamResultScreen extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.only(top: AppSpacing.x2),
                         child: Text(
-                          'Písemná đạt — cần hoàn thành phần nói để có kết quả tổng',
+                          AppLocalizations.of(context).fullExamPisemnaPassHint,
                           style: AppTypography.bodySmall.copyWith(color: AppColors.onTertiaryContainer),
                           textAlign: TextAlign.center,
                         ),
@@ -73,10 +74,10 @@ class FullExamResultScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.x6),
 
               // Písemná part
-              Text('Phần viết (Písemná)', style: AppTypography.titleSmall),
+              Text(AppLocalizations.of(context).fullExamPisemnaLabel, style: AppTypography.titleSmall),
               const SizedBox(height: AppSpacing.x3),
               _ScoreRow(
-                label: 'Điểm đạt được',
+                label: AppLocalizations.of(context).resultScreenTitle,
                 score: session.pisemnaScore,
                 maxScore: pisemnaMax,
                 passScore: 42,
@@ -86,10 +87,10 @@ class FullExamResultScreen extends StatelessWidget {
 
               // Ústní part (if completed)
               if (session.status == 'completed') ...[
-                Text('Phần nói (Ústní)', style: AppTypography.titleSmall),
+                Text(AppLocalizations.of(context).fullExamUstniLabel, style: AppTypography.titleSmall),
                 const SizedBox(height: AppSpacing.x3),
                 _ScoreRow(
-                  label: 'Điểm đạt được',
+                  label: AppLocalizations.of(context).resultScreenTitle,
                   score: session.ustniScore,
                   maxScore: ustniMax,
                   passScore: 24,
@@ -110,7 +111,7 @@ class FullExamResultScreen extends StatelessWidget {
                       const SizedBox(width: AppSpacing.x3),
                       Expanded(
                         child: Text(
-                          'Phần nói (Ústní) chưa hoàn thành. Làm bài thi nói riêng để có kết quả tổng.',
+                          AppLocalizations.of(context).fullExamUstniPending,
                           style: AppTypography.bodySmall,
                         ),
                       ),
@@ -130,7 +131,7 @@ class FullExamResultScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  child: Text('Về trang chủ', style: AppTypography.labelLarge.copyWith(color: Colors.white)),
+                  child: Text(AppLocalizations.of(context).fullExamGoHome, style: AppTypography.labelLarge.copyWith(color: Colors.white)),
                 ),
               ),
             ],
@@ -175,7 +176,7 @@ class _ScoreRow extends StatelessWidget {
               children: [
                 Text(label, style: AppTypography.labelSmall.copyWith(color: AppColors.onSurfaceVariant)),
                 Text(
-                  '$score / $maxScore  (cần ≥$passScore)',
+                  '${AppLocalizations.of(context).objectiveScoreDisplay(score, maxScore)}  (${AppLocalizations.of(context).fullExamScoreNeed(passScore)})',
                   style: AppTypography.titleMedium.copyWith(color: color, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -185,7 +186,7 @@ class _ScoreRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3, vertical: AppSpacing.x1),
             decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
             child: Text(
-              passed ? 'ĐẠT' : 'TRƯỢT',
+              passed ? AppLocalizations.of(context).fullExamPassedBadge : AppLocalizations.of(context).fullExamFailedBadge,
               style: AppTypography.labelSmall.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ),
