@@ -27,6 +27,7 @@ type Server struct {
 	audioURLProvider AudioURLProvider
 	audioSignSecret  []byte
 	audioGenerator   processing.ExerciseAudioGenerator
+	fullExamScorer   *processing.FullExamScorer
 	mux              *http.ServeMux
 }
 
@@ -57,6 +58,7 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 		audioURLProvider: audioURLProvider,
 		audioSignSecret:  audioSignSecret,
 		audioGenerator:   processing.DevExerciseAudioGenerator{},
+		fullExamScorer:   processing.NewFullExamScorer(repo),
 		mux:              http.NewServeMux(),
 	}
 	s.routes()
@@ -78,6 +80,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/mock-exams", s.withAuth(s.handleMockExams))
 	s.mux.HandleFunc("/v1/mock-exams/", s.withAuth(s.handleMockExamByID))
 	s.mux.HandleFunc("/v1/mock-tests", s.withAuth(s.handleMockTests))
+	s.mux.HandleFunc("/v1/full-exams", s.withAuth(s.handleFullExams))
+	s.mux.HandleFunc("/v1/full-exams/", s.withAuth(s.handleFullExamByID))
 	// Course/Skill learner APIs
 	s.mux.HandleFunc("/v1/courses", s.withAuth(s.handleCourses))
 	s.mux.HandleFunc("/v1/courses/", s.withAuth(s.handleCourseByID))
@@ -971,6 +975,74 @@ func (s *Server) handleAdminGenerateAudio(w http.ResponseWriter, r *http.Request
 		},
 		"meta": map[string]any{},
 	})
+}
+
+// POST /v1/full-exams — create full exam session (písemná part completed, compute score).
+// GET  /v1/full-exams — list learner's full exam sessions.
+func (s *Server) handleFullExams(w http.ResponseWriter, r *http.Request, user contracts.User) {
+	switch r.Method {
+	case http.MethodPost:
+		var req contracts.FullExamCreateRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "validation_error", "Invalid request body.", false)
+			return
+		}
+		// Default section max points: cteni=25, psani=20, poslech=25
+		maxPoints := req.PisemnaSectionMaxPoints
+		if len(maxPoints) == 0 {
+			maxPoints = make([]int, len(req.PisemnaAttemptIDs))
+			for i := range maxPoints {
+				maxPoints[i] = 25 // default per section
+			}
+		}
+		session, err := s.fullExamScorer.CreateSession(user.ID, req.MockTestID, req.PisemnaAttemptIDs, maxPoints)
+		if err != nil {
+			log.Printf("full exam create: %v", err)
+			writeError(w, http.StatusBadRequest, "validation_error", err.Error(), false)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"data": session, "meta": map[string]any{}})
+	case http.MethodGet:
+		sessions := s.repo.ListFullExamSessions(user.ID)
+		writeJSON(w, http.StatusOK, map[string]any{"data": sessions, "meta": map[string]any{}})
+	default:
+		writeMethodNotAllowed(w)
+	}
+}
+
+// GET  /v1/full-exams/:id — get session.
+// POST /v1/full-exams/:id/complete — link ústní session and compute overall_passed.
+func (s *Server) handleFullExamByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	path := strings.TrimPrefix(r.URL.Path, "/v1/full-exams/")
+	if strings.HasSuffix(path, "/complete") {
+		id := strings.TrimSuffix(path, "/complete")
+		if r.Method != http.MethodPost {
+			writeMethodNotAllowed(w)
+			return
+		}
+		var req contracts.FullExamCompleteRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "validation_error", "Invalid request body.", false)
+			return
+		}
+		session, err := s.fullExamScorer.CompleteSession(id, req.UstniMockExamSessionID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "not_found", err.Error(), false)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})
+		return
+	}
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	session, ok := s.repo.FullExamSession(path)
+	if !ok {
+		writeNotFound(w)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})
 }
 
 func localExerciseAudioPath(storageKey string) string {

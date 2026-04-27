@@ -450,7 +450,8 @@ type MockTest struct {
 	Title                    string            `json:"title"`
 	Description              string            `json:"description"`
 	EstimatedDurationMinutes int               `json:"estimated_duration_minutes"`
-	Status                   string            `json:"status"` // draft, published
+	Status                   string            `json:"status"`       // draft, published
+	SessionType              string            `json:"session_type"` // speaking | pisemna | full
 	Sections                 []MockTestSection `json:"sections"`
 }
 
@@ -470,6 +471,35 @@ type MockExamSession struct {
 	OverallReadinessLevel string                `json:"overall_readiness_level,omitempty"`
 	OverallSummary        string                `json:"overall_summary,omitempty"`
 	Sections              []MockExamSessionItem `json:"sections"`
+}
+
+// FullExamSession tracks both písemná and ústní parts of the full A2 exam.
+// Písemná: čtení (25) + psaní (20) + poslech (25) = 70 pts, pass ≥42.
+// Ústní:   mluvení = 40 pts, pass ≥24.
+type FullExamSession struct {
+	ID                     string `json:"id"`
+	LearnerID              string `json:"learner_id"`
+	MockTestID             string `json:"mock_test_id,omitempty"`
+	PisemnaScore           int    `json:"pisemna_score"`
+	UstniScore             int    `json:"ustni_score"`
+	PisemnaPassed          bool   `json:"pisemna_passed"`
+	UstniPassed            bool   `json:"ustni_passed"`
+	OverallPassed          bool   `json:"overall_passed"`
+	Status                 string `json:"status"` // in_progress | pisemna_done | completed
+	UstniMockExamSessionID string `json:"ustni_mock_exam_session_id,omitempty"`
+	CreatedAt              string `json:"created_at"`
+}
+
+// FullExamCreateRequest is the body of POST /v1/full-exams.
+type FullExamCreateRequest struct {
+	MockTestID              string   `json:"mock_test_id"`
+	PisemnaAttemptIDs       []string `json:"pisemna_attempt_ids"`         // scored attempts for cteni+psani+poslech
+	PisemnaSectionMaxPoints []int    `json:"pisemna_section_max_points"`  // max pts per section, default 25 each
+}
+
+// FullExamCompleteRequest is the body of POST /v1/full-exams/:id/complete.
+type FullExamCompleteRequest struct {
+	UstniMockExamSessionID string `json:"ustni_mock_exam_session_id"`
 }
 
 type MockExamSessionItem struct {

@@ -20,7 +20,8 @@ type MemoryStore struct {
 	attempts       AttemptStore
 	mockExams      MockExamStore
 	mockTests      MockTestStore
-	exerciseAudio  map[string]contracts.ExerciseAudio // exercise_id → audio
+	exerciseAudio  map[string]contracts.ExerciseAudio   // exercise_id → audio
+	fullExams      map[string]contracts.FullExamSession  // id → session
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -76,6 +77,7 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 		mockExams:     newMemoryMockExamStore(exercises, attempts),
 		mockTests:     newMemoryMockTestStore(),
 		exerciseAudio: map[string]contracts.ExerciseAudio{},
+		fullExams:     map[string]contracts.FullExamSession{},
 	}
 }
 
@@ -321,6 +323,37 @@ func (s *MemoryStore) AdvanceMockExam(id, attemptID string) (contracts.MockExamS
 
 func (s *MemoryStore) CompleteMockExam(id string) (contracts.MockExamSession, error) {
 	return s.mockExams.CompleteMockExam(id)
+}
+
+// FullExamSession methods
+
+func (s *MemoryStore) FullExamSession(id string) (*contracts.FullExamSession, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sess, ok := s.fullExams[id]
+	if !ok {
+		return nil, false
+	}
+	cp := sess
+	return &cp, true
+}
+
+func (s *MemoryStore) SetFullExamSession(session contracts.FullExamSession) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.fullExams[session.ID] = session
+}
+
+func (s *MemoryStore) ListFullExamSessions(learnerID string) []contracts.FullExamSession {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []contracts.FullExamSession
+	for _, sess := range s.fullExams {
+		if sess.LearnerID == learnerID {
+			out = append(out, sess)
+		}
+	}
+	return out
 }
 
 // ExerciseAudio methods
