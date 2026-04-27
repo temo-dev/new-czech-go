@@ -258,6 +258,24 @@ func (s *MemoryStore) ListAttempts() []contracts.Attempt {
 	return s.attempts.ListAttempts()
 }
 
+func (s *MemoryStore) SetCourseStore(cs CourseStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.courses = cs
+}
+
+func (s *MemoryStore) SetModuleStore(ms ModuleStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.modules = ms
+}
+
+func (s *MemoryStore) SetSkillStore(ss SkillStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.skills = ss
+}
+
 func (s *MemoryStore) SetMockExamStore(ms MockExamStore) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

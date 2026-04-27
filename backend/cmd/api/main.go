@@ -21,6 +21,9 @@ func main() {
 	var exerciseStore store.ExerciseStore
 	var mockExamStore store.MockExamStore
 	var mockTestStore store.MockTestStore
+	var courseStore store.CourseStore
+	var moduleStore store.ModuleStore
+	var skillStore store.SkillStore
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
 		persistentAttemptStore, err := store.NewPostgresAttemptStore(databaseURL)
 		if err != nil {
@@ -38,11 +41,26 @@ func main() {
 		if err != nil {
 			log.Fatalf("could not initialize postgres mock test store: %v", err)
 		}
+		persistentCourseStore, err := store.NewPostgresCourseStore(databaseURL)
+		if err != nil {
+			log.Fatalf("could not initialize postgres course store: %v", err)
+		}
+		persistentModuleStore, err := store.NewPostgresModuleStore(databaseURL)
+		if err != nil {
+			log.Fatalf("could not initialize postgres module store: %v", err)
+		}
+		persistentSkillStore, err := store.NewPostgresSkillStore(databaseURL)
+		if err != nil {
+			log.Fatalf("could not initialize postgres skill store: %v", err)
+		}
 		attemptStore = persistentAttemptStore
 		exerciseStore = persistentExerciseStore
 		mockExamStore = persistentMockExamStore
 		mockTestStore = persistentMockTestStore
-		log.Printf("attempt, exercise, mock exam, and mock test persistence enabled with Postgres")
+		courseStore = persistentCourseStore
+		moduleStore = persistentModuleStore
+		skillStore = persistentSkillStore
+		log.Printf("full Postgres persistence enabled (attempts, exercises, mock exams/tests, courses, modules, skills)")
 	}
 
 	repo := store.NewMemoryStoreWithStores(attemptStore, exerciseStore)
@@ -51,6 +69,11 @@ func main() {
 	}
 	if mockTestStore != nil {
 		repo.SetMockTestStore(mockTestStore)
+	}
+	if courseStore != nil {
+		repo.SetCourseStore(courseStore)
+		repo.SetModuleStore(moduleStore)
+		repo.SetSkillStore(skillStore)
 	}
 	transcriber, err := processing.NewConfiguredTranscriber(context.Background())
 	if err != nil {
