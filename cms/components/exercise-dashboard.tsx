@@ -45,7 +45,12 @@ type ExerciseType =
   | 'uloha_3_story_narration'
   | 'uloha_4_choice_reasoning'
   | 'psani_1_formular'
-  | 'psani_2_email';
+  | 'psani_2_email'
+  | 'poslech_1'
+  | 'poslech_2'
+  | 'poslech_3'
+  | 'poslech_4'
+  | 'poslech_5';
 
 type ExerciseFormState = {
   exerciseType: ExerciseType;
@@ -76,6 +81,15 @@ type ExerciseFormState = {
   emailPrompt: string;
   emailTopics: string;
   emailMinWords: number;
+  // poslech_* shared
+  poslechItems: string;        // one text segment block per line-group, items separated by ---
+  poslechOptions: string;      // one option per line: A | Label (or A | asset_id for poslech_4)
+  poslechCorrectAnswers: string; // one per line: 1=B, 2=A, ...
+  poslechAudioSource: 'text' | 'upload'; // how audio is provided
+  poslechGeneratingAudio: boolean;
+  poslechAudioReady: boolean;
+  // poslech_5 voicemail
+  poslechVoicemailText: string;
 };
 
 const exerciseTypeOptions: Array<{
@@ -113,6 +127,11 @@ const exerciseTypeOptions: Array<{
     label: 'Psaní 2 — E-mail',
     hint: 'Writing: email from 5 image prompts, ≥35 words (12 pts).',
   },
+  { value: 'poslech_1', label: 'Poslech 1', hint: 'Listening: 5 short passages → A-D (5 pts).' },
+  { value: 'poslech_2', label: 'Poslech 2', hint: 'Listening: 5 short passages → A-D (5 pts).' },
+  { value: 'poslech_3', label: 'Poslech 3', hint: 'Listening: 5 passages → match A-G (5 pts).' },
+  { value: 'poslech_4', label: 'Poslech 4', hint: 'Listening: 5 dialogs → choose image A-F (5 pts).' },
+  { value: 'poslech_5', label: 'Poslech 5', hint: 'Listening: voicemail → fill info (5 pts).' },
 ];
 
 function createInitialFormState(): ExerciseFormState {
@@ -150,6 +169,13 @@ function createInitialFormState(): ExerciseFormState {
     emailPrompt: 'Jste na dovolené a chcete napsat své kamarádce.',
     emailTopics: 'KDE JSTE?\nJAK DLOUHO TAM JSTE?\nKDE BYDLÍTE?\nCO DĚLÁTE DOPOLEDNE?\nCO DĚLÁTE ODPOLEDNE?',
     emailMinWords: 35,
+    poslechItems: 'Kde je nádraží?\n---\nJak se jmenujete?',
+    poslechOptions: 'A | Možnost A\nB | Možnost B\nC | Možnost C\nD | Možnost D',
+    poslechCorrectAnswers: '1=B\n2=A\n3=D\n4=C\n5=B',
+    poslechAudioSource: 'text',
+    poslechGeneratingAudio: false,
+    poslechAudioReady: false,
+    poslechVoicemailText: 'Ahoj Lído, tady Eva. Dostala jsem lístky na balet.',
   };
 }
 
@@ -262,10 +288,103 @@ function formStateFromExercise(item: Exercise): ExerciseFormState {
       ? (detail.topics as unknown[]).map(String).join('\n')
       : '',
     emailMinWords: typeof detail.min_words === 'number' ? detail.min_words : 35,
+    poslechItems: '',
+    poslechOptions: Array.isArray(detail.options)
+      ? (detail.options as Array<Record<string, unknown>>)
+          .map(o => `${o.key ?? ''} | ${o.label ?? o.asset_id ?? ''}`)
+          .join('\n')
+      : '',
+    poslechCorrectAnswers: detail.correct_answers
+      ? Object.entries(detail.correct_answers as Record<string, string>)
+          .map(([k, v]) => `${k}=${v}`)
+          .join('\n')
+      : '',
+    poslechAudioSource: 'text',
+    poslechGeneratingAudio: false,
+    poslechAudioReady: !!(item as unknown as Record<string, unknown>).hasAudio,
+    poslechVoicemailText: (() => {
+      const segs = (detail.audio_source as Record<string, unknown> | undefined)?.segments;
+      return Array.isArray(segs)
+        ? (segs as Array<Record<string, unknown>>).map(s => s.text ?? '').join('\n')
+        : '';
+    })(),
+  };
+}
+
+// Parse "A | Label" or "A | asset_id" lines into option objects
+function parsePoslechOptions(input: string, type: 'choice' | 'match' | 'image') {
+  return input.split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+    const [key = '', value = ''] = line.split('|').map(p => p.trim());
+    if (type === 'image') return { key, asset_id: value };
+    if (type === 'match') return { key, label: value };
+    return { key, text: value };
+  });
+}
+
+// Parse "1=B\n2=A" into {"1":"B","2":"A"}
+function parsePoslechCorrectAnswers(input: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  input.split('\n').map(l => l.trim()).filter(Boolean).forEach(line => {
+    const [k, v] = line.split('=');
+    if (k && v) result[k.trim()] = v.trim();
+  });
+  return result;
+}
+
+// Parse items: blocks separated by --- , each block is text lines (=segments)
+function parsePoslechItems(input: string, questionCount: number) {
+  const blocks = input.split(/\n---\n/).map(b => b.trim()).filter(Boolean);
+  return Array.from({ length: questionCount }, (_, i) => {
+    const block = blocks[i] ?? '';
+    const segments = block.split('\n').filter(Boolean).map(t => ({ text: t.trim() }));
+    return {
+      question_no: i + 1,
+      audio_source: { segments },
+      options: [] as unknown[],
+    };
+  });
+}
+
+function buildPoslechPayload(form: ExerciseFormState) {
+  const correct = parsePoslechCorrectAnswers(form.poslechCorrectAnswers);
+  const base = {
+    module_id: form.moduleId,
+    skill_id: form.skillId,
+    exercise_type: form.exerciseType,
+    title: form.title,
+    short_instruction: form.shortInstruction,
+    learner_instruction: form.learnerInstruction,
+    estimated_duration_sec: 1800,
+    sample_answer_enabled: false,
+    status: form.status,
+    pool: form.pool,
+  };
+  if (form.exerciseType === 'poslech_5') {
+    const segments = form.poslechVoicemailText.split('\n').filter(Boolean).map(t => ({ text: t.trim() }));
+    return {
+      ...base,
+      detail: {
+        audio_source: { segments },
+        questions: Object.keys(correct).map(k => ({ question_no: parseInt(k), prompt: '' })),
+        correct_answers: correct,
+      },
+    };
+  }
+  const items = parsePoslechItems(form.poslechItems, 5);
+  const optionType = form.exerciseType === 'poslech_4' ? 'image' : form.exerciseType === 'poslech_3' ? 'match' : 'choice';
+  const options = parsePoslechOptions(form.poslechOptions, optionType);
+  return {
+    ...base,
+    detail: {
+      items: items.map(item => ({ ...item, options: optionType === 'choice' ? options : [] })),
+      options: optionType !== 'choice' ? options : undefined,
+      correct_answers: correct,
+    },
   };
 }
 
 function buildCreatePayload(form: ExerciseFormState) {
+  if (form.exerciseType.startsWith('poslech_')) return buildPoslechPayload(form);
   if (form.exerciseType === 'uloha_1_topic_answers') {
     return {
       module_id: form.moduleId,
@@ -396,6 +515,7 @@ function buildCreatePayload(form: ExerciseFormState) {
 }
 
 function buildUpdatePayload(form: ExerciseFormState) {
+  if (form.exerciseType.startsWith('poslech_')) return buildPoslechPayload(form);
   if (form.exerciseType === 'uloha_1_topic_answers') {
     return {
       module_id: form.moduleId,
@@ -541,6 +661,8 @@ export function ExerciseDashboard() {
   const [availableModules, setAvailableModules] = useState<CmsModule[]>([]);
   const [availableSkills, setAvailableSkills] = useState<CmsSkill[]>([]);
   const [formTab, setFormTab] = useState(0);
+  const [audioGenerating, setAudioGenerating] = useState(false);
+  const [audioGenMsg, setAudioGenMsg] = useState<string | null>(null);
 
   const editingItem = editingId ? items.find((item) => item.id === editingId) ?? null : null;
   const currentAssets = editingItem?.assets ?? [];
@@ -788,7 +910,9 @@ export function ExerciseDashboard() {
                 : form.exerciseType === 'uloha_3_story_narration' ? '`Uloha 3`'
                 : form.exerciseType === 'uloha_4_choice_reasoning' ? '`Uloha 4`'
                 : form.exerciseType === 'psani_1_formular' ? '`Psaní 1 — Formulář`'
-                : '`Psaní 2 — E-mail`'}
+                : form.exerciseType === 'psani_2_email' ? '`Psaní 2 — E-mail`'
+                : form.exerciseType.startsWith('poslech_') ? `\`${form.exerciseType.replace('_', ' ').toUpperCase()}\``
+                : '`Exercise`'}
             </h2>
             <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
               {S.exercise.editorHint}
@@ -1217,6 +1341,28 @@ export function ExerciseDashboard() {
             </>
           ) : null}
 
+          {form.exerciseType.startsWith('poslech_') ? (
+            <PoslechFields
+              form={form}
+              setForm={setForm}
+              editingId={editingId}
+              audioGenerating={audioGenerating}
+              audioGenMsg={audioGenMsg}
+              onGenerateAudio={async () => {
+                if (!editingId) { setAudioGenMsg('Save the draft first.'); return; }
+                setAudioGenerating(true); setAudioGenMsg(null);
+                try {
+                  const res = await fetch(`${adminApi}/${editingId}/generate-audio`, { method: 'POST' });
+                  const j = await res.json();
+                  if (!res.ok) throw new Error(j.error?.message ?? 'Failed');
+                  setAudioGenMsg(`Audio generated: ${j.data?.storage_key ?? 'ok'}`);
+                } catch (e) {
+                  setAudioGenMsg(e instanceof Error ? e.message : 'Error');
+                } finally { setAudioGenerating(false); }
+              }}
+            />
+          ) : null}
+
           {(form.exerciseType === 'uloha_3_story_narration' ||
             form.exerciseType === 'uloha_4_choice_reasoning' ||
             form.exerciseType === 'psani_2_email') ? (
@@ -1501,6 +1647,131 @@ export function ExerciseDashboard() {
         </section>
       </section>
     </main>
+  );
+}
+
+type PoslechFieldsProps = {
+  form: ExerciseFormState;
+  setForm: React.Dispatch<React.SetStateAction<ExerciseFormState>>;
+  editingId: string | null;
+  audioGenerating: boolean;
+  audioGenMsg: string | null;
+  onGenerateAudio: () => void;
+};
+
+function PoslechFields({ form, setForm, editingId, audioGenerating, audioGenMsg, onGenerateAudio }: PoslechFieldsProps) {
+  const isPoslech5 = form.exerciseType === 'poslech_5';
+  const isPoslech4 = form.exerciseType === 'poslech_4';
+  const isPoslech3 = form.exerciseType === 'poslech_3';
+
+  return (
+    <>
+      {/* Audio source */}
+      <div style={{ display: 'grid', gap: 6 }}>
+        <span style={fieldLabelStyle}>Nguồn audio</span>
+        <div style={{ display: 'flex', gap: 16 }}>
+          {(['text', 'upload'] as const).map(src => (
+            <label key={src} style={{ display: 'flex', gap: 6, cursor: 'pointer', alignItems: 'center' }}>
+              <input
+                type="radio"
+                value={src}
+                checked={form.poslechAudioSource === src}
+                onChange={() => setForm(f => ({ ...f, poslechAudioSource: src }))}
+              />
+              {src === 'text' ? 'Nhập text → Polly TTS' : 'Upload file audio'}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Text input for Polly */}
+      {form.poslechAudioSource === 'text' && (
+        <>
+          {isPoslech5 ? (
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={fieldLabelStyle}>Nội dung voicemail (mỗi dòng = 1 câu)</span>
+              <textarea
+                rows={6}
+                value={form.poslechVoicemailText}
+                onChange={e => setForm(f => ({ ...f, poslechVoicemailText: e.target.value }))}
+                style={fieldStyle}
+                placeholder="Ahoj Lído, tady Eva.&#10;Dostala jsem lístky na balet."
+              />
+            </label>
+          ) : (
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={fieldLabelStyle}>Nội dung từng item (phân cách bằng dòng ---)</span>
+              <textarea
+                rows={8}
+                value={form.poslechItems}
+                onChange={e => setForm(f => ({ ...f, poslechItems: e.target.value }))}
+                style={fieldStyle}
+                placeholder={'Item 1 text...\n---\nItem 2 text...\n---\nItem 3 text...'}
+              />
+              <span style={fieldHintStyle}>Mỗi block là 1 câu hỏi. Dùng --- để phân cách.</span>
+            </label>
+          )}
+
+          {/* Generate audio button */}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={onGenerateAudio}
+              disabled={audioGenerating || !editingId}
+              style={{
+                ...secondaryActionStyle,
+                opacity: (audioGenerating || !editingId) ? 0.5 : 1,
+              }}
+            >
+              {audioGenerating ? 'Đang tạo...' : 'Tạo audio (Polly)'}
+            </button>
+            {audioGenMsg && <span style={fieldHintStyle}>{audioGenMsg}</span>}
+          </div>
+        </>
+      )}
+
+      {/* Options */}
+      {(isPoslech3 || isPoslech4) && (
+        <label style={{ display: 'grid', gap: 6 }}>
+          <span style={fieldLabelStyle}>
+            {isPoslech4 ? 'Options A-F (key | asset_id)' : 'Options A-G (key | label)'}
+          </span>
+          <textarea
+            rows={7}
+            value={form.poslechOptions}
+            onChange={e => setForm(f => ({ ...f, poslechOptions: e.target.value }))}
+            style={fieldStyle}
+            placeholder={isPoslech4 ? 'A | asset-id-1\nB | asset-id-2' : 'A | Koníček: běh\nB | Koníček: vaření'}
+          />
+        </label>
+      )}
+
+      {!isPoslech3 && !isPoslech4 && !isPoslech5 && (
+        <label style={{ display: 'grid', gap: 6 }}>
+          <span style={fieldLabelStyle}>Options A-D (key | text)</span>
+          <textarea
+            rows={4}
+            value={form.poslechOptions}
+            onChange={e => setForm(f => ({ ...f, poslechOptions: e.target.value }))}
+            style={fieldStyle}
+            placeholder="A | Možnost A\nB | Možnost B\nC | Možnost C\nD | Možnost D"
+          />
+        </label>
+      )}
+
+      {/* Correct answers */}
+      <label style={{ display: 'grid', gap: 6 }}>
+        <span style={fieldLabelStyle}>Đáp án đúng (1=B, 2=A, ...)</span>
+        <textarea
+          rows={5}
+          value={form.poslechCorrectAnswers}
+          onChange={e => setForm(f => ({ ...f, poslechCorrectAnswers: e.target.value }))}
+          style={fieldStyle}
+          placeholder="1=B\n2=A\n3=D\n4=C\n5=B"
+        />
+        <span style={fieldHintStyle}>Fill-in (poslech_5): nhập toàn bộ nội dung câu trả lời, so khớp substring.</span>
+      </label>
+    </>
   );
 }
 
