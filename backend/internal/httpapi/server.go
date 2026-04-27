@@ -349,6 +349,14 @@ func (s *Server) handleAttemptByID(w http.ResponseWriter, r *http.Request, user 
 		s.handleUploadComplete(w, r, strings.TrimSuffix(path, "/upload-complete"))
 		return
 	}
+	if strings.HasSuffix(path, "/submit-text") {
+		s.handleSubmitText(w, r, user, strings.TrimSuffix(path, "/submit-text"))
+		return
+	}
+	if strings.HasSuffix(path, "/submit-answers") {
+		s.handleSubmitAnswers(w, r, user, strings.TrimSuffix(path, "/submit-answers"))
+		return
+	}
 	if r.Method != http.MethodGet {
 		writeMethodNotAllowed(w)
 		return
@@ -901,6 +909,77 @@ func (s *Server) handleUploadComplete(w http.ResponseWriter, r *http.Request, at
 		},
 		"meta": map[string]any{},
 	})
+}
+
+func (s *Server) handleSubmitText(w http.ResponseWriter, r *http.Request, user contracts.User, attemptID string) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	attempt, ok := s.authorizedAttemptForUser(w, user, attemptID)
+	if !ok {
+		return
+	}
+	if attempt.Status != "created" {
+		writeError(w, http.StatusConflict, "attempt_not_pending", "Attempt is not in the created state.", false)
+		return
+	}
+	exercise, ok := s.repo.Exercise(attempt.ExerciseID)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Exercise not found.", true)
+		return
+	}
+	if exercise.ExerciseType != "psani_1_formular" && exercise.ExerciseType != "psani_2_email" {
+		writeError(w, http.StatusBadRequest, "validation_error", "Exercise type does not support text submission.", false)
+		return
+	}
+	var sub contracts.WritingSubmission
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error", "Invalid submission body.", false)
+		return
+	}
+	if err := processing.ValidateWritingSubmission(exercise.ExerciseType, sub); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_word_count", err.Error(), false)
+		return
+	}
+	s.repo.SetAttemptStatus(attemptID, "scoring")
+	go s.processor.ProcessWritingAttempt(attemptID, sub)
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"data": map[string]any{"attempt_id": attemptID, "status": "scoring"},
+		"meta": map[string]any{},
+	})
+}
+
+func (s *Server) handleSubmitAnswers(w http.ResponseWriter, r *http.Request, user contracts.User, attemptID string) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	attempt, ok := s.authorizedAttemptForUser(w, user, attemptID)
+	if !ok {
+		return
+	}
+	if attempt.Status != "created" {
+		writeError(w, http.StatusConflict, "attempt_not_pending", "Attempt is not in the created state.", false)
+		return
+	}
+	var sub contracts.AnswerSubmission
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error", "Invalid submission body.", false)
+		return
+	}
+	if len(sub.Answers) == 0 {
+		writeError(w, http.StatusBadRequest, "validation_error", "answers map must not be empty.", false)
+		return
+	}
+	// Objective scoring is synchronous — score and complete in-request.
+	completed, err := s.processor.ProcessObjectiveAttempt(attemptID, sub)
+	if err != nil {
+		log.Printf("objective attempt %s scoring error: %v", attemptID, err)
+		writeError(w, http.StatusInternalServerError, "internal_error", "Scoring failed.", true)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": completed, "meta": map[string]any{}})
 }
 
 func (s *Server) handleMockExams(w http.ResponseWriter, r *http.Request, user contracts.User) {

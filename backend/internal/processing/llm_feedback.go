@@ -318,8 +318,94 @@ func describeExercisePrompt(exercise contracts.Exercise) string {
 			b.WriteString("- sample_answer: one Czech sentence with 'Vybiram [option]' + 'protoze [reason touching one expected axis]'.\n")
 			return b.String()
 		}
+	case "psani_1_formular":
+		if d, ok := extractPsani1Detail(exercise.Detail); ok {
+			var b strings.Builder
+			b.WriteString("WRITING TASK: Form answers (psani_1_formular)\n")
+			b.WriteString("The learner wrote Czech answers to a satisfaction questionnaire. Each answer should be ≥10 words.\n")
+			if len(d.Questions) > 0 {
+				b.WriteString("Questions:\n")
+				for i, q := range d.Questions {
+					fmt.Fprintf(&b, "%d. %s\n", i+1, q)
+				}
+			}
+			b.WriteString("TASK RUBRIC:\n")
+			b.WriteString("- Task completion: did the learner answer each question with a full sentence?\n")
+			b.WriteString("- Grammar: check case endings, verb conjugation, word order.\n")
+			b.WriteString("- Vocabulary: appropriate register, no mixing of languages.\n")
+			b.WriteString("- sample_answer: provide a correct Czech answer for each question, joined by double newlines.\n")
+			return b.String()
+		}
+		return "WRITING TASK: Form answers. Evaluate Czech grammar, vocabulary, and task completion.\n"
+	case "psani_2_email":
+		if d, ok := extractPsani2Detail(exercise.Detail); ok {
+			var b strings.Builder
+			b.WriteString("WRITING TASK: Email (psani_2_email)\n")
+			if d.Prompt != "" {
+				fmt.Fprintf(&b, "Context: %s\n", d.Prompt)
+			}
+			if len(d.Topics) > 0 {
+				b.WriteString("The learner must address these topics (one per image prompt):\n")
+				for _, t := range d.Topics {
+					fmt.Fprintf(&b, "- %s\n", t)
+				}
+			}
+			b.WriteString("The email should be ≥35 words total.\n")
+			b.WriteString("TASK RUBRIC:\n")
+			b.WriteString("- Task completion: does the email address all required topics?\n")
+			b.WriteString("- Opening/closing: appropriate greeting and sign-off for an informal email?\n")
+			b.WriteString("- Grammar: case endings, verb conjugation, tense consistency.\n")
+			b.WriteString("- sample_answer: a correct Czech email addressing all topics.\n")
+			return b.String()
+		}
+		return "WRITING TASK: Email writing. Evaluate Czech grammar, vocabulary, and task completion.\n"
 	}
 	return ""
+}
+
+func extractPsani1Detail(v any) (contracts.Psani1Detail, bool) {
+	if d, ok := v.(contracts.Psani1Detail); ok {
+		return d, true
+	}
+	if m, ok := v.(map[string]any); ok {
+		d := contracts.Psani1Detail{}
+		if qs, ok := m["questions"].([]any); ok {
+			for _, q := range qs {
+				if s, ok := q.(string); ok {
+					d.Questions = append(d.Questions, s)
+				}
+			}
+		}
+		if mw, ok := m["min_words"].(float64); ok {
+			d.MinWords = int(mw)
+		}
+		return d, true
+	}
+	return contracts.Psani1Detail{}, false
+}
+
+func extractPsani2Detail(v any) (contracts.Psani2Detail, bool) {
+	if d, ok := v.(contracts.Psani2Detail); ok {
+		return d, true
+	}
+	if m, ok := v.(map[string]any); ok {
+		d := contracts.Psani2Detail{}
+		if s, ok := m["prompt"].(string); ok {
+			d.Prompt = s
+		}
+		if ts, ok := m["topics"].([]any); ok {
+			for _, t := range ts {
+				if s, ok := t.(string); ok {
+					d.Topics = append(d.Topics, s)
+				}
+			}
+		}
+		if mw, ok := m["min_words"].(float64); ok {
+			d.MinWords = int(mw)
+		}
+		return d, true
+	}
+	return contracts.Psani2Detail{}, false
 }
 
 func extractUloha1Prompt(v any) (contracts.Uloha1Prompt, bool) {
