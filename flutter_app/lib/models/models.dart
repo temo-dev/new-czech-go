@@ -44,7 +44,7 @@ class Skill {
   final int sequenceNo;
   final String status;
 
-  bool get isImplemented => skillKind == 'noi' || skillKind == 'viet' || skillKind == 'nghe';
+  bool get isImplemented => skillKind == 'noi' || skillKind == 'viet' || skillKind == 'nghe' || skillKind == 'doc';
 
   bool get isWriting => skillKind == 'viet';
 
@@ -339,6 +339,11 @@ class ExerciseDetail {
     this.poslechItems = const [],
     this.poslechOptions = const [],
     this.poslechQuestions = const [],
+    // reading
+    this.cteniText = '',
+    this.cteniItems = const [],
+    this.cteniOptions = const [],
+    this.cteniQuestions = const [],
   });
 
   final String id;
@@ -365,11 +370,17 @@ class ExerciseDetail {
   final List<PoslechItemView> poslechItems;
   final List<PoslechOptionView> poslechOptions;
   final List<FillQuestionView> poslechQuestions;
+  final String cteniText;
+  final List<dynamic> cteniItems;     // ReadingItem or TextItem (raw maps)
+  final List<PoslechOptionView> cteniOptions;
+  final List<FillQuestionView> cteniQuestions;
 
   bool get isPsani1 => exerciseType == 'psani_1_formular';
   bool get isPsani2 => exerciseType == 'psani_2_email';
   bool get isPoslech => exerciseType.startsWith('poslech_');
   bool get isPoslech5 => exerciseType == 'poslech_5';
+  bool get isCteni => exerciseType.startsWith('cteni_');
+  bool get isCteni5 => exerciseType == 'cteni_5';
 
   PromptAssetView? assetById(String assetId) {
     for (final asset in assets) {
@@ -462,6 +473,16 @@ class ExerciseDetail {
           .map((e) => PoslechOptionView.fromJson(e as Map<String, dynamic>))
           .toList(),
       poslechQuestions: (detail['questions'] as List<dynamic>? ?? const [])
+          .map((e) => FillQuestionView.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      cteniText: detail['text'] as String? ?? '',
+      cteniItems: detail['items'] as List<dynamic>? ?? detail['texts'] as List<dynamic>? ?? const [],
+      cteniOptions: (() {
+        final opts = detail['options'] ?? detail['persons'];
+        if (opts is List<dynamic>) return opts.map((e) => PoslechOptionView.fromJson(e as Map<String, dynamic>)).toList();
+        return <PoslechOptionView>[];
+      })(),
+      cteniQuestions: (detail['questions'] as List<dynamic>? ?? const [])
           .map((e) => FillQuestionView.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
