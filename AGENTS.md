@@ -23,8 +23,11 @@ MockTest (đề thi)
 ```
 
 **Implemented skills:**
-- `noi` (Speaking) — fully implemented: Úloha 1-4, AI scoring, review artifact
-- `nghe`, `doc`, `viet`, `tu_vung`, `ngu_phap` — data model defined, UI placeholder only
+- `noi` (Speaking) — fully implemented: Úloha 1-4, AI scoring, review artifact, MockTest speaking flow
+- `viet` (Writing) — V2: `psani_1_formular` + `psani_2_email`, LLM scoring, `WritingExerciseScreen`
+- `nghe` (Listening) — V3: `poslech_1-5`, Polly TTS exercise audio, objective scoring, `ListeningExerciseScreen`
+- `doc` (Reading) — V4: `cteni_1-5`, objective scoring (substring fill-in), `ReadingExerciseScreen`
+- `tu_vung`, `ngu_phap` — data model defined, UI placeholder only
 
 **Exercise types** come from Modelový test A2 (NPI ČR, platný od dubna 2026). See `docs/specs/content-and-attempt-model.md` for full list.
 
@@ -37,12 +40,12 @@ Do not expand into:
 - live teacher marketplace
 - advanced analytics platform
 - pronunciation-first product positioning
-- listening/reading/writing UI before data model is stable
 
 ## Source Of Truth
 Read these first before making structural changes:
-- `docs/ideas/a2-mluveni-sprint.md`
-- `docs/plans/v1-implementation-plan.md`
+- `SPEC.md` — skills expansion spec (V2 Writing → V5 Full MockTest), all decisions frozen
+- `tasks/plan.md` — implementation plan V2→V5 với design decisions per version
+- `tasks/todo.md` — task checklist (W1-W4, L1-L4, R1-R4, M1-M4 all ✅)
 - `docs/specs/content-and-attempt-model.md`
 - `docs/specs/api-contracts.md`
 - `docs/specs/attempt-state-machine.md`
@@ -102,11 +105,40 @@ The implemented V1 foundation currently includes:
 - **`criteria_results`** from `task_completion` now parsed in Flutter `AttemptFeedbackView` as `CriterionCheckView` list; displayed as met/unmet checklist in Feedback tab
 - **Admin content guide**: `docs/admin-guide.md` — luồng nhập Course → Module → Skill → Exercise → MockTest
 
+- **V2 Writing (psaní) — 2026-04-27:**
+  - exercise types: `psani_1_formular` (3 câu hỏi ≥10 từ, 8đ), `psani_2_email` (email theo 5 ảnh ≥35 từ, 12đ)
+  - Backend: `POST /v1/attempts/:id/submit-text`, `writing_scorer.go`, LLM feedback (highlight lỗi + corrected text)
+  - CMS: forms riêng cho psani_1/2 với image upload
+  - Flutter: `WritingExerciseScreen` với word-count gate, `_WritingResultPoller`
+
+- **V3 Listening (poslech) — 2026-04-27:**
+  - exercise types: `poslech_1-5` (5 dạng nghe khác nhau, tổng 25đ)
+  - Backend: `POST /v1/attempts/:id/submit-answers` (sync scoring), `objective_scorer.go`, `exercise_audio.go`
+  - API: `GET /v1/exercises/:id/audio`, `POST /v1/admin/exercises/:id/generate-audio` (Polly TTS)
+  - DB: migration `010_exercise_audio.sql`
+  - CMS: audio source radio (upload / text→Polly), options, correct_answers
+  - Flutter: `ListeningExerciseScreen` với `AudioPlayerWidget` (just_audio + auth headers), `MultipleChoiceWidget`, `FillInWidget`, `ObjectiveResultCard`
+
+- **V4 Reading (čtení) — 2026-04-27:**
+  - exercise types: `cteni_1-5` (5 dạng đọc, tổng 25đ)
+  - Backend: reuses `objective_scorer.go`; fill-in dùng substring match case-insensitive
+  - Flutter: `ReadingExerciseScreen` với `SelectableText` reading passage, reuses widgets từ V3
+
+- **V5 Full MockTest — 2026-04-27 (MVP):**
+  - `MockTest.session_type`: `speaking` | `pisemna` | `full`
+  - `FullExamSession`: tracks pisemna_score (≥42/70) + ustni_score (≥24/40), computes `overall_passed`
+  - API: `POST /v1/full-exams`, `GET /v1/full-exams/:id`, `POST /v1/full-exams/:id/complete`
+  - DB: migration `011_full_exam.sql`
+  - CMS: `session_type` dropdown trong MockTest form; `DEFAULT_MAX_POINTS` cho tất cả exercise types
+  - Flutter: `FullExamIntroScreen` (section list + submit), `FullExamResultScreen` (2-panel PASS/FAIL)
+
 Important current limitations:
 - local strict real-transcript mode still depends on valid AWS credentials plus `transcribe:*` IAM on the active local identity
-- learner-surface feedback copy and authored `sample_answer_text` coverage for `Uloha 3` and `Uloha 4` are still lighter than `Uloha 1` / `Uloha 2`, even though the review artifact pipeline now covers all four task types
-- **Postgres DB hiện đang trống** — `seedDefaults` đã bị xóa; admin cần nhập nội dung qua CMS trước khi test Flutter end-to-end
-- mock test list is empty until at least one `MockTest` is created and published in the CMS
+- learner-surface feedback copy and `sample_answer_text` coverage for `Uloha 3` and `Uloha 4` lighter than `Uloha 1` / `Uloha 2`
+- **Postgres DB hiện đang trống** — admin cần nhập nội dung qua CMS trước khi test Flutter end-to-end
+- Listening exercise audio: `GET /v1/exercises/:id/audio` dùng in-memory store, không persist qua restart (cần Postgres backing)
+- V5 FullExamIntroScreen mark section "done" bằng placeholder, không capture real attempt_id; link ústní session cần làm tay
+- `full_exam_sessions` table chỉ in-memory, chưa có Postgres store (migration 011 tồn tại nhưng chưa wired)
 
 ## Working Rules
 - Build in thin vertical slices.
@@ -187,27 +219,24 @@ Do not mix these in one change unless the human asks:
 If you notice adjacent cleanup, note it separately instead of silently expanding scope.
 
 ## Good Next Steps
-Content architecture V2 (Phases 1-4) done ✅. Design system V0 done ✅. Flutter V1.1/V1.3/V1.4/V1.5 done ✅.
+V2 Writing ✅ V3 Listening ✅ V4 Reading ✅ V5 Full MockTest (MVP) ✅ — tất cả 16 tasks (W1-W4, L1-L4, R1-R4, M1-M4) hoàn thành.
 
-Preferred sequence from current state (see `tasks/todo.md` for full checklist):
+Backlog ưu tiên cao (xem `tasks/todo.md`):
 
-**TIER 1 — Unblocked, highest impact:**
-1. **V4.1** Backend verify `criteria_results` JSON output — `backend/internal/contracts/types.go`, `backend/internal/httpapi/server.go`
-2. **V4.2** Flutter `CriterionCheckView` model + parse — `flutter_app/lib/models/models.dart`
-3. **V1.2** ResultCard 4-col criteria grid — `flutter_app/lib/features/exercise/widgets/result_card.dart`
-4. **V3.2** MockTestListScreen rich cards — `flutter_app/lib/features/mock_exam/screens/mock_test_list_screen.dart`
-5. **V3.3** MockTestIntroScreen 3-stat grid — `flutter_app/lib/features/mock_exam/screens/mock_test_intro_screen.dart`
+**V5 hardening:**
+1. Capture real attempt_id trong `FullExamIntroScreen` (hiện dùng placeholder `done-N`)
+2. Postgres backing cho `full_exam_sessions` (migration 011 đã có, cần wired vào store)
+3. Auto-link ústní session sau khi MockExamSession speaking hoàn tất
 
-**TIER 2 — CMS pages:**
-6. **V2.2** Exercise editor 5-tab + Rubric scoring grid
-7. **V2.1** Courses page 3-col card grid
-8. **V3.1** Dashboard stats header
+**Infrastructure:**
+4. Postgres backing cho `exercise_audio` (migration 010 đã có)
+5. Polly 2 voices cho `poslech_4` dialogs (hiện 1 voice Option B)
 
-**TIER 3 — New pages:**
-9. **V2.3** Learners page (new)
-10. **C4** Mock Tests builder
+**Content:**
+6. Nhập nội dung mẫu qua CMS: ít nhất 1 exercise mỗi loại để test end-to-end
+7. Flutter i18n keys cho V2/V3/V4 screens (hiện hardcode Vietnamese UI strings)
 
-Full spec: `docs/specs/v2-ui-spec.md`. Full plan: `tasks/plan.md` + `tasks/todo.md`.
+Full plan: `tasks/plan.md` + `tasks/todo.md` + `SPEC.md`.
 
 ## Avoid
 - adding generic plugin systems
