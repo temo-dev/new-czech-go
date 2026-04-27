@@ -14,12 +14,13 @@ SMOKE_ATTEMPT_ARGS ?=
 .PHONY: help install install-cms install-flutter \
 	backend-run backend-build backend-test backend-fmt \
 	cms-dev cms-build cms-lint \
-	flutter-analyze flutter-test flutter-run-ios flutter-devices flutter-format \
+	flutter-analyze flutter-test flutter-run-ios flutter-build-ipa flutter-devices flutter-format \
 	dev-backend dev-cms dev-ios dev-check dev-stop-backend dev-stop-cms dev-stop \
 	compose-build compose-up compose-down compose-logs compose-config compose-proxy-config \
 	compose-proxy-up compose-proxy-down compose-proxy-logs compose-ec2-config \
 	compose-ec2-pull compose-ec2-up compose-ec2-down compose-ec2-logs release-images ecr-login check-ec2-env \
-	check-ec2-host check-aws-audio-pipeline package-ec2-deploy smoke-attempt-flow graph-status verify clean
+	check-ec2-host check-aws-audio-pipeline package-ec2-deploy smoke-attempt-flow \
+	seed-modelovy-test-2 graph-status verify clean
 
 help:
 	@echo "Available targets:"
@@ -33,6 +34,7 @@ help:
 	@echo "  make flutter-analyze  - Run Flutter static analysis"
 	@echo "  make flutter-test     - Run Flutter tests"
 	@echo "  make flutter-run-ios  - Run the learner app on iOS (set IOS_DEVICE if needed)"
+	@echo "  make flutter-build-ipa - Build release IPA pointed at EC2 (https://apicz.hadoo.eu)"
 	@echo "  make flutter-devices  - List Flutter devices"
 	@echo "  make dev-backend      - Start the Go API for local development"
 	@echo "  make dev-cms          - Start the CMS dev server"
@@ -103,6 +105,11 @@ flutter-test:
 
 flutter-run-ios:
 	cd $(FLUTTER_DIR) && $(RTK) $(FLUTTER) run -d "$(IOS_DEVICE)"
+
+flutter-build-ipa:
+	cd $(FLUTTER_DIR) && $(RTK) $(FLUTTER) build ipa \
+		--dart-define=API_BASE_URL=https://apicz.hadoo.eu \
+		--release
 
 flutter-devices:
 	cd $(FLUTTER_DIR) && $(RTK) $(FLUTTER) devices
@@ -202,6 +209,9 @@ package-ec2-deploy:
 
 smoke-attempt-flow:
 	$(RTK) python3 scripts/smoke_test_attempt_flow.py --base-url $(SMOKE_BASE_URL) $(SMOKE_ATTEMPT_ARGS)
+
+seed-modelovy-test-2:
+	$(RTK) python3 scripts/seed-modelovy-test-2.py
 
 graph-status:
 	@if [ -f .code-review-graph/graph.db ]; then \
