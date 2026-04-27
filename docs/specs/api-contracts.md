@@ -1030,7 +1030,97 @@ Returns the full review payload, including transcript and learner-visible feedba
 - Reject if task-specific required fields are missing.
 - Reject if exercise type and detail payload do not match.
 
+## POST /v1/attempts/:attempt_id/submit-text
+
+Submit written text for a writing attempt (`psani_1_formular` or `psani_2_email`).
+Triggers async LLM scoring — poll `GET /v1/attempts/:attempt_id` until `status=completed`.
+
+### Request
+```json
+{
+  "answers": ["câu trả lời 1", "câu trả lời 2", "câu trả lời 3"],
+  "text": "full email text"
+}
+```
+- `answers`: array of 3 strings — dùng cho `psani_1_formular`. Mỗi string ≥10 từ (validated server-side, trả 400 nếu thiếu).
+- `text`: single string — dùng cho `psani_2_email`. ≥35 từ (validated server-side).
+- Chỉ một trong hai field được dùng tùy `exercise_type`.
+
+### Response
+```json
+{ "data": { "attempt_id": "...", "status": "scoring" }, "meta": {} }
+```
+
+### Errors
+- `400 invalid_word_count` — text chưa đủ từ tối thiểu
+- `409 attempt_not_pending` — attempt không ở trạng thái `created`
+
+---
+
+## POST /v1/attempts/:attempt_id/submit-answers
+
+Submit objective answers for listening (`poslech_*`) or reading (`cteni_*`) attempts.
+Scoring là **synchronous** — response trả về attempt đã `completed`, không cần poll.
+
+### Request
+```json
+{ "answers": { "1": "B", "2": "A", "3": "D", "4": "C", "5": "B" } }
+```
+- Keys = question_no (string "1"–"N")
+- Values = answer string: multiple-choice key ("A"/"B"/...) hoặc fill-in text
+
+### Response
+```json
+{
+  "data": {
+    "id": "attempt-123",
+    "status": "completed",
+    "feedback": {
+      "readiness_level": "ok",
+      "objective_result": {
+        "score": 4,
+        "max_score": 5,
+        "breakdown": [
+          { "question_no": 1, "learner_answer": "B", "correct_answer": "B", "is_correct": true },
+          { "question_no": 2, "learner_answer": "A", "correct_answer": "C", "is_correct": false }
+        ]
+      }
+    }
+  },
+  "meta": {}
+}
+```
+
+---
+
+## GET /v1/exercises/:exercise_id/audio
+
+Trả về audio cho listening exercises (`poslech_*`). Same signed-URL pattern as attempt audio.
+
+### Response
+```json
+{ "data": { "url": "https://...", "expires_in_sec": 300 }, "meta": {} }
+```
+
+---
+
+## POST /v1/admin/exercises/:exercise_id/generate-audio
+
+Gọi Polly TTS để generate audio từ text trong exercise detail. Lưu vào `exercise_audio` table.
+
+### Request
+```json
+{}
+```
+(Lấy text từ exercise detail — không cần body)
+
+### Response
+```json
+{ "data": { "storage_key": "exercise-audio/...", "mime_type": "audio/mpeg", "duration_sec": 45 }, "meta": {} }
+```
+
+---
+
 ## Open Questions
 - Do we want `POST /v1/auth/magic-link` later for pilot onboarding, or is email/password enough for now?
 - Keep `GET /v1/attempts/:attempt_id/audio/file` as the playback surface, or later fold playback URLs into the attempt payload if cloud-only playback becomes simpler?
-- If `Uloha 2` is delayed in implementation, should its API contracts still ship now or be hidden until the task is active?

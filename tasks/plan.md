@@ -1,395 +1,644 @@
-# Master Plan — Content Architecture V2
+# Plan: Skills Expansion V2→V5
 
-Source format: Modelový test A2, NPI ČR (platný od dubna 2026).
-
----
-
-## Kiến trúc
-
-```
-Exam (MockTest)  [pool=exam, riêng biệt]
-  └── Section (MockTestSection → Exercise)
-
-Course  [pool=course, riêng biệt]
-  └── Module  ("Ở bưu điện", "Tuần 1: Gia đình", ...)
-       └── Skill  (nói | nghe | đọc | viết | từ vựng | ngữ pháp)
-            └── Exercise
-```
+Source: Modelový test A2, NPI ČR (platný od dubna 2026). OCR'd 2026-04-27.
 
 ---
 
-## Exercise types từ A2 PDF (nguồn chuẩn)
+## Đã xong
 
-### Speaking (noi) — ĐÃ IMPLEMENT
-| exercise_type | Mô tả | Max pts thi |
-|---|---|---|
-| `uloha_1_topic_answers` | 8 câu / 2 chủ đề | 8 |
-| `uloha_2_dialogue_questions` | 2 hội thoại, hỏi 4 thông tin | 12 |
-| `uloha_3_story_narration` | Kể chuyện 4 tranh, thì quá khứ | 10 |
-| `uloha_4_choice_reasoning` | Chọn 1/3 phương án + lý do | 7 |
+- ✅ Nói (Speaking) — Úloha 1-4, LLM scoring, review artifact, MockTest (speaking-only)
+- ✅ Content architecture — Course → Module → Skill → Exercise hierarchy
+- ✅ pool=course / pool=exam separation
+- ✅ Design system V0 (Babbel theme)
+- ✅ Flutter i18n (VI/EN)
 
-### Listening (nghe) — chưa implement
-| exercise_type | Mô tả | Max pts thi |
-|---|---|---|
-| `listening_dialogue_picture` | 5 hội thoại → chọn ảnh A-D | 5 |
-| `listening_announcement_choice` | 5 bản tin → trắc nghiệm A-D | 5 |
-| `listening_monologue_match` | 5 monologue → ghép danh mục A-G | 5 |
-| `listening_dialogue_image` | 5 hội thoại → chọn ảnh A-F | 5 |
-| `listening_voicemail_fill` | Tin nhắn thoại → điền thông tin | 5 |
+---
 
-### Reading (doc) — chưa implement
-| exercise_type | Mô tả | Max pts thi |
-|---|---|---|
-| `reading_picture_message_match` | 5 tranh → ghép tin A-H | 5 |
-| `reading_article_choice` | Đọc bài → trắc nghiệm A-D | 5 |
-| `reading_text_person_match` | Ghép đoạn văn với người A-E | 4 |
-| `reading_gap_fill_word` | Điền từ vào chỗ trống (chọn A-D) | 6 |
-| `reading_text_completion` | Đọc → hoàn chỉnh câu | 5 |
+## Quyết định kiến trúc (không thay đổi)
 
-### Writing (viet) — chưa implement
-| exercise_type | Mô tả | Max pts thi |
-|---|---|---|
-| `writing_form_answers` | Điền khảo sát, ≥10 từ/câu | 8 |
-| `writing_email_pictures` | Viết email theo 5 tranh, ≥35 từ | 12 |
-
-### Vocabulary + Grammar — course only, không có trong đề thi
-| exercise_type | Mô tả |
+| Quyết định | Lý do |
 |---|---|
-| `vocabulary_match` | Ghép từ Czech → nghĩa |
-| `vocabulary_fill` | Điền từ vào câu |
-| `grammar_choice` | Chọn dạng ngữ pháp đúng |
-| `grammar_fill` | Điền dạng đúng |
+| pool=course và pool=exam là 2 records riêng | Admin tạo khóa học riêng + bài exam riêng, không reuse |
+| V2 Writing: LLM chấm, KHÔNG dùng Polly đọc model_answer | Đủ cho V1, Polly là tùy chọn sau |
+| V3 Listening audio: upload file OR text→Polly (1 voice, ghép segments) | Đơn giản, upgrade 2 voices sau |
+| V4 Reading: objective scoring (đúng/sai), không cần LLM | All answers deterministic |
+| V5 MockTest full: chỉ làm sau V4 xong | 2 session riêng: písemná (doc+viet+poslech) + ústní (noi) |
 
 ---
 
-## Skill → valid exercise_types mapping
+## Exercise types đầy đủ
 
-```
-noi        → uloha_1, uloha_2, uloha_3, uloha_4
-nghe       → listening_*
-doc        → reading_*
-viet       → writing_*
-tu_vung    → vocabulary_*
-ngu_phap   → grammar_*
-```
+### Viết (viet) — 20đ
+| exercise_type | Mô tả | Pool | Điểm thi |
+|---|---|---|---|
+| `psani_1_formular` | 3 câu hỏi form, mỗi câu ≥10 từ | cả 2 | 8 |
+| `psani_2_email` | Viết email theo 5 ảnh, ≥35 từ | cả 2 | 12 |
 
----
+### Nghe (nghe) — 25đ
+| exercise_type | Mô tả | Pool | Điểm thi |
+|---|---|---|---|
+| `poslech_1` | 5 đoạn ngắn → chọn A-D | cả 2 | 5 |
+| `poslech_2` | 5 đoạn ngắn → chọn A-D | cả 2 | 5 |
+| `poslech_3` | 5 đoạn → match A-G (2 dư) | cả 2 | 5 |
+| `poslech_4` | 5 dialog → chọn ảnh A-F (1 dư) | cả 2 | 5 |
+| `poslech_5` | Nghe voicemail → điền thông tin (5 ô) | cả 2 | 5 |
 
-## Đã xong (session này)
-- ✅ Mock exam record-all-then-analyze flow
-- ✅ MockTest entity + CMS + scoring 0-40 điểm + PASS/FAIL
-- ✅ Section detail tap → full ResultCard
-- ✅ Back-to-home fix
-
----
-
-## Phần chưa làm — chia theo phase
-
-### Phase 1 — Exercise pool separation (prerequisite, làm trước)
-Tách exercise pool để CMS exam chỉ thấy pool=exam, course chỉ thấy pool=course.
-
-- T1.1: `contracts.Exercise` thêm `Pool string` (course|exam) + migration `007_exercise_pool.sql`
-- T1.2: Backend `GET /v1/admin/exercises?pool=` filter
-- T1.3: CMS exercise form: pool dropdown
-- T1.4: CMS mock-test-dashboard: fetch `?pool=exam`
-
-**[CHECKPOINT 1]** backend-build + cms-build
+### Đọc (doc) — 25đ
+| exercise_type | Mô tả | Pool | Điểm thi |
+|---|---|---|---|
+| `cteni_1` | Match 5 ảnh/tin nhắn → A-H (3 dư) | cả 2 | 5 |
+| `cteni_2` | Đọc text → chọn A-D (5 câu) | cả 2 | 5 |
+| `cteni_3` | Match 4 text → nhân vật A-E (1 dư) | cả 2 | 4 |
+| `cteni_4` | Chọn A-D (6 câu) | cả 2 | 6 |
+| `cteni_5` | Đọc text → điền thông tin (5 ô) | cả 2 | 5 |
 
 ---
-
-### Phase 2 — Backend: Course/Module/Skill/Exercise hierarchy
-
-- T2.1: `CourseStore` + Postgres + seed 2 courses: "A2 Mluveni Sprint" + "Giao tiếp cơ bản"
-- T2.2: `Module` thêm `course_id`+`status` + `ModuleStore` + Postgres + seed
-- T2.3: `Skill` entity + `SkillStore` + Postgres + seed (1 "Nói"/module)
-- T2.4: `Exercise` thêm `skill_id` + `ExercisesBySkill` + backward compat
-- T2.5: Learner APIs: `GET /v1/courses`, `GET /v1/courses/:id/modules`, `GET /v1/modules/:id/skills`, `GET /v1/skills/:id/exercises`
-- T2.6: Admin APIs: `/v1/admin/courses`, `/v1/admin/modules`, `/v1/admin/skills`
-
-**Quan trọng:** `Skill` store validate `exercise_type` thuộc đúng `skill_kind` khi CMS assign exercise vào skill.
-
-**[CHECKPOINT 2]** backend-build + backend-test
-
----
-
-### Phase 3 — CMS
-
-- T3.1: API routes proxy (courses + modules + skills)
-- T3.2: CourseDashboard + page `/courses`
-- T3.3: ModuleDashboard + page `/modules` (course_id dropdown)
-- T3.4: SkillDashboard per module (skill_kind dropdown, hiện valid exercise_types)
-- T3.5: Exercise form: skill dropdown (thay module_id), pool selector
-- T3.6: Nav: Courses | Modules | Skills | Exercises | Mock Tests
-
-**[CHECKPOINT 3]** cms-lint + cms-build
-
----
-
-### Phase 4 — Flutter (Speaking only, others placeholder)
-
-- T4.1: i18n strings (skill kinds + screen titles)
-- T4.2: Models (Course, updated Module, Skill, updated ExerciseSummary) + ApiClient
-- T4.3: `CourseListScreen`
-- T4.4: `CourseDetailScreen` (module list)
-- T4.5: `ModuleDetailScreen` (skill cards: "Nói" tappable, others "Sắp ra mắt")
-- T4.6: `ExerciseListScreen` per skill
-- T4.7: Navigation: Home → CourseListScreen. Bỏ hoàn toàn PlanStrip + 14-day plan UI.
-
-**[CHECKPOINT 4]** flutter-analyze + flutter-test
-**[CHECKPOINT 5]** Simulator: Course → Module → Skill "Nói" → Exercises → Record → Result
-
----
-
-## Scope KHÔNG làm trong slices này
-
-- Listening/Reading/Writing/Vocabulary/Grammar exercise UIs → placeholder only
-- Learner enrollment / progress tracking per course
-- Plan progression (current_day tự động)
-- Multi-language course (chỉ Tiếng Việt)
-- Pronunciation scoring nâng cao
-
----
-
-# V2 UI Upgrade Plan — Babbel Design System
-
-Source: `docs/design/czech-app-2/` — handoff bundle từ claude.ai/design.
-
-## Đã hoàn thành (Phase 0)
-
-- ✅ CMS `globals.css` — design tokens: `--bg #fbf3e7`, `--brand #ff6a14`, `--accent #0f3d3a`, fonts Inter+Fraunces, radius vars, utility classes (`.card`, `.badge`, `.btn`, `.stats-grid`)
-- ✅ CMS `layout.tsx` — sidebar layout 248px (thay top navbar), `CmsSidebar` component với teal bg + nav items
-- ✅ Flutter `app_colors.dart` — orange primary `#FF6A14`, teal secondary `#0F3D3A`, warm cream surface `#FBF3E7`
-- ✅ Flutter `app_theme.dart` — Inter font (thay Manrope), warm shadows
-- ✅ Flutter `app_radius.dart` — radius 10/14/18/24/32 theo design tokens
-- ✅ Flutter `result_card.dart` — tabs: Phản hồi / Bản ghi / Bài mẫu
-- ✅ Flutter `recording_card.dart` — màu `AppColors.rec` (#E2530A) cho recording state
-- ✅ L10n — thêm `resultTabFeedback`, `resultTabTranscript`, `resultTabSample`, `resultNoFeedback`, `resultNoTranscript`, `resultNoSample`
-
-## Phase 1 — Flutter UX Polish (pending)
-
-**F1 — AnalysisScreen animated progress**
-- File: `flutter_app/lib/features/exercise/screens/analysis_screen.dart`
-- Replace spinner với orbiting-ring widget + 3 animated steps (Uploading → Processing → Analysing)
-- AC: 3 steps animate đúng state từ API poll
-
-**F2 — ResultCard score dimension grid**
-- Files: `flutter_app/lib/features/exercise/widgets/result_card.dart`, `flutter_app/lib/models/models.dart`
-- Parse `criteria_results` từ API → 4-column grid: Nội dung | Ngữ pháp | Từ vựng | Phát âm
-- AC: grid hiển thị khi có data, hidden khi không có
-
-**F3 — CourseListScreen visual update**
-- File: `flutter_app/lib/features/home/screens/course_list_screen.dart`
-- Progress bar (height 6, pill), learner count, status badge
-- AC: flutter-analyze pass
-
-**F4 — ModuleDetailScreen 2-column skill grid**
-- File: `flutter_app/lib/features/home/screens/module_detail_screen.dart`
-- GridView 2 cột, mock teaser card dashed border ở cuối
-- AC: flutter-analyze pass
-
-**F5 — ExerciseListScreen filter pills**
-- File: `flutter_app/lib/features/home/screens/exercise_list_screen.dart`
-- Horizontal scroll filter (Tất cả | Úloha 1-4), readiness badge per card
-- AC: filter hoạt động đúng
-
-## Phase 2 — CMS Pages v2 (pending)
-
-**C1 — Courses page 3-column card grid**
-- File: `cms/app/courses/page.tsx`
-- 3-col grid dùng `.stats-grid` style, course color header, metrics row
-- AC: cms-lint + cms-build pass
-
-**C2 — Exercise editor 5-tab layout**
-- File: `cms/components/exercise-dashboard.tsx`
-- Tabs: Prompt | Bài mẫu | Rubric | AI | Metadata; sticky tab bar; right sidebar 300px với preview + actions
-- AC: cms-lint + cms-build pass
-
-**C3 — Learners page (new)**
-- Files: `cms/app/admin/learners/page.tsx`, `cms/app/api/admin/attempts/route.ts`
-- Stats grid + filter pills + submissions table (Ngày | Bài | Trạng thái | Score)
-- AC: cms-lint + cms-build pass
-
-## Phase 3 — Stats + Mock UX (pending)
-
-**D1 — CMS dashboard stats header**
-- File: `cms/components/exercise-dashboard.tsx`
-- 4-column `.stats-grid` trên đầu trang: exercises published, attempts, pass rate, avg score
-- AC: build pass
-
-**D2 — MockTestListScreen rich cards**
-- File: `flutter_app/lib/features/mock_exam/screens/mock_test_list_screen.dart`
-- Metadata row: duration + "4 phần" + "Đạt 24/40", "MỚI" pill
-- AC: analyze pass
-
-**D3 — MockTestIntroScreen 3-stat grid + part breakdown**
-- File: `flutter_app/lib/features/mock_exam/screens/mock_test_intro_screen.dart`
-- 3-stat grid (Thời gian | Điểm tối đa | Điểm đỗ), part list với circle badge
-- AC: analyze pass
-
-## Phase 4 — Backend criteria_results (pending)
-
-**B1 — Expose criteria_results in API**
-- Files: `backend/internal/contracts/types.go`, `backend/internal/httpapi/server.go`
-- Verify/add `CriteriaResults map[string]float64` trong feedback response JSON
-- AC: backend-build + backend-test pass
-
-**B2 — Flutter parse criteria_results**
-- Files: `flutter_app/lib/models/models.dart`
-- Parse map → wire vào F2 score grid
-- AC: flutter-analyze pass, grid hiện với real data
-
-## Verification
-
-- Phase 1: `flutter analyze && flutter test`
-- Phase 2: `npm run lint && npm run build` trong `cms/`
-- Phase 3: simulator end-to-end
-- Phase 4: `make backend-test`, curl check `criteria_results` trong response
-
-## Out of scope v2
-
-- Listening/Reading/Writing exercise UIs
-- Activity chart (cần charting lib)
-- Dashboard pipeline sidebar (cần learner analytics API)
-- Mock exam settings CRUD
-
----
-
-# i18n Patch Plan
-
-## Bối cảnh
-
-Flutter i18n Slice 1+2 đã ship (2026-04-25). Tuy nhiên, UI polish V5.x (history_screen redesign, result_card criteria checklist, recording_card coach tip) thêm vào 8 chuỗi hardcoded — trong đó **6 chuỗi tiếng Séc** — sau khi i18n slice đóng. CMS chưa có i18n; chuỗi UI phân tán giữa tiếng Việt và tiếng Anh.
-
-## Assumptions
-
-1. CMS là tool nội bộ (admin là người Việt) → không cần locale switching, chỉ cần chuẩn hoá sang tiếng Việt qua constants file.
-2. Flutter ARB parity đang tốt (EN = VI = 167 keys, diff = 0); chỉ cần thêm 8 keys mới.
-3. Chuỗi `'• '` trong feedback_card là typographic separator — không dịch, giữ nguyên.
-4. `locale_selector.dart` không dùng AppLocalizations — đúng (tự tham chiếu, hardcode language names là đúng).
 
 ## Dependency graph
 
 ```
-F-I1 (ARB keys) → F-I2 (history_screen) 
-F-I1 (ARB keys) → F-I3 (result_card + recording_card)
-F-I1, F-I2, F-I3 → [CHECKPOINT F]
+W1 (contracts) ──→ W2 (backend flow) ──→ W3 (CMS) ──→ W4 (Flutter)
+                                                             ↓
+[CHECKPOINT W] ←─────────────────────────────────────────────
 
-C-I1 (strings.ts) → C-I2 (migrate components)
-C-I2 → [CHECKPOINT C]
+L1 (contracts+audio) ──→ L2 (backend flow) ──→ L3 (CMS) ──→ L4 (Flutter)
+                                                                  ↓
+[CHECKPOINT L] ←──────────────────────────────────────────────────
+
+R1 (contracts) ──→ R2 (backend flow, reuse L2) ──→ R3 (CMS) ──→ R4 (Flutter, reuse L4 widgets)
+                                                                       ↓
+[CHECKPOINT R] ←───────────────────────────────────────────────────────
+
+M1 (data model) ──→ M2 (backend) ──→ M3 (CMS) ──→ M4 (Flutter)
+                                                         ↓
+[CHECKPOINT M] ←──────────────────────────────────────────
 ```
 
 ---
 
-## Slice F — Flutter: fix post-i18n hardcoded strings
+## V2 — Psaní (Writing)
 
-### F-I1: Thêm 8 ARB keys (en + vi)
-
-**Files:** `flutter_app/lib/l10n/app_en.arb`, `flutter_app/lib/l10n/app_vi.arb`
-
-**Keys cần thêm:**
-
-| Key | EN | VI |
-|---|---|---|
-| `historyLabel` | `HISTORY` | `LỊCH SỬ` |
-| `historyTitle` | `Practice History` | `Lịch sử luyện tập` |
-| `historySubtitle` | `Track your progress and submission results.` | `Theo dõi tiến độ và kết quả các bài đã nộp.` |
-| `historyStatTotal` | `Total attempts` | `Tổng số bài` |
-| `historyStatSuccess` | `Success rate` | `Tỷ lệ thành công` |
-| `resultCoachTipLabel` | `COACH TIP` | `NHẬN XÉT HUẤN LUYỆN VIÊN` |
-| `resultCriteriaLabel` | `EVALUATION CRITERIA` | `TIÊU CHÍ ĐÁNH GIÁ` |
-| `recordingCoachTip` | `Coach tip` | `Nhận xét huấn luyện viên` |
-
-Run `flutter gen-l10n` sau khi thêm.
-
-**AC:**
-- [ ] Cả 2 ARB files có đủ 8 keys mới
-- [ ] EN + VI key sets vẫn bằng nhau (diff = 0)
-- [ ] `flutter gen-l10n` thành công
-
-### F-I2: Migrate history_screen.dart
-
-**File:** `flutter_app/lib/features/history/screens/history_screen.dart`
-
-Thay 5 hardcoded strings:
-- `'LỊCH SỬ'` → `l.historyLabel`
-- `'Lịch sử luyện tập'` → `l.historyTitle`
-- `'Theo dõi tiến độ và kết quả các bài đã nộp.'` → `l.historySubtitle`
-- `'Celkem lekcí'` → `l.historyStatTotal`
-- `'Průměrná úspěšnost'` → `l.historyStatSuccess`
-
-**AC:**
-- [ ] Không còn chuỗi Czech/Vietnamese hardcoded trong file
-- [ ] Widget dùng `l = AppLocalizations.of(context)` ở đầu build
-
-### F-I3: Migrate result_card.dart + recording_card.dart
-
-**Files:**
-- `flutter_app/lib/features/exercise/widgets/result_card.dart`
-- `flutter_app/lib/features/exercise/widgets/recording_card.dart`
-
-Thay 3 hardcoded strings:
-- `result_card.dart`: `'TIP OD KOUČE'` → `l.resultCoachTipLabel`
-- `result_card.dart`: `'TIÊU CHÍ ĐÁNH GIÁ'` → `l.resultCriteriaLabel`
-- `recording_card.dart`: `'Tip od kouče'` → `l.recordingCoachTip`
-
-**AC:**
-- [ ] Không còn chuỗi Czech hardcoded trong 2 file
-- [ ] `recording_card.dart` nhận `BuildContext` để gọi `AppLocalizations.of(context)` (check xem widget đã có context chưa)
-
-### [CHECKPOINT F]
+### Design: Writing attempt flow
 
 ```
+Flutter: display questions/images
+  → POST /v1/attempts          (create, attempt_type="writing")
+  → POST /v1/attempts/:id/submit-text   (NEW)
+     body: { "answers": ["Q1 text", "Q2 text", "Q3 text"] }  -- psani_1
+        OR { "text": "full email text" }                      -- psani_2
+  → poll GET /v1/attempts/:id
+  → show result (corrected_text + diff + criteria)
+```
+
+### Design: Writing review artifact
+
+Reuses existing `AttemptReviewArtifact` struct. Mapping:
+- `source_transcript_text` ← learner's written text (or joined answers)
+- `corrected_transcript_text` ← LLM-corrected version
+- `model_answer_text` ← example answer
+- `speaking_focus_items` ← writing errors (grammar, vocabulary, coherence)
+- `diff_chunks` ← text diff
+- `tts_audio` ← **nil** (không dùng Polly)
+
+LLM prompt differs from speaking: no transcript noise, no readiness_level từ confidence. Scoring: `weak` (<60% criteria met) / `ok` (60-80%) / `strong` (>80%).
+
+Word count validated **client-side** trước khi submit:
+- psani_1: mỗi answer ≥10 từ
+- psani_2: tổng text ≥35 từ
+
+### Slice W1 — Contracts + exercise types (Backend)
+
+**Files:** `backend/internal/contracts/types.go`
+
+Thêm:
+```go
+type Psani1Detail struct {
+    ExerciseID string   `json:"exercise_id"`
+    Questions  []string `json:"questions"`   // 3 câu hỏi
+    MinWords   int      `json:"min_words"`   // default 10
+}
+
+type Psani2Detail struct {
+    ExerciseID    string   `json:"exercise_id"`
+    Prompt        string   `json:"prompt"`         // "Jste na dovolené..."
+    ImageAssetIDs []string `json:"image_asset_ids"` // 5 ảnh
+    Topics        []string `json:"topics"`          // ["KDE JSTE?", ...]
+    MinWords      int      `json:"min_words"`        // default 35
+}
+
+type WritingSubmission struct {
+    Answers []string `json:"answers,omitempty"` // psani_1: 3 answers
+    Text    string   `json:"text,omitempty"`    // psani_2: full text
+}
+```
+
+Thêm vào `ExerciseType` validation: `psani_1_formular`, `psani_2_email`.
+Thêm vào `SkillKind → ExerciseType` mapping: `viet → psani_*`.
+
+**AC:** `make backend-build` passes.
+
+### Slice W2 — Backend writing attempt flow
+
+**Files:**
+- `backend/internal/httpapi/server.go` — thêm route `POST /v1/attempts/:id/submit-text`
+- `backend/internal/processing/writing_scorer.go` — NEW
+- `backend/internal/processing/llm_feedback.go` — extend cho writing
+
+`writing_scorer.go`:
+1. Load exercise detail (Psani1Detail hoặc Psani2Detail)
+2. Validate word count (trả lỗi nếu thiếu)
+3. Call `LLMWritingFeedbackProvider.Score(exerciseType, submission, detail)`
+4. Build `AttemptFeedback` + `AttemptReviewArtifact`
+5. Persist + mark attempt `completed`
+
+LLM prompt cho writing khác speaking:
+- Input: learner text + exercise questions/images description
+- Output: corrected_text, error_highlights, model_answer, criteria_results, readiness_level
+
+`POST /v1/attempts/:id/submit-text`:
+- Validate attempt exists + status=`created`
+- Parse `WritingSubmission`
+- Client-side word count validation (return 400 nếu thiếu)
+- Transition attempt → `scoring`
+- Trigger `writing_scorer` async (same pattern as audio processing)
+
+**AC:** `make backend-test` passes. Integration test: create psani_1 attempt → submit text → poll → completed with feedback.
+
+### Slice W3 — CMS writing exercise forms
+
+**Files:** `cms/app/exercises/` — extend exercise dashboard
+
+Thêm 2 form types:
+- `psani_1_formular`: 3 question text fields + min_words number input
+- `psani_2_email`: prompt text + 5 image upload slots + 5 topic label fields
+
+CMS exercise list filter: hiện `Viết` exercises khi skill_kind=`viet`.
+
+**AC:** `make cms-build` passes. Admin có thể tạo/edit psani_1 và psani_2 exercises.
+
+### Slice W4 — Flutter writing screen
+
+**Files:**
+- `flutter_app/lib/features/exercise/screens/writing_exercise_screen.dart` — NEW
+- `flutter_app/lib/features/exercise/widgets/writing_result_card.dart` — NEW (hoặc extend result_card.dart)
+- `flutter_app/lib/models/models.dart` — add WritingSubmission, Psani1Detail, Psani2Detail
+- `flutter_app/lib/core/api/api_client.dart` — add `submitText()`
+
+`WritingExerciseScreen`:
+- psani_1: show 3 câu hỏi, 3 TextField, word count badge mỗi field
+- psani_2: show 5 ảnh + topics, 1 TextField lớn, word count badge
+- Submit button: disabled nếu chưa đủ từ
+- On submit → create attempt → submitText → AnalysisScreen (spinner) → ResultCard
+
+`WritingResultCard`:
+- Tab 1 "Bài làm": show learner text với highlight lỗi
+- Tab 2 "Gợi ý": corrected text (diff view) + writing_focus_items
+- Tab 3 "Tiêu chí": criteria_results checklist (reuse CriterionCheckView)
+
+ExerciseScreen routing: detect `exercise.skillKind == "viet"` → navigate to `WritingExerciseScreen`.
+
+**AC:** `make flutter-analyze` passes. End-to-end: chọn psani_1 exercise → nhập text → submit → xem kết quả có highlight lỗi.
+
+### [CHECKPOINT W]
+
+```
+make backend-build && make backend-test
+make cms-build
 make flutter-analyze && make flutter-test
 ```
 
-Chuyển tiếp device sang EN → kiểm tra history + result + recording hiển thị đúng tiếng Anh.
+Manual: Simulator: psani_1 → nhập 3 câu trả lời → submit → result card hiển thị corrected text.
 
 ---
 
-## Slice C — CMS: chuẩn hoá strings
+## V3 — Poslech (Listening)
 
-### C-I1: Tạo cms/lib/strings.ts
+### Design: Exercise audio
 
-**File:** `cms/lib/strings.ts` (mới)
+Admin chọn một trong hai:
+- **Upload**: upload file MP3/WAV trực tiếp (dùng asset upload flow đã có)
+- **Text→Polly**: nhập Czech text → CMS gọi `POST /v1/admin/exercises/:id/generate-audio` → backend gọi Polly → lưu audio file → link vào exercise
 
-Constants file tập trung tất cả CMS UI strings, chuẩn hoá sang tiếng Việt. Không dùng library.
+`poslech_4` (dialog 2 người): text chia thành segments với speaker prefix:
+```json
+{"segments": [
+  {"speaker": "A", "text": "Paní prodavačko..."},
+  {"speaker": "B", "text": "Počkejte, podívám se."}
+]}
+```
+Polly đọc tuần tự, ghép thành 1 audio file. V3 dùng 1 voice duy nhất (Tomáš - Czech neural). Upgrade 2 voices sau.
 
-**Nội dung cần cover:**
-- Nav labels (sidebar): Bài tập, Khóa học, Mock Test, Học viên, Module, Kỹ năng
-- Button labels: Tạo mới, Lưu, Xoá, Chỉnh sửa, Huỷ
-- Status labels: Bản nháp, Đã xuất bản
-- Form tabs (exercise-dashboard): Đề bài, Bài mẫu, Siêu dữ liệu
-- Mock test UI: Thêm bài thi mới, Chỉnh sửa bài thi, Thêm phần thi
-- Stats labels (dashboard-stats): đã là tiếng Việt, giữ nguyên hoặc nhất quán hoá
-- Error messages tiếng Anh → tiếng Việt
+### Design: Objective scoring
 
-**AC:**
-- [ ] File export `CMS_STRINGS` const object với đủ keys
-- [ ] TypeScript type-safe (no `any`)
-- [ ] `cms-lint` pass
+Listening và Reading dùng chung `objective_scorer.go`:
+```go
+type AnswerSubmission struct {
+    Answers map[int]string `json:"answers"` // question_no → answer (e.g. "B", "Restaurace Klášterní")
+}
 
-### C-I2: Migrate CMS components
+type ObjectiveResult struct {
+    Score      int                  `json:"score"`
+    MaxScore   int                  `json:"max_score"`
+    Breakdown  []QuestionResult     `json:"breakdown"`
+}
+
+type QuestionResult struct {
+    QuestionNo     int    `json:"question_no"`
+    LearnerAnswer  string `json:"learner_answer"`
+    CorrectAnswer  string `json:"correct_answer"`
+    IsCorrect      bool   `json:"is_correct"`
+}
+```
+
+Stored trong `AttemptFeedback.objective_result` (new field).
+
+### Design: Listening attempt flow
+
+```
+Flutter: show exercise + audio player
+  → play audio (GET /v1/exercises/:id/audio)
+  → learner answers
+  → POST /v1/attempts          (create, attempt_type="listening")
+  → POST /v1/attempts/:id/submit-answers   (NEW, reused cho Reading)
+     body: { "answers": {"1": "B", "2": "C", ...} }
+  → GET /v1/attempts/:id (poll — but sync scoring, returns immediately)
+  → show result (correct/wrong per question)
+```
+
+Objective scoring là sync (no async pipeline) — kết quả ngay lập tức.
+
+### Slice L1 — Contracts + exercise audio infrastructure
 
 **Files:**
-- `cms/components/cms-sidebar.tsx` — NAV labels từ constants
-- `cms/components/exercise-dashboard.tsx` — tab labels, button labels
-- `cms/components/mock-test-dashboard.tsx` — button labels, status options
-- `cms/components/learners-dashboard.tsx` — button/filter labels
-- `cms/components/module-dashboard.tsx` — button labels
-- `cms/components/skill-dashboard.tsx` — button labels
-- `cms/components/course-dashboard.tsx` — button labels
+- `backend/internal/contracts/types.go` — thêm Poslech1-5Detail types
+- `backend/internal/httpapi/server.go` — thêm `GET /v1/exercises/:id/audio` + `POST /v1/admin/exercises/:id/generate-audio`
+- `backend/internal/processing/exercise_audio.go` — NEW: Polly call cho exercise audio
+- `backend/db/migrations/010_exercise_audio.sql` — NEW: `exercise_audio` table
 
-Import `CMS_STRINGS` và thay literal strings. Sidebar NAV array: thay inline labels → `CMS_STRINGS.nav.*`.
+```go
+// Exercise audio types
+type MultipleChoiceOption struct {
+    Key  string `json:"key"`  // "A", "B", ...
+    Text string `json:"text"`
+}
 
-**AC:**
-- [ ] Không còn English button labels ('Edit', 'Delete', 'New mock test') trong JSX
-- [ ] Tất cả components import từ `cms/lib/strings.ts`
-- [ ] `cms-lint` + `cms-build` pass
+type AudioSegment struct {
+    Speaker string `json:"speaker"` // "A" hoặc "B" (cho dialog)
+    Text    string `json:"text"`
+}
 
-### [CHECKPOINT C]
+type Poslech1Detail struct {
+    ExerciseID    string                 `json:"exercise_id"`
+    Items         []ListeningItem        `json:"items"`  // 5 items
+    CorrectAnswers map[int]string        `json:"correct_answers"` // {1:"B", 2:"A",...}
+}
+
+type ListeningItem struct {
+    QuestionNo  int                    `json:"question_no"`
+    AudioSource ListeningAudioSource   `json:"audio_source"` // file or text
+    Options     []MultipleChoiceOption `json:"options"`
+}
+
+type ListeningAudioSource struct {
+    AssetID  string         `json:"asset_id,omitempty"`  // uploaded file
+    Segments []AudioSegment `json:"segments,omitempty"`  // text→Polly
+}
+// Poslech2Detail same as Poslech1Detail
+
+type Poslech3Detail struct { // match A-G (2 extra)
+    ExerciseID    string            `json:"exercise_id"`
+    Items         []ListeningItem   `json:"items"`  // 5 items
+    Options       []MatchOption     `json:"options"` // A-G (7 total)
+    CorrectAnswers map[int]string   `json:"correct_answers"`
+}
+
+type Poslech4Detail struct { // dialog → choose image
+    ExerciseID    string            `json:"exercise_id"`
+    Items         []DialogItem      `json:"items"`  // 5 dialogs
+    Options       []ImageOption     `json:"options"` // A-F (6 images, 1 extra)
+    CorrectAnswers map[int]string   `json:"correct_answers"`
+}
+
+type Poslech5Detail struct { // voicemail → fill
+    ExerciseID    string            `json:"exercise_id"`
+    AudioSource   ListeningAudioSource `json:"audio_source"`
+    Questions     []FillQuestion    `json:"questions"` // 5 questions
+    CorrectAnswers map[int]string   `json:"correct_answers"`
+}
+
+type FillQuestion struct {
+    QuestionNo int    `json:"question_no"`
+    Prompt     string `json:"prompt"` // "KDO dal Evě lístky?"
+}
+```
+
+`exercise_audio` table: `(exercise_id, storage_key, mime_type, source_type, generated_at)`.
+
+**AC:** `make backend-build` passes. `POST /v1/admin/exercises/:id/generate-audio` gọi Polly thành công (integration test with mock Polly).
+
+### Slice L2 — Backend objective scoring + submit-answers endpoint
+
+**Files:**
+- `backend/internal/httpapi/server.go` — `POST /v1/attempts/:id/submit-answers`
+- `backend/internal/processing/objective_scorer.go` — NEW
+
+`objective_scorer.go`:
+1. Load exercise detail (detect type by exercise_type)
+2. Compare `submission.answers` với `detail.correct_answers`
+3. Calculate score (1 point per correct answer, or as configured)
+4. Build `ObjectiveResult`
+5. Persist trong `AttemptFeedback.objective_result`
+6. Mark attempt `completed` (sync, không async)
+
+`POST /v1/attempts/:id/submit-answers`:
+- Validate attempt + status
+- Parse `AnswerSubmission`
+- Score sync → return completed attempt immediately (no polling needed, but same GET endpoint works)
+
+**AC:** `make backend-test`. Unit test: poslech_1 answers → correct score calculated. Integration test: submit answers → attempt completed immediately.
+
+### Slice L3 — CMS listening exercise forms
+
+**Files:** `cms/app/exercises/` — extend forms
+
+Forms cho 5 poslech types:
+- Audio source: radio (Upload file / Generate from text)
+- If "Generate": text area + "Generate audio" button → calls backend → shows audio preview
+- Options (A-D / A-G / A-F): text fields hoặc image upload (poslech_4)
+- Correct answers: dropdown / input per question
+- AC: `make cms-build`. Admin tạo được poslech_5 với text → Polly generated audio.
+
+### Slice L4 — Flutter listening UI
+
+**Files:**
+- `flutter_app/lib/features/exercise/screens/listening_exercise_screen.dart` — NEW
+- `flutter_app/lib/features/exercise/widgets/audio_player_widget.dart` — NEW
+- `flutter_app/lib/features/exercise/widgets/multiple_choice_widget.dart` — NEW (reusable)
+- `flutter_app/lib/features/exercise/widgets/match_widget.dart` — NEW
+- `flutter_app/lib/features/exercise/widgets/fill_in_widget.dart` — NEW
+- `flutter_app/lib/features/exercise/widgets/objective_result_card.dart` — NEW
+
+`ListeningExerciseScreen`:
+- AudioPlayerWidget: play/pause, progress bar, replay button
+- Answer widgets swap theo exercise_type
+- Submit button → create attempt + submit answers (sync) → ObjectiveResultCard
+
+`ObjectiveResultCard`:
+- Per-question: ✅ correct / ❌ wrong + correct answer shown
+- Score: X/5 display
+- Retry button
+
+ExerciseScreen routing: detect `skillKind == "nghe"` → `ListeningExerciseScreen`.
+
+**AC:** `make flutter-analyze`. End-to-end: chọn poslech_1 → nghe audio → chọn đáp án → submit → thấy kết quả ngay.
+
+### [CHECKPOINT L]
 
 ```
-make cms-lint && make cms-build
+make backend-build && make backend-test
+make cms-build
+make flutter-analyze && make flutter-test
 ```
 
-Spot check: mở `/`, `/mock-tests`, `/exercises` → kiểm tra labels tiếng Việt nhất quán.
+Manual: poslech_5 voicemail → nghe 2 lần → điền thông tin → xem điểm.
+
+---
+
+## V4 — Čtení (Reading)
+
+### Design
+
+Reuse toàn bộ objective scoring từ V3. Chỉ cần:
+- New exercise detail types (Cteni1-5)
+- CMS forms cho reading
+- Flutter UI (reuse widgets từ L4, thêm text display)
+
+`cteni_1` cần images — reuse asset upload flow đã có.
+`cteni_3` (match text → person) cần text display cho mỗi item.
+
+Không có audio. Không cần Polly.
+
+### Slice R1 — Contracts + reading exercise types
+
+**Files:** `backend/internal/contracts/types.go`
+
+```go
+type Cteni1Detail struct { // match image/message → A-H (3 extra)
+    ExerciseID    string          `json:"exercise_id"`
+    Items         []ReadingItem   `json:"items"`   // 5 items (ảnh)
+    Options       []TextOption    `json:"options"` // A-H (8 options)
+    CorrectAnswers map[int]string `json:"correct_answers"`
+}
+
+type Cteni2Detail struct { // đọc text → A-D (5 câu)
+    ExerciseID    string                 `json:"exercise_id"`
+    Text          string                 `json:"text"`
+    Questions     []ReadingQuestion      `json:"questions"` // 5 questions
+    CorrectAnswers map[int]string        `json:"correct_answers"`
+}
+
+type ReadingQuestion struct {
+    QuestionNo int                    `json:"question_no"`
+    Prompt     string                 `json:"prompt"`
+    Options    []MultipleChoiceOption `json:"options"`
+}
+
+type Cteni3Detail struct { // match text → person A-E (1 extra)
+    ExerciseID    string        `json:"exercise_id"`
+    Texts         []TextItem    `json:"texts"`   // 4 texts
+    Persons       []PersonOption `json:"persons"` // A-E (5 persons)
+    CorrectAnswers map[int]string `json:"correct_answers"`
+}
+
+type Cteni4Detail struct { // A-D (6 câu)
+    ExerciseID    string            `json:"exercise_id"`
+    Context       string            `json:"context,omitempty"` // optional passage
+    Questions     []ReadingQuestion `json:"questions"` // 6 questions
+    CorrectAnswers map[int]string   `json:"correct_answers"`
+}
+
+type Cteni5Detail struct { // điền thông tin từ text
+    ExerciseID    string         `json:"exercise_id"`
+    Text          string         `json:"text"`
+    Questions     []FillQuestion `json:"questions"` // 5 questions
+    CorrectAnswers map[int]string `json:"correct_answers"`
+    // fill-in: accept substring match (case-insensitive)
+}
+```
+
+Thêm vào `SkillKind → ExerciseType` mapping: `doc → cteni_*`.
+
+**AC:** `make backend-build`.
+
+### Slice R2 — Backend reading scoring (reuse L2)
+
+`objective_scorer.go` đã handle reading types sau khi thêm Cteni1-5.
+
+Đặc biệt: `cteni_5` và `poslech_5` là fill-in — cần fuzzy match (substring, case-insensitive, trim whitespace).
+
+**Files:** `backend/internal/processing/objective_scorer.go` — extend với fill-in matching logic.
+
+**AC:** `make backend-test`. Unit test cteni_5: "bramborový salát" matches "Bramborový/chutný/jednoduchý salát".
+
+### Slice R3 — CMS reading exercise forms
+
+**Files:** `cms/app/exercises/` — extend forms
+
+- `cteni_1`: 5 image upload slots + 8 option text fields + correct answers
+- `cteni_2`: textarea (text) + 5 question blocks (prompt + 4 options) + correct answers
+- `cteni_3`: 4 text blocks + 5 person descriptions + correct answers
+- `cteni_4`: optional context textarea + 6 question blocks + correct answers
+- `cteni_5`: textarea (text) + 5 prompt fields + correct answers (with note: fuzzy match)
+
+**AC:** `make cms-build`.
+
+### Slice R4 — Flutter reading UI
+
+**Files:**
+- `flutter_app/lib/features/exercise/screens/reading_exercise_screen.dart` — NEW
+- Reuse: `multiple_choice_widget.dart`, `fill_in_widget.dart`, `objective_result_card.dart` từ V3
+- NEW: `match_text_widget.dart` cho cteni_3 (tap text → tap person)
+- NEW: `image_match_widget.dart` cho cteni_1
+
+`ReadingExerciseScreen`:
+- Text display (scrollable, selectable)
+- Answer widgets theo exercise_type
+- Submit → create attempt + submit answers → ObjectiveResultCard
+
+ExerciseScreen routing: `skillKind == "doc"` → `ReadingExerciseScreen`.
+
+**AC:** `make flutter-analyze`. End-to-end: cteni_2 → đọc text → chọn đáp án → xem điểm.
+
+### [CHECKPOINT R]
+
+```
+make backend-build && make backend-test
+make cms-build
+make flutter-analyze && make flutter-test
+```
+
+Manual: cteni_5 fill-in → nhập thông tin → xem điểm (fuzzy match hoạt động).
+
+---
+
+## V5 — Full MockTest (4 kỹ năng)
+
+### Design: 2-session exam structure
+
+Kỳ thi thật có 2 phần riêng biệt:
+- **Písemná část**: Čtení (40') + Psaní (25') + Poslech (~40') → max 70đ, pass ≥42
+- **Ústní část**: Mluvení (15') → max 40đ, pass ≥24
+
+Cả 2 phải pass. Fail 1 → phải thi lại cả 2.
+
+App V5 model:
+```
+FullExamSession
+  ├── pisemna_session_id → MockExamSession (type=pisemna, skills: doc+viet+poslech)
+  └── ustni_session_id   → MockExamSession (type=ustni,   skills: noi) ← existing
+```
+
+Hoặc: mở rộng `MockExamSession` với `session_type: "pisemna" | "ustni" | "speaking"`.
+
+MockTest V5 template sẽ có `session_type` field để chỉ định đây là písemná hay ústní.
+
+### Slice M1 — Data model + migrations
+
+**Files:**
+- `backend/db/migrations/011_full_exam.sql` — NEW
+- `backend/internal/contracts/types.go` — extend MockTest, MockExamSession
+
+```sql
+-- Extend mock_tests với session_type
+ALTER TABLE mock_tests ADD COLUMN session_type TEXT NOT NULL DEFAULT 'speaking';
+-- 'speaking' | 'pisemna' | 'full'
+
+-- full_exam_sessions: link 2 sessions
+CREATE TABLE full_exam_sessions (
+    id TEXT PRIMARY KEY,
+    learner_id TEXT NOT NULL,
+    mock_test_id TEXT NOT NULL,
+    pisemna_session_id TEXT,
+    ustni_session_id TEXT,
+    pisemna_score INT,
+    ustni_score INT,
+    pisemna_passed BOOL,
+    ustni_passed BOOL,
+    overall_passed BOOL,
+    status TEXT NOT NULL DEFAULT 'in_progress',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**AC:** `make backend-build`. Migration runs.
+
+### Slice M2 — Backend full exam flow
+
+**Files:**
+- `backend/internal/httpapi/server.go` — new routes: `POST /v1/full-exams`, `GET /v1/full-exams/:id`
+- `backend/internal/store/` — full_exam CRUD
+- `backend/internal/processing/full_exam_scorer.go` — NEW
+
+Písemná scoring:
+```
+pisemna_score = cteni_score + viet_score + poslech_score
+pisemna_passed = pisemna_score >= 42
+```
+
+Ústní scoring: existing speaking mock exam (score 0-40, pass ≥24).
+
+`POST /v1/full-exams`: tạo FullExamSession + MockExamSession cho písemná.
+Khi písemná complete → link ustni session.
+
+**AC:** `make backend-test`. Integration test: full exam session created → both parts scored → overall_passed computed.
+
+### Slice M3 — CMS full exam builder
+
+**Files:** `cms/app/mock-tests/` — extend
+
+MockTest form thêm `session_type` dropdown: Speaking / Písemná / Full (4 skills).
+
+Písemná builder: pick exercises cho từng section (cteni_1-5, psani_1-2, poslech_1-5).
+Full builder: link 1 Písemná MockTest + 1 Ústní MockTest.
+
+**AC:** `make cms-build`. Admin tạo được Full exam template.
+
+### Slice M4 — Flutter full exam flow
+
+**Files:**
+- `flutter_app/lib/features/mock_exam/screens/full_exam_intro_screen.dart` — NEW
+- `flutter_app/lib/features/mock_exam/screens/full_exam_result_screen.dart` — NEW
+- Extend MockExamScreen để handle písemná sections (text/listening/writing)
+
+Full exam flow:
+1. Intro screen: duration, 110đ total, pass conditions (42/70 písemná + 24/40 ústní)
+2. Písemná session: Čtení sections → Psaní sections → Poslech sections
+3. Submit písemná → result intermediate
+4. Ústní session: Mluvení (existing flow)
+5. Final result: 2-panel (písemná + ústní), PASS/FAIL overall
+
+**AC:** `make flutter-analyze`. End-to-end: chọn full exam → hoàn thành cả 2 phần → xem kết quả tổng.
+
+### [CHECKPOINT M]
+
+```
+make backend-build && make backend-test
+make cms-build && make cms-lint
+make flutter-analyze && make flutter-test
+make verify
+```
+
+Manual: Full exam → Písemná (cteni_2 + psani_1 + poslech_1) → Ústní (uloha_1) → Overall result.
+
+---
+
+## Thứ tự ưu tiên tuyệt đối
+
+```
+W1 → W2 → W3 → W4 → [CHECKPOINT W]
+→ L1 → L2 → L3 → L4 → [CHECKPOINT L]
+→ R1 → R2 → R3 → R4 → [CHECKPOINT R]
+→ M1 → M2 → M3 → M4 → [CHECKPOINT M]
+```
+
+Không nhảy cóc giữa versions. Mỗi CHECKPOINT phải green trước khi bắt đầu version tiếp theo.

@@ -117,6 +117,48 @@ type Uloha4Detail struct {
 	ExpectedReasoningAxes []string       `json:"expected_reasoning_axes,omitempty"`
 }
 
+// --- Writing (V2) ---
+
+type Psani1Detail struct {
+	Questions []string `json:"questions"` // 3 câu hỏi
+	MinWords  int      `json:"min_words"` // default 10
+}
+
+type Psani2Detail struct {
+	Prompt        string   `json:"prompt"`           // "Jste na dovolené..."
+	ImageAssetIDs []string `json:"image_asset_ids"`  // 5 ảnh
+	Topics        []string `json:"topics"`           // ["KDE JSTE?", ...]
+	MinWords      int      `json:"min_words"`         // default 35
+}
+
+// WritingSubmission is the body of POST /v1/attempts/:id/submit-text.
+// Use Answers for psani_1_formular (3 items), Text for psani_2_email.
+type WritingSubmission struct {
+	Answers []string `json:"answers,omitempty"`
+	Text    string   `json:"text,omitempty"`
+}
+
+// --- Objective scoring (V3/V4) ---
+
+// AnswerSubmission is the body of POST /v1/attempts/:id/submit-answers.
+// Keys are question numbers as strings ("1", "2", ...).
+type AnswerSubmission struct {
+	Answers map[string]string `json:"answers"`
+}
+
+type ObjectiveResult struct {
+	Score     int              `json:"score"`
+	MaxScore  int              `json:"max_score"`
+	Breakdown []QuestionResult `json:"breakdown"`
+}
+
+type QuestionResult struct {
+	QuestionNo    int    `json:"question_no"`
+	LearnerAnswer string `json:"learner_answer"`
+	CorrectAnswer string `json:"correct_answer"`
+	IsCorrect     bool   `json:"is_correct"`
+}
+
 type Attempt struct {
 	ID                      string                        `json:"id"`
 	UserID                  string                        `json:"user_id,omitempty"`
@@ -161,14 +203,15 @@ type Transcript struct {
 }
 
 type AttemptFeedback struct {
-	ReadinessLevel  string          `json:"readiness_level"`
-	OverallSummary  string          `json:"overall_summary"`
-	Strengths       []string        `json:"strengths"`
-	Improvements    []string        `json:"improvements"`
-	TaskCompletion  TaskCompletion  `json:"task_completion"`
-	GrammarFeedback GrammarFeedback `json:"grammar_feedback"`
-	RetryAdvice     []string        `json:"retry_advice"`
-	SampleAnswer    string          `json:"sample_answer_text,omitempty"`
+	ReadinessLevel  string           `json:"readiness_level"`
+	OverallSummary  string           `json:"overall_summary"`
+	Strengths       []string         `json:"strengths"`
+	Improvements    []string         `json:"improvements"`
+	TaskCompletion  TaskCompletion   `json:"task_completion"`
+	GrammarFeedback GrammarFeedback  `json:"grammar_feedback"`
+	RetryAdvice     []string         `json:"retry_advice"`
+	SampleAnswer    string           `json:"sample_answer_text,omitempty"`
+	ObjectiveResult *ObjectiveResult `json:"objective_result,omitempty"` // V3/V4: listening/reading
 }
 
 type AttemptReviewArtifactSummary struct {

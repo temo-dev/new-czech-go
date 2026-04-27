@@ -95,23 +95,23 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026).
 - `uloha_3_story_narration` — Kể chuyện 4 tranh, thì quá khứ (10 điểm)
 - `uloha_4_choice_reasoning` — Chọn 1/3 phương án + lý do (7 điểm)
 
-**Listening (nghe) — chưa implement:**
-- `listening_dialogue_picture` — 5 hội thoại → chọn ảnh A-D (5 điểm)
-- `listening_announcement_choice` — 5 bản tin → trắc nghiệm A-D (5 điểm)
-- `listening_monologue_match` — 5 monologue → ghép danh mục A-G (5 điểm)
-- `listening_dialogue_image` — 5 hội thoại → chọn ảnh A-F (5 điểm)
-- `listening_voicemail_fill` — Tin nhắn thoại → điền thông tin (5 điểm)
+**Writing (viet) — V2:**
+- `psani_1_formular` — 3 câu hỏi form, mỗi câu ≥10 từ (8 điểm)
+- `psani_2_email` — Viết email theo 5 ảnh, ≥35 từ (12 điểm)
 
-**Reading (doc) — chưa implement:**
-- `reading_picture_message_match` — 5 tranh → ghép tin nhắn A-H (5 điểm)
-- `reading_article_choice` — Đọc bài → trắc nghiệm A-D (5 điểm)
-- `reading_text_person_match` — Ghép đoạn văn với người A-E (4 điểm)
-- `reading_gap_fill_word` — Điền từ vào chỗ trống chọn A-D (6 điểm)
-- `reading_text_completion` — Đọc → hoàn chỉnh câu (5 điểm)
+**Listening (nghe) — V3:**
+- `poslech_1` — 5 đoạn ngắn → chọn A-D (5 điểm)
+- `poslech_2` — 5 đoạn ngắn → chọn A-D (5 điểm)
+- `poslech_3` — 5 đoạn → match A-G, 2 dư (5 điểm)
+- `poslech_4` — 5 dialog → chọn ảnh A-F, 1 dư (5 điểm)
+- `poslech_5` — Nghe voicemail → điền thông tin, 5 ô (5 điểm)
 
-**Writing (viet) — chưa implement:**
-- `writing_form_answers` — Điền khảo sát ≥10 từ/câu (8 điểm)
-- `writing_email_pictures` — Viết email theo 5 tranh ≥35 từ (12 điểm)
+**Reading (doc) — V4:**
+- `cteni_1` — Match 5 ảnh/tin nhắn → A-H, 3 dư (5 điểm)
+- `cteni_2` — Đọc text → chọn A-D, 5 câu (5 điểm)
+- `cteni_3` — Match 4 text → nhân vật A-E, 1 dư (4 điểm)
+- `cteni_4` — Chọn A-D, 6 câu (6 điểm)
+- `cteni_5` — Đọc text → điền thông tin, 5 ô (5 điểm)
 
 **Vocabulary / Grammar (tu_vung, ngu_phap) — course-only, chưa implement:**
 - `vocabulary_match` — Ghép từ Czech → nghĩa
@@ -122,9 +122,9 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026).
 **SkillKind → valid ExerciseType mapping:**
 ```
 noi      → uloha_1_*, uloha_2_*, uloha_3_*, uloha_4_*
-nghe     → listening_*
-doc      → reading_*
-viet     → writing_*
+viet     → psani_1_formular, psani_2_email
+nghe     → poslech_1, poslech_2, poslech_3, poslech_4, poslech_5
+doc      → cteni_1, cteni_2, cteni_3, cteni_4, cteni_5
 tu_vung  → vocabulary_*
 ngu_phap → grammar_*
 ```
