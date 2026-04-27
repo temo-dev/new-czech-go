@@ -382,3 +382,60 @@ func TestDeleteExerciseRemovesItem(t *testing.T) {
 		t.Fatalf("expected exercise %s to be gone after delete", created.ID)
 	}
 }
+
+func TestRollupReadiness(t *testing.T) {
+	tests := []struct {
+		name          string
+		levels        []string
+		wantLevel     string
+		wantSummaryOK bool // summary must be non-empty and not contain ":"
+	}{
+		{
+			name:          "all ready → ready",
+			levels:        []string{"ready", "ready", "ready", "ready"},
+			wantLevel:     "ready",
+			wantSummaryOK: true,
+		},
+		{
+			name:          "mix ready+almost → almost",
+			levels:        []string{"ready", "almost", "almost", "needs_work"},
+			wantLevel:     "almost",
+			wantSummaryOK: true,
+		},
+		{
+			name:          "mix almost+needs_work → needs_work",
+			levels:        []string{"almost", "needs_work", "needs_work", "not_ready"},
+			wantLevel:     "needs_work",
+			wantSummaryOK: true,
+		},
+		{
+			name:          "all not_ready → not_ready",
+			levels:        []string{"not_ready", "not_ready", "not_ready", "not_ready"},
+			wantLevel:     "not_ready",
+			wantSummaryOK: true,
+		},
+		{
+			name:          "empty → not_ready",
+			levels:        []string{},
+			wantLevel:     "not_ready",
+			wantSummaryOK: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			level, summary := rollupReadiness(tc.levels)
+			if level != tc.wantLevel {
+				t.Errorf("level = %q, want %q", level, tc.wantLevel)
+			}
+			if summary == "" {
+				t.Error("summary must not be empty")
+			}
+			for _, ch := range summary {
+				if ch == ':' {
+					t.Errorf("summary looks like debug format (contains ':'): %q", summary)
+					break
+				}
+			}
+		})
+	}
+}

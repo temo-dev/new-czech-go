@@ -235,6 +235,10 @@ func buildReviewArtifact(exercise contracts.Exercise, transcript contracts.Trans
 		return buildUloha1ReviewArtifact(exercise, transcript, feedback)
 	case "uloha_2_dialogue_questions":
 		return buildUloha2ReviewArtifact(exercise, transcript, feedback)
+	case "uloha_3_story_narration":
+		return buildUloha3ReviewArtifact(exercise, transcript, feedback)
+	case "uloha_4_choice_reasoning":
+		return buildUloha4ReviewArtifact(exercise, transcript, feedback)
 	default:
 		return contracts.AttemptReviewArtifact{}, false
 	}
@@ -294,6 +298,255 @@ func buildUloha2ReviewArtifact(exercise contracts.Exercise, transcript contracts
 	}, true
 }
 
+func buildUloha3ReviewArtifact(exercise contracts.Exercise, transcript contracts.Transcript, feedback contracts.AttemptFeedback) (contracts.AttemptReviewArtifact, bool) {
+	normalized := normalizeTranscript(transcript.FullText)
+	if normalized == "" {
+		return contracts.AttemptReviewArtifact{}, false
+	}
+
+	corrected := correctedNarrativeTranscript(normalized)
+	model := uloha3ModelAnswer(exercise, feedback)
+	if corrected == "" || model == "" {
+		return contracts.AttemptReviewArtifact{}, false
+	}
+
+	diffChunks := buildReadableDiffChunks(normalized, normalizeTranscript(corrected))
+	speakingFocus := buildUloha3SpeakingFocus(exercise, feedback)
+
+	return contracts.AttemptReviewArtifact{
+		Status:                   "ready",
+		SourceTranscriptText:     transcript.FullText,
+		SourceTranscriptProvider: transcript.Provider,
+		CorrectedTranscriptText:  corrected,
+		ModelAnswerText:          model,
+		SpeakingFocusItems:       speakingFocus,
+		DiffChunks:               diffChunks,
+		RepairProvider:           "task_aware_repair_v1",
+	}, true
+}
+
+func buildUloha4ReviewArtifact(exercise contracts.Exercise, transcript contracts.Transcript, feedback contracts.AttemptFeedback) (contracts.AttemptReviewArtifact, bool) {
+	normalized := normalizeTranscript(transcript.FullText)
+	if normalized == "" {
+		return contracts.AttemptReviewArtifact{}, false
+	}
+
+	corrected := correctedNarrativeTranscript(normalized)
+	model := uloha4ModelAnswer(exercise, normalized, feedback)
+	if corrected == "" || model == "" {
+		return contracts.AttemptReviewArtifact{}, false
+	}
+
+	diffChunks := buildReadableDiffChunks(normalized, normalizeTranscript(corrected))
+	speakingFocus := buildUloha4SpeakingFocus(exercise, feedback)
+
+	return contracts.AttemptReviewArtifact{
+		Status:                   "ready",
+		SourceTranscriptText:     transcript.FullText,
+		SourceTranscriptProvider: transcript.Provider,
+		CorrectedTranscriptText:  corrected,
+		ModelAnswerText:          model,
+		SpeakingFocusItems:       speakingFocus,
+		DiffChunks:               diffChunks,
+		RepairProvider:           "task_aware_repair_v1",
+	}, true
+}
+
+func correctedNarrativeTranscript(normalized string) string {
+	trimmed := strings.TrimSpace(normalized)
+	if trimmed == "" {
+		return ""
+	}
+	runes := []rune(trimmed)
+	runes[0] = []rune(strings.ToUpper(string(runes[0])))[0]
+	sentence := string(runes)
+	if !strings.HasSuffix(sentence, ".") && !strings.HasSuffix(sentence, "!") && !strings.HasSuffix(sentence, "?") {
+		sentence += "."
+	}
+	return sentence
+}
+
+func uloha3ModelAnswer(exercise contracts.Exercise, feedback contracts.AttemptFeedback) string {
+	if authored := strings.TrimSpace(exercise.SampleAnswerText); authored != "" {
+		return authored
+	}
+	if detail, ok := extractUloha3Detail(exercise.Detail); ok {
+		if sample := buildUloha3SampleFromCheckpoints(detail.NarrativeCheckpoints); sample != "" {
+			return sample
+		}
+	}
+	if feedback.SampleAnswer != "" {
+		return feedback.SampleAnswer
+	}
+	return sampleAnswerForExercise("uloha_3_story_narration")
+}
+
+func buildUloha3SampleFromCheckpoints(checkpoints []string) string {
+	connectives := []string{"Nejdriv", "Potom", "Nakonec"}
+	clean := make([]string, 0, len(checkpoints))
+	for _, cp := range checkpoints {
+		trimmed := strings.TrimSpace(cp)
+		if trimmed == "" {
+			continue
+		}
+		trimmed = strings.TrimRight(trimmed, ".!?")
+		runes := []rune(trimmed)
+		runes[0] = []rune(strings.ToLower(string(runes[0])))[0]
+		clean = append(clean, string(runes))
+	}
+	if len(clean) == 0 {
+		return ""
+	}
+	limit := len(clean)
+	if limit > len(connectives) {
+		limit = len(connectives)
+	}
+	parts := make([]string, 0, limit)
+	for i := 0; i < limit; i++ {
+		parts = append(parts, connectives[i]+" "+clean[i]+".")
+	}
+	return strings.Join(parts, " ")
+}
+
+func buildUloha3SpeakingFocus(exercise contracts.Exercise, feedback contracts.AttemptFeedback) []contracts.SpeakingFocusItem {
+	items := make([]contracts.SpeakingFocusItem, 0, 3)
+	criteria := feedback.TaskCompletion.CriteriaResults
+
+	if !criterionMetByKey(criteria, "covered_story_events") {
+		target := ""
+		if detail, ok := extractUloha3Detail(exercise.Detail); ok && len(detail.NarrativeCheckpoints) > 0 {
+			target = strings.Join(detail.NarrativeCheckpoints, "; ")
+		}
+		items = append(items, contracts.SpeakingFocusItem{
+			FocusKey:       "story_coverage",
+			Label:          "Bao quat cac moc chinh",
+			TargetFragment: target,
+			IssueType:      "missing_detail",
+			CommentVI:      "Hay nhac du cac moc chinh cua cau chuyen theo dung thu tu.",
+		})
+	}
+
+	if !criterionMetByKey(criteria, "narrative_sequence_present") && len(items) < 3 {
+		items = append(items, contracts.SpeakingFocusItem{
+			FocusKey:       "sequence_markers",
+			Label:          "Dung tu noi thu tu",
+			TargetFragment: "Nejdriv..., potom..., nakonec...",
+			IssueType:      "clarity_hint",
+			CommentVI:      "Them tu noi thu tu (nejdriv, potom, nakonec) de nguoi nghe biet dau la moc dau va ket.",
+		})
+	}
+
+	if !criterionMetByKey(criteria, "used_story_language") && len(items) < 3 {
+		items = append(items, contracts.SpeakingFocusItem{
+			FocusKey:       "past_tense",
+			Label:          "Dung dong tu qua khu",
+			TargetFragment: "byli, sli, koupili, odvezli",
+			IssueType:      "word_form",
+			CommentVI:      "Cau chuyen phai dung dong tu o qua khu (byl, sli, koupili, videli...).",
+		})
+	}
+
+	if len(items) == 0 {
+		items = append(items, contracts.SpeakingFocusItem{
+			FocusKey:  "keep_story_flow",
+			Label:     "Giu nhip ke nay",
+			IssueType: "clarity_hint",
+			CommentVI: "Ban da giu duoc mach ke chuyen; hay tiep tuc giu nhip tu nhien nay o buoc sau.",
+		})
+	}
+
+	return items
+}
+
+func uloha4ModelAnswer(exercise contracts.Exercise, normalized string, feedback contracts.AttemptFeedback) string {
+	if authored := strings.TrimSpace(exercise.SampleAnswerText); authored != "" {
+		return authored
+	}
+	if detail, ok := extractUloha4Detail(exercise.Detail); ok && len(detail.Options) > 0 {
+		chosen := detail.Options[0]
+		for i := range detail.Options {
+			if optionMentioned(normalized, detail.Options[i]) {
+				chosen = detail.Options[i]
+				break
+			}
+		}
+		label := strings.TrimSpace(chosen.Label)
+		if label != "" {
+			axis := ""
+			if len(detail.ExpectedReasoningAxes) > 0 {
+				axis = strings.TrimSpace(detail.ExpectedReasoningAxes[0])
+			}
+			if axis != "" {
+				return fmt.Sprintf("Vybiram %s, protoze %s.", label, axis)
+			}
+			return fmt.Sprintf("Vybiram %s, protoze je to pro me nejlepsi.", label)
+		}
+	}
+	if feedback.SampleAnswer != "" {
+		return feedback.SampleAnswer
+	}
+	return sampleAnswerForExercise("uloha_4_choice_reasoning")
+}
+
+func buildUloha4SpeakingFocus(exercise contracts.Exercise, feedback contracts.AttemptFeedback) []contracts.SpeakingFocusItem {
+	items := make([]contracts.SpeakingFocusItem, 0, 3)
+	criteria := feedback.TaskCompletion.CriteriaResults
+
+	if !criterionMetByKey(criteria, "made_clear_choice") {
+		target := "Vybiram..."
+		if detail, ok := extractUloha4Detail(exercise.Detail); ok && len(detail.Options) > 0 {
+			for _, o := range detail.Options {
+				if o.Label != "" {
+					target = "Vybiram " + o.Label
+					break
+				}
+			}
+		}
+		items = append(items, contracts.SpeakingFocusItem{
+			FocusKey:       "clear_choice",
+			Label:          "Noi ro lua chon",
+			TargetFragment: target,
+			IssueType:      "missing_detail",
+			CommentVI:      "Bat dau bang \"Vybiram...\" va neu ro phuong an ban chon.",
+		})
+	}
+
+	if !criterionMetByKey(criteria, "gave_reason") && len(items) < 3 {
+		items = append(items, contracts.SpeakingFocusItem{
+			FocusKey:       "give_reason",
+			Label:          "Them ly do",
+			TargetFragment: "..., protoze ...",
+			IssueType:      "missing_detail",
+			CommentVI:      "Them it nhat mot ve sau tu \"protoze\" de giai thich vi sao ban chon phuong an nay.",
+		})
+	}
+
+	if !criterionMetByKey(criteria, "reason_matches_choice") && len(items) < 3 {
+		axis := ""
+		if detail, ok := extractUloha4Detail(exercise.Detail); ok && len(detail.ExpectedReasoningAxes) > 0 {
+			axis = detail.ExpectedReasoningAxes[0]
+		}
+		items = append(items, contracts.SpeakingFocusItem{
+			FocusKey:       "reason_matches",
+			Label:          "Ly do sat lua chon",
+			TargetFragment: axis,
+			IssueType:      "clarity_hint",
+			CommentVI:      "Ly do nen gan truc tiep voi phuong an da chon, khong noi chung chung.",
+		})
+	}
+
+	if len(items) == 0 {
+		items = append(items, contracts.SpeakingFocusItem{
+			FocusKey:  "keep_choice_clarity",
+			Label:     "Giu cau tra loi ro nay",
+			IssueType: "clarity_hint",
+			CommentVI: "Ban dang dua ra lua chon va ly do kha tot; hay giu nguyen mau cau nay o lan sau.",
+		})
+	}
+
+	return items
+}
+
 func correctedUloha1Transcript(normalized string) string {
 	trimmed := strings.TrimSpace(normalized)
 	if trimmed == "" {
@@ -326,6 +579,9 @@ func correctedUloha1Transcript(normalized string) string {
 func uloha1ModelAnswer(exercise contracts.Exercise, corrected string, feedback contracts.AttemptFeedback) string {
 	if corrected == "" {
 		return ""
+	}
+	if authored := strings.TrimSpace(exercise.SampleAnswerText); authored != "" {
+		return authored
 	}
 	if criterionMetByKey(feedback.TaskCompletion.CriteriaResults, "gave_supporting_detail") {
 		return corrected
@@ -417,6 +673,9 @@ func correctedUloha2Transcript(exercise contracts.Exercise, normalized string, f
 func uloha2ModelAnswer(exercise contracts.Exercise, corrected string, feedback contracts.AttemptFeedback) string {
 	if corrected == "" {
 		return ""
+	}
+	if authored := strings.TrimSpace(exercise.SampleAnswerText); authored != "" {
+		return authored
 	}
 	if criterionMetByKey(feedback.TaskCompletion.CriteriaResults, "covered_required_slots") &&
 		criterionMetByKey(feedback.TaskCompletion.CriteriaResults, "used_question_form") &&

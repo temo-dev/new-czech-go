@@ -959,6 +959,135 @@ func TestAdminAssetUploadRegisterAndPreview(t *testing.T) {
 	}
 }
 
+func TestGetAttemptIncludesCriteriaResultsInFeedback(t *testing.T) {
+	repo := store.NewMemoryStore()
+	attempt, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi")
+	if err != nil {
+		t.Fatalf("CreateAttempt: %v", err)
+	}
+
+	// Directly complete the attempt with feedback containing criteria_results
+	repo.CompleteAttempt(attempt.ID,
+		contracts.Transcript{FullText: "Mam rad teple pocasi.", Provider: "dev_stub", IsSynthetic: true},
+		contracts.AttemptFeedback{
+			ReadinessLevel: "almost_ready",
+			OverallSummary: "Good effort.",
+			TaskCompletion: contracts.TaskCompletion{
+				ScoreBand: "almost",
+				CriteriaResults: []contracts.CriterionCheck{
+					{CriterionKey: "answered_question", Label: "Trả lời đúng câu hỏi", Met: true},
+					{CriterionKey: "gave_supporting_detail", Label: "Có chi tiết hỗ trợ", Met: false, Comment: "Cần thêm ví dụ"},
+				},
+			},
+		},
+	)
+
+	server := httptest.NewServer(NewServer(repo, nil, nil))
+	defer server.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, server.URL+"/v1/attempts/"+attempt.ID, nil)
+	req.Header.Set("Authorization", "Bearer dev-learner-token")
+	resp, err := server.Client().Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, body)
+	}
+
+	var decoded map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	data := decoded["data"].(map[string]any)
+	feedback := data["feedback"].(map[string]any)
+
+	taskCompletion, ok := feedback["task_completion"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected feedback.task_completion in response, got: %v", feedback)
+	}
+	criteriaRaw, ok := taskCompletion["criteria_results"].([]any)
+	if !ok || len(criteriaRaw) == 0 {
+		t.Fatalf("expected criteria_results to be non-empty, got: %v", taskCompletion)
+	}
+	first := criteriaRaw[0].(map[string]any)
+	if first["criterion_key"] != "answered_question" {
+		t.Fatalf("expected first criterion_key=answered_question, got %v", first["criterion_key"])
+	}
+	if first["met"] != true {
+		t.Fatalf("expected first criterion met=true, got %v", first["met"])
+	}
+	second := criteriaRaw[1].(map[string]any)
+	if second["met"] != false {
+		t.Fatalf("expected second criterion met=false, got %v", second["met"])
+	}
+	if second["comment"] != "Cần thêm ví dụ" {
+		t.Fatalf("expected comment, got %v", second["comment"])
+	}
+}
+
+func TestAdminSeesAllLearnersAttempts(t *testing.T) {
+	repo := store.NewMemoryStore()
+	if _, err := repo.CreateAttempt("user-learner-1", "exercise-uloha1-weather", "ios", "0.1.0", "vi"); err != nil {
+		t.Fatalf("CreateAttempt: %v", err)
+	}
+	if _, err := repo.CreateAttempt("user-learner-2", "exercise-uloha2-cinema", "ios", "0.1.0", "vi"); err != nil {
+		t.Fatalf("CreateAttempt: %v", err)
+	}
+
+	server := httptest.NewServer(NewServer(repo, nil, nil))
+	defer server.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, server.URL+"/v1/attempts", nil)
+	req.Header.Set("Authorization", "Bearer dev-admin-token")
+	resp, err := server.Client().Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, body)
+	}
+
+	var decoded map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	items := decoded["data"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("admin should see all 2 attempts, got %d", len(items))
+	}
+}
+
+func TestGetCoursesReturnsPublishedList(t *testing.T) {
+	repo := store.NewMemoryStore()
+	server := httptest.NewServer(NewServer(repo, nil, nil))
+	defer server.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, server.URL+"/v1/courses", nil)
+	req.Header.Set("Authorization", "Bearer dev-learner-token")
+	resp, err := server.Client().Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200 from GET /v1/courses, got %d: %s", resp.StatusCode, body)
+	}
+
+	var decoded map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if decoded["data"] == nil {
+		t.Fatal("expected data field in courses response")
+	}
+}
+
 func postJSON(t *testing.T, server *httptest.Server, path string, body map[string]any) map[string]any {
 	t.Helper()
 	status, decoded := postJSONAllowError(t, server, path, body)

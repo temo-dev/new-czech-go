@@ -7,7 +7,7 @@ Use this in a new chat:
 
 Or the more specific version:
 
-`Tiếp tục dự án ở /Users/daniel.dev/Desktop/czech-go-system. Đọc AGENTS.md và docs/README.md trước. Chúng ta đã có Flutter ghi âm thật, upload binary lên backend dev, và attempt đã lưu audio metadata. Hãy tiếp tục bước kế tiếp.`
+`Tiếp tục dự án ở /Users/daniel.dev/Desktop/czech-go-system. Đọc AGENTS.md và docs/next-session.md trước. V2 UI design system đã apply (Babbel orange, warm cream, teal, Inter font, sidebar CMS). Bước tiếp theo theo tasks/todo.md: V1.1 AnalysisScreen animated progress.`
 
 ## Current State
 - `Flutter` can record real local audio.
@@ -130,12 +130,43 @@ Or the more specific version:
   - the result card now shows a dedicated `Repair and shadowing` block for completed attempts
   - that block polls `/v1/attempts/:attempt_id/review` until the artifact is ready or failed
   - learners can now read corrected transcript text, model answer text, diff items, speaking-focus items, and play the model-answer audio from backend review storage
+- Review artifact generation now covers all four oral task types:
+  - `buildReviewArtifact` switch branches for `uloha_3_story_narration` and `uloha_4_choice_reasoning` (previously fell through to `not_applicable` and rendered the placeholder card)
+  - `Uloha 3` rule-based fallback synthesizes a past-tense narrative from `Uloha3Detail.NarrativeCheckpoints` and surfaces checkpoint coverage / past tense / connective use as speaking-focus items
+  - `Uloha 4` rule-based fallback uses `Vybírám {Option.Label}, protože {first reasoning axis}` and tracks choice clarity, `protože` clause, axis coverage
+  - authored `Exercise.sample_answer_text` now overrides the rule-based model answer for any task type when present
+- CMS exercise dashboard now exposes a `Status` select (draft / published / archived) on create and update, and `ExercisesByModule` filters strictly on `status = 'published'` so draft/archived exercises stay hidden from learners.
+- Backend `seedDefaults` for the Postgres exercise store is now per-id idempotent, so newly added seed exercises (e.g. `exercise-uloha3-tv`, `exercise-uloha4-flat`) are inserted on next startup even when the table already has rows.
+- Postgres exercise schema now adds `sample_answer_text TEXT NOT NULL DEFAULT ''`. `ensureSchema` runs an additive `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` so previously seeded local databases pick the column up automatically; migration `backend/db/migrations/004_exercise_sample_answer_text.sql` is the canonical record.
+- Backend startup is now graceful when `LLM_PROVIDER=claude` but `ANTHROPIC_API_KEY` is missing: the API logs a warning and falls back to the rule-based feedback/review path instead of fatal-exiting.
+- `docker-compose.yml` now mounts named volumes `backend_assets` (asset blobs) and `backend_attempts` (local attempt audio + TTS cache) so signed audio URLs and uploaded prompt assets survive container rebuilds. `AUDIO_SIGN_SECRET` is wired through both compose files plus `.env.compose.example`; if unset the backend falls back to an ephemeral per-process HMAC key.
+- `TRANSCRIBE_TIMEOUT` default is now `3m` (was `2m`) in compose and `.env.compose.example` after a real run hit `transcription timeout: context deadline exceeded`.
 - The next implementation slice should start from `Task 8: Add Retry with this model`.
+- **Before next EC2 deploy**: set `AUDIO_SIGN_SECRET=$(openssl rand -hex 32)` in `.env.ec2` — backend will fatal-exit at startup if this is missing.
+- **Mock exam V2** is now fully implemented:
+  - `MockTest` entity: admin-defined templates with per-section `max_points`; CMS `/mock-tests` page for create/edit/publish
+  - Learner flow: Home → pick test (list) → intro screen → record all 4 → bulk analyse → scored result (X/40, PASS/FAIL)
+  - Scoring: `section_score = round(readiness_fraction × max_points)`, pronunciation bonus `= round(avg_fraction × 3)`, `passed = overall_score >= 24`
+  - Result screen: tap any section → `MockExamSectionDetailScreen` shows full `ResultCard` (transcript + feedback + review artifact)
+  - Record-all-then-analyse: `ExerciseScreen.onRecordingReady` callback; `MockExamScreen` bulk-uploads and polls after all sections recorded
+  - DB migration `006_mock_tests.sql`; backend `ensureSchema` auto-creates tables on startup
+  - `mock_test_list_screen` is empty until at least one `MockTest` is published in CMS
 - One deploy-bundle bug was found: older bundles needed scripts to be called with `./.env.ec2`; the repo scripts are now patched for future bundles.
 - CMS may show stale `Failed to find Server Action ...` errors after redeploy until the browser is hard-refreshed or opened in an incognito tab.
 - CMS now expects server-side runtime envs `API_BASE_URL` and `CMS_ADMIN_TOKEN` instead of the old public build-time admin token.
 - Production CMS deploys should also set `CMS_BASIC_AUTH_USER` and `CMS_BASIC_AUTH_PASSWORD` so the admin desk is not public-open.
 - GitHub Actions now includes a minimal backend/CMS CI workflow and a tag-driven ARM64 image release workflow for `ECR`.
+- Pre-ship security audit (2026-04-25) surfaced and fixed three blockers:
+  - **Upload size limit**: `handleAttemptAudioUpload` and `handleAdminAssetBlobUpload` now wrap `r.Body` with `http.MaxBytesReader(100 MB)`; exceeding the limit returns `413 payload_too_large` instead of filling disk.
+  - **`AUDIO_SIGN_SECRET` required**: backend now calls `log.Fatalf` at startup if `AUDIO_SIGN_SECRET` is unset; the ephemeral per-process fallback was removed from the production startup path. Generate with `openssl rand -hex 32` and add to `.env.ec2` before the next deploy.
+  - **`SampleAnswerEnabled` can now be cleared**: `contracts.Exercise` gained `disable_sample_answer bool`; `mergeExerciseUpdate` now respects `DisableSampleAnswer = true` to turn the flag off after it has been enabled.
+  - Duplicate `ALTER TABLE exercises ADD COLUMN IF NOT EXISTS sample_answer_text` removed from `ensureSchema`; `CREATE TABLE IF NOT EXISTS` already includes the column, and migration `004` is the canonical record.
+- Acknowledged risks (not blocking V1 pilot but should be tracked):
+  - CORS policy is `Access-Control-Allow-Origin: *` on all endpoints including authenticated ones; low operational risk for iOS-only V1 but should be locked to specific origins before any browser client is added.
+  - No rate limiting on `POST /v1/auth/login`.
+  - Admin token default `dev-admin-token` must be overridden in production (already documented in CMS constraints; add startup guard when hardening).
+  - `X-Forwarded-Proto` trusted unconditionally in `buildAbsoluteURL`; safe behind ALB/nginx as used in EC2 deploy.
+  - HTTP handler test coverage is thin outside audio URL signing; processor tests are thorough.
 
 ## Recommended Reading Order
 1. [AGENTS.md](/Users/daniel.dev/Desktop/czech-go-system/AGENTS.md)
@@ -145,32 +176,49 @@ Or the more specific version:
 5. [attempt-repair-and-shadowing-plan.md](/Users/daniel.dev/Desktop/czech-go-system/docs/plans/attempt-repair-and-shadowing-plan.md)
 6. [flutter-exercise-practice.md](/Users/daniel.dev/Desktop/czech-go-system/docs/screens/flutter-exercise-practice.md)
 
+- **V2 Design System** applied (2026-04-27):
+  - CMS `globals.css` rewritten: tokens `--bg #fbf3e7` (warm cream), `--brand #ff6a14` (Babbel orange), `--accent #0f3d3a` (teal), fonts Inter+Fraunces, radius vars, utility classes `.card/.badge/.btn/.stats-grid`
+  - CMS `layout.tsx` + `CmsSidebar`: sidebar layout 248px teal fixed, thay thế top navbar cũ
+  - Flutter `app_colors.dart`: full color rewrite — orange primary, teal secondary, warm cream surfaces
+  - Flutter `app_theme.dart`: Inter font (thay Manrope), warm shadow tones
+  - Flutter `app_radius.dart`: radius 10/14/18/24/32 theo design tokens
+  - Flutter `result_card.dart`: 3 tabs (Phản hồi / Bản ghi / Bài mẫu) thay vertical scroll
+  - Flutter `recording_card.dart`: `AppColors.rec` (#E2530A) cho recording dot/button/label
+  - L10n `app_vi.arb` + `app_en.arb`: thêm 6 keys mới (resultTab*, resultNo*)
+
+- **V2 deep analysis** completed (2026-04-27): gap analysis giữa design files và implementation, product spec viết tại `docs/specs/v2-ui-spec.md`
+- **Flutter V1 polish** done: AnalysisScreen orbiting ring (V1.1), CourseList status badge (V1.3), ModuleDetail 2-col grid (V1.4), ExerciseList filter pills (V1.5)
+
 ## Best Next Step
-Choose one:
-- Rotate the current production `RDS` password and update `.env.ec2`
-- Continue `Attempt Repair And Shadowing` from `Task 8: Add Retry with this model`
-- Add provider-aware failure mapping for `S3` upload or transcription edge cases once the smoke path reveals real errors
-- Grant `transcribe:StartTranscriptionJob`, `transcribe:GetTranscriptionJob`, and `transcribe:ListTranscriptionJobs` to the AWS identity used by local compose real-transcript mode, then rerun the strict smoke test
-- Improve the learner and CMS slice now that all four V1 oral tasks are wired end-to-end
-- Refine `Uloha 3` and `Uloha 4` feedback so story and choice tasks get the same task-aware guidance quality as `Uloha 1` and `Uloha 2`
-- If full-app testing should now rely on real transcript quality instead of synthetic local transcript, switch the active dev/staging stack into `REQUIRE_REAL_TRANSCRIPT=true` mode and keep using the cloud upload/transcribe path during learner testing
-- Decide whether the next learner polish step should be dedicated attempt-detail UX, retry UX, or provider-aware replay for non-local storage
-- Persist modules and the rest of the content structure in `Postgres`
-- Set the GitHub repository variables for the new release workflow, then publish one test tag to `ECR`
+
+**TIER 1 — Start here:**
+
+**V4.1** — Verify backend `criteria_results` in API response: grep `types.go` và `server.go`, confirm JSON field tồn tại.  
+**V4.2** — Flutter: add `CriterionCheckView` model + parse trong `AttemptFeedbackView.fromJson` → `flutter_app/lib/models/models.dart`  
+**V1.2** — ResultCard 4-col criteria grid display → `flutter_app/lib/features/exercise/widgets/result_card.dart`
+
+Sau đó: **V3.2** MockTestListScreen rich cards, **V3.3** MockTestIntroScreen 3-stat grid.
+
+Full roadmap: `tasks/todo.md`.
+
+**Phase 2 (~5h):** Backend: CourseStore + ModuleStore (with course_id) + SkillStore + ExercisesBySkill + new learner/admin APIs.
+
+**Phase 3 (~4h):** CMS dashboards for Course/Module/Skill. Exercise form: skill dropdown replaces module_id.
+
+**Phase 4 (~5h):** Flutter: CourseListScreen → CourseDetailScreen → ModuleDetailScreen (skill cards) → ExerciseListScreen.
+
+Other:
+- Seed at least one `MockTest` (pool=exam) in CMS for end-to-end exam testing
+- Polish `Uloha 3`/`Uloha 4` messaging + `sample_answer_text`
 
 ## Last Verified
-- `cms lint` pass
-- `cms build` pass
-- `go build ./...` pass
-- `flutter analyze` pass
-- `flutter test` pass
-- `go test ./...` pass
-- `Task 5` backend tests for review-artifact TTS metadata persistence pass
-- `Task 6` backend tests for review artifact fetch and review-audio playback pass
-- `Task 7` Flutter model parsing and review-block UI compile checks pass
-- `Uloha 2` backend store/API tests pass
-- `Uloha 3` backend store/API tests pass
-- `Uloha 4` backend store/API tests pass
+- `cms lint` pass (2026-04-26)
+- `cms build` pass (2026-04-26)
+- `go build ./...` pass (2026-04-26) — GOTOOLCHAIN=go1.24.2
+- `go test ./...` pass (2026-04-26) — 5 packages, all pass
+- `flutter analyze` pass (2026-04-26)
+- `flutter test` pass (2026-04-26) — 6 tests
+- Mock exam V2 full flow verified: CMS create → Flutter list → intro → 4-section record-all-then-analyse → scored result → section detail tap
 
 ## Important Constraints
 - Always prefix shell commands with `rtk`

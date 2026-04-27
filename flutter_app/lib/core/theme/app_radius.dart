@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 abstract final class AppRadius {
   static const double xs   = 4;
-  static const double sm   = 8;
-  static const double md   = 12;
-  static const double lg   = 16;
+  static const double sm   = 10;
+  static const double md   = 14;
+  static const double lg   = 18;
   static const double xl   = 24;
-  static const double xxl  = 28;
+  static const double xxl  = 32;
   static const double full = 999;
 
   static const BorderRadius xsAll   = BorderRadius.all(Radius.circular(xs));
@@ -24,34 +24,20 @@ abstract final class AppRadius {
 
 abstract final class AppShadows {
   static const List<BoxShadow> card = [
-    BoxShadow(
-      color: Color(0x0A3A302A),
-      blurRadius: 16,
-      offset: Offset(0, 2),
-    ),
+    BoxShadow(color: Color(0x0D281C10), blurRadius: 4,  spreadRadius: 0, offset: Offset(0, 1)),
+    BoxShadow(color: Color(0x0F281C10), blurRadius: 16, spreadRadius: 0, offset: Offset(0, 2)),
   ];
 
   static const List<BoxShadow> elevated = [
-    BoxShadow(
-      color: Color(0x143A302A),
-      blurRadius: 24,
-      offset: Offset(0, 4),
-    ),
+    BoxShadow(color: Color(0x0F281C10), blurRadius: 8,  spreadRadius: 0, offset: Offset(0, 2)),
+    BoxShadow(color: Color(0x17281C10), blurRadius: 36, spreadRadius: 0, offset: Offset(0, 8)),
   ];
 
   static const List<BoxShadow> modal = [
-    BoxShadow(
-      color: Color(0x1A3A302A),
-      blurRadius: 40,
-      offset: Offset(0, -4),
-    ),
+    BoxShadow(color: Color(0x1A281C10), blurRadius: 40, spreadRadius: 0, offset: Offset(0, -4)),
   ];
 
   static const List<BoxShadow> primaryGlow = [
-    BoxShadow(
-      color: Color(0x33C2652A),
-      blurRadius: 20,
-      offset: Offset(0, 4),
-    ),
+    BoxShadow(color: Color(0x40FF6A14), blurRadius: 20, spreadRadius: 0, offset: Offset(0, 4)),
   ];
 }

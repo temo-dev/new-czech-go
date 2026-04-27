@@ -49,12 +49,15 @@ services:
       TRANSCRIBE_OUTPUT_PREFIX: ${TRANSCRIBE_OUTPUT_PREFIX:-}
       TRANSCRIBE_LANGUAGE_CODE: ${TRANSCRIBE_LANGUAGE_CODE:-cs-CZ}
       TRANSCRIBE_POLL_INTERVAL: ${TRANSCRIBE_POLL_INTERVAL:-5s}
-      TRANSCRIBE_TIMEOUT: ${TRANSCRIBE_TIMEOUT:-2m}
+      TRANSCRIBE_TIMEOUT: ${TRANSCRIBE_TIMEOUT:-3m}
       LLM_PROVIDER: ${LLM_PROVIDER:-dev}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-}
+      AUDIO_SIGN_SECRET: ${AUDIO_SIGN_SECRET:-}
     volumes:
       - ${HOME}/.aws:/root/.aws:ro
+      - backend_assets:/tmp/czech-go-system-assets
+      - backend_attempts:/tmp/czech-go-system
     ports:
       - "${BACKEND_PORT:-8080}:8080"
 
@@ -76,3 +79,5 @@ services:
 
 volumes:
   postgres_data:
+  backend_assets:
+  backend_attempts:

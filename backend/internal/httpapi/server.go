@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -74,8 +75,22 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/attempt-audio/stream", s.handleAttemptAudioStream)
 	s.mux.HandleFunc("/v1/mock-exams", s.withAuth(s.handleMockExams))
 	s.mux.HandleFunc("/v1/mock-exams/", s.withAuth(s.handleMockExamByID))
+	s.mux.HandleFunc("/v1/mock-tests", s.withAuth(s.handleMockTests))
+	// Course/Skill learner APIs
+	s.mux.HandleFunc("/v1/courses", s.withAuth(s.handleCourses))
+	s.mux.HandleFunc("/v1/courses/", s.withAuth(s.handleCourseByID))
+	s.mux.HandleFunc("/v1/skills/", s.withAuth(s.handleSkillExercises))
+	// Admin APIs
 	s.mux.HandleFunc("/v1/admin/exercises", s.withRole("admin", s.handleAdminExercises))
 	s.mux.HandleFunc("/v1/admin/exercises/", s.withRole("admin", s.handleAdminExerciseByID))
+	s.mux.HandleFunc("/v1/admin/mock-tests", s.withRole("admin", s.handleAdminMockTests))
+	s.mux.HandleFunc("/v1/admin/mock-tests/", s.withRole("admin", s.handleAdminMockTestByID))
+	s.mux.HandleFunc("/v1/admin/courses", s.withRole("admin", s.handleAdminCourses))
+	s.mux.HandleFunc("/v1/admin/courses/", s.withRole("admin", s.handleAdminCourseByID))
+	s.mux.HandleFunc("/v1/admin/modules", s.withRole("admin", s.handleAdminModules))
+	s.mux.HandleFunc("/v1/admin/modules/", s.withRole("admin", s.handleAdminModuleByID))
+	s.mux.HandleFunc("/v1/admin/skills", s.withRole("admin", s.handleAdminSkills))
+	s.mux.HandleFunc("/v1/admin/skills/", s.withRole("admin", s.handleAdminSkillByID))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -188,15 +203,25 @@ func (s *Server) handleModules(w http.ResponseWriter, r *http.Request, _ contrac
 }
 
 func (s *Server) handleModuleExercises(w http.ResponseWriter, r *http.Request, _ contracts.User) {
-	if !strings.HasSuffix(r.URL.Path, "/exercises") || r.Method != http.MethodGet {
-		writeNotFound(w)
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
 		return
 	}
-	moduleID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/modules/"), "/exercises")
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": s.repo.ExercisesByModule(moduleID),
-		"meta": map[string]any{},
-	})
+	path := strings.TrimPrefix(r.URL.Path, "/v1/modules/")
+	if strings.HasSuffix(path, "/skills") {
+		moduleID := strings.TrimSuffix(path, "/skills")
+		s.handleModuleSkills(w, moduleID)
+		return
+	}
+	if strings.HasSuffix(path, "/exercises") {
+		moduleID := strings.TrimSuffix(path, "/exercises")
+		writeJSON(w, http.StatusOK, map[string]any{
+			"data": s.repo.ExercisesByModule(moduleID),
+			"meta": map[string]any{},
+		})
+		return
+	}
+	writeNotFound(w)
 }
 
 func (s *Server) handleExercise(w http.ResponseWriter, r *http.Request, _ contracts.User) {
@@ -405,11 +430,18 @@ func (s *Server) handleAttemptReviewAudioFile(w http.ResponseWriter, r *http.Req
 	}
 	defer file.Close()
 
+	stat, err := file.Stat()
+	if err != nil {
+		log.Printf("attempt review audio stat failed: attempt_id=%s error=%v", attemptID, err)
+		writeNotFound(w)
+		return
+	}
 	if audio.MimeType != "" {
 		w.Header().Set("Content-Type", audio.MimeType)
 	}
-	w.WriteHeader(http.StatusOK)
-	_, _ = io.Copy(w, file)
+	w.Header().Set("Accept-Ranges", "bytes")
+	w.Header().Set("Cache-Control", "no-store")
+	http.ServeContent(w, r, filePath, stat.ModTime(), file)
 }
 
 func (s *Server) handleAttemptAudioURL(w http.ResponseWriter, r *http.Request, user contracts.User, attemptID string) {
@@ -549,11 +581,18 @@ func (s *Server) streamAttemptAudio(w http.ResponseWriter, r *http.Request, atte
 		return
 	}
 	defer file.Close()
+	stat, err := file.Stat()
+	if err != nil {
+		log.Printf("stream attempt audio stat failed: attempt_id=%s error=%v", attemptID, err)
+		writeNotFound(w)
+		return
+	}
 	if audio.MimeType != "" {
 		w.Header().Set("Content-Type", audio.MimeType)
 	}
-	w.WriteHeader(http.StatusOK)
-	_, _ = io.Copy(w, file)
+	w.Header().Set("Accept-Ranges", "bytes")
+	w.Header().Set("Cache-Control", "no-store")
+	http.ServeContent(w, r, audio.StoredFilePath, stat.ModTime(), file)
 }
 
 func (s *Server) streamReviewAudio(w http.ResponseWriter, r *http.Request, attemptID string) {
@@ -575,11 +614,18 @@ func (s *Server) streamReviewAudio(w http.ResponseWriter, r *http.Request, attem
 		return
 	}
 	defer file.Close()
+	stat, err := file.Stat()
+	if err != nil {
+		log.Printf("stream review audio stat failed: attempt_id=%s error=%v", attemptID, err)
+		writeNotFound(w)
+		return
+	}
 	if audio.MimeType != "" {
 		w.Header().Set("Content-Type", audio.MimeType)
 	}
-	w.WriteHeader(http.StatusOK)
-	_, _ = io.Copy(w, file)
+	w.Header().Set("Accept-Ranges", "bytes")
+	w.Header().Set("Cache-Control", "no-store")
+	http.ServeContent(w, r, filePath, stat.ModTime(), file)
 }
 
 func (s *Server) authorizedAttemptForUser(w http.ResponseWriter, user contracts.User, attemptID string) (*contracts.Attempt, bool) {
@@ -649,11 +695,18 @@ func (s *Server) handleAttemptAudioFile(w http.ResponseWriter, r *http.Request, 
 	}
 	defer file.Close()
 
+	stat, err := file.Stat()
+	if err != nil {
+		log.Printf("attempt audio stat failed: attempt_id=%s error=%v", attemptID, err)
+		writeNotFound(w)
+		return
+	}
 	if audio.MimeType != "" {
 		w.Header().Set("Content-Type", audio.MimeType)
 	}
-	w.WriteHeader(http.StatusOK)
-	_, _ = io.Copy(w, file)
+	w.Header().Set("Accept-Ranges", "bytes")
+	w.Header().Set("Cache-Control", "no-store")
+	http.ServeContent(w, r, audio.StoredFilePath, stat.ModTime(), file)
 }
 
 func (s *Server) handleRecordingStarted(w http.ResponseWriter, r *http.Request, attemptID string) {
@@ -762,9 +815,16 @@ func (s *Server) handleAttemptAudioUpload(w http.ResponseWriter, r *http.Request
 	}
 	defer file.Close()
 
+	const maxAudioBytes = 100 * 1024 * 1024 // 100 MB
+	r.Body = http.MaxBytesReader(w, r.Body, maxAudioBytes)
 	size, err := io.Copy(file, r.Body)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "upload_failed", "Could not store uploaded audio.", true)
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "payload_too_large", "Audio file exceeds 100 MB limit.", false)
+		} else {
+			writeError(w, http.StatusInternalServerError, "upload_failed", "Could not store uploaded audio.", true)
+		}
 		return
 	}
 
@@ -843,12 +903,23 @@ func (s *Server) handleUploadComplete(w http.ResponseWriter, r *http.Request, at
 	})
 }
 
-func (s *Server) handleMockExams(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+func (s *Server) handleMockExams(w http.ResponseWriter, r *http.Request, user contracts.User) {
 	if r.Method != http.MethodPost {
 		writeMethodNotAllowed(w)
 		return
 	}
-	session, err := s.repo.CreateMockExam()
+	var body struct {
+		MockTestID string `json:"mock_test_id"`
+	}
+	if r.ContentLength > 0 {
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"error": map[string]any{"code": "invalid_body", "message": err.Error()},
+			})
+			return
+		}
+	}
+	session, err := s.repo.CreateMockExam(user.ID, body.MockTestID)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
 			"error": map[string]any{"code": "mock_exam_create_failed", "message": err.Error()},
@@ -859,6 +930,87 @@ func (s *Server) handleMockExams(w http.ResponseWriter, r *http.Request, _ contr
 		"data": session,
 		"meta": map[string]any{},
 	})
+}
+
+// GET /v1/mock-tests — learner list of published mock tests
+func (s *Server) handleMockTests(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	tests := s.repo.ListMockTests("published")
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": tests,
+		"meta": map[string]any{},
+	})
+}
+
+// Admin CRUD: /v1/admin/mock-tests
+func (s *Server) handleAdminMockTests(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	switch r.Method {
+	case http.MethodGet:
+		tests := s.repo.ListMockTests("")
+		writeJSON(w, http.StatusOK, map[string]any{"data": tests, "meta": map[string]any{}})
+	case http.MethodPost:
+		var t contracts.MockTest
+		if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"error": map[string]any{"code": "invalid_body", "message": err.Error()},
+			})
+			return
+		}
+		created, err := s.repo.CreateMockTest(t)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"error": map[string]any{"code": "create_failed", "message": err.Error()},
+			})
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"data": created, "meta": map[string]any{}})
+	default:
+		writeMethodNotAllowed(w)
+	}
+}
+
+func (s *Server) handleAdminMockTestByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	id := strings.TrimPrefix(r.URL.Path, "/v1/admin/mock-tests/")
+	if id == "" {
+		writeNotFound(w)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		t, ok := s.repo.MockTestByID(id)
+		if !ok {
+			writeNotFound(w)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": t, "meta": map[string]any{}})
+	case http.MethodPatch:
+		var update contracts.MockTest
+		if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"error": map[string]any{"code": "invalid_body", "message": err.Error()},
+			})
+			return
+		}
+		updated, ok := s.repo.UpdateMockTest(id, update)
+		if !ok {
+			writeNotFound(w)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": updated, "meta": map[string]any{}})
+	case http.MethodDelete:
+		if !s.repo.DeleteMockTest(id) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"error": map[string]any{"code": "delete_failed", "message": "mock test not found or not in draft status"},
+			})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{}, "meta": map[string]any{}})
+	default:
+		writeMethodNotAllowed(w)
+	}
 }
 
 func (s *Server) handleMockExamByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
@@ -930,7 +1082,8 @@ func (s *Server) handleMockExamComplete(w http.ResponseWriter, r *http.Request, 
 func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ contracts.User) {
 	switch r.Method {
 	case http.MethodGet:
-		writeJSON(w, http.StatusOK, map[string]any{"data": s.repo.ListExercises(), "meta": map[string]any{}})
+		pool := r.URL.Query().Get("pool")
+		writeJSON(w, http.StatusOK, map[string]any{"data": s.repo.ListExercises(pool), "meta": map[string]any{}})
 	case http.MethodPost:
 		var req struct {
 			ModuleID              string          `json:"module_id"`
@@ -942,12 +1095,20 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 			PrepTimeSec           int             `json:"prep_time_sec"`
 			RecordingTimeLimitSec int             `json:"recording_time_limit_sec"`
 			SampleAnswerEnabled   bool            `json:"sample_answer_enabled"`
+			SampleAnswerText      string          `json:"sample_answer_text"`
+			Status                string          `json:"status"`
 			Detail                json.RawMessage `json:"detail"`
 			Questions             []string        `json:"questions"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Title == "" || req.ExerciseType == "" {
 			writeError(w, http.StatusBadRequest, "validation_error", "Title and exercise type are required.", false)
 			return
+		}
+		status := strings.TrimSpace(req.Status)
+		switch status {
+		case "draft", "published", "archived":
+		default:
+			status = "draft"
 		}
 		exercise := contracts.Exercise{
 			ModuleID:               req.ModuleID,
@@ -959,7 +1120,8 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 			PrepTimeSec:            req.PrepTimeSec,
 			RecordingTimeLimitSec:  req.RecordingTimeLimitSec,
 			SampleAnswerEnabled:    req.SampleAnswerEnabled,
-			Status:                 "draft",
+			SampleAnswerText:       strings.TrimSpace(req.SampleAnswerText),
+			Status:                 status,
 			ScoringTemplatePreview: &contracts.ScoringPreview{RubricVersion: "v1", FeedbackStyle: "supportive_direct_vi"},
 		}
 		switch req.ExerciseType {
@@ -1178,9 +1340,16 @@ func (s *Server) handleAdminAssetBlobUpload(w http.ResponseWriter, r *http.Reque
 	}
 	defer file.Close()
 
+	const maxAssetBytes = 100 * 1024 * 1024 // 100 MB
+	r.Body = http.MaxBytesReader(w, r.Body, maxAssetBytes)
 	size, err := io.Copy(file, r.Body)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "upload_failed", "Could not store uploaded asset.", true)
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "payload_too_large", "Asset file exceeds 100 MB limit.", false)
+		} else {
+			writeError(w, http.StatusInternalServerError, "upload_failed", "Could not store uploaded asset.", true)
+		}
 		return
 	}
 
@@ -1492,4 +1661,243 @@ func attemptSequenceOrZero(attemptID string) int {
 		return 0
 	}
 	return sequence
+}
+
+// ── Learner: Courses + Skills ────────────────────────────────────────────────
+
+func (s *Server) handleCourses(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	courses := s.repo.ListCourses("published")
+	writeJSON(w, http.StatusOK, map[string]any{"data": courses, "meta": map[string]any{}})
+}
+
+func (s *Server) handleCourseByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	path := strings.TrimPrefix(r.URL.Path, "/v1/courses/")
+	if strings.HasSuffix(path, "/modules") {
+		id := strings.TrimSuffix(path, "/modules")
+		mods := s.repo.ListModules("", id)
+		var published []contracts.Module
+		for _, m := range mods {
+			if m.Status == "published" {
+				published = append(published, m)
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": published, "meta": map[string]any{}})
+		return
+	}
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	c, ok := s.repo.CourseByID(path)
+	if !ok {
+		writeNotFound(w)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": c, "meta": map[string]any{}})
+}
+
+func (s *Server) handleSkillExercises(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	// /v1/skills/:id/exercises  OR  /v1/modules/:id/skills (handled via handleModuleExercises)
+	path := strings.TrimPrefix(r.URL.Path, "/v1/skills/")
+	if !strings.HasSuffix(path, "/exercises") {
+		writeNotFound(w)
+		return
+	}
+	skillID := strings.TrimSuffix(path, "/exercises")
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	exercises := s.repo.ExercisesBySkill(skillID)
+	writeJSON(w, http.StatusOK, map[string]any{"data": exercises, "meta": map[string]any{}})
+}
+
+// ── Admin: Courses ────────────────────────────────────────────────────────────
+
+func (s *Server) handleAdminCourses(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{"data": s.repo.ListCourses(""), "meta": map[string]any{}})
+	case http.MethodPost:
+		var c contracts.Course
+		if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_body", err.Error(), false)
+			return
+		}
+		created, err := s.repo.CreateCourse(c)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "create_failed", err.Error(), false)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"data": created, "meta": map[string]any{}})
+	default:
+		writeMethodNotAllowed(w)
+	}
+}
+
+func (s *Server) handleAdminCourseByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	id := strings.TrimPrefix(r.URL.Path, "/v1/admin/courses/")
+	switch r.Method {
+	case http.MethodGet:
+		c, ok := s.repo.CourseByID(id)
+		if !ok {
+			writeNotFound(w)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": c, "meta": map[string]any{}})
+	case http.MethodPatch:
+		var update contracts.Course
+		if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_body", err.Error(), false)
+			return
+		}
+		updated, ok := s.repo.UpdateCourse(id, update)
+		if !ok {
+			writeNotFound(w)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": updated, "meta": map[string]any{}})
+	case http.MethodDelete:
+		if !s.repo.DeleteCourse(id) {
+			writeError(w, http.StatusBadRequest, "delete_failed", "course not found", false)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{}, "meta": map[string]any{}})
+	default:
+		writeMethodNotAllowed(w)
+	}
+}
+
+// ── Admin: Modules ────────────────────────────────────────────────────────────
+
+func (s *Server) handleAdminModules(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	switch r.Method {
+	case http.MethodGet:
+		kind := r.URL.Query().Get("kind")
+		courseID := r.URL.Query().Get("course_id")
+		writeJSON(w, http.StatusOK, map[string]any{"data": s.repo.ListModules(kind, courseID), "meta": map[string]any{}})
+	case http.MethodPost:
+		var m contracts.Module
+		if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_body", err.Error(), false)
+			return
+		}
+		created, err := s.repo.CreateModule(m)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "create_failed", err.Error(), false)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"data": created, "meta": map[string]any{}})
+	default:
+		writeMethodNotAllowed(w)
+	}
+}
+
+func (s *Server) handleAdminModuleByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	id := strings.TrimPrefix(r.URL.Path, "/v1/admin/modules/")
+	switch r.Method {
+	case http.MethodGet:
+		m, ok := s.repo.ModuleByID(id)
+		if !ok {
+			writeNotFound(w)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": m, "meta": map[string]any{}})
+	case http.MethodPatch:
+		var update contracts.Module
+		if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_body", err.Error(), false)
+			return
+		}
+		updated, ok := s.repo.UpdateModule(id, update)
+		if !ok {
+			writeNotFound(w)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": updated, "meta": map[string]any{}})
+	case http.MethodDelete:
+		if !s.repo.DeleteModule(id) {
+			writeError(w, http.StatusBadRequest, "delete_failed", "module not found", false)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{}, "meta": map[string]any{}})
+	default:
+		writeMethodNotAllowed(w)
+	}
+}
+
+// ── Admin: Skills ─────────────────────────────────────────────────────────────
+
+func (s *Server) handleAdminSkills(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	switch r.Method {
+	case http.MethodGet:
+		moduleID := r.URL.Query().Get("module_id")
+		var skills []contracts.Skill
+		if moduleID != "" {
+			skills = s.repo.SkillsByModule(moduleID)
+		} else {
+			// return all (admin view)
+			writeJSON(w, http.StatusOK, map[string]any{"data": []contracts.Skill{}, "meta": map[string]any{}})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": skills, "meta": map[string]any{}})
+	case http.MethodPost:
+		var sk contracts.Skill
+		if err := json.NewDecoder(r.Body).Decode(&sk); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_body", err.Error(), false)
+			return
+		}
+		created, err := s.repo.CreateSkill(sk)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "create_failed", err.Error(), false)
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"data": created, "meta": map[string]any{}})
+	default:
+		writeMethodNotAllowed(w)
+	}
+}
+
+func (s *Server) handleAdminSkillByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	id := strings.TrimPrefix(r.URL.Path, "/v1/admin/skills/")
+	switch r.Method {
+	case http.MethodGet:
+		sk, ok := s.repo.SkillByID(id)
+		if !ok {
+			writeNotFound(w)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": sk, "meta": map[string]any{}})
+	case http.MethodPatch:
+		var update contracts.Skill
+		if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_body", err.Error(), false)
+			return
+		}
+		updated, ok := s.repo.UpdateSkill(id, update)
+		if !ok {
+			writeNotFound(w)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": updated, "meta": map[string]any{}})
+	case http.MethodDelete:
+		if !s.repo.DeleteSkill(id) {
+			writeError(w, http.StatusBadRequest, "delete_failed", "skill not found", false)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{}, "meta": map[string]any{}})
+	default:
+		writeMethodNotAllowed(w)
+	}
+}
+
+// handleModulesSkills handles GET /v1/modules/:id/skills
+// Injected into handleModuleExercises path matching.
+func (s *Server) handleModuleSkills(w http.ResponseWriter, moduleID string) {
+	skills := s.repo.SkillsByModule(moduleID)
+	writeJSON(w, http.StatusOK, map[string]any{"data": skills, "meta": map[string]any{}})
 }

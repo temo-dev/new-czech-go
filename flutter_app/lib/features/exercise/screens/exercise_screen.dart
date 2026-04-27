@@ -27,11 +27,21 @@ class ExerciseScreen extends StatefulWidget {
     required this.client,
     required this.detail,
     this.onOpenNext,
+    this.onRecordingReady,
   });
 
   final ApiClient client;
   final ExerciseDetail detail;
   final VoidCallback? onOpenNext;
+
+  /// If set, called instead of pushing AnalysisScreen after recording stops.
+  /// Caller is responsible for upload + analysis.
+  final void Function(
+    String attemptId,
+    String audioPath,
+    int fileSizeBytes,
+    int durationMs,
+  )? onRecordingReady;
 
   @override
   State<ExerciseScreen> createState() => _ExerciseScreenState();
@@ -182,6 +192,14 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
     await _player.stop();
     if (!mounted) return;
+
+    final onRecordingReady = widget.onRecordingReady;
+    if (onRecordingReady != null) {
+      onRecordingReady(attemptId, audioPath, fileSizeBytes, durationMs);
+      Navigator.of(context).pop();
+      return;
+    }
+
     final navigator = Navigator.of(context);
     final onOpenNext = widget.onOpenNext;
     await navigator.push(

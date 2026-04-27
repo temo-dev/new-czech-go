@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A2 Mluvení Sprint — Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; font-family: 'Inter', system-ui, sans-serif; background: #f0eee9; color: #1F1A14; -webkit-font-smoothing: antialiased; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.4); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tokens.jsx"></script>
+<script type="text/babel" src="icons.jsx"></script>
+<script type="text/babel" src="components.jsx"></script>
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="screens-list.jsx"></script>
+<script type="text/babel" src="screens-exercise.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect } = React;
+
+function Root() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  return (
+    <>
+      <DesignCanvas>
+        <DCSection id="hero" title="A2 Mluvení Sprint" subtitle="Interactive prototype — Speaking flow. Bấm vào card để bắt đầu, ghi âm, xem kết quả.">
+          <DCArtboard id="hero-prototype" label="Hero · Tap-through prototype" width={420} height={880}>
+            <div data-screen-label="Prototype" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0eee9' }}>
+              <Phone initial="course-list" />
+            </div>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="speaking" title="Speaking flow" subtitle="Exercise → Recording → Analyzing → Result">
+          <DCArtboard id="ex-list" label="04 · Exercise list" width={420} height={880}>
+            <div data-screen-label="04 Exercise list" style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:'#f0eee9'}}>
+              <Phone initial="exercise-list" startState={{ skill: MOCK.SKILLS[0] }} />
+            </div>
+          </DCArtboard>
+          <DCArtboard id="ex-record" label="05 · Recording" width={420} height={880}>
+            <div data-screen-label="05 Recording" style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:'#f0eee9'}}>
+              <Phone initial="exercise" startState={{ exercise: MOCK.EXERCISES[3] }} />
+            </div>
+          </DCArtboard>
+          <DCArtboard id="ex-analyze" label="06 · Analyzing" width={420} height={880}>
+            <div data-screen-label="06 Analyzing" style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:'#f0eee9'}}>
+              <Phone initial="analyzing" />
+            </div>
+          </DCArtboard>
+          <DCArtboard id="ex-result" label="07 · Result" width={420} height={880}>
+            <div data-screen-label="07 Result" style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:'#f0eee9'}}>
+              <Phone initial="result" />
+            </div>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="entry" title="Entry & navigation" subtitle="Course → Module → Skill">
+          <DCArtboard id="screen-1" label="01 · Course list" width={420} height={880}>
+            <div data-screen-label="01 Course list" style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:'#f0eee9'}}>
+              <Phone initial="course-list" />
+            </div>
+          </DCArtboard>
+          <DCArtboard id="screen-2" label="02 · Module list" width={420} height={880}>
+            <div data-screen-label="02 Module list" style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:'#f0eee9'}}>
+              <Phone initial="module-list" startState={{ course: MOCK.COURSES[0] }} />
+            </div>
+          </DCArtboard>
+          <DCArtboard id="screen-3" label="03 · Module detail (skills)" width={420} height={880}>
+            <div data-screen-label="03 Module detail" style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:'#f0eee9'}}>
+              <Phone initial="module-detail" startState={{ module: MOCK.MODULES[2], course: MOCK.COURSES[0] }} />
+            </div>
+          </DCArtboard>
+          <DCArtboard id="screen-9" label="09 · History" width={420} height={880}>
+            <div data-screen-label="09 History" style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:'#f0eee9'}}>
+              <Phone initial="history" />
+            </div>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="mock" title="Mock test flow" subtitle="Đề thi mô phỏng đầy đủ 4 phần">
+          <DCArtboard id="mock-list-ab" label="08a · Mock list" width={420} height={880}>
+            <div data-screen-label="08a Mock list" style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:'#f0eee9'}}>
+              <Phone initial="mock-list" />
+            </div>
+          </DCArtboard>
+          <DCArtboard id="mock-intro-ab" label="08b · Mock intro" width={420} height={880}>
+            <div data-screen-label="08b Mock intro" style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:'#f0eee9'}}>
+              <Phone initial="mock-intro" startState={{ test: MOCK.MOCK_TESTS[0] }} />
+            </div>
+          </DCArtboard>
+          <DCArtboard id="mock-exam-ab" label="08c · Mock exam (recording)" width={420} height={880}>
+            <div data-screen-label="08c Mock exam" style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:'#f0eee9'}}>
+              <Phone initial="mock-exam" startState={{ test: MOCK.MOCK_TESTS[0] }} />
+            </div>
+          </DCArtboard>
+          <DCArtboard id="mock-result-ab" label="08d · Mock result" width={420} height={880}>
+            <div data-screen-label="08d Mock result" style={{ width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:'#f0eee9'}}>
+              <Phone initial="mock-result" />
+            </div>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="system" title="Design system" subtitle="Tokens & components">
+          <DCArtboard id="tokens" label="Tokens · Type · Color · Components" width={920} height={780}>
+            <TokensArtboard />
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="Recording screen">
+          <TweakRadio
+            label="Visual style"
+            value={tweaks.recordingVariant}
+            onChange={(v) => setTweak('recordingVariant', v)}
+            options={[
+              { value: 'A', label: 'Pulsing orb' },
+              { value: 'B', label: 'Waveform' },
+            ]}
+          />
+        </TweakSection>
+        <TweakSection title="Result screen">
+          <TweakRadio
+            label="Layout"
+            value={tweaks.resultVariant}
+            onChange={(v) => setTweak('resultVariant', v)}
+            options={[
+              { value: 'A', label: 'Score + tabs' },
+            ]}
+          />
+        </TweakSection>
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+</script>
+
+</body>
+</html>

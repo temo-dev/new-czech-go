@@ -63,7 +63,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get mockExamIntroTitle => '4 phần, mỗi phần 1 lần';
 
   @override
-  String get mockExamIntroBody => 'Làm lần lượt từng Uloha. Có kết quả tổng sau khi xong.';
+  String get mockExamIntroBody => 'Ghi âm lần lượt từng Uloha. Sau khi xong cả 4 phần, hệ thống sẽ phân tích và cho kết quả tổng.';
 
   @override
   String mockExamSectionLabel(int index) {
@@ -75,6 +75,17 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get mockExamStatusPending => 'CHỜ';
+
+  @override
+  String get mockExamStatusRecorded => 'ĐÃ GHI';
+
+  @override
+  String get mockExamAnalyzing => 'Đang phân tích bài thi...';
+
+  @override
+  String mockExamAnalyzingProgress(int n, int total) {
+    return 'Đang phân tích phần $n / $total';
+  }
 
   @override
   String get mockExamActionStart => 'Bắt đầu';
@@ -92,7 +103,105 @@ class AppLocalizationsVi extends AppLocalizations {
   String get mockExamBackHome => 'Về trang chủ';
 
   @override
+  String get mockExamCardPill => 'BÀI THI THỬ';
+
+  @override
+  String get mockExamCardTitle => 'Bài thi thử nói A2';
+
+  @override
+  String get mockExamCardSubtitle => 'Kiểm tra cả 4 phần nói liên tiếp như thi thật.';
+
+  @override
   String get mockExamOpenCta => 'Mở mock exam';
+
+  @override
+  String get courseListTitle => 'Khóa học';
+
+  @override
+  String get courseListEmpty => 'Chưa có khóa học nào. Hãy nhờ admin publish một khóa.';
+
+  @override
+  String get moduleListTitle => 'Chủ đề';
+
+  @override
+  String get skillListTitle => 'Kỹ năng';
+
+  @override
+  String get exerciseListTitle => 'Bài tập';
+
+  @override
+  String get skillNoi => 'Nói';
+
+  @override
+  String get skillNghe => 'Nghe';
+
+  @override
+  String get skillDoc => 'Đọc';
+
+  @override
+  String get skillViet => 'Viết';
+
+  @override
+  String get skillTuVung => 'Từ vựng';
+
+  @override
+  String get skillNguPhap => 'Ngữ pháp';
+
+  @override
+  String get skillComingSoon => 'Sắp ra mắt';
+
+  @override
+  String get mockTestListTitle => 'Chọn đề thi';
+
+  @override
+  String get mockTestListEmpty => 'Chưa có đề thi nào. Hãy nhờ admin publish một đề.';
+
+  @override
+  String mockTestCardMinutes(int n) {
+    return '$n phút';
+  }
+
+  @override
+  String mockTestCardSections(int n) {
+    return '$n phần';
+  }
+
+  @override
+  String get mockTestIntroStartCta => 'Bắt đầu thi';
+
+  @override
+  String mockTestIntroPoints(int pts) {
+    return 'Tổng $pts điểm';
+  }
+
+  @override
+  String mockTestIntroPassThreshold(int pts) {
+    return 'Đạt: từ $pts điểm trở lên';
+  }
+
+  @override
+  String get mockTestIntroSectionsTitle => 'Các phần thi';
+
+  @override
+  String mockExamScoreLabel(int score, int max) {
+    return '$score / $max';
+  }
+
+  @override
+  String get mockExamPassLabel => 'ĐẠT';
+
+  @override
+  String get mockExamFailLabel => 'CHƯA ĐẠT';
+
+  @override
+  String mockExamSectionScoreLabel(int n, int score, int max) {
+    return 'Úloha $n: $score/$max điểm';
+  }
+
+  @override
+  String mockExamSectionDetail(int n) {
+    return 'Phân tích Phần $n';
+  }
 
   @override
   String get recentAttemptsTitle => 'Lần tập gần đây';
@@ -286,6 +395,24 @@ class AppLocalizationsVi extends AppLocalizations {
   String get resultNextExerciseCta => 'Sang bài tiếp theo';
 
   @override
+  String get resultTabFeedback => 'Phản hồi';
+
+  @override
+  String get resultTabTranscript => 'Bản ghi';
+
+  @override
+  String get resultTabSample => 'Bài mẫu';
+
+  @override
+  String get resultNoFeedback => 'Chưa có phản hồi.';
+
+  @override
+  String get resultNoTranscript => 'Chưa có bản ghi âm.';
+
+  @override
+  String get resultNoSample => 'Chưa có bài mẫu.';
+
+  @override
   String get reviewArtifactTitle => 'Sửa & luyện theo mẫu';
 
   @override
@@ -404,5 +531,31 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String promptChoiceReasoningHint(String list) {
     return 'Gợi ý lý do: $list';
+  }
+
+  @override
+  String get bottomNavTests => 'Đề thi';
+
+  @override
+  String get bottomNavProfile => 'Hồ sơ';
+
+  @override
+  String get profileTitle => 'Hồ sơ';
+
+  @override
+  String get profileLanguageSection => 'Ngôn ngữ';
+
+  @override
+  String get profileAboutSection => 'Thông tin';
+
+  @override
+  String get profileAppName => 'A2 Mluvení Sprint';
+
+  @override
+  String get profileAppTagline => 'Luyện thi nói A2 tiếng Czech cho người Việt';
+
+  @override
+  String profileVersion(String version) {
+    return 'Phiên bản $version';
   }
 }

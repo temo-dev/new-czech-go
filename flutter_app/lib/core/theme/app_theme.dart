@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 import 'app_typography.dart';
 import 'app_radius.dart';
@@ -42,13 +43,27 @@ abstract final class AppTheme {
       surfaceTint: AppColors.surfaceTint,
     );
 
+    // Apply Inter to body/title/label; display/headline keep PlayfairDisplay.
+    final baseTextTheme = AppTypography.textTheme.apply(
+      bodyColor: colorScheme.onSurface,
+      displayColor: colorScheme.onSurface,
+    );
+    final textTheme = baseTextTheme.copyWith(
+      bodyLarge:   GoogleFonts.inter(textStyle: baseTextTheme.bodyLarge),
+      bodyMedium:  GoogleFonts.inter(textStyle: baseTextTheme.bodyMedium),
+      bodySmall:   GoogleFonts.inter(textStyle: baseTextTheme.bodySmall),
+      titleLarge:  GoogleFonts.inter(textStyle: baseTextTheme.titleLarge),
+      titleMedium: GoogleFonts.inter(textStyle: baseTextTheme.titleMedium),
+      titleSmall:  GoogleFonts.inter(textStyle: baseTextTheme.titleSmall),
+      labelLarge:  GoogleFonts.inter(textStyle: baseTextTheme.labelLarge),
+      labelMedium: GoogleFonts.inter(textStyle: baseTextTheme.labelMedium),
+      labelSmall:  GoogleFonts.inter(textStyle: baseTextTheme.labelSmall),
+    );
+
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      textTheme: AppTypography.textTheme.apply(
-        bodyColor: colorScheme.onSurface,
-        displayColor: colorScheme.onSurface,
-      ),
+      textTheme: textTheme,
       scaffoldBackgroundColor: AppColors.surface,
 
       appBarTheme: AppBarTheme(
@@ -163,11 +178,13 @@ abstract final class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.inverseSurfaceLight,
-        contentTextStyle: AppTypography.bodyMedium.copyWith(
-          color: AppColors.inverseOnSurfaceLight,
+        contentTextStyle: GoogleFonts.inter(
+          textStyle: AppTypography.bodyMedium.copyWith(
+            color: AppColors.inverseOnSurfaceLight,
+          ),
         ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         elevation: 4,
       ),
@@ -176,10 +193,10 @@ abstract final class AppTheme {
         backgroundColor: AppColors.surfaceContainerLowest,
         surfaceTintColor: Colors.transparent,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
         ),
         elevation: 8,
-        shadowColor: const Color(0x1A3A302A),
+        shadowColor: const Color(0x1A281C10),
       ),
 
       dialogTheme: DialogThemeData(

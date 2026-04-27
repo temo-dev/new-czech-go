@@ -1,19 +1,91 @@
-class ModuleSummary {
-  const ModuleSummary({
+class Course {
+  const Course({
     required this.id,
+    required this.slug,
     required this.title,
-    required this.moduleKind,
+    required this.description,
+    required this.status,
+    required this.sequenceNo,
   });
 
   final String id;
+  final String slug;
   final String title;
+  final String description;
+  final String status;
+  final int sequenceNo;
+
+  factory Course.fromJson(Map<String, dynamic> json) {
+    return Course(
+      id: json['id'] as String? ?? '',
+      slug: json['slug'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      status: json['status'] as String? ?? 'published',
+      sequenceNo: (json['sequence_no'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class Skill {
+  const Skill({
+    required this.id,
+    required this.moduleId,
+    required this.skillKind,
+    required this.title,
+    required this.sequenceNo,
+    required this.status,
+  });
+
+  final String id;
+  final String moduleId;
+  final String skillKind;
+  final String title;
+  final int sequenceNo;
+  final String status;
+
+  bool get isImplemented => skillKind == 'noi';
+
+  factory Skill.fromJson(Map<String, dynamic> json) {
+    return Skill(
+      id: json['id'] as String? ?? '',
+      moduleId: json['module_id'] as String? ?? '',
+      skillKind: json['skill_kind'] as String? ?? 'noi',
+      title: json['title'] as String? ?? '',
+      sequenceNo: (json['sequence_no'] as num?)?.toInt() ?? 0,
+      status: json['status'] as String? ?? 'published',
+    );
+  }
+}
+
+class ModuleSummary {
+  const ModuleSummary({
+    required this.id,
+    required this.courseId,
+    required this.title,
+    required this.description,
+    required this.moduleKind,
+    required this.sequenceNo,
+    required this.status,
+  });
+
+  final String id;
+  final String courseId;
+  final String title;
+  final String description;
   final String moduleKind;
+  final int sequenceNo;
+  final String status;
 
   factory ModuleSummary.fromJson(Map<String, dynamic> json) {
     return ModuleSummary(
       id: json['id'] as String,
+      courseId: json['course_id'] as String? ?? '',
       title: json['title'] as String,
-      moduleKind: json['module_kind'] as String,
+      description: json['description'] as String? ?? '',
+      moduleKind: json['module_kind'] as String? ?? 'daily_plan',
+      sequenceNo: (json['sequence_no'] as num?)?.toInt() ?? 0,
+      status: json['status'] as String? ?? 'published',
     );
   }
 }
@@ -51,19 +123,78 @@ class PlanDay {
   }
 }
 
+class MockTestSection {
+  const MockTestSection({
+    required this.sequenceNo,
+    required this.exerciseId,
+    required this.exerciseType,
+    required this.maxPoints,
+  });
+
+  final int sequenceNo;
+  final String exerciseId;
+  final String exerciseType;
+  final int maxPoints;
+
+  factory MockTestSection.fromJson(Map<String, dynamic> json) {
+    return MockTestSection(
+      sequenceNo: (json['sequence_no'] as num).toInt(),
+      exerciseId: json['exercise_id'] as String? ?? '',
+      exerciseType: json['exercise_type'] as String? ?? '',
+      maxPoints: (json['max_points'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class MockTest {
+  const MockTest({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.estimatedDurationMinutes,
+    required this.status,
+    required this.sections,
+  });
+
+  final String id;
+  final String title;
+  final String description;
+  final int estimatedDurationMinutes;
+  final String status;
+  final List<MockTestSection> sections;
+
+  int get totalMaxPoints => sections.fold(0, (s, sec) => s + sec.maxPoints);
+
+  factory MockTest.fromJson(Map<String, dynamic> json) {
+    final raw = json['sections'] as List<dynamic>? ?? const [];
+    return MockTest(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      estimatedDurationMinutes: (json['estimated_duration_minutes'] as num?)?.toInt() ?? 15,
+      status: json['status'] as String? ?? 'draft',
+      sections: raw.map((e) => MockTestSection.fromJson(e as Map<String, dynamic>)).toList(),
+    );
+  }
+}
+
 class MockExamSection {
   const MockExamSection({
     required this.sequenceNo,
     required this.exerciseId,
     required this.exerciseType,
+    required this.maxPoints,
     required this.attemptId,
+    required this.sectionScore,
     required this.status,
   });
 
   final int sequenceNo;
   final String exerciseId;
   final String exerciseType;
+  final int maxPoints;
   final String attemptId;
+  final int sectionScore;
   final String status;
 
   bool get isPending => status == 'pending';
@@ -74,7 +205,9 @@ class MockExamSection {
       sequenceNo: (json['sequence_no'] as num).toInt(),
       exerciseId: json['exercise_id'] as String? ?? '',
       exerciseType: json['exercise_type'] as String? ?? '',
+      maxPoints: (json['max_points'] as num?)?.toInt() ?? 0,
       attemptId: json['attempt_id'] as String? ?? '',
+      sectionScore: (json['section_score'] as num?)?.toInt() ?? 0,
       status: json['status'] as String? ?? 'pending',
     );
   }
@@ -84,6 +217,9 @@ class MockExamSessionView {
   const MockExamSessionView({
     required this.id,
     required this.status,
+    required this.mockTestId,
+    required this.overallScore,
+    required this.passed,
     required this.overallReadinessLevel,
     required this.overallSummary,
     required this.sections,
@@ -91,11 +227,17 @@ class MockExamSessionView {
 
   final String id;
   final String status;
+  final String mockTestId;
+  final int overallScore;
+  final bool passed;
   final String overallReadinessLevel;
   final String overallSummary;
   final List<MockExamSection> sections;
 
   bool get isCompleted => status == 'completed';
+
+  int get totalMaxPoints => sections.fold(0, (s, sec) => s + sec.maxPoints);
+
   MockExamSection? get nextPending {
     for (final s in sections) {
       if (s.isPending) return s;
@@ -108,11 +250,12 @@ class MockExamSessionView {
     return MockExamSessionView(
       id: json['id'] as String? ?? '',
       status: json['status'] as String? ?? 'created',
+      mockTestId: json['mock_test_id'] as String? ?? '',
+      overallScore: (json['overall_score'] as num?)?.toInt() ?? 0,
+      passed: json['passed'] as bool? ?? false,
       overallReadinessLevel: json['overall_readiness_level'] as String? ?? '',
       overallSummary: json['overall_summary'] as String? ?? '',
-      sections: raw
-          .map((item) => MockExamSection.fromJson(item as Map<String, dynamic>))
-          .toList(),
+      sections: raw.map((e) => MockExamSection.fromJson(e as Map<String, dynamic>)).toList(),
     );
   }
 }
@@ -136,9 +279,10 @@ class LearningPlanView {
       currentDay: (json['current_day'] as num?)?.toInt() ?? 1,
       startDate: json['start_date'] as String? ?? '',
       status: json['status'] as String? ?? 'active',
-      days: rawDays
-          .map((item) => PlanDay.fromJson(item as Map<String, dynamic>))
-          .toList(),
+      days:
+          rawDays
+              .map((item) => PlanDay.fromJson(item as Map<String, dynamic>))
+              .toList(),
     );
   }
 }
@@ -514,7 +658,9 @@ class AttemptReviewArtifactView {
               .toList(),
       diffChunks:
           (json['diff_chunks'] as List<dynamic>? ?? const [])
-              .map((item) => DiffChunkView.fromJson(item as Map<String, dynamic>))
+              .map(
+                (item) => DiffChunkView.fromJson(item as Map<String, dynamic>),
+              )
               .toList(),
       ttsAudio:
           json['tts_audio'] == null
@@ -586,15 +732,18 @@ class ReviewArtifactAudioView {
   const ReviewArtifactAudioView({
     required this.storageKey,
     required this.mimeType,
+    required this.durationMs,
   });
 
   final String storageKey;
   final String mimeType;
+  final int durationMs;
 
   factory ReviewArtifactAudioView.fromJson(Map<String, dynamic> json) {
     return ReviewArtifactAudioView(
       storageKey: json['storage_key'] as String? ?? '',
       mimeType: json['mime_type'] as String? ?? '',
+      durationMs: json['duration_ms'] as int? ?? 0,
     );
   }
 }
@@ -622,6 +771,29 @@ class AttemptAudioView {
   }
 }
 
+class CriterionCheckView {
+  const CriterionCheckView({
+    required this.criterionKey,
+    required this.label,
+    required this.met,
+    this.comment = '',
+  });
+
+  final String criterionKey;
+  final String label;
+  final bool met;
+  final String comment;
+
+  factory CriterionCheckView.fromJson(Map<String, dynamic> json) {
+    return CriterionCheckView(
+      criterionKey: json['criterion_key'] as String? ?? '',
+      label: json['label'] as String? ?? '',
+      met: json['met'] as bool? ?? false,
+      comment: json['comment'] as String? ?? '',
+    );
+  }
+}
+
 class AttemptFeedbackView {
   const AttemptFeedbackView({
     required this.readinessLevel,
@@ -630,6 +802,7 @@ class AttemptFeedbackView {
     required this.improvements,
     required this.retryAdvice,
     required this.sampleAnswer,
+    this.criteriaResults = const [],
   });
 
   final String readinessLevel;
@@ -638,6 +811,7 @@ class AttemptFeedbackView {
   final List<String> improvements;
   final List<String> retryAdvice;
   final String sampleAnswer;
+  final List<CriterionCheckView> criteriaResults;
 
   factory AttemptFeedbackView.fromJson(Map<String, dynamic> json) {
     List<String> toStrings(dynamic value) {
@@ -646,6 +820,14 @@ class AttemptFeedbackView {
           .toList();
     }
 
+    final taskCompletion =
+        json['task_completion'] as Map<String, dynamic>? ?? {};
+    final rawCriteria =
+        taskCompletion['criteria_results'] as List<dynamic>? ?? [];
+    final criteria = rawCriteria
+        .map((e) => CriterionCheckView.fromJson(e as Map<String, dynamic>))
+        .toList();
+
     return AttemptFeedbackView(
       readinessLevel: json['readiness_level'] as String? ?? 'needs_work',
       overallSummary: json['overall_summary'] as String? ?? '',
@@ -653,6 +835,7 @@ class AttemptFeedbackView {
       improvements: toStrings(json['improvements']),
       retryAdvice: toStrings(json['retry_advice']),
       sampleAnswer: json['sample_answer_text'] as String? ?? '',
+      criteriaResults: criteria,
     );
   }
 }

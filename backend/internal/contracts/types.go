@@ -9,9 +9,21 @@ type User struct {
 }
 
 type Course struct {
-	ID    string `json:"id"`
-	Slug  string `json:"slug"`
-	Title string `json:"title"`
+	ID          string `json:"id"`
+	Slug        string `json:"slug"`
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
+	Status      string `json:"status,omitempty"`   // draft, published
+	SequenceNo  int    `json:"sequence_no,omitempty"`
+}
+
+type Skill struct {
+	ID         string `json:"id"`
+	ModuleID   string `json:"module_id"`
+	SkillKind  string `json:"skill_kind"` // noi, nghe, doc, viet, tu_vung, ngu_phap
+	Title      string `json:"title"`
+	SequenceNo int    `json:"sequence_no"`
+	Status     string `json:"status,omitempty"`
 }
 
 type LearningPlan struct {
@@ -22,16 +34,20 @@ type LearningPlan struct {
 
 type Module struct {
 	ID          string `json:"id"`
+	CourseID    string `json:"course_id,omitempty"`
 	Slug        string `json:"slug"`
 	Title       string `json:"title"`
 	ModuleKind  string `json:"module_kind"`
 	SequenceNo  int    `json:"sequence_no"`
 	Description string `json:"description,omitempty"`
+	Status      string `json:"status,omitempty"` // draft, published
 }
 
 type Exercise struct {
 	ID                     string          `json:"id"`
 	ModuleID               string          `json:"module_id,omitempty"`
+	SkillID                string          `json:"skill_id,omitempty"`
+	Pool                   string          `json:"pool,omitempty"` // course | exam
 	ExerciseType           string          `json:"exercise_type"`
 	Title                  string          `json:"title"`
 	ShortInstruction       string          `json:"short_instruction"`
@@ -40,6 +56,8 @@ type Exercise struct {
 	PrepTimeSec            int             `json:"prep_time_sec,omitempty"`
 	RecordingTimeLimitSec  int             `json:"recording_time_limit_sec,omitempty"`
 	SampleAnswerEnabled    bool            `json:"sample_answer_enabled"`
+	DisableSampleAnswer    bool            `json:"disable_sample_answer,omitempty"`
+	SampleAnswerText       string          `json:"sample_answer_text,omitempty"`
 	Status                 string          `json:"status,omitempty"`
 	SequenceNo             int             `json:"sequence_no,omitempty"`
 	Prompt                 any             `json:"prompt,omitempty"`
@@ -230,9 +248,28 @@ type UploadTarget struct {
 	ExpiresInSec int               `json:"expires_in_sec"`
 }
 
+type MockTest struct {
+	ID                       string            `json:"id"`
+	Title                    string            `json:"title"`
+	Description              string            `json:"description"`
+	EstimatedDurationMinutes int               `json:"estimated_duration_minutes"`
+	Status                   string            `json:"status"` // draft, published
+	Sections                 []MockTestSection `json:"sections"`
+}
+
+type MockTestSection struct {
+	SequenceNo   int    `json:"sequence_no"`
+	ExerciseID   string `json:"exercise_id"`
+	ExerciseType string `json:"exercise_type"`
+	MaxPoints    int    `json:"max_points"`
+}
+
 type MockExamSession struct {
 	ID                    string                `json:"id"`
 	Status                string                `json:"status"`
+	MockTestID            string                `json:"mock_test_id,omitempty"`
+	OverallScore          int                   `json:"overall_score,omitempty"`
+	Passed                bool                  `json:"passed,omitempty"`
 	OverallReadinessLevel string                `json:"overall_readiness_level,omitempty"`
 	OverallSummary        string                `json:"overall_summary,omitempty"`
 	Sections              []MockExamSessionItem `json:"sections"`
@@ -242,6 +279,8 @@ type MockExamSessionItem struct {
 	SequenceNo   int    `json:"sequence_no"`
 	ExerciseID   string `json:"exercise_id"`
 	ExerciseType string `json:"exercise_type"`
+	MaxPoints    int    `json:"max_points,omitempty"`
 	AttemptID    string `json:"attempt_id,omitempty"`
+	SectionScore int    `json:"section_score,omitempty"`
 	Status       string `json:"status"`
 }

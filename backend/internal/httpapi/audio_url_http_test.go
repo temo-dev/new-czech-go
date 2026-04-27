@@ -53,9 +53,33 @@ func TestAttemptAudioURLReturnsSignedLocalStreamURL(t *testing.T) {
 		rb, _ := io.ReadAll(response.Body)
 		t.Fatalf("expected 200 from stream, got %d body=%s", response.StatusCode, string(rb))
 	}
+	if response.Header.Get("Accept-Ranges") != "bytes" {
+		t.Fatalf("expected byte-range support, got Accept-Ranges=%q", response.Header.Get("Accept-Ranges"))
+	}
+	if response.Header.Get("Content-Length") != strconv.Itoa(len(body)) {
+		t.Fatalf("expected Content-Length %d, got %q", len(body), response.Header.Get("Content-Length"))
+	}
 	got, _ := io.ReadAll(response.Body)
 	if string(got) != string(body) {
 		t.Fatalf("expected audio bytes to round-trip, got %q", string(got))
+	}
+
+	rangeRequest, err := http.NewRequest(http.MethodGet, streamURL, nil)
+	if err != nil {
+		t.Fatalf("NewRequest range stream failed: %v", err)
+	}
+	rangeRequest.Header.Set("Range", "bytes=0-4")
+	rangeResponse, err := server.Client().Do(rangeRequest)
+	if err != nil {
+		t.Fatalf("GET range stream failed: %v", err)
+	}
+	defer rangeResponse.Body.Close()
+	if rangeResponse.StatusCode != http.StatusPartialContent {
+		t.Fatalf("expected 206 from range stream, got %d", rangeResponse.StatusCode)
+	}
+	rangeBody, _ := io.ReadAll(rangeResponse.Body)
+	if string(rangeBody) != string(body[:5]) {
+		t.Fatalf("expected first five bytes %q, got %q", string(body[:5]), string(rangeBody))
 	}
 }
 
@@ -166,9 +190,33 @@ func TestReviewAudioURLReturnsSignedLocalStreamURL(t *testing.T) {
 		rb, _ := io.ReadAll(response.Body)
 		t.Fatalf("expected 200 for review stream, got %d body=%s", response.StatusCode, string(rb))
 	}
+	if response.Header.Get("Accept-Ranges") != "bytes" {
+		t.Fatalf("expected byte-range support, got Accept-Ranges=%q", response.Header.Get("Accept-Ranges"))
+	}
+	if response.Header.Get("Content-Length") != strconv.Itoa(len(audioBody)) {
+		t.Fatalf("expected Content-Length %d, got %q", len(audioBody), response.Header.Get("Content-Length"))
+	}
 	got, _ := io.ReadAll(response.Body)
 	if string(got) != audioBody {
 		t.Fatalf("review audio round-trip mismatch, got %q", string(got))
+	}
+
+	rangeRequest, err := http.NewRequest(http.MethodGet, server.URL+parsed.Path+"?"+parsed.RawQuery, nil)
+	if err != nil {
+		t.Fatalf("NewRequest range stream failed: %v", err)
+	}
+	rangeRequest.Header.Set("Range", "bytes=0-4")
+	rangeResponse, err := server.Client().Do(rangeRequest)
+	if err != nil {
+		t.Fatalf("GET range stream failed: %v", err)
+	}
+	defer rangeResponse.Body.Close()
+	if rangeResponse.StatusCode != http.StatusPartialContent {
+		t.Fatalf("expected 206 for review range stream, got %d", rangeResponse.StatusCode)
+	}
+	rangeBody, _ := io.ReadAll(rangeResponse.Body)
+	if string(rangeBody) != audioBody[:5] {
+		t.Fatalf("expected first five review bytes %q, got %q", audioBody[:5], string(rangeBody))
 	}
 }
 

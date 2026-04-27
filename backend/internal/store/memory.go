@@ -12,13 +12,14 @@ import (
 type MemoryStore struct {
 	mu           sync.RWMutex
 	usersByToken map[string]contracts.User
-	course       contracts.Course
 	plan         contracts.LearningPlan
-	modules      []contracts.Module
+	courses      CourseStore
+	modules      ModuleStore
+	skills       SkillStore
 	exercises    ExerciseStore
 	attempts     AttemptStore
-	mockExams    map[string]*contracts.MockExamSession
-	nextMockExam int
+	mockExams    MockExamStore
+	mockTests    MockTestStore
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -61,21 +62,18 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 				PreferredLanguage: "vi",
 			},
 		},
-		course: contracts.Course{
-			ID:    "course-a2-mluveni",
-			Slug:  "a2-mluveni-sprint",
-			Title: "A2 Mluveni Sprint",
-		},
 		plan: contracts.LearningPlan{
 			StartDate:  time.Now().Format("2006-01-02"),
 			CurrentDay: 1,
 			Status:     "active",
 		},
-		modules:      seedDailyPlanModules(),
-		exercises:    exercises,
-		attempts:     attempts,
-		mockExams:    map[string]*contracts.MockExamSession{},
-		nextMockExam: 1,
+		courses:   newMemoryCourseStore(seedCourses()),
+		modules:   newMemoryModuleStore(seedDailyPlanModules()),
+		skills:    newMemorySkillStore(seedSkills(seedDailyPlanModules())),
+		exercises: exercises,
+		attempts:  attempts,
+		mockExams: newMemoryMockExamStore(exercises, attempts),
+		mockTests: newMemoryMockTestStore(),
 	}
 }
 
@@ -101,32 +99,94 @@ func (s *MemoryStore) UserByToken(token string) (contracts.User, bool) {
 }
 
 func (s *MemoryStore) Course() contracts.Course {
-	return s.course
+	// backward compat: return first published course
+	all := s.courses.ListCourses("published")
+	if len(all) > 0 {
+		return all[0]
+	}
+	return contracts.Course{ID: "course-a2-mluveni", Slug: "a2-mluveni-sprint", Title: "A2 Mluveni Sprint"}
 }
 
 func (s *MemoryStore) Plan() contracts.LearningPlan {
 	return s.plan
 }
 
+// Modules returns modules filtered by kind. Kept for backward compat.
 func (s *MemoryStore) Modules(kind string) []contracts.Module {
-	if kind == "" {
-		return append([]contracts.Module(nil), s.modules...)
-	}
-	var filtered []contracts.Module
-	for _, module := range s.modules {
-		if module.ModuleKind == kind {
-			filtered = append(filtered, module)
+	return s.modules.ListModules(kind, "")
+}
+
+// Course CRUD
+func (s *MemoryStore) ListCourses(status string) []contracts.Course {
+	return s.courses.ListCourses(status)
+}
+func (s *MemoryStore) CourseByID(id string) (contracts.Course, bool) {
+	return s.courses.CourseByID(id)
+}
+func (s *MemoryStore) CreateCourse(c contracts.Course) (contracts.Course, error) {
+	return s.courses.CreateCourse(c)
+}
+func (s *MemoryStore) UpdateCourse(id string, update contracts.Course) (contracts.Course, bool) {
+	return s.courses.UpdateCourse(id, update)
+}
+func (s *MemoryStore) DeleteCourse(id string) bool {
+	return s.courses.DeleteCourse(id)
+}
+
+// Module CRUD
+func (s *MemoryStore) ListModules(kind, courseID string) []contracts.Module {
+	return s.modules.ListModules(kind, courseID)
+}
+func (s *MemoryStore) ModuleByID(id string) (contracts.Module, bool) {
+	return s.modules.ModuleByID(id)
+}
+func (s *MemoryStore) CreateModule(m contracts.Module) (contracts.Module, error) {
+	return s.modules.CreateModule(m)
+}
+func (s *MemoryStore) UpdateModule(id string, update contracts.Module) (contracts.Module, bool) {
+	return s.modules.UpdateModule(id, update)
+}
+func (s *MemoryStore) DeleteModule(id string) bool {
+	return s.modules.DeleteModule(id)
+}
+
+// Skill CRUD
+func (s *MemoryStore) SkillsByModule(moduleID string) []contracts.Skill {
+	return s.skills.SkillsByModule(moduleID)
+}
+func (s *MemoryStore) SkillByID(id string) (contracts.Skill, bool) {
+	return s.skills.SkillByID(id)
+}
+func (s *MemoryStore) CreateSkill(sk contracts.Skill) (contracts.Skill, error) {
+	return s.skills.CreateSkill(sk)
+}
+func (s *MemoryStore) UpdateSkill(id string, update contracts.Skill) (contracts.Skill, bool) {
+	return s.skills.UpdateSkill(id, update)
+}
+func (s *MemoryStore) DeleteSkill(id string) bool {
+	return s.skills.DeleteSkill(id)
+}
+
+// ExercisesBySkill returns published exercises for a skill (pool=course).
+func (s *MemoryStore) ExercisesBySkill(skillID string) []contracts.Exercise {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	all := s.exercises.ListExercises("course")
+	var out []contracts.Exercise
+	for _, ex := range all {
+		if ex.SkillID == skillID && ex.Status == "published" {
+			out = append(out, ex)
 		}
 	}
-	return filtered
+	return out
 }
 
 func (s *MemoryStore) ExercisesByModule(moduleID string) []contracts.Exercise {
 	return s.exercises.ExercisesByModule(moduleID)
 }
 
-func (s *MemoryStore) ListExercises() []contracts.Exercise {
-	return s.exercises.ListExercises()
+func (s *MemoryStore) ListExercises(pool string) []contracts.Exercise {
+	return s.exercises.ListExercises(pool)
 }
 
 func (s *MemoryStore) Exercise(id string) (contracts.Exercise, bool) {
@@ -198,144 +258,81 @@ func (s *MemoryStore) ListAttempts() []contracts.Attempt {
 	return s.attempts.ListAttempts()
 }
 
-var mockExamTaskTypes = []string{
-	"uloha_1_topic_answers",
-	"uloha_2_dialogue_questions",
-	"uloha_3_story_narration",
-	"uloha_4_choice_reasoning",
-}
-
-func (s *MemoryStore) CreateMockExam() (contracts.MockExamSession, error) {
+func (s *MemoryStore) SetMockExamStore(ms MockExamStore) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.mockExams = ms
+}
 
-	all := s.exercises.ListExercises()
-	sections := make([]contracts.MockExamSessionItem, 0, len(mockExamTaskTypes))
-	for i, kind := range mockExamTaskTypes {
-		ex := firstPublishedExerciseByType(all, kind)
-		if ex.ID == "" {
-			return contracts.MockExamSession{}, fmt.Errorf("no published exercise for %s", kind)
-		}
-		sections = append(sections, contracts.MockExamSessionItem{
-			SequenceNo:   i + 1,
-			ExerciseID:   ex.ID,
-			ExerciseType: ex.ExerciseType,
-			Status:       "pending",
-		})
-	}
+func (s *MemoryStore) SetMockTestStore(ms MockTestStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.mockTests = ms
+}
 
-	id := fmt.Sprintf("mock-session-%d", s.nextMockExam)
-	s.nextMockExam++
-	session := &contracts.MockExamSession{
-		ID:       id,
-		Status:   "in_progress",
-		Sections: sections,
-	}
-	s.mockExams[id] = session
-	return *session, nil
+func (s *MemoryStore) CreateMockExam(learnerID, mockTestID string) (contracts.MockExamSession, error) {
+	return s.mockExams.CreateMockExam(learnerID, mockTestID, s.mockTests)
+}
+
+// MockTest CRUD methods
+func (s *MemoryStore) CreateMockTest(t contracts.MockTest) (contracts.MockTest, error) {
+	return s.mockTests.CreateMockTest(t)
+}
+func (s *MemoryStore) MockTestByID(id string) (contracts.MockTest, bool) {
+	return s.mockTests.MockTestByID(id)
+}
+func (s *MemoryStore) ListMockTests(statusFilter string) []contracts.MockTest {
+	return s.mockTests.ListMockTests(statusFilter)
+}
+func (s *MemoryStore) UpdateMockTest(id string, update contracts.MockTest) (contracts.MockTest, bool) {
+	return s.mockTests.UpdateMockTest(id, update)
+}
+func (s *MemoryStore) DeleteMockTest(id string) bool {
+	return s.mockTests.DeleteMockTest(id)
 }
 
 func (s *MemoryStore) MockExamByID(id string) (contracts.MockExamSession, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	session, ok := s.mockExams[id]
-	if !ok {
-		return contracts.MockExamSession{}, false
-	}
-	return *session, true
+	return s.mockExams.MockExamByID(id)
 }
 
 func (s *MemoryStore) AdvanceMockExam(id, attemptID string) (contracts.MockExamSession, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	session, ok := s.mockExams[id]
-	if !ok {
-		return contracts.MockExamSession{}, fmt.Errorf("mock exam not found")
-	}
-	if session.Status == "completed" {
-		return contracts.MockExamSession{}, fmt.Errorf("mock exam already completed")
-	}
-	for i := range session.Sections {
-		if session.Sections[i].Status == "pending" {
-			session.Sections[i].AttemptID = attemptID
-			session.Sections[i].Status = "completed"
-			return *session, nil
-		}
-	}
-	return contracts.MockExamSession{}, fmt.Errorf("no pending section")
+	return s.mockExams.AdvanceMockExam(id, attemptID)
 }
 
 func (s *MemoryStore) CompleteMockExam(id string) (contracts.MockExamSession, error) {
-	s.mu.Lock()
-	session, ok := s.mockExams[id]
-	if !ok {
-		s.mu.Unlock()
-		return contracts.MockExamSession{}, fmt.Errorf("mock exam not found")
-	}
-	attemptIDs := make([]string, 0, len(session.Sections))
-	for _, sec := range session.Sections {
-		if sec.Status != "completed" || sec.AttemptID == "" {
-			s.mu.Unlock()
-			return contracts.MockExamSession{}, fmt.Errorf("section %d not completed", sec.SequenceNo)
-		}
-		attemptIDs = append(attemptIDs, sec.AttemptID)
-	}
-	s.mu.Unlock()
-
-	level, summary := s.aggregateMockExam(attemptIDs)
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	session = s.mockExams[id]
-	session.Status = "completed"
-	session.OverallReadinessLevel = level
-	session.OverallSummary = summary
-	return *session, nil
-}
-
-func (s *MemoryStore) aggregateMockExam(attemptIDs []string) (string, string) {
-	levels := make([]string, 0, len(attemptIDs))
-	for _, aid := range attemptIDs {
-		attempt, ok := s.attempts.Attempt(aid)
-		if !ok || attempt.Feedback == nil {
-			continue
-		}
-		levels = append(levels, attempt.Feedback.ReadinessLevel)
-	}
-	return rollupReadiness(levels)
+	return s.mockExams.CompleteMockExam(id)
 }
 
 func rollupReadiness(levels []string) (string, string) {
 	if len(levels) == 0 {
-		return "not_ready", "Chua co du feedback de danh gia."
+		return "not_ready", "Chưa có đủ feedback để đánh giá."
 	}
 	score := map[string]int{
-		"ready":       3,
-		"almost":      2,
-		"needs_work":  1,
-		"not_ready":   0,
+		"ready":      3,
+		"almost":     2,
+		"needs_work": 1,
+		"not_ready":  0,
 	}
 	total := 0
-	counts := map[string]int{}
 	for _, lv := range levels {
 		total += score[lv]
-		counts[lv]++
 	}
 	avg := float64(total) / float64(len(levels))
-	var overall string
+	var overall, summary string
 	switch {
 	case avg >= 2.5:
 		overall = "ready"
+		summary = "Bạn đã sẵn sàng cho bài thi! Cả 4 phần đều đạt yêu cầu."
 	case avg >= 1.5:
 		overall = "almost"
+		summary = "Gần đến rồi! Ôn thêm một vài phần và bạn sẽ sẵn sàng."
 	case avg >= 0.75:
 		overall = "needs_work"
+		summary = "Cần luyện thêm. Hãy ôn lại các phần chưa đạt trước khi thi."
 	default:
 		overall = "not_ready"
+		summary = "Chưa sẵn sàng. Cần luyện tập thêm các phần cơ bản."
 	}
-	summary := fmt.Sprintf("ready:%d almost:%d needs_work:%d not_ready:%d",
-		counts["ready"], counts["almost"], counts["needs_work"], counts["not_ready"])
 	return overall, summary
 }
 
@@ -373,11 +370,13 @@ func seedDailyPlanModules() []contracts.Module {
 		seq := i + 1
 		mods = append(mods, contracts.Module{
 			ID:          fmt.Sprintf("module-day-%d", seq),
+			CourseID:    "course-a2-mluveni",
 			Slug:        fmt.Sprintf("day-%d", seq),
 			Title:       d.title,
 			ModuleKind:  "daily_plan",
 			SequenceNo:  seq,
 			Description: d.description,
+			Status:      "published",
 		})
 	}
 	mods = append(mods, contracts.Module{

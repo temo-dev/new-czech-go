@@ -63,7 +63,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mockExamIntroTitle => 'Four sections, one attempt each';
 
   @override
-  String get mockExamIntroBody => 'Run through each Uloha in order. You get feedback at the end.';
+  String get mockExamIntroBody => 'Record each Uloha in order. After all four sections, your answers are analysed together.';
 
   @override
   String mockExamSectionLabel(int index) {
@@ -75,6 +75,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mockExamStatusPending => 'PENDING';
+
+  @override
+  String get mockExamStatusRecorded => 'RECORDED';
+
+  @override
+  String get mockExamAnalyzing => 'Analysing your exam...';
+
+  @override
+  String mockExamAnalyzingProgress(int n, int total) {
+    return 'Analysing section $n of $total';
+  }
 
   @override
   String get mockExamActionStart => 'Start';
@@ -92,7 +103,105 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mockExamBackHome => 'Back to home';
 
   @override
+  String get mockExamCardPill => 'MOCK EXAM';
+
+  @override
+  String get mockExamCardTitle => 'A2 Mock Oral Exam';
+
+  @override
+  String get mockExamCardSubtitle => 'Run through all four speaking sections in sequence.';
+
+  @override
   String get mockExamOpenCta => 'Open mock exam';
+
+  @override
+  String get courseListTitle => 'Courses';
+
+  @override
+  String get courseListEmpty => 'No courses available. Ask the admin to publish one.';
+
+  @override
+  String get moduleListTitle => 'Topics';
+
+  @override
+  String get skillListTitle => 'Skills';
+
+  @override
+  String get exerciseListTitle => 'Exercises';
+
+  @override
+  String get skillNoi => 'Speaking';
+
+  @override
+  String get skillNghe => 'Listening';
+
+  @override
+  String get skillDoc => 'Reading';
+
+  @override
+  String get skillViet => 'Writing';
+
+  @override
+  String get skillTuVung => 'Vocabulary';
+
+  @override
+  String get skillNguPhap => 'Grammar';
+
+  @override
+  String get skillComingSoon => 'Coming soon';
+
+  @override
+  String get mockTestListTitle => 'Choose exam';
+
+  @override
+  String get mockTestListEmpty => 'No mock tests available. Ask the admin to publish one.';
+
+  @override
+  String mockTestCardMinutes(int n) {
+    return '$n min';
+  }
+
+  @override
+  String mockTestCardSections(int n) {
+    return '$n sections';
+  }
+
+  @override
+  String get mockTestIntroStartCta => 'Start exam';
+
+  @override
+  String mockTestIntroPoints(int pts) {
+    return '$pts points total';
+  }
+
+  @override
+  String mockTestIntroPassThreshold(int pts) {
+    return 'Pass: $pts points or more';
+  }
+
+  @override
+  String get mockTestIntroSectionsTitle => 'Sections';
+
+  @override
+  String mockExamScoreLabel(int score, int max) {
+    return '$score / $max';
+  }
+
+  @override
+  String get mockExamPassLabel => 'PASS';
+
+  @override
+  String get mockExamFailLabel => 'FAIL';
+
+  @override
+  String mockExamSectionScoreLabel(int n, int score, int max) {
+    return 'Úloha $n: $score/$max pts';
+  }
+
+  @override
+  String mockExamSectionDetail(int n) {
+    return 'Section $n Analysis';
+  }
 
   @override
   String get recentAttemptsTitle => 'Recent attempts';
@@ -286,6 +395,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resultNextExerciseCta => 'Next exercise';
 
   @override
+  String get resultTabFeedback => 'Feedback';
+
+  @override
+  String get resultTabTranscript => 'Transcript';
+
+  @override
+  String get resultTabSample => 'Sample';
+
+  @override
+  String get resultNoFeedback => 'No feedback available.';
+
+  @override
+  String get resultNoTranscript => 'No transcript available.';
+
+  @override
+  String get resultNoSample => 'No sample answer available.';
+
+  @override
   String get reviewArtifactTitle => 'Corrections & shadowing';
 
   @override
@@ -404,5 +531,31 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String promptChoiceReasoningHint(String list) {
     return 'Reasoning hints: $list';
+  }
+
+  @override
+  String get bottomNavTests => 'Tests';
+
+  @override
+  String get bottomNavProfile => 'Profile';
+
+  @override
+  String get profileTitle => 'Profile';
+
+  @override
+  String get profileLanguageSection => 'Language';
+
+  @override
+  String get profileAboutSection => 'About';
+
+  @override
+  String get profileAppName => 'A2 Mluvení Sprint';
+
+  @override
+  String get profileAppTagline => 'Czech A2 oral exam prep for Vietnamese learners';
+
+  @override
+  String profileVersion(String version) {
+    return 'Version $version';
   }
 }

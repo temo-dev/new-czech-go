@@ -9,12 +9,30 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../../../shared/widgets/info_pill.dart';
 import '../../exercise/screens/exercise_screen.dart' as exercise_feature;
+import 'mock_exam_section_detail_screen.dart';
 
-/// Sequential mock oral exam: one exercise per Uloha type, aggregate result.
+class _PendingAnalysis {
+  const _PendingAnalysis({
+    required this.attemptId,
+    required this.audioPath,
+    required this.fileSizeBytes,
+    required this.durationMs,
+  });
+
+  final String attemptId;
+  final String audioPath;
+  final int fileSizeBytes;
+  final int durationMs;
+}
+
+/// Sequential mock oral exam: record all sections first, then analyse together.
 class MockExamScreen extends StatefulWidget {
-  const MockExamScreen({super.key, required this.client});
+  const MockExamScreen({super.key, required this.client, this.initialSession});
 
   final ApiClient client;
+
+  /// Pre-created session from the intro screen. If null, a new session is created.
+  final MockExamSessionView? initialSession;
 
   @override
   State<MockExamScreen> createState() => _MockExamScreenState();
@@ -24,6 +42,11 @@ class _MockExamScreenState extends State<MockExamScreen> {
   MockExamSessionView? _session;
   bool _loading = true;
   String? _error;
+  Map<String, String> _sectionReadiness = {};
+
+  final List<_PendingAnalysis> _pendingAnalyses = [];
+  bool _analyzing = false;
+  int _analyzeProgress = 0;
 
   @override
   void initState() {
@@ -32,9 +55,22 @@ class _MockExamScreenState extends State<MockExamScreen> {
   }
 
   Future<void> _bootstrap() async {
+    // Use pre-created session from intro screen if available
+    final initial = widget.initialSession;
+    if (initial != null) {
+      setState(() {
+        _session = initial;
+        _loading = false;
+      });
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
+      _pendingAnalyses.clear();
+      _analyzing = false;
+      _analyzeProgress = 0;
     });
     try {
       final payload = await widget.client.createMockExam();
@@ -56,39 +92,46 @@ class _MockExamScreenState extends State<MockExamScreen> {
   Future<void> _runSection(MockExamSection section) async {
     final navigator = Navigator.of(context);
     try {
-      final beforeAttemptIds = await _knownAttemptIds(section.exerciseId);
       final detail = ExerciseDetail.fromJson(
         await widget.client.getExercise(section.exerciseId),
       );
       if (!mounted) return;
+
+      _PendingAnalysis? recorded;
       await navigator.push(
         MaterialPageRoute(
           builder: (_) => exercise_feature.ExerciseScreen(
             client: widget.client,
             detail: detail,
+            onRecordingReady: (attemptId, audioPath, fileSizeBytes, durationMs) {
+              recorded = _PendingAnalysis(
+                attemptId: attemptId,
+                audioPath: audioPath,
+                fileSizeBytes: fileSizeBytes,
+                durationMs: durationMs,
+              );
+            },
           ),
         ),
       );
       if (!mounted) return;
 
-      final newAttemptId = await _findNewAttempt(
-        section.exerciseId,
-        beforeAttemptIds,
-      );
-      if (newAttemptId == null) {
-        setState(() => _error = 'No attempt submitted for this section.');
-        return;
-      }
+      final rec = recorded;
+      if (rec == null) return; // user backed out without recording
 
       final payload = await widget.client.advanceMockExam(
         _session!.id,
-        attemptId: newAttemptId,
+        attemptId: rec.attemptId,
       );
       if (!mounted) return;
-      setState(() => _session = MockExamSessionView.fromJson(payload));
+      setState(() {
+        _session = MockExamSessionView.fromJson(payload);
+        _pendingAnalyses.add(rec);
+        _error = null;
+      });
 
       if (_session!.nextPending == null) {
-        await _finalize();
+        await _bulkAnalyze();
       }
     } catch (err) {
       if (!mounted) return;
@@ -96,36 +139,82 @@ class _MockExamScreenState extends State<MockExamScreen> {
     }
   }
 
-  Future<Set<String>> _knownAttemptIds(String exerciseId) async {
-    final payload = await widget.client.getAttempts();
-    return payload
-        .map((item) => AttemptResult.fromJson(item as Map<String, dynamic>))
-        .where((a) => a.exerciseId == exerciseId)
-        .map((a) => a.id)
-        .toSet();
+  Future<void> _bulkAnalyze() async {
+    setState(() {
+      _analyzing = true;
+      _analyzeProgress = 0;
+    });
+
+    final total = _pendingAnalyses.length;
+    for (var i = 0; i < total; i++) {
+      final pending = _pendingAnalyses[i];
+      if (!mounted) return;
+      setState(() => _analyzeProgress = i + 1);
+      try {
+        await widget.client.submitRecordedAudio(
+          pending.attemptId,
+          audioPath: pending.audioPath,
+          mimeType: 'audio/m4a',
+          fileSizeBytes: pending.fileSizeBytes,
+          durationMs: pending.durationMs,
+        );
+        await _pollUntilDone(pending.attemptId);
+      } catch (err) {
+        if (!mounted) return;
+        setState(() {
+          _analyzing = false;
+          _error = err.toString();
+        });
+        return;
+      }
+    }
+
+    if (!mounted) return;
+    await _finalize();
   }
 
-  Future<String?> _findNewAttempt(
-    String exerciseId,
-    Set<String> before,
-  ) async {
-    final payload = await widget.client.getAttempts();
-    final attempts = payload
-        .map((item) => AttemptResult.fromJson(item as Map<String, dynamic>))
-        .where((a) => a.exerciseId == exerciseId && !before.contains(a.id))
-        .toList();
-    if (attempts.isEmpty) return null;
-    return attempts.first.id;
+  Future<void> _pollUntilDone(String attemptId) async {
+    while (mounted) {
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      final attempt = AttemptResult.fromJson(
+        await widget.client.getAttempt(attemptId),
+      );
+      if (attempt.status == 'completed' || attempt.status == 'failed') return;
+    }
   }
 
   Future<void> _finalize() async {
     try {
       final payload = await widget.client.completeMockExam(_session!.id);
       if (!mounted) return;
-      setState(() => _session = MockExamSessionView.fromJson(payload));
+      final completed = MockExamSessionView.fromJson(payload);
+      final attemptIds = completed.sections
+          .map((s) => s.attemptId)
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      final Map<String, String> readiness = {};
+      if (attemptIds.isNotEmpty) {
+        final all = await widget.client.getAttempts();
+        for (final item in all) {
+          final a = AttemptResult.fromJson(item as Map<String, dynamic>);
+          if (attemptIds.contains(a.id) && a.readinessLevel.isNotEmpty) {
+            readiness[a.id] = a.readinessLevel;
+          }
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _session = completed;
+        _sectionReadiness = readiness;
+        _analyzing = false;
+      });
     } catch (err) {
       if (!mounted) return;
-      setState(() => _error = err.toString());
+      setState(() {
+        _analyzing = false;
+        _error = err.toString();
+      });
     }
   }
 
@@ -158,9 +247,16 @@ class _MockExamScreenState extends State<MockExamScreen> {
         ),
       );
     }
+    if (_analyzing) {
+      return _buildAnalyzingView(l);
+    }
     final session = _session!;
     if (session.isCompleted) {
-      return _MockExamResultView(session: session);
+      return _MockExamResultView(
+        client: widget.client,
+        session: session,
+        sectionReadiness: _sectionReadiness,
+      );
     }
     return ListView(
       padding: EdgeInsets.symmetric(
@@ -191,6 +287,29 @@ class _MockExamScreenState extends State<MockExamScreen> {
       ],
     );
   }
+
+  Widget _buildAnalyzingView(AppLocalizations l) {
+    final total = _pendingAnalyses.length;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.x5),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: AppSpacing.x4),
+            Text(
+              _analyzeProgress > 0
+                  ? l.mockExamAnalyzingProgress(_analyzeProgress, total)
+                  : l.mockExamAnalyzing,
+              style: AppTypography.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _SectionTile extends StatelessWidget {
@@ -206,7 +325,7 @@ class _SectionTile extends StatelessWidget {
         ? PillTone.info
         : (section.isPending ? PillTone.primary : PillTone.neutral);
     final label = section.isCompleted
-        ? l.mockExamStatusDone
+        ? l.mockExamStatusRecorded
         : l.mockExamStatusPending;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.x4),
@@ -253,94 +372,238 @@ class _SectionTile extends StatelessWidget {
 }
 
 class _MockExamResultView extends StatelessWidget {
-  const _MockExamResultView({required this.session});
+  const _MockExamResultView({
+    required this.client,
+    required this.session,
+    required this.sectionReadiness,
+  });
 
+  final ApiClient client;
   final MockExamSessionView session;
+  final Map<String, String> sectionReadiness;
+
+  // Helper so Builder callbacks inside build() can access client.
+  ApiClient _client(BuildContext context) => client;
+
+  IconData _sectionIcon(String exerciseType) => switch (exerciseType) {
+    String t when t.contains('uloha_1') => Icons.person_outline_rounded,
+    String t when t.contains('uloha_2') => Icons.image_outlined,
+    String t when t.contains('uloha_3') => Icons.people_outline_rounded,
+    String t when t.contains('uloha_4') => Icons.mic_none_rounded,
+    _ => Icons.school_outlined,
+  };
+
+  Color _sectionIconBg(String exerciseType) => switch (exerciseType) {
+    String t when t.contains('uloha_1') => AppColors.primaryFixed,
+    String t when t.contains('uloha_2') => AppColors.infoContainer,
+    String t when t.contains('uloha_3') => AppColors.warningContainer,
+    String t when t.contains('uloha_4') => AppColors.successContainer,
+    _ => AppColors.surfaceContainerHigh,
+  };
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final totalMax = session.totalMaxPoints > 0 ? session.totalMaxPoints + 3 : 40;
+    final hasScore = session.overallScore > 0 || session.passed;
+    final passColor = session.passed ? AppColors.success : AppColors.error;
+    final passContainerColor = session.passed ? AppColors.successContainer : AppColors.errorContainer;
+
     return ListView(
       padding: EdgeInsets.symmetric(
         horizontal: AppSpacing.pagePaddingH(context),
         vertical: AppSpacing.x5,
       ),
       children: [
-        Text(l.mockExamResultTitle, style: AppTypography.titleLarge),
-        const SizedBox(height: AppSpacing.x3),
-        Container(
-          padding: const EdgeInsets.all(AppSpacing.x5),
-          decoration: BoxDecoration(
-            color: AppColors.primaryContainer,
-            borderRadius: AppRadius.lgAll,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              InfoPill(
-                label: session.overallReadinessLevel.toUpperCase(),
-                tone: PillTone.primary,
+        // ── Score hero ────────────────────────────────────────────────────────
+        if (hasScore) ...[
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x6, vertical: AppSpacing.x5),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLowest,
+                borderRadius: AppRadius.lgAll,
+                border: Border.all(color: AppColors.outlineVariant),
               ),
-              const SizedBox(height: AppSpacing.x2),
-              Text(
-                l.mockExamOverallTitle,
-                style: AppTypography.titleMedium.copyWith(
-                  color: AppColors.onPrimaryContainer,
+              child: Column(children: [
+                Text('CELKOVÉ SKÓRE',
+                    style: AppTypography.labelUppercase.copyWith(
+                        fontSize: 10, color: AppColors.onSurfaceVariant, letterSpacing: 1.2)),
+                const SizedBox(height: AppSpacing.x2),
+                RichText(
+                  text: TextSpan(
+                    text: '${session.overallScore}',
+                    style: AppTypography.scoreDisplay.copyWith(
+                        fontSize: 52, fontWeight: FontWeight.w900),
+                    children: [
+                      TextSpan(
+                        text: ' / $totalMax',
+                        style: AppTypography.titleMedium.copyWith(
+                            color: AppColors.onSurfaceVariant, fontWeight: FontWeight.w400),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.x1),
-              Text(
-                session.overallSummary,
-                style: AppTypography.bodyMedium.copyWith(
-                  color: AppColors.onPrimaryContainer,
-                ),
-              ),
-            ],
+              ]),
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.x4),
+          const SizedBox(height: AppSpacing.x3),
+
+          // Pass/Fail badge
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              decoration: BoxDecoration(
+                color: passContainerColor,
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(session.passed ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                    color: passColor, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  session.passed ? l.mockExamPassLabel : l.mockExamFailLabel,
+                  style: AppTypography.labelUppercase.copyWith(
+                      color: passColor, fontSize: 13, letterSpacing: 1.2, fontWeight: FontWeight.w700),
+                ),
+              ]),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.x3),
+          if (session.overallSummary.isNotEmpty)
+            Center(
+              child: Text(session.overallSummary,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant)),
+            ),
+          const SizedBox(height: AppSpacing.x5),
+        ],
+
+        // ── Section breakdown ─────────────────────────────────────────────────
         for (final section in session.sections)
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.x3),
-            child: Container(
-              padding: const EdgeInsets.all(AppSpacing.x4),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
-                borderRadius: AppRadius.mdAll,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
+            child: Builder(
+              builder: (context) {
+                final hasMax = section.maxPoints > 0;
+                final canTap = section.attemptId.isNotEmpty;
+                final score = section.sectionScore;
+                final maxPts = section.maxPoints;
+                final pct = hasMax && maxPts > 0 ? score / maxPts : 0.0;
+                final barColor = pct >= 0.75
+                    ? AppColors.success
+                    : pct >= 0.5
+                        ? AppColors.warning
+                        : AppColors.error;
+
+                return GestureDetector(
+                  onTap: canTap
+                      ? () => Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => MockExamSectionDetailScreen(
+                              client: _client(context),
+                              attemptId: section.attemptId,
+                              sequenceNo: section.sequenceNo,
+                            ),
+                          ))
+                      : null,
+                  child: Container(
+                    padding: const EdgeInsets.all(AppSpacing.x4),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLowest,
+                      borderRadius: AppRadius.lgAll,
+                      border: Border.all(color: AppColors.outlineVariant),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          l.mockExamSectionLabel(section.sequenceNo),
-                          style: AppTypography.titleSmall,
-                        ),
-                        const SizedBox(height: AppSpacing.x1),
-                        Text(
-                          section.exerciseType.toUpperCase(),
-                          style: AppTypography.bodySmall.copyWith(
-                            color: AppColors.onSurfaceVariant,
+                        Row(children: [
+                          Text(
+                            l.mockExamSectionLabel(section.sequenceNo),
+                            style: AppTypography.labelUppercase.copyWith(
+                                fontSize: 10, color: AppColors.onSurfaceVariant, letterSpacing: 1.2),
                           ),
-                        ),
+                          const Spacer(),
+                          if (canTap)
+                            const Icon(Icons.chevron_right, size: 16, color: AppColors.onSurfaceVariant),
+                        ]),
+                        const SizedBox(height: AppSpacing.x2),
+                        Row(children: [
+                          Container(
+                            width: 36, height: 36,
+                            decoration: BoxDecoration(
+                              color: _sectionIconBg(section.exerciseType),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(_sectionIcon(section.exerciseType), size: 20, color: AppColors.primary),
+                          ),
+                          const SizedBox(width: AppSpacing.x3),
+                          if (hasMax) ...[
+                            Text('$score/$maxPts',
+                                style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700)),
+                            const SizedBox(width: AppSpacing.x3),
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: pct.clamp(0.0, 1.0),
+                                  minHeight: 6,
+                                  backgroundColor: AppColors.surfaceContainerHigh,
+                                  valueColor: AlwaysStoppedAnimation(barColor),
+                                ),
+                              ),
+                            ),
+                          ] else
+                            Text(section.exerciseType.toUpperCase(),
+                                style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant)),
+                        ]),
                       ],
                     ),
                   ),
-                  InfoPill(
-                    label: l.mockExamStatusDone,
-                    tone: PillTone.info,
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ),
+
         const SizedBox(height: AppSpacing.x3),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l.mockExamBackHome),
+
+        // ── Readiness analysis card ───────────────────────────────────────────
+        if (session.overallSummary.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.x5),
+            decoration: BoxDecoration(
+              color: AppColors.inverseSurfaceLight,
+              borderRadius: AppRadius.lgAll,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  const Icon(Icons.analytics_outlined, color: AppColors.primaryFixed, size: 20),
+                  const SizedBox(width: AppSpacing.x2),
+                  Text('Analýza připravenosti',
+                      style: AppTypography.titleSmall.copyWith(color: AppColors.primaryFixed)),
+                ]),
+                const SizedBox(height: AppSpacing.x3),
+                Text(session.overallSummary,
+                    style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.inverseOnSurfaceLight.withAlpha(200), height: 1.6)),
+              ],
+            ),
+          ),
+
+        const SizedBox(height: AppSpacing.x5),
+
+        // ── CTA ───────────────────────────────────────────────────────────────
+        FilledButton.icon(
+          onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+          icon: const Icon(Icons.home_outlined, size: 18),
+          label: Text(l.mockExamBackHome),
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
         ),
+
+        const SizedBox(height: AppSpacing.x6),
       ],
     );
   }

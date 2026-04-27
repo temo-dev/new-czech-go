@@ -1,0 +1,269 @@
+'use client';
+import { FormEvent, useEffect, useState } from 'react';
+
+type Course = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  status: string;
+  sequence_no: number;
+};
+
+const API = '/api/admin/courses';
+
+const CARD_COLORS = [
+  { header: '#FF6A14', text: '#fff', badge: 'rgba(255,255,255,0.25)' },
+  { header: '#0F3D3A', text: '#fff', badge: 'rgba(255,255,255,0.2)' },
+  { header: '#3060B8', text: '#fff', badge: 'rgba(255,255,255,0.2)' },
+  { header: '#C28012', text: '#fff', badge: 'rgba(255,255,255,0.2)' },
+  { header: '#1F8A4D', text: '#fff', badge: 'rgba(255,255,255,0.2)' },
+];
+
+export function CourseDashboard() {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    status: 'draft',
+    sequence_no: 1,
+  });
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await fetch(API);
+      const j = await res.json();
+      setCourses(j.data ?? []);
+    } catch {
+      setError('Failed to load courses.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function openCreate() {
+    setEditingId(null);
+    setForm({ title: '', description: '', status: 'draft', sequence_no: courses.length + 1 });
+    setShowForm(true);
+  }
+  function openEdit(c: Course) {
+    setEditingId(c.id);
+    setForm({ title: c.title, description: c.description, status: c.status, sequence_no: c.sequence_no });
+    setShowForm(true);
+  }
+  function cancel() { setShowForm(false); setEditingId(null); setError(''); }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const url = editingId ? `${API}/${editingId}` : API;
+      const method = editingId ? 'PATCH' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) throw new Error((await res.json()).error?.message ?? 'Save failed');
+      await load();
+      cancel();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function del(id: string) {
+    if (!confirm('Delete this course?')) return;
+    try { await fetch(`${API}/${id}`, { method: 'DELETE' }); await load(); }
+    catch { setError('Delete failed'); }
+  }
+
+  if (loading) return <p style={{ padding: 24, color: 'var(--ink-3)' }}>Loading…</p>;
+
+  return (
+    <div>
+      {/* Page header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24 }}>
+        <div>
+          <div className="eyebrow" style={{ marginBottom: 4 }}>NỘI DUNG</div>
+          <h1 className="page-title">Khóa học</h1>
+        </div>
+        <button
+          onClick={openCreate}
+          className="btn btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+          Khóa học mới
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ padding: '10px 14px', background: 'var(--error-bg)', color: 'var(--error)', borderRadius: 'var(--r2)', marginBottom: 16, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+
+      {/* Course grid */}
+      {!showForm && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          {courses.length === 0 && (
+            <p style={{ color: 'var(--ink-3)', gridColumn: '1/-1', padding: '32px 0', textAlign: 'center' }}>
+              Chưa có khóa học nào.
+            </p>
+          )}
+          {courses.map((c, i) => {
+            const colors = CARD_COLORS[i % CARD_COLORS.length];
+            const isPublished = c.status === 'published';
+            return (
+              <div
+                key={c.id}
+                className="card"
+                style={{ cursor: 'pointer', transition: 'box-shadow 120ms ease' }}
+                onMouseEnter={e => (e.currentTarget.style.boxShadow = 'var(--shadow-md)')}
+                onMouseLeave={e => (e.currentTarget.style.boxShadow = 'var(--shadow-sm)')}
+              >
+                {/* Color header */}
+                <div style={{
+                  height: 96,
+                  background: colors.header,
+                  borderRadius: 'var(--r3) var(--r3) 0 0',
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  padding: '12px 16px',
+                  position: 'relative',
+                }}>
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: 0.6,
+                    textTransform: 'uppercase',
+                    background: colors.badge,
+                    color: colors.text,
+                    padding: '3px 9px',
+                    borderRadius: 999,
+                  }}>
+                    #{c.sequence_no} · {c.status}
+                  </span>
+                </div>
+
+                {/* Card body */}
+                <div className="card-padded">
+                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)', marginBottom: 4, lineHeight: 1.3 }}>
+                    {c.title}
+                  </div>
+                  {c.description && (
+                    <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {c.description}
+                    </div>
+                  )}
+
+                  {/* Status badge */}
+                  <span className={`badge ${isPublished ? 'badge-ready' : 'badge-neutral'}`}>
+                    {isPublished ? 'Đang chạy' : 'Nháp'}
+                  </span>
+                </div>
+
+                {/* Actions footer */}
+                <div style={{
+                  padding: '10px 16px',
+                  borderTop: '1px solid var(--border)',
+                  display: 'flex',
+                  gap: 8,
+                }}>
+                  <button onClick={() => openEdit(c)} className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center', fontSize: 12, padding: '6px 0' }}>
+                    Chỉnh sửa
+                  </button>
+                  <button onClick={() => del(c.id)} className="btn btn-danger" style={{ fontSize: 12, padding: '6px 12px' }}>
+                    Xoá
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create / Edit form */}
+      {showForm && (
+        <div className="card" style={{ maxWidth: 560 }}>
+          <div className="card-padded" style={{ borderBottom: '1px solid var(--border)' }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontFamily: 'Fraunces, serif' }}>
+              {editingId ? 'Chỉnh sửa khóa học' : 'Khóa học mới'}
+            </h2>
+          </div>
+          <form onSubmit={submit} className="card-padded">
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                Tiêu đề *
+              </label>
+              <input
+                required
+                type="text"
+                value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+              />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                Mô tả
+              </label>
+              <textarea
+                value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                rows={3}
+              />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                  Thứ tự
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={form.sequence_no}
+                  onChange={e => setForm(f => ({ ...f, sequence_no: parseInt(e.target.value) || 1 }))}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                  Trạng thái
+                </label>
+                <select
+                  value={form.status}
+                  onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+                >
+                  <option value="draft">Nháp</option>
+                  <option value="published">Đã xuất bản</option>
+                </select>
+              </div>
+            </div>
+            {error && (
+              <div style={{ color: 'var(--error)', fontSize: 13, marginBottom: 12 }}>{error}</div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="submit" disabled={saving} className="btn btn-primary">
+                {saving ? 'Đang lưu…' : editingId ? 'Lưu' : 'Tạo mới'}
+              </button>
+              <button type="button" onClick={cancel} className="btn btn-ghost">
+                Huỷ
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}

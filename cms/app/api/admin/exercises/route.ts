@@ -5,7 +5,10 @@ const adminToken = process.env.CMS_ADMIN_TOKEN ?? process.env.NEXT_PUBLIC_ADMIN_
 
 async function proxyToBackend(method: 'GET' | 'POST', request: NextRequest) {
   const body = method === 'POST' ? await request.text() : undefined;
-  const response = await fetch(`${apiBaseUrl}/v1/admin/exercises`, {
+  // Forward all query params (pool, status, module_id, skill_id, etc.)
+  const qs = request.nextUrl.searchParams.toString();
+  const url = `${apiBaseUrl}/v1/admin/exercises${qs ? '?' + qs : ''}`;
+  const response = await fetch(url, {
     method,
     cache: 'no-store',
     headers: {

@@ -111,6 +111,7 @@ Fill in:
 - `CMS_BASIC_AUTH_USER`
 - `CMS_BASIC_AUTH_PASSWORD`
 - `DATABASE_URL`
+- `AUDIO_SIGN_SECRET` — **required**; backend fatal-exits if missing. Generate: `openssl rand -hex 32`
 
 Use `sslmode=require` in `DATABASE_URL` for `RDS`.
 

@@ -30,8 +30,7 @@ class AttemptAudioPlaybackCard extends StatefulWidget {
       _AttemptAudioPlaybackCardState();
 }
 
-class _AttemptAudioPlaybackCardState
-    extends State<AttemptAudioPlaybackCard> {
+class _AttemptAudioPlaybackCardState extends State<AttemptAudioPlaybackCard> {
   final AudioPlayer _player = AudioPlayer();
   Duration _position = Duration.zero;
   Duration? _duration;
@@ -48,8 +47,12 @@ class _AttemptAudioPlaybackCardState
     _stateSub = _player.playerStateStream.listen((s) {
       if (!mounted) return;
       if (s.processingState == ProcessingState.completed) {
-        _player.seek(Duration.zero);
-        setState(() => _position = Duration.zero);
+        unawaited(_player.pause());
+        setState(() {
+          if (_duration != null) {
+            _position = _duration!;
+          }
+        });
       } else {
         setState(() {});
       }
@@ -60,7 +63,9 @@ class _AttemptAudioPlaybackCardState
     });
     _durSub = _player.durationStream.listen((d) {
       if (!mounted) return;
-      setState(() => _duration = d);
+      if (d != null) {
+        setState(() => _duration = d);
+      }
     });
     _errSub = _player.errorStream.listen((e) async {
       if (!mounted) return;
@@ -103,7 +108,10 @@ class _AttemptAudioPlaybackCardState
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _duration = dur ?? _player.duration;
+        _duration =
+            dur ??
+            _player.duration ??
+            _durationFromMilliseconds(widget.audio.durationMs);
         _position = Duration.zero;
       });
     } catch (e) {
@@ -174,17 +182,20 @@ class _AttemptAudioPlaybackCardState
               children: [
                 FilledButton.tonal(
                   onPressed: _loading ? null : _toggle,
-                  child: _loading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(_player.playing ? Icons.pause : Icons.play_arrow),
+                  child:
+                      _loading
+                          ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : Icon(
+                            _player.playing ? Icons.pause : Icons.play_arrow,
+                          ),
                 ),
                 const SizedBox(width: AppSpacing.x3),
                 Text(
-                  '${_fmt(_position)} / ${_fmt(_duration ?? Duration.zero)}',
+                  '${_fmt(_position)} / ${_fmtNullable(_duration)}',
                   style: AppTypography.bodySmall.copyWith(
                     color: AppColors.onSurfaceVariant,
                   ),
@@ -192,18 +203,29 @@ class _AttemptAudioPlaybackCardState
               ],
             ),
             const SizedBox(height: AppSpacing.x2),
-            Slider(
-              min: 0,
-              max: ((_duration ?? Duration.zero).inMilliseconds.toDouble())
-                  .clamp(1, double.infinity),
-              value: _duration == null
-                  ? 0
-                  : _position.inMilliseconds
-                      .clamp(0, _duration!.inMilliseconds)
-                      .toDouble(),
-              onChanged: (_duration == null || _loading)
-                  ? null
-                  : (v) => unawaited(_seek(v)),
+            Builder(
+              builder: (_) {
+                final knownDur = _duration;
+                final maxMs =
+                    (knownDur?.inMilliseconds ?? 1)
+                        .clamp(1, 1 << 31)
+                        .toDouble();
+                final valueMs =
+                    knownDur == null
+                        ? 0.0
+                        : _position.inMilliseconds
+                            .clamp(0, maxMs.toInt())
+                            .toDouble();
+                return Slider(
+                  min: 0,
+                  max: maxMs,
+                  value: valueMs,
+                  onChanged:
+                      (knownDur == null || _loading)
+                          ? null
+                          : (v) => unawaited(_seek(v)),
+                );
+              },
             ),
           ],
         ],
@@ -226,7 +248,8 @@ class ReviewAudioPlaybackCard extends StatefulWidget {
   final ReviewArtifactAudioView audio;
 
   @override
-  State<ReviewAudioPlaybackCard> createState() => _ReviewAudioPlaybackCardState();
+  State<ReviewAudioPlaybackCard> createState() =>
+      _ReviewAudioPlaybackCardState();
 }
 
 class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
@@ -246,8 +269,12 @@ class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
     _stateSub = _player.playerStateStream.listen((s) {
       if (!mounted) return;
       if (s.processingState == ProcessingState.completed) {
-        _player.seek(Duration.zero);
-        setState(() => _position = Duration.zero);
+        unawaited(_player.pause());
+        setState(() {
+          if (_duration != null) {
+            _position = _duration!;
+          }
+        });
       } else {
         setState(() {});
       }
@@ -258,15 +285,18 @@ class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
     });
     _durSub = _player.durationStream.listen((d) {
       if (!mounted) return;
-      setState(() => _duration = d);
+      if (d != null) {
+        setState(() => _duration = d);
+      }
     });
     _errSub = _player.errorStream.listen((e) async {
       if (!mounted) return;
       if (!_refreshedOnError) {
         _refreshedOnError = true;
         try {
-          final info =
-              await widget.client.getAttemptReviewAudioUrl(widget.attemptId);
+          final info = await widget.client.getAttemptReviewAudioUrl(
+            widget.attemptId,
+          );
           _stream = info;
           await _player.setUrl(info.url.toString());
           return;
@@ -296,14 +326,18 @@ class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
 
   Future<void> _prepare() async {
     try {
-      final info =
-          await widget.client.getAttemptReviewAudioUrl(widget.attemptId);
+      final info = await widget.client.getAttemptReviewAudioUrl(
+        widget.attemptId,
+      );
       _stream = info;
       final dur = await _player.setUrl(info.url.toString());
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _duration = dur ?? _player.duration;
+        _duration =
+            dur ??
+            _player.duration ??
+            _durationFromMilliseconds(widget.audio.durationMs);
         _position = Duration.zero;
       });
     } catch (e) {
@@ -325,8 +359,9 @@ class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
     }
     if (_stream != null && _stream!.isExpiringSoon) {
       try {
-        final info =
-            await widget.client.getAttemptReviewAudioUrl(widget.attemptId);
+        final info = await widget.client.getAttemptReviewAudioUrl(
+          widget.attemptId,
+        );
         _stream = info;
         await _player.setUrl(info.url.toString());
       } catch (_) {}
@@ -367,17 +402,20 @@ class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
               children: [
                 FilledButton.tonal(
                   onPressed: _loading ? null : _toggle,
-                  child: _loading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(_player.playing ? Icons.pause : Icons.play_arrow),
+                  child:
+                      _loading
+                          ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : Icon(
+                            _player.playing ? Icons.pause : Icons.play_arrow,
+                          ),
                 ),
                 const SizedBox(width: AppSpacing.x3),
                 Text(
-                  '${_fmt(_position)} / ${_fmt(_duration ?? Duration.zero)}',
+                  '${_fmt(_position)} / ${_fmtNullable(_duration)}',
                   style: AppTypography.bodySmall.copyWith(
                     color: AppColors.onSurfaceVariant,
                   ),
@@ -385,18 +423,29 @@ class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
               ],
             ),
             const SizedBox(height: AppSpacing.x2),
-            Slider(
-              min: 0,
-              max: ((_duration ?? Duration.zero).inMilliseconds.toDouble())
-                  .clamp(1, double.infinity),
-              value: _duration == null
-                  ? 0
-                  : _position.inMilliseconds
-                      .clamp(0, _duration!.inMilliseconds)
-                      .toDouble(),
-              onChanged: (_duration == null || _loading)
-                  ? null
-                  : (v) => unawaited(_seek(v)),
+            Builder(
+              builder: (_) {
+                final knownDur = _duration;
+                final maxMs =
+                    (knownDur?.inMilliseconds ?? 1)
+                        .clamp(1, 1 << 31)
+                        .toDouble();
+                final valueMs =
+                    knownDur == null
+                        ? 0.0
+                        : _position.inMilliseconds
+                            .clamp(0, maxMs.toInt())
+                            .toDouble();
+                return Slider(
+                  min: 0,
+                  max: maxMs,
+                  value: valueMs,
+                  onChanged:
+                      (knownDur == null || _loading)
+                          ? null
+                          : (v) => unawaited(_seek(v)),
+                );
+              },
             ),
           ],
         ],
@@ -411,3 +460,11 @@ String _fmt(Duration d) {
   return '$m:$s';
 }
 
+String _fmtNullable(Duration? d) => d == null ? '--:--' : _fmt(d);
+
+Duration? _durationFromMilliseconds(int milliseconds) {
+  if (milliseconds <= 0) {
+    return null;
+  }
+  return Duration(milliseconds: milliseconds);
+}

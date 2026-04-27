@@ -10,8 +10,9 @@ import 'core/theme/app_theme.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'features/exercise/screens/exercise_screen.dart' as exercise_feature;
 import 'features/history/screens/history_screen.dart';
-import 'features/home/screens/home_screen.dart';
-import 'features/mock_exam/screens/mock_exam_screen.dart';
+import 'features/home/screens/course_list_screen.dart';
+import 'features/mock_exam/screens/mock_test_list_screen.dart';
+import 'features/profile/screens/profile_screen.dart';
 import 'models/models.dart';
 import 'shared/widgets/app_bottom_nav.dart';
 
@@ -61,11 +62,7 @@ class _LearnerShellState extends State<LearnerShell> {
   final ApiClient _client = ApiClient();
   bool _loading = true;
   String? _error;
-  String _learnerName = '';
-  List<ModuleSummary> _modules = const [];
-  Map<String, List<ExerciseSummary>> _exercisesByModule = const {};
   List<AttemptResult> _recentAttempts = const [];
-  LearningPlanView? _plan;
   int _tabIndex = 0;
 
   @override
@@ -80,42 +77,16 @@ class _LearnerShellState extends State<LearnerShell> {
       _error = null;
     });
     try {
-      final login = await _client.login(
+      await _client.login(
         email: 'learner@example.com',
         password: 'demo123',
       );
-      final modulesPayload = await _client.getModules();
-      final allModules = modulesPayload
-          .map((item) => ModuleSummary.fromJson(item as Map<String, dynamic>))
-          .toList();
-
-      final exerciseMap = <String, List<ExerciseSummary>>{};
-      for (final module in allModules) {
-        final payload = await _client.getExercises(module.id);
-        exerciseMap[module.id] = payload
-            .map((item) => ExerciseSummary.fromJson(item as Map<String, dynamic>))
-            .toList();
-      }
-
-      final modules = allModules
-          .where((m) => (exerciseMap[m.id] ?? const []).isNotEmpty)
-          .toList();
-
-      final planPayload = await _client.getPlan();
-      final plan = LearningPlanView.fromJson(planPayload);
-
       final attemptsPayload = await _client.getAttempts();
       final recentAttempts = attemptsPayload
           .map((item) => AttemptResult.fromJson(item as Map<String, dynamic>))
           .toList();
 
       setState(() {
-        _learnerName =
-            (login['user'] as Map<String, dynamic>)['display_name'] as String? ??
-                'Learner';
-        _modules = modules;
-        _exercisesByModule = exerciseMap;
-        _plan = plan;
         _recentAttempts = recentAttempts;
       });
     } catch (err) {
@@ -139,56 +110,17 @@ class _LearnerShellState extends State<LearnerShell> {
     }
   }
 
-  ExerciseSummary? _nextSibling(String exerciseId) {
-    for (final siblings in _exercisesByModule.values) {
-      final idx = siblings.indexWhere((e) => e.id == exerciseId);
-      if (idx >= 0 && idx + 1 < siblings.length) {
-        return siblings[idx + 1];
-      }
-    }
-    return null;
-  }
-
-  Future<void> _openExercise(BuildContext context, ExerciseSummary exercise) async {
-    final navigator = Navigator.of(context);
-    final detail =
-        ExerciseDetail.fromJson(await _client.getExercise(exercise.id));
-    if (!mounted) return;
-    final next = _nextSibling(exercise.id);
-    await navigator.push(
-      MaterialPageRoute(
-        builder: (ctx) => exercise_feature.ExerciseScreen(
-          client: _client,
-          detail: detail,
-          onOpenNext: next == null ? null : () => _openExercise(ctx, next),
-        ),
-      ),
-    );
-    await _loadRecentAttempts();
-  }
-
-  Future<void> _openMockExam(BuildContext context) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => MockExamScreen(client: _client),
-      ),
-    );
-    await _loadRecentAttempts();
-  }
-
   Future<void> _openAttemptExercise(
       BuildContext context, AttemptResult attempt) async {
     final navigator = Navigator.of(context);
     final detail =
         ExerciseDetail.fromJson(await _client.getExercise(attempt.exerciseId));
     if (!mounted) return;
-    final next = _nextSibling(attempt.exerciseId);
     await navigator.push(
       MaterialPageRoute(
-        builder: (ctx) => exercise_feature.ExerciseScreen(
+        builder: (_) => exercise_feature.ExerciseScreen(
           client: _client,
           detail: detail,
-          onOpenNext: next == null ? null : () => _openExercise(ctx, next),
         ),
       ),
     );
@@ -221,18 +153,15 @@ class _LearnerShellState extends State<LearnerShell> {
     } else if (_tabIndex == 1) {
       body = HistoryScreen(
         attempts: _recentAttempts,
-        exercisesByModule: _exercisesByModule,
+        exercisesByModule: const {},
         onOpenAttemptExercise: (a) => _openAttemptExercise(context, a),
       );
+    } else if (_tabIndex == 2) {
+      body = MockTestListScreen(client: _client);
+    } else if (_tabIndex == 3) {
+      body = const ProfileScreen();
     } else {
-      body = HomeScreen(
-        learnerName: _learnerName,
-        modules: _modules,
-        exercisesByModule: _exercisesByModule,
-        onOpenExercise: (e) => _openExercise(context, e),
-        plan: _plan,
-        onOpenMockExam: () => _openMockExam(context),
-      );
+      body = CourseListScreen(client: _client);
     }
     return Scaffold(
       body: SafeArea(child: body),
@@ -251,6 +180,16 @@ class _LearnerShellState extends State<LearnerShell> {
                   icon: Icons.history_outlined,
                   selectedIcon: Icons.history_rounded,
                   label: l.bottomNavHistory,
+                ),
+                AppBottomNavItem(
+                  icon: Icons.assignment_outlined,
+                  selectedIcon: Icons.assignment_rounded,
+                  label: l.bottomNavTests,
+                ),
+                AppBottomNavItem(
+                  icon: Icons.person_outline_rounded,
+                  selectedIcon: Icons.person_rounded,
+                  label: l.bottomNavProfile,
                 ),
               ],
             ),

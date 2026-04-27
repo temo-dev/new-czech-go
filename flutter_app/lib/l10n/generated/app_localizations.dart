@@ -194,7 +194,7 @@ abstract class AppLocalizations {
   /// No description provided for @mockExamIntroBody.
   ///
   /// In vi, this message translates to:
-  /// **'Làm lần lượt từng Uloha. Có kết quả tổng sau khi xong.'**
+  /// **'Ghi âm lần lượt từng Uloha. Sau khi xong cả 4 phần, hệ thống sẽ phân tích và cho kết quả tổng.'**
   String get mockExamIntroBody;
 
   /// No description provided for @mockExamSectionLabel.
@@ -214,6 +214,24 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'CHỜ'**
   String get mockExamStatusPending;
+
+  /// No description provided for @mockExamStatusRecorded.
+  ///
+  /// In vi, this message translates to:
+  /// **'ĐÃ GHI'**
+  String get mockExamStatusRecorded;
+
+  /// No description provided for @mockExamAnalyzing.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang phân tích bài thi...'**
+  String get mockExamAnalyzing;
+
+  /// No description provided for @mockExamAnalyzingProgress.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang phân tích phần {n} / {total}'**
+  String mockExamAnalyzingProgress(int n, int total);
 
   /// No description provided for @mockExamActionStart.
   ///
@@ -245,11 +263,179 @@ abstract class AppLocalizations {
   /// **'Về trang chủ'**
   String get mockExamBackHome;
 
+  /// No description provided for @mockExamCardPill.
+  ///
+  /// In vi, this message translates to:
+  /// **'BÀI THI THỬ'**
+  String get mockExamCardPill;
+
+  /// No description provided for @mockExamCardTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bài thi thử nói A2'**
+  String get mockExamCardTitle;
+
+  /// No description provided for @mockExamCardSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kiểm tra cả 4 phần nói liên tiếp như thi thật.'**
+  String get mockExamCardSubtitle;
+
   /// No description provided for @mockExamOpenCta.
   ///
   /// In vi, this message translates to:
   /// **'Mở mock exam'**
   String get mockExamOpenCta;
+
+  /// No description provided for @courseListTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Khóa học'**
+  String get courseListTitle;
+
+  /// No description provided for @courseListEmpty.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa có khóa học nào. Hãy nhờ admin publish một khóa.'**
+  String get courseListEmpty;
+
+  /// No description provided for @moduleListTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chủ đề'**
+  String get moduleListTitle;
+
+  /// No description provided for @skillListTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kỹ năng'**
+  String get skillListTitle;
+
+  /// No description provided for @exerciseListTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bài tập'**
+  String get exerciseListTitle;
+
+  /// No description provided for @skillNoi.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nói'**
+  String get skillNoi;
+
+  /// No description provided for @skillNghe.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nghe'**
+  String get skillNghe;
+
+  /// No description provided for @skillDoc.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đọc'**
+  String get skillDoc;
+
+  /// No description provided for @skillViet.
+  ///
+  /// In vi, this message translates to:
+  /// **'Viết'**
+  String get skillViet;
+
+  /// No description provided for @skillTuVung.
+  ///
+  /// In vi, this message translates to:
+  /// **'Từ vựng'**
+  String get skillTuVung;
+
+  /// No description provided for @skillNguPhap.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ngữ pháp'**
+  String get skillNguPhap;
+
+  /// No description provided for @skillComingSoon.
+  ///
+  /// In vi, this message translates to:
+  /// **'Sắp ra mắt'**
+  String get skillComingSoon;
+
+  /// No description provided for @mockTestListTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chọn đề thi'**
+  String get mockTestListTitle;
+
+  /// No description provided for @mockTestListEmpty.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa có đề thi nào. Hãy nhờ admin publish một đề.'**
+  String get mockTestListEmpty;
+
+  /// No description provided for @mockTestCardMinutes.
+  ///
+  /// In vi, this message translates to:
+  /// **'{n} phút'**
+  String mockTestCardMinutes(int n);
+
+  /// No description provided for @mockTestCardSections.
+  ///
+  /// In vi, this message translates to:
+  /// **'{n} phần'**
+  String mockTestCardSections(int n);
+
+  /// No description provided for @mockTestIntroStartCta.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bắt đầu thi'**
+  String get mockTestIntroStartCta;
+
+  /// No description provided for @mockTestIntroPoints.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tổng {pts} điểm'**
+  String mockTestIntroPoints(int pts);
+
+  /// No description provided for @mockTestIntroPassThreshold.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đạt: từ {pts} điểm trở lên'**
+  String mockTestIntroPassThreshold(int pts);
+
+  /// No description provided for @mockTestIntroSectionsTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Các phần thi'**
+  String get mockTestIntroSectionsTitle;
+
+  /// No description provided for @mockExamScoreLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'{score} / {max}'**
+  String mockExamScoreLabel(int score, int max);
+
+  /// No description provided for @mockExamPassLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'ĐẠT'**
+  String get mockExamPassLabel;
+
+  /// No description provided for @mockExamFailLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'CHƯA ĐẠT'**
+  String get mockExamFailLabel;
+
+  /// No description provided for @mockExamSectionScoreLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Úloha {n}: {score}/{max} điểm'**
+  String mockExamSectionScoreLabel(int n, int score, int max);
+
+  /// No description provided for @mockExamSectionDetail.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phân tích Phần {n}'**
+  String mockExamSectionDetail(int n);
 
   /// No description provided for @recentAttemptsTitle.
   ///
@@ -617,6 +803,42 @@ abstract class AppLocalizations {
   /// **'Sang bài tiếp theo'**
   String get resultNextExerciseCta;
 
+  /// No description provided for @resultTabFeedback.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phản hồi'**
+  String get resultTabFeedback;
+
+  /// No description provided for @resultTabTranscript.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bản ghi'**
+  String get resultTabTranscript;
+
+  /// No description provided for @resultTabSample.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bài mẫu'**
+  String get resultTabSample;
+
+  /// No description provided for @resultNoFeedback.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa có phản hồi.'**
+  String get resultNoFeedback;
+
+  /// No description provided for @resultNoTranscript.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa có bản ghi âm.'**
+  String get resultNoTranscript;
+
+  /// No description provided for @resultNoSample.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa có bài mẫu.'**
+  String get resultNoSample;
+
   /// No description provided for @reviewArtifactTitle.
   ///
   /// In vi, this message translates to:
@@ -826,6 +1048,54 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Gợi ý lý do: {list}'**
   String promptChoiceReasoningHint(String list);
+
+  /// No description provided for @bottomNavTests.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đề thi'**
+  String get bottomNavTests;
+
+  /// No description provided for @bottomNavProfile.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hồ sơ'**
+  String get bottomNavProfile;
+
+  /// No description provided for @profileTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hồ sơ'**
+  String get profileTitle;
+
+  /// No description provided for @profileLanguageSection.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ngôn ngữ'**
+  String get profileLanguageSection;
+
+  /// No description provided for @profileAboutSection.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thông tin'**
+  String get profileAboutSection;
+
+  /// No description provided for @profileAppName.
+  ///
+  /// In vi, this message translates to:
+  /// **'A2 Mluvení Sprint'**
+  String get profileAppName;
+
+  /// No description provided for @profileAppTagline.
+  ///
+  /// In vi, this message translates to:
+  /// **'Luyện thi nói A2 tiếng Czech cho người Việt'**
+  String get profileAppTagline;
+
+  /// No description provided for @profileVersion.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phiên bản {version}'**
+  String profileVersion(String version);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

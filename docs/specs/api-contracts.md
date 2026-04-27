@@ -154,52 +154,96 @@ Returns the authenticated user profile used by the learner app shell.
 
 ## Learner Content Endpoints
 
+## GET /v1/courses
+Returns all published courses ordered by sequence_no.
+
+### Response
+```json
+{
+  "data": [
+    { "id": "course-1", "slug": "giao-tiep-co-ban", "title": "Giao tiếp cơ bản", "description": "...", "sequence_no": 1 },
+    { "id": "course-2", "slug": "di-urad", "title": "Đi urad", "description": "...", "sequence_no": 2 }
+  ],
+  "meta": {}
+}
+```
+
+## GET /v1/courses/:course_id
+Returns one course.
+
+## GET /v1/courses/:course_id/modules
+Returns published modules in a course ordered by sequence_no.
+
+### Response
+```json
+{
+  "data": [
+    { "id": "mod-1", "course_id": "course-1", "title": "Ở bưu điện", "description": "...", "sequence_no": 1 }
+  ],
+  "meta": {}
+}
+```
+
+## GET /v1/modules/:module_id/skills
+Returns published skills in a module ordered by sequence_no.
+
+### Response
+```json
+{
+  "data": [
+    { "id": "skill-1", "module_id": "mod-1", "skill_kind": "noi", "title": "Kỹ năng nói", "sequence_no": 1 },
+    { "id": "skill-2", "module_id": "mod-1", "skill_kind": "nghe", "title": "Kỹ năng nghe", "sequence_no": 2 }
+  ],
+  "meta": {}
+}
+```
+
+## GET /v1/skills/:skill_id/exercises
+Returns published exercises for one skill (pool=course only).
+
+### Response
+```json
+{
+  "data": [
+    { "id": "ex-1", "skill_id": "skill-1", "exercise_type": "uloha_1_topic_answers", "title": "Chủ đề: Gia đình", "pool": "course" }
+  ],
+  "meta": {}
+}
+```
+
 ## GET /v1/course
-Returns the learner's active course shell and current day state.
+**Deprecated** — kept for backward compat. Returns first published course + learning_plan.
 
 ### Response
 ```json
 {
   "data": {
-    "course": {
-      "id": "f6122020-d85d-4dd6-a5ce-88f7ed4c9f43",
-      "slug": "a2-mluveni-sprint",
-      "title": "A2 Mluveni Sprint"
-    },
-    "learning_plan": {
-      "start_date": "2026-04-21",
-      "current_day": 3,
-      "status": "active"
-    }
+    "course": { "id": "course-1", "slug": "a2-mluveni-sprint", "title": "A2 Mluveni Sprint" },
+    "learning_plan": { "start_date": "2026-04-21", "current_day": 3, "status": "active" }
   },
   "meta": {}
 }
 ```
 
 ## GET /v1/modules
-Returns published modules available to the learner.
+Returns published modules. **Prefer** `GET /v1/courses/:id/modules`.
 
 ### Query Params
-- `kind` optional: `daily_plan`, `practice`, `mock_exam`
+- `kind` optional: `daily_plan`, `practice`
+- `course_id` optional: filter by course
 
 ### Response
 ```json
 {
   "data": [
-    {
-      "id": "a8b74ad2-2f5c-41c6-bdd9-cc1d5e388558",
-      "slug": "day-1",
-      "title": "Day 1",
-      "module_kind": "daily_plan",
-      "sequence_no": 1
-    }
+    { "id": "mod-1", "course_id": "course-1", "slug": "day-1", "title": "Day 1", "module_kind": "daily_plan", "sequence_no": 1 }
   ],
   "meta": {}
 }
 ```
 
 ## GET /v1/modules/:module_id/exercises
-Returns learner-visible exercises for one module.
+Returns learner-visible exercises for one module. **Deprecated** — use `/v1/skills/:id/exercises`. Aggregates across all skills in module for backward compat.
 
 ### Response
 ```json
@@ -602,15 +646,42 @@ Returns learner history.
 }
 ```
 
+## Mock Test Endpoints (learner)
+
+## GET /v1/mock-tests
+Returns all published mock test templates. Learner uses this to pick an exam before starting.
+
+### Response
+```json
+{
+  "data": [
+    {
+      "id": "mt-1",
+      "title": "Modelový test 2 — Mluvení",
+      "description": "Full A2 speaking exam: 4 sections, 40 points total.",
+      "estimated_duration_minutes": 15,
+      "status": "published",
+      "sections": [
+        { "sequence_no": 1, "exercise_id": "...", "exercise_type": "uloha_1_topic_answers", "max_points": 8 },
+        { "sequence_no": 2, "exercise_id": "...", "exercise_type": "uloha_2_dialogue_questions", "max_points": 12 },
+        { "sequence_no": 3, "exercise_id": "...", "exercise_type": "uloha_3_story_narration", "max_points": 10 },
+        { "sequence_no": 4, "exercise_id": "...", "exercise_type": "uloha_4_choice_reasoning", "max_points": 7 }
+      ]
+    }
+  ],
+  "meta": {}
+}
+```
+
 ## Mock Exam Endpoints
 
 ## POST /v1/mock-exams
-Creates a new mock oral exam session.
+Creates a new mock oral exam session. `mock_test_id` is optional — if omitted, falls back to hardcoded one-exercise-per-type selection.
 
 ### Request
 ```json
 {
-  "course_id": "f6122020-d85d-4dd6-a5ce-88f7ed4c9f43"
+  "mock_test_id": "mt-1"
 }
 ```
 
@@ -618,22 +689,17 @@ Creates a new mock oral exam session.
 ```json
 {
   "data": {
-    "session": {
-      "id": "3b3319e3-01c4-4878-9362-cf64b6b3d326",
-      "status": "created",
-      "sections": [
-        {
-          "sequence_no": 1,
-          "exercise_id": "c46ab0f5-b4f2-451d-b555-aef7d1fd2288",
-          "exercise_type": "uloha_1_topic_answers"
-        },
-        {
-          "sequence_no": 2,
-          "exercise_id": "f4c09b2b-55d3-4bc1-a549-d21fa523e47b",
-          "exercise_type": "uloha_3_story_narration"
-        }
-      ]
-    }
+    "id": "3b3319e3-01c4-4878-9362-cf64b6b3d326",
+    "status": "in_progress",
+    "mock_test_id": "mt-1",
+    "overall_score": 0,
+    "passed": false,
+    "sections": [
+      { "sequence_no": 1, "exercise_id": "...", "exercise_type": "uloha_1_topic_answers", "max_points": 8, "status": "pending" },
+      { "sequence_no": 2, "exercise_id": "...", "exercise_type": "uloha_2_dialogue_questions", "max_points": 12, "status": "pending" },
+      { "sequence_no": 3, "exercise_id": "...", "exercise_type": "uloha_3_story_narration", "max_points": 10, "status": "pending" },
+      { "sequence_no": 4, "exercise_id": "...", "exercise_type": "uloha_4_choice_reasoning", "max_points": 7, "status": "pending" }
+    ]
   },
   "meta": {}
 }
@@ -648,27 +714,31 @@ Returns mock exam session progress and section status.
   "data": {
     "id": "3b3319e3-01c4-4878-9362-cf64b6b3d326",
     "status": "in_progress",
+    "mock_test_id": "mt-1",
+    "overall_score": 0,
+    "passed": false,
     "sections": [
-      {
-        "sequence_no": 1,
-        "exercise_id": "c46ab0f5-b4f2-451d-b555-aef7d1fd2288",
-        "attempt_id": "0c64ff53-3f06-4e86-bede-2b5fe1d4c481",
-        "status": "completed"
-      },
-      {
-        "sequence_no": 2,
-        "exercise_id": "f4c09b2b-55d3-4bc1-a549-d21fa523e47b",
-        "attempt_id": null,
-        "status": "pending"
-      }
+      { "sequence_no": 1, "exercise_id": "...", "exercise_type": "uloha_1_topic_answers", "max_points": 8, "attempt_id": "0c64ff53-...", "section_score": 0, "status": "completed" },
+      { "sequence_no": 2, "exercise_id": "...", "exercise_type": "uloha_2_dialogue_questions", "max_points": 12, "attempt_id": "", "section_score": 0, "status": "pending" }
     ]
   },
   "meta": {}
 }
 ```
 
+## POST /v1/mock-exams/:session_id/advance
+Associates the next pending section with a submitted attempt ID.
+
+### Request
+```json
+{ "attempt_id": "0c64ff53-3f06-4e86-bede-2b5fe1d4c481" }
+```
+
+### Response
+Updated session (same shape as GET).
+
 ## POST /v1/mock-exams/:session_id/complete
-Marks the mock exam session complete and returns the aggregated summary.
+Computes scores, marks session complete, returns final result.
 
 ### Request
 ```json
@@ -681,12 +751,54 @@ Marks the mock exam session complete and returns the aggregated summary.
   "data": {
     "id": "3b3319e3-01c4-4878-9362-cf64b6b3d326",
     "status": "completed",
-    "overall_readiness_level": "needs_work",
-    "overall_summary": "Ban da hoan thanh bai mock, nhung can on dinh hon o phan tra loi va giai thich ly do."
+    "mock_test_id": "mt-1",
+    "overall_score": 28,
+    "passed": true,
+    "overall_readiness_level": "almost",
+    "overall_summary": "Gần đến rồi! Ôn thêm một vài phần và bạn sẽ sẵn sàng.",
+    "sections": [
+      { "sequence_no": 1, "exercise_type": "uloha_1_topic_answers", "max_points": 8, "section_score": 6, "attempt_id": "...", "status": "completed" },
+      { "sequence_no": 2, "exercise_type": "uloha_2_dialogue_questions", "max_points": 12, "section_score": 9, "attempt_id": "...", "status": "completed" },
+      { "sequence_no": 3, "exercise_type": "uloha_3_story_narration", "max_points": 10, "section_score": 7, "attempt_id": "...", "status": "completed" },
+      { "sequence_no": 4, "exercise_type": "uloha_4_choice_reasoning", "max_points": 7, "section_score": 4, "attempt_id": "...", "status": "completed" }
+    ]
   },
   "meta": {}
 }
 ```
+
+## CMS Mock Test Endpoints
+
+## GET /v1/admin/mock-tests
+List all mock test templates (all statuses).
+
+## POST /v1/admin/mock-tests
+Create a new mock test template.
+
+### Request
+```json
+{
+  "title": "Modelový test 2 — Mluvení",
+  "description": "Full A2 speaking exam: 4 sections, 40 points total.",
+  "estimated_duration_minutes": 15,
+  "status": "draft",
+  "sections": [
+    { "sequence_no": 1, "exercise_id": "...", "exercise_type": "uloha_1_topic_answers", "max_points": 8 },
+    { "sequence_no": 2, "exercise_id": "...", "exercise_type": "uloha_2_dialogue_questions", "max_points": 12 },
+    { "sequence_no": 3, "exercise_id": "...", "exercise_type": "uloha_3_story_narration", "max_points": 10 },
+    { "sequence_no": 4, "exercise_id": "...", "exercise_type": "uloha_4_choice_reasoning", "max_points": 7 }
+  ]
+}
+```
+
+## GET /v1/admin/mock-tests/:id
+Get a single mock test template.
+
+## PATCH /v1/admin/mock-tests/:id
+Update title, description, duration, status, or sections. Sections are fully replaced.
+
+## DELETE /v1/admin/mock-tests/:id
+Delete a draft mock test. Published tests cannot be deleted.
 
 ## Learning Plan Endpoint
 
@@ -725,13 +837,45 @@ Returns the learner's simple 14-day plan.
 
 ## CMS Endpoints
 
+## GET /v1/admin/courses
+List all courses (all statuses).
+
+## POST /v1/admin/courses
+Create a course. Body: `{ title, description, sequence_no, status }`.
+
+## GET /v1/admin/courses/:id
+## PATCH /v1/admin/courses/:id
+## DELETE /v1/admin/courses/:id — draft only.
+
+## GET /v1/admin/modules
+List all modules. Query params: `?course_id=`, `?kind=`.
+
+## POST /v1/admin/modules
+Create a module. Body: `{ course_id, title, description, module_kind, sequence_no, status }`.
+
+## GET /v1/admin/modules/:id
+## PATCH /v1/admin/modules/:id
+## DELETE /v1/admin/modules/:id — draft only.
+
+## GET /v1/admin/skills
+List all skills. Query params: `?module_id=`.
+
+## POST /v1/admin/skills
+Create a skill. Body: `{ module_id, skill_kind, title, sequence_no, status }`.
+
+## GET /v1/admin/skills/:id
+## PATCH /v1/admin/skills/:id
+## DELETE /v1/admin/skills/:id — draft only.
+
 ## GET /v1/admin/exercises
 Returns exercise rows for the CMS table view.
 
 ### Query Params
 - `status` optional
 - `exercise_type` optional
-- `module_id` optional
+- `pool` optional: `course` or `exam`
+- `skill_id` optional
+- `module_id` optional (backward compat)
 
 ## POST /v1/admin/exercises
 Creates an exercise with common fields and task-specific detail.

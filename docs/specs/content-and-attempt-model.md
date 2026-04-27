@@ -51,14 +51,20 @@ User
          +-- AttemptFeedback
          +-- AttemptReviewArtifact
 
-Course
+Course  (nhiều khóa học: "Giao tiếp cơ bản", "Đi urad", "Ôn thi A2", ...)
   |
-  +-- Module
+  +-- Module  (chủ đề trong khóa: "Ở bưu điện", "Tại phòng khám", ...)
          |
-         +-- Exercise
+         +-- Skill  (kỹ năng: nói, nghe, đọc, viết, từ vựng, ngữ pháp)
                 |
-                +-- PromptAsset
-                +-- ScoringTemplate
+                +-- Exercise [pool=course]
+                       |
+                       +-- PromptAsset
+                       +-- ScoringTemplate
+
+MockTest  (đề thi tổng hợp, pool=exam)
+  |
+  +-- MockTestSection → Exercise [pool=exam]
 ```
 
 ## Core Enums
@@ -68,11 +74,60 @@ Course
 - `admin`
 - `reviewer`
 
+### ExercisePool
+- `course` — bài luyện trong Course → Module → Skill (default)
+- `exam` — bài thi trong MockTest → MockTestSection
+
+### SkillKind
+- `noi` — Kỹ năng nói (Speaking) — **đã implement**
+- `nghe` — Kỹ năng nghe (Listening) — placeholder V1
+- `doc` — Kỹ năng đọc (Reading) — placeholder V1
+- `viet` — Kỹ năng viết (Writing) — placeholder V1
+- `tu_vung` — Từ vựng (Vocabulary) — course-only, placeholder V1
+- `ngu_phap` — Ngữ pháp (Grammar) — course-only, placeholder V1
+
 ### ExerciseType
-- `uloha_1_topic_answers`
-- `uloha_2_dialogue_questions`
-- `uloha_3_story_narration`
-- `uloha_4_choice_reasoning`
+Source: Modelový test A2, NPI ČR (platný od dubna 2026).
+
+**Speaking (noi) — đã implement:**
+- `uloha_1_topic_answers` — 8 câu hỏi / 2 chủ đề (8 điểm)
+- `uloha_2_dialogue_questions` — 2 hội thoại, hỏi 4 thông tin (12 điểm)
+- `uloha_3_story_narration` — Kể chuyện 4 tranh, thì quá khứ (10 điểm)
+- `uloha_4_choice_reasoning` — Chọn 1/3 phương án + lý do (7 điểm)
+
+**Listening (nghe) — chưa implement:**
+- `listening_dialogue_picture` — 5 hội thoại → chọn ảnh A-D (5 điểm)
+- `listening_announcement_choice` — 5 bản tin → trắc nghiệm A-D (5 điểm)
+- `listening_monologue_match` — 5 monologue → ghép danh mục A-G (5 điểm)
+- `listening_dialogue_image` — 5 hội thoại → chọn ảnh A-F (5 điểm)
+- `listening_voicemail_fill` — Tin nhắn thoại → điền thông tin (5 điểm)
+
+**Reading (doc) — chưa implement:**
+- `reading_picture_message_match` — 5 tranh → ghép tin nhắn A-H (5 điểm)
+- `reading_article_choice` — Đọc bài → trắc nghiệm A-D (5 điểm)
+- `reading_text_person_match` — Ghép đoạn văn với người A-E (4 điểm)
+- `reading_gap_fill_word` — Điền từ vào chỗ trống chọn A-D (6 điểm)
+- `reading_text_completion` — Đọc → hoàn chỉnh câu (5 điểm)
+
+**Writing (viet) — chưa implement:**
+- `writing_form_answers` — Điền khảo sát ≥10 từ/câu (8 điểm)
+- `writing_email_pictures` — Viết email theo 5 tranh ≥35 từ (12 điểm)
+
+**Vocabulary / Grammar (tu_vung, ngu_phap) — course-only, chưa implement:**
+- `vocabulary_match` — Ghép từ Czech → nghĩa
+- `vocabulary_fill` — Điền từ vào câu
+- `grammar_choice` — Chọn dạng ngữ pháp đúng
+- `grammar_fill` — Điền dạng đúng
+
+**SkillKind → valid ExerciseType mapping:**
+```
+noi      → uloha_1_*, uloha_2_*, uloha_3_*, uloha_4_*
+nghe     → listening_*
+doc      → reading_*
+viet     → writing_*
+tu_vung  → vocabulary_*
+ngu_phap → grammar_*
+```
 
 ### ExerciseStatus
 - `draft`
@@ -123,7 +178,7 @@ Represents a learner or CMS/admin user.
 | `last_active_at` | `timestamp` | no | Optional |
 
 ## Course
-Logical grouping for the first release. V1 can use a single course, but modeling it now avoids hard-coding everything to one flat list.
+Top-level content grouping. Multiple courses are supported — e.g., "Giao tiếp cơ bản", "Đi urad", "Ôn thi A2 trvaly pobyt". Learners see all published courses.
 
 | Field | Type | Required | Notes |
 |------|------|----------|------|
@@ -151,14 +206,28 @@ Represents a grouping like `Day 1`, `Mock Exam`, or `Story Practice`.
 | `created_at` | `timestamp` | yes | Audit |
 | `updated_at` | `timestamp` | yes | Audit |
 
-## Exercise
-The main learner-facing content unit. Each exercise is one task instance the learner can open and attempt.
+## Skill
+Groups exercises by skill kind within a module. Only one `noi` (speaking) skill is fully implemented; others show as placeholders.
 
 | Field | Type | Required | Notes |
 |------|------|----------|------|
 | `id` | `uuid` | yes | Primary identifier |
 | `module_id` | `uuid` | yes | FK to `Module` |
-| `exercise_type` | `ExerciseType` | yes | Determines detail payload |
+| `skill_kind` | `SkillKind` | yes | `noi`, `nghe`, `doc`, `viet`, `tu_vung`, `ngu_phap` |
+| `title` | `string` | yes | Display name e.g. "Kỹ năng nói" |
+| `sequence_no` | `int` | yes | Ordering within module |
+| `status` | `ExerciseStatus` | yes | Draft/published/archived |
+
+## Exercise
+The main learner-facing content unit. Each exercise belongs to a Skill (course exercises) or directly to a MockTestSection (exam exercises). The `pool` field separates these two use-cases.
+
+| Field | Type | Required | Notes |
+|------|------|----------|------|
+| `id` | `uuid` | yes | Primary identifier |
+| `skill_id` | `uuid` | no | FK to `Skill` — set for pool=course exercises |
+| `module_id` | `uuid` | no | Denormalized from skill; kept for backward compat |
+| `pool` | `ExercisePool` | yes | `course` (default) or `exam` |
+| `exercise_type` | `ExerciseType` | yes | Must match skill_kind of parent Skill |
 | `title` | `string` | yes | Learner-visible |
 | `short_instruction` | `string` | yes | Shown in list cards |
 | `learner_instruction` | `text` | yes | Full instructions |
@@ -167,7 +236,7 @@ The main learner-facing content unit. Each exercise is one task instance the lea
 | `recording_time_limit_sec` | `int` | no | Optional hard limit |
 | `sample_answer_enabled` | `bool` | yes | V1 can default to true |
 | `status` | `ExerciseStatus` | yes | Draft/published/archive |
-| `sequence_no` | `int` | yes | Ordering within module |
+| `sequence_no` | `int` | yes | Ordering within skill |
 | `created_at` | `timestamp` | yes | Audit |
 | `updated_at` | `timestamp` | yes | Audit |
 
@@ -409,30 +478,65 @@ This entity should stay separate from `AttemptFeedback` so the current `complete
 | `comment` | `string` | yes | Short explanation |
 | `example_fix` | `string` | no | Better phrasing |
 
+## MockTest
+Admin-defined exam template. Defines which exercises appear in each section and the maximum score for each section. Based on the Modelový test A2 format (NPI ČR, platný od dubna 2026).
+
+| Field | Type | Required | Notes |
+|------|------|----------|------|
+| `id` | `uuid` | yes | Primary identifier |
+| `title` | `string` | yes | Display name, e.g. "Modelový test 2 — Mluvení" |
+| `description` | `text` | no | Shown on the intro screen |
+| `estimated_duration_minutes` | `int` | yes | Shown on the intro screen (e.g. 15) |
+| `status` | `string` | yes | `draft`, `published` |
+| `sections` | `[]MockTestSection` | yes | Ordered list of sections |
+
+## MockTestSection
+One section within a MockTest template.
+
+| Field | Type | Required | Notes |
+|------|------|----------|------|
+| `sequence_no` | `int` | yes | Order in the exam |
+| `exercise_id` | `uuid` | yes | Specific exercise to use |
+| `exercise_type` | `string` | yes | Denormalised from `Exercise` for display |
+| `max_points` | `int` | yes | Max score for this section (standard A2: Úloha1=8, Úloha2=12, Úloha3=10, Úloha4=7) |
+
 ## MockExamSession
-Groups multiple attempts taken as part of a full mock oral exam.
+One learner's attempt at a MockTest. Created when the learner starts an exam.
 
 | Field | Type | Required | Notes |
 |------|------|----------|------|
 | `id` | `uuid` | yes | Primary identifier |
 | `user_id` | `uuid` | yes | FK to `User` |
-| `course_id` | `uuid` | yes | FK to `Course` |
-| `status` | `string` | yes | `created`, `in_progress`, `completed`, `failed` |
-| `started_at` | `timestamp` | yes | Audit |
-| `completed_at` | `timestamp` | no | Audit |
-| `overall_readiness_level` | `FeedbackReadinessLevel` | no | Final summary |
-| `overall_summary` | `text` | no | Final summary text |
+| `mock_test_id` | `string` | no | FK to `MockTest`; empty if created without a template |
+| `status` | `string` | yes | `in_progress`, `completed` |
+| `overall_readiness_level` | `FeedbackReadinessLevel` | no | Computed on completion |
+| `overall_summary` | `text` | no | Human-readable summary |
+| `overall_score` | `int` | no | 0–40, computed on completion |
+| `passed` | `bool` | no | `true` when `overall_score >= 24` (60% of 40) |
 
 ## MockExamSessionItem
-Connects exercises and attempts to a mock exam session.
+One section within a `MockExamSession`. Tracks attempt and per-section score.
 
 | Field | Type | Required | Notes |
 |------|------|----------|------|
-| `id` | `uuid` | yes | Primary identifier |
 | `session_id` | `uuid` | yes | FK to `MockExamSession` |
 | `exercise_id` | `uuid` | yes | FK to `Exercise` |
+| `exercise_type` | `string` | yes | Denormalised |
 | `sequence_no` | `int` | yes | Order in exam |
-| `attempt_id` | `uuid` | no | Filled after completion |
+| `max_points` | `int` | yes | Max score for this section |
+| `attempt_id` | `uuid` | no | Filled after learner records |
+| `section_score` | `int` | no | Computed on completion: `round(readiness_fraction × max_points)` |
+| `status` | `string` | yes | `pending`, `completed` |
+
+## Scoring formula (speaking mock exam)
+
+```
+readiness_fraction: ready=1.0, almost=0.75, needs_work=0.5, not_ready=0.25, missing=0.0
+section_score[i] = round(readiness_fraction[i] × max_points[i])
+pronunciation_bonus = round(avg(readiness_fractions) × 3)
+overall_score = sum(section_scores) + pronunciation_bonus   // max 40
+passed = overall_score >= 24
+```
 
 ## Relationships Summary
 - One `Course` has many `Module` rows.
@@ -442,6 +546,8 @@ Connects exercises and attempts to a mock exam session.
 - One `User` has many `Attempt` rows.
 - One `Attempt` has exactly one `AttemptAudio`, one `AttemptTranscript`, and one `AttemptFeedback` after successful completion.
 - One `Attempt` may later have one `AttemptReviewArtifact` after the repair-and-shadowing layer runs.
+- One `MockTest` has many `MockTestSection` rows.
+- One `MockExamSession` references one `MockTest` (optional) and has many `MockExamSessionItem` rows.
 - One `MockExamSession` has many `MockExamSessionItem` rows.
 
 ## Minimum Validation Rules

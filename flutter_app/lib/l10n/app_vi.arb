@@ -29,19 +29,74 @@
     "planMockExamLabel": "MOCK EXAM",
     "mockExamTitle": "Mock thi nói",
     "mockExamIntroTitle": "4 phần, mỗi phần 1 lần",
-    "mockExamIntroBody": "Làm lần lượt từng Uloha. Có kết quả tổng sau khi xong.",
+    "mockExamIntroBody": "Ghi âm lần lượt từng Uloha. Sau khi xong cả 4 phần, hệ thống sẽ phân tích và cho kết quả tổng.",
     "mockExamSectionLabel": "Phần {index}",
     "@mockExamSectionLabel": {
         "placeholders": { "index": { "type": "int" } }
     },
     "mockExamStatusDone": "XONG",
     "mockExamStatusPending": "CHỜ",
+    "mockExamStatusRecorded": "ĐÃ GHI",
+    "mockExamAnalyzing": "Đang phân tích bài thi...",
+    "mockExamAnalyzingProgress": "Đang phân tích phần {n} / {total}",
+    "@mockExamAnalyzingProgress": {
+        "placeholders": {
+            "n": { "type": "int" },
+            "total": { "type": "int" }
+        }
+    },
     "mockExamActionStart": "Bắt đầu",
     "mockExamActionDone": "Xong",
     "mockExamResultTitle": "Kết quả mock exam",
     "mockExamOverallTitle": "Mức sẵn sàng tổng",
     "mockExamBackHome": "Về trang chủ",
+    "mockExamCardPill": "BÀI THI THỬ",
+    "mockExamCardTitle": "Bài thi thử nói A2",
+    "mockExamCardSubtitle": "Kiểm tra cả 4 phần nói liên tiếp như thi thật.",
     "mockExamOpenCta": "Mở mock exam",
+    "courseListTitle": "Khóa học",
+    "courseListEmpty": "Chưa có khóa học nào. Hãy nhờ admin publish một khóa.",
+    "moduleListTitle": "Chủ đề",
+    "skillListTitle": "Kỹ năng",
+    "exerciseListTitle": "Bài tập",
+    "skillNoi": "Nói",
+    "skillNghe": "Nghe",
+    "skillDoc": "Đọc",
+    "skillViet": "Viết",
+    "skillTuVung": "Từ vựng",
+    "skillNguPhap": "Ngữ pháp",
+    "skillComingSoon": "Sắp ra mắt",
+    "mockTestListTitle": "Chọn đề thi",
+    "mockTestListEmpty": "Chưa có đề thi nào. Hãy nhờ admin publish một đề.",
+    "mockTestCardMinutes": "{n} phút",
+    "@mockTestCardMinutes": { "placeholders": { "n": { "type": "int" } } },
+    "mockTestCardSections": "{n} phần",
+    "@mockTestCardSections": { "placeholders": { "n": { "type": "int" } } },
+    "mockTestIntroStartCta": "Bắt đầu thi",
+    "mockTestIntroPoints": "Tổng {pts} điểm",
+    "@mockTestIntroPoints": { "placeholders": { "pts": { "type": "int" } } },
+    "mockTestIntroPassThreshold": "Đạt: từ {pts} điểm trở lên",
+    "@mockTestIntroPassThreshold": { "placeholders": { "pts": { "type": "int" } } },
+    "mockTestIntroSectionsTitle": "Các phần thi",
+    "mockExamScoreLabel": "{score} / {max}",
+    "@mockExamScoreLabel": {
+        "placeholders": {
+            "score": { "type": "int" },
+            "max":   { "type": "int" }
+        }
+    },
+    "mockExamPassLabel": "ĐẠT",
+    "mockExamFailLabel": "CHƯA ĐẠT",
+    "mockExamSectionScoreLabel": "Úloha {n}: {score}/{max} điểm",
+    "mockExamSectionDetail": "Phân tích Phần {n}",
+    "@mockExamSectionDetail": { "placeholders": { "n": { "type": "int" } } },
+    "@mockExamSectionScoreLabel": {
+        "placeholders": {
+            "n":     { "type": "int" },
+            "score": { "type": "int" },
+            "max":   { "type": "int" }
+        }
+    },
 
     "recentAttemptsTitle": "Lần tập gần đây",
     "recentAttemptsSubtitle": "Xem transcript và feedback để theo dõi tiến bộ.",
@@ -120,6 +175,12 @@
     "resultSampleAnswerTitle": "Câu trả lời mẫu",
     "resultRetryCta": "Thử lại bài này",
     "resultNextExerciseCta": "Sang bài tiếp theo",
+    "resultTabFeedback": "Phản hồi",
+    "resultTabTranscript": "Bản ghi",
+    "resultTabSample": "Bài mẫu",
+    "resultNoFeedback": "Chưa có phản hồi.",
+    "resultNoTranscript": "Chưa có bản ghi âm.",
+    "resultNoSample": "Chưa có bài mẫu.",
 
     "reviewArtifactTitle": "Sửa & luyện theo mẫu",
     "reviewArtifactSubtitle": "Bản gốc, bản đã sửa, và bản mẫu để shadow theo.",
@@ -184,5 +245,17 @@
     "promptChoiceReasoningHint": "Gợi ý lý do: {list}",
     "@promptChoiceReasoningHint": {
         "placeholders": { "list": { "type": "String" } }
+    },
+
+    "bottomNavTests": "Đề thi",
+    "bottomNavProfile": "Hồ sơ",
+    "profileTitle": "Hồ sơ",
+    "profileLanguageSection": "Ngôn ngữ",
+    "profileAboutSection": "Thông tin",
+    "profileAppName": "A2 Mluvení Sprint",
+    "profileAppTagline": "Luyện thi nói A2 tiếng Czech cho người Việt",
+    "profileVersion": "Phiên bản {version}",
+    "@profileVersion": {
+        "placeholders": { "version": { "type": "String" } }
     }
 }

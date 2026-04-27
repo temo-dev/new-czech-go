@@ -256,7 +256,7 @@ Store these outside source control:
 ### Upload Validation
 Backend must validate:
 - expected content type
-- max file size
+- max file size — enforced via `http.MaxBytesReader(100 MB)` on both `handleAttemptAudioUpload` and `handleAdminAssetBlobUpload`; exceeding the limit returns `413 payload_too_large`
 - duration bounds
 - upload target ownership
 
@@ -345,6 +345,17 @@ Local developer needs:
 - one sample CMS admin account
 - one sample audio file for scoring pipeline testing
 
+Compose persistence:
+- named volume `postgres_data` for the database
+- named volume `backend_assets` for prompt asset blobs (mounts `/tmp/czech-go-system-assets`)
+- named volume `backend_attempts` for local-mode attempt audio + TTS cache (mounts `/tmp/czech-go-system`)
+
+These named volumes survive `docker compose down`, so signed audio URLs and uploaded prompt assets continue to resolve across container rebuilds. They were ephemeral before and dropped on every restart.
+
+Schema migrations:
+- `backend/internal/store/postgres_exercises.go` runs `CREATE TABLE IF NOT EXISTS` on startup for each table; new columns are added only via migration files, not via runtime `ALTER TABLE`
+- one-shot migration files live in `backend/db/migrations/` and are the sole canonical record of each schema delta; do not add `ALTER TABLE` calls to `ensureSchema`
+
 ## Environment Variables
 
 Illustrative categories:
@@ -352,14 +363,17 @@ Illustrative categories:
 - auth secrets
 - database DSN
 - AWS region and bucket names
-- Transcribe config
+- Transcribe config (e.g. `TRANSCRIBE_TIMEOUT`, default 3m)
 - Polly config
-- scoring provider config
+- scoring provider config (`LLM_PROVIDER`, `LLM_REVIEW_PROVIDER`, `ANTHROPIC_API_KEY`, `LLM_MODEL`)
+- audio signing secret (`AUDIO_SIGN_SECRET`) — **required**; backend will fatal-exit at startup if unset. Generate with `openssl rand -hex 32`. Signed URLs are HMAC-protected; without a stable secret, URLs issued before a restart will fail to verify after it.
 
 Do not hard-code:
 - bucket names
 - provider credentials
 - environment URLs
+
+LLM provider degrades gracefully: when `LLM_PROVIDER=claude` but `ANTHROPIC_API_KEY` is missing, the backend logs a warning and continues with the rule-based feedback/review path instead of exiting.
 
 ## Non-Goals for V1 Infrastructure
 - zero-downtime deployments

@@ -8,6 +8,7 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../../../shared/widgets/info_pill.dart';
 import '../widgets/locale_selector.dart';
+import '../widgets/mock_exam_card.dart';
 import '../widgets/plan_strip.dart';
 
 /// Home tab: hero header + module/exercise list.
@@ -38,8 +39,12 @@ class HomeScreen extends StatelessWidget {
       ),
       children: [
         _HeroCard(learnerName: learnerName),
-        if (plan != null) ...[
+        if (onOpenMockExam != null) ...[
           const SizedBox(height: AppSpacing.x5),
+          MockExamCard(onStart: onOpenMockExam!),
+        ],
+        if (plan != null) ...[
+          const SizedBox(height: AppSpacing.x4),
           PlanStrip(plan: plan!, onOpenMockExam: onOpenMockExam),
         ],
         const SizedBox(height: AppSpacing.x5),

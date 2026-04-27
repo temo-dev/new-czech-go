@@ -686,6 +686,182 @@ func TestBuildUloha1SpeakingFocusReturnsPracticalItems(t *testing.T) {
 	}
 }
 
+func TestBuildUloha3ReviewArtifactUsesCheckpoints(t *testing.T) {
+	exercise := contracts.Exercise{
+		ID:           "exercise-uloha3-tv",
+		ExerciseType: "uloha_3_story_narration",
+		Title:        "Koupe televize",
+		Detail: contracts.Uloha3Detail{
+			StoryTitle:           "Otec a syn kupuji televizi",
+			NarrativeCheckpoints: []string{"Otec a syn sli do obchodu", "Koupili televizi", "Odvezli ji domu"},
+			GrammarFocus:         []string{"minuly cas"},
+		},
+	}
+	transcript := contracts.Transcript{
+		FullText: "sli do obchodu koupili televizi",
+		Provider: "amazon_transcribe",
+	}
+	feedback := contracts.AttemptFeedback{
+		TaskCompletion: contracts.TaskCompletion{
+			CriteriaResults: []contracts.CriterionCheck{
+				{CriterionKey: "covered_story_events", Met: false},
+				{CriterionKey: "narrative_sequence_present", Met: false},
+				{CriterionKey: "used_story_language", Met: true},
+			},
+		},
+		SampleAnswer: "fallback",
+	}
+
+	artifact, ok := buildUloha3ReviewArtifact(exercise, transcript, feedback)
+	if !ok {
+		t.Fatal("expected uloha_3 review artifact to build")
+	}
+	if artifact.Status != "ready" {
+		t.Fatalf("expected ready status, got %s", artifact.Status)
+	}
+	if !strings.HasPrefix(artifact.CorrectedTranscriptText, "Sli ") {
+		t.Fatalf("expected corrected transcript to capitalize first word, got %q", artifact.CorrectedTranscriptText)
+	}
+	if !strings.HasSuffix(artifact.CorrectedTranscriptText, ".") {
+		t.Fatalf("expected corrected transcript to end with period, got %q", artifact.CorrectedTranscriptText)
+	}
+	for _, marker := range []string{"Nejdriv", "Potom", "Nakonec"} {
+		if !strings.Contains(artifact.ModelAnswerText, marker) {
+			t.Fatalf("expected model answer to use sequence marker %q, got %q", marker, artifact.ModelAnswerText)
+		}
+	}
+	if !containsFocusKey(artifact.SpeakingFocusItems, "story_coverage") {
+		t.Fatalf("expected story_coverage focus item, got %+v", artifact.SpeakingFocusItems)
+	}
+	if !containsFocusKey(artifact.SpeakingFocusItems, "sequence_markers") {
+		t.Fatalf("expected sequence_markers focus item, got %+v", artifact.SpeakingFocusItems)
+	}
+}
+
+func TestBuildUloha3ReviewArtifactPrefersAuthoredSample(t *testing.T) {
+	authored := "Nejdriv prisel otec, potom vybrali televizi, nakonec ji odvezli domu."
+	exercise := contracts.Exercise{
+		ID:               "exercise-uloha3-authored",
+		ExerciseType:     "uloha_3_story_narration",
+		SampleAnswerText: authored,
+		Detail: contracts.Uloha3Detail{
+			NarrativeCheckpoints: []string{"Otec a syn sli", "Koupili televizi"},
+		},
+	}
+	transcript := contracts.Transcript{FullText: "sli koupili"}
+	feedback := contracts.AttemptFeedback{SampleAnswer: "ignored"}
+
+	artifact, ok := buildUloha3ReviewArtifact(exercise, transcript, feedback)
+	if !ok {
+		t.Fatal("expected artifact to build")
+	}
+	if artifact.ModelAnswerText != authored {
+		t.Fatalf("expected authored sample to win, got %q", artifact.ModelAnswerText)
+	}
+}
+
+func TestBuildUloha4ReviewArtifactPrefersAuthoredSample(t *testing.T) {
+	authored := "Vybiram polevku, protoze je tepla a sytostna."
+	exercise := contracts.Exercise{
+		ID:               "exercise-uloha4-authored",
+		ExerciseType:     "uloha_4_choice_reasoning",
+		SampleAnswerText: authored,
+		Detail: contracts.Uloha4Detail{
+			Options:               []contracts.ChoiceOption{{OptionKey: "knedliky", Label: "knedliky"}},
+			ExpectedReasoningAxes: []string{"je rychly"},
+		},
+	}
+	transcript := contracts.Transcript{FullText: "knedliky"}
+	feedback := contracts.AttemptFeedback{}
+
+	artifact, ok := buildUloha4ReviewArtifact(exercise, transcript, feedback)
+	if !ok {
+		t.Fatal("expected artifact to build")
+	}
+	if artifact.ModelAnswerText != authored {
+		t.Fatalf("expected authored sample to win, got %q", artifact.ModelAnswerText)
+	}
+}
+
+func TestBuildUloha3ReviewArtifactFallsBackToSampleAnswer(t *testing.T) {
+	exercise := contracts.Exercise{
+		ID:           "exercise-uloha3-empty",
+		ExerciseType: "uloha_3_story_narration",
+		Detail:       contracts.Uloha3Detail{},
+	}
+	transcript := contracts.Transcript{FullText: "neco se stalo"}
+	feedback := contracts.AttemptFeedback{SampleAnswer: "Nejdriv byli doma, potom sli ven."}
+
+	artifact, ok := buildUloha3ReviewArtifact(exercise, transcript, feedback)
+	if !ok {
+		t.Fatal("expected artifact to build with fallback sample answer")
+	}
+	if artifact.ModelAnswerText != feedback.SampleAnswer {
+		t.Fatalf("expected fallback sample answer, got %q", artifact.ModelAnswerText)
+	}
+}
+
+func TestBuildUloha4ReviewArtifactUsesChoiceAndAxis(t *testing.T) {
+	exercise := contracts.Exercise{
+		ID:           "exercise-uloha4-weekend",
+		ExerciseType: "uloha_4_choice_reasoning",
+		Detail: contracts.Uloha4Detail{
+			ScenarioPrompt:        "Kam jet o vikendu?",
+			Options:               []contracts.ChoiceOption{{OptionKey: "park", Label: "park"}, {OptionKey: "kino", Label: "kino"}},
+			ExpectedReasoningAxes: []string{"je tam klid a priroda"},
+		},
+	}
+	transcript := contracts.Transcript{FullText: "jdu do parku"}
+	feedback := contracts.AttemptFeedback{
+		TaskCompletion: contracts.TaskCompletion{
+			CriteriaResults: []contracts.CriterionCheck{
+				{CriterionKey: "made_clear_choice", Met: false},
+				{CriterionKey: "gave_reason", Met: false},
+				{CriterionKey: "reason_matches_choice", Met: false},
+			},
+		},
+	}
+
+	artifact, ok := buildUloha4ReviewArtifact(exercise, transcript, feedback)
+	if !ok {
+		t.Fatal("expected uloha_4 review artifact to build")
+	}
+	if !strings.Contains(artifact.ModelAnswerText, "Vybiram park") {
+		t.Fatalf("expected model answer to pick mentioned option, got %q", artifact.ModelAnswerText)
+	}
+	if !strings.Contains(artifact.ModelAnswerText, "protoze je tam klid a priroda") {
+		t.Fatalf("expected model answer to include expected axis, got %q", artifact.ModelAnswerText)
+	}
+	for _, key := range []string{"clear_choice", "give_reason", "reason_matches"} {
+		if !containsFocusKey(artifact.SpeakingFocusItems, key) {
+			t.Fatalf("expected focus key %q, got %+v", key, artifact.SpeakingFocusItems)
+		}
+	}
+}
+
+func TestBuildUloha4ReviewArtifactDefaultsToFirstOptionWhenUnmentioned(t *testing.T) {
+	exercise := contracts.Exercise{
+		ID:           "exercise-uloha4-food",
+		ExerciseType: "uloha_4_choice_reasoning",
+		Detail: contracts.Uloha4Detail{
+			Options: []contracts.ChoiceOption{{OptionKey: "knedliky", Label: "knedliky"}, {OptionKey: "polevka", Label: "polevka"}},
+		},
+	}
+	transcript := contracts.Transcript{FullText: "nevim co rict"}
+	feedback := contracts.AttemptFeedback{}
+
+	artifact, ok := buildUloha4ReviewArtifact(exercise, transcript, feedback)
+	if !ok {
+		t.Fatal("expected artifact to build with defaults")
+	}
+	if !strings.HasPrefix(artifact.ModelAnswerText, "Vybiram knedliky") {
+		t.Fatalf("expected default to first option knedliky, got %q", artifact.ModelAnswerText)
+	}
+	if !strings.Contains(artifact.ModelAnswerText, "protoze") {
+		t.Fatalf("expected protoze in fallback model answer, got %q", artifact.ModelAnswerText)
+	}
+}
+
 type failingReviewArtifactRepo struct {
 	*store.MemoryStore
 }

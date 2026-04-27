@@ -160,6 +160,53 @@ void main() {
     expect(attempt.reviewArtifact?.repairProvider, 'task_aware_repair_v1');
   });
 
+  test('AttemptFeedbackView parses criteria_results from task_completion', () {
+    final feedback = AttemptFeedbackView.fromJson({
+      'readiness_level': 'almost_ready',
+      'overall_summary': 'Kha tot.',
+      'strengths': ['Phat am ro rang'],
+      'improvements': ['Can them chi tiet'],
+      'retry_advice': [],
+      'sample_answer_text': '',
+      'task_completion': {
+        'score_band': 'almost',
+        'criteria_results': [
+          {
+            'criterion_key': 'answered_question',
+            'label': 'Tra loi dung cau hoi',
+            'met': true,
+            'comment': '',
+          },
+          {
+            'criterion_key': 'gave_supporting_detail',
+            'label': 'Co chi tiet ho tro',
+            'met': false,
+            'comment': 'Can them vi du cu the',
+          },
+        ],
+      },
+    });
+
+    expect(feedback.criteriaResults, hasLength(2));
+    expect(feedback.criteriaResults.first.criterionKey, 'answered_question');
+    expect(feedback.criteriaResults.first.met, isTrue);
+    expect(feedback.criteriaResults.last.criterionKey, 'gave_supporting_detail');
+    expect(feedback.criteriaResults.last.met, isFalse);
+    expect(feedback.criteriaResults.last.comment, 'Can them vi du cu the');
+  });
+
+  test('AttemptFeedbackView handles missing task_completion gracefully', () {
+    final feedback = AttemptFeedbackView.fromJson({
+      'readiness_level': 'needs_work',
+      'overall_summary': '',
+      'strengths': [],
+      'improvements': [],
+      'retry_advice': [],
+    });
+
+    expect(feedback.criteriaResults, isEmpty);
+  });
+
   test('AttemptReviewArtifact parses full review payload', () {
     final artifact = AttemptReviewArtifactView.fromJson({
       'attempt_id': 'attempt-123',
@@ -188,6 +235,7 @@ void main() {
       'tts_audio': {
         'storage_key': 'attempt-review/attempt-123/model-answer.wav',
         'mime_type': 'audio/wav',
+        'duration_ms': 4200,
       },
       'repair_provider': 'task_aware_repair_v1',
       'generated_at': '2026-04-23T12:00:00Z',
@@ -198,5 +246,78 @@ void main() {
     expect(artifact.speakingFocusItems, hasLength(1));
     expect(artifact.diffChunks.first.kind, 'replaced');
     expect(artifact.ttsAudio?.mimeType, 'audio/wav');
+    expect(artifact.ttsAudio?.durationMs, 4200);
+  });
+
+  test('MockTest parses sections and totalMaxPoints', () {
+    final test = MockTest.fromJson({
+      'id': 'mock-test-1',
+      'title': 'Mock Test 01',
+      'description': 'Bản thân & nhà ở',
+      'estimated_duration_minutes': 12,
+      'status': 'published',
+      'sections': [
+        {'sequence_no': 1, 'exercise_id': 'ex-1', 'exercise_type': 'uloha_1_topic_answers', 'max_points': 8},
+        {'sequence_no': 2, 'exercise_id': 'ex-2', 'exercise_type': 'uloha_2_dialogue_questions', 'max_points': 12},
+        {'sequence_no': 3, 'exercise_id': 'ex-3', 'exercise_type': 'uloha_3_story_narration', 'max_points': 10},
+        {'sequence_no': 4, 'exercise_id': 'ex-4', 'exercise_type': 'uloha_4_choice_reasoning', 'max_points': 7},
+      ],
+    });
+
+    expect(test.id, 'mock-test-1');
+    expect(test.estimatedDurationMinutes, 12);
+    expect(test.sections.length, 4);
+    expect(test.totalMaxPoints, 37); // 8+12+10+7
+    expect(test.sections.first.maxPoints, 8);
+    expect(test.sections.last.exerciseType, 'uloha_4_choice_reasoning');
+  });
+
+  test('ModuleSummary parses status field', () {
+    final module = ModuleSummary.fromJson({
+      'id': 'module-1',
+      'course_id': 'course-a2',
+      'title': 'Tuần 1 · Giới thiệu',
+      'description': 'Chủ đề tuần đầu',
+      'status': 'published',
+      'sequence_no': 1,
+      'module_kind': 'daily_practice',
+    });
+
+    expect(module.id, 'module-1');
+    expect(module.status, 'published');
+    expect(module.sequenceNo, 1);
+
+    final locked = ModuleSummary.fromJson({
+      'id': 'module-2',
+      'course_id': 'course-a2',
+      'title': 'Tuần 2',
+      'description': '',
+      'status': 'locked',
+      'sequence_no': 2,
+      'module_kind': 'daily_practice',
+    });
+    expect(locked.status, 'locked');
+  });
+
+  test('CriterionCheckView.fromJson parses met and comment', () {
+    final c = CriterionCheckView.fromJson({
+      'criterion_key': 'gave_supporting_detail',
+      'label': 'Có chi tiết hỗ trợ',
+      'met': false,
+      'comment': 'Cần thêm ví dụ cụ thể',
+    });
+
+    expect(c.criterionKey, 'gave_supporting_detail');
+    expect(c.label, 'Có chi tiết hỗ trợ');
+    expect(c.met, isFalse);
+    expect(c.comment, 'Cần thêm ví dụ cụ thể');
+
+    final met = CriterionCheckView.fromJson({
+      'criterion_key': 'answered_question',
+      'label': 'Trả lời đúng câu hỏi',
+      'met': true,
+    });
+    expect(met.met, isTrue);
+    expect(met.comment, isEmpty);
   });
 }

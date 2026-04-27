@@ -1,16 +1,18 @@
 # Spec: Attempt Repair And Shadowing
 
 ## Status
-Tasks 1-5 are landed for `Uloha 1` and `Uloha 2`:
+Tasks 1-5 are landed for all four oral task types (`Uloha 1`–`Uloha 4`):
 - contract types and persistence exist
-- `Uloha 1` and `Uloha 2` review artifacts generate corrected text, model answer text, diff chunks, and speaking-focus items
+- review artifacts generate corrected text, model answer text, diff chunks, and speaking-focus items for `Uloha 1`, `Uloha 2`, `Uloha 3`, `Uloha 4`
 - backend generates one model-answer audio artifact through a pluggable `TTSProvider`
 - learner-facing review endpoints, Flutter rendering, and `Retry with this model` are live on the shared result screen
 - opt-in `LLMReviewProvider` (Claude) replaces the rule-based echo repair with a task-aware corrected transcript + model answer; falls back to rule-based on error
+- authored `sample_answer_text` on `Exercise` is preferred as the model answer when present; rule-based fallback synthesizes from task detail (checkpoints for `Uloha 3`, choice + reasoning axis for `Uloha 4`)
+- provider-aware audio replay landed: signed URLs from `GET /v1/attempts/:id/audio/url` and `.../review/audio/url` cover both local and S3 audio
 
 Follow-up work:
-- expand review artifact generation to `Uloha 3` and `Uloha 4`
-- provider-aware replay for cloud-only audio artifacts
+- learner-surface polish for `Uloha 3` and `Uloha 4` feedback messaging
+- broader sample-answer authoring coverage in CMS
 
 ## Purpose
 This spec defines a post-attempt repair-and-shadowing layer for `A2 Mluveni Sprint`.
@@ -22,7 +24,7 @@ The goal is to extend the current `transcript + feedback` result with a more act
 - generate model audio for shadowing
 
 ## Current Implementation Snapshot
-Today the backend can already attach a persisted review artifact to completed `Uloha 1` and `Uloha 2` attempts.
+Today the backend attaches a persisted review artifact to completed attempts across all four oral task types.
 
 That first slice currently includes:
 - `status=ready`
@@ -40,7 +42,11 @@ Current generation notes:
 - `TTS_PROVIDER=amazon_polly` synthesizes `model_answer_text` through `Amazon Polly` and stores the returned audio in backend temp storage
 - TTS failure does not erase the text review artifact or block the attempt from staying `completed`
 - `Uloha 2` uses `required_info_slots` plus the extra-question hint to keep corrected/model output in question form instead of turning the review into a statement paragraph
+- `Uloha 3` builders synthesize a past-tense narrative from `Uloha3Detail.NarrativeCheckpoints`; speaking-focus items cover checkpoint coverage, past tense, connectives
+- `Uloha 4` builders default to `Vybírám {Option.Label}, protože {first reasoning axis}` and surface choice clarity, `protože` clause, axis coverage as focus items
+- authored `Exercise.sample_answer_text` (when present) overrides the rule-based model answer for any task type
 - when `LLM_REVIEW_PROVIDER=claude` (or `LLM_PROVIDER=claude` is set as the default), `corrected_transcript_text` and `model_answer_text` come from Claude, scoped to the exercise + learner transcript. Diff chunks are recomputed from the LLM-corrected text. Rule-based output is used as fallback
+- backend startup is graceful: missing `ANTHROPIC_API_KEY` while `LLM_PROVIDER=claude` logs a warning and falls back to the rule-based provider instead of exiting
 
 ## Graph Notes
 `code-review-graph` confirms the current attempt flow is concentrated in:

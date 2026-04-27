@@ -1,0 +1,10 @@
+import { NextRequest } from 'next/server';
+const apiBaseUrl = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
+const adminToken = process.env.CMS_ADMIN_TOKEN ?? process.env.NEXT_PUBLIC_ADMIN_TOKEN ?? 'dev-admin-token';
+async function proxy(method: 'GET' | 'POST', request: NextRequest) {
+  const body = method === 'POST' ? await request.text() : undefined;
+  const res = await fetch(`${apiBaseUrl}/v1/admin/courses`, { method, cache: 'no-store', headers: { Authorization: `Bearer ${adminToken}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body });
+  return new Response(await res.text(), { status: res.status, headers: { 'Content-Type': res.headers.get('Content-Type') ?? 'application/json' } });
+}
+export async function GET(req: NextRequest) { return proxy('GET', req); }
+export async function POST(req: NextRequest) { return proxy('POST', req); }

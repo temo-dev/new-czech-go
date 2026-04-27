@@ -20,16 +20,71 @@
     "planMockExamLabel": "MOCK EXAM",
     "mockExamTitle": "Mock oral exam",
     "mockExamIntroTitle": "Four sections, one attempt each",
-    "mockExamIntroBody": "Run through each Uloha in order. You get feedback at the end.",
+    "mockExamIntroBody": "Record each Uloha in order. After all four sections, your answers are analysed together.",
     "mockExamSectionLabel": "Section {index}",
     "mockExamStatusDone": "DONE",
     "mockExamStatusPending": "PENDING",
+    "mockExamStatusRecorded": "RECORDED",
+    "mockExamAnalyzing": "Analysing your exam...",
+    "mockExamAnalyzingProgress": "Analysing section {n} of {total}",
+    "@mockExamAnalyzingProgress": {
+        "placeholders": {
+            "n": { "type": "int" },
+            "total": { "type": "int" }
+        }
+    },
     "mockExamActionStart": "Start",
     "mockExamActionDone": "Done",
     "mockExamResultTitle": "Mock exam result",
     "mockExamOverallTitle": "Overall readiness",
     "mockExamBackHome": "Back to home",
+    "mockExamCardPill": "MOCK EXAM",
+    "mockExamCardTitle": "A2 Mock Oral Exam",
+    "mockExamCardSubtitle": "Run through all four speaking sections in sequence.",
     "mockExamOpenCta": "Open mock exam",
+    "courseListTitle": "Courses",
+    "courseListEmpty": "No courses available. Ask the admin to publish one.",
+    "moduleListTitle": "Topics",
+    "skillListTitle": "Skills",
+    "exerciseListTitle": "Exercises",
+    "skillNoi": "Speaking",
+    "skillNghe": "Listening",
+    "skillDoc": "Reading",
+    "skillViet": "Writing",
+    "skillTuVung": "Vocabulary",
+    "skillNguPhap": "Grammar",
+    "skillComingSoon": "Coming soon",
+    "mockTestListTitle": "Choose exam",
+    "mockTestListEmpty": "No mock tests available. Ask the admin to publish one.",
+    "mockTestCardMinutes": "{n} min",
+    "@mockTestCardMinutes": { "placeholders": { "n": { "type": "int" } } },
+    "mockTestCardSections": "{n} sections",
+    "@mockTestCardSections": { "placeholders": { "n": { "type": "int" } } },
+    "mockTestIntroStartCta": "Start exam",
+    "mockTestIntroPoints": "{pts} points total",
+    "@mockTestIntroPoints": { "placeholders": { "pts": { "type": "int" } } },
+    "mockTestIntroPassThreshold": "Pass: {pts} points or more",
+    "@mockTestIntroPassThreshold": { "placeholders": { "pts": { "type": "int" } } },
+    "mockTestIntroSectionsTitle": "Sections",
+    "mockExamScoreLabel": "{score} / {max}",
+    "@mockExamScoreLabel": {
+        "placeholders": {
+            "score": { "type": "int" },
+            "max":   { "type": "int" }
+        }
+    },
+    "mockExamPassLabel": "PASS",
+    "mockExamFailLabel": "FAIL",
+    "mockExamSectionScoreLabel": "Úloha {n}: {score}/{max} pts",
+    "mockExamSectionDetail": "Section {n} Analysis",
+    "@mockExamSectionDetail": { "placeholders": { "n": { "type": "int" } } },
+    "@mockExamSectionScoreLabel": {
+        "placeholders": {
+            "n":     { "type": "int" },
+            "score": { "type": "int" },
+            "max":   { "type": "int" }
+        }
+    },
 
     "recentAttemptsTitle": "Recent attempts",
     "recentAttemptsSubtitle": "Check the transcript and feedback to track your progress.",
@@ -102,6 +157,12 @@
     "resultSampleAnswerTitle": "Sample answer",
     "resultRetryCta": "Retry this exercise",
     "resultNextExerciseCta": "Next exercise",
+    "resultTabFeedback": "Feedback",
+    "resultTabTranscript": "Transcript",
+    "resultTabSample": "Sample",
+    "resultNoFeedback": "No feedback available.",
+    "resultNoTranscript": "No transcript available.",
+    "resultNoSample": "No sample answer available.",
 
     "reviewArtifactTitle": "Corrections & shadowing",
     "reviewArtifactSubtitle": "Your original, the corrected version, and a model to shadow.",
@@ -139,5 +200,17 @@
     "promptStoryCheckpointsTitle": "Beats to mention",
     "promptStoryGrammarFocus": "Grammar to emphasize: {list}",
     "promptChoiceOptionsTitle": "Options",
-    "promptChoiceReasoningHint": "Reasoning hints: {list}"
+    "promptChoiceReasoningHint": "Reasoning hints: {list}",
+
+    "bottomNavTests": "Tests",
+    "bottomNavProfile": "Profile",
+    "profileTitle": "Profile",
+    "profileLanguageSection": "Language",
+    "profileAboutSection": "About",
+    "profileAppName": "A2 Mluvení Sprint",
+    "profileAppTagline": "Czech A2 oral exam prep for Vietnamese learners",
+    "profileVersion": "Version {version}",
+    "@profileVersion": {
+        "placeholders": { "version": { "type": "String" } }
+    }
 }

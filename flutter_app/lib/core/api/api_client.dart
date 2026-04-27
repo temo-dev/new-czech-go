@@ -31,6 +31,26 @@ class ApiClient {
     return payload['data'] as Map<String, dynamic>;
   }
 
+  Future<List<dynamic>> listCourses() async {
+    final payload = await _authed('GET', '/v1/courses');
+    return payload['data'] as List<dynamic>? ?? const [];
+  }
+
+  Future<List<dynamic>> listCourseModules(String courseId) async {
+    final payload = await _authed('GET', '/v1/courses/$courseId/modules');
+    return payload['data'] as List<dynamic>? ?? const [];
+  }
+
+  Future<List<dynamic>> listModuleSkills(String moduleId) async {
+    final payload = await _authed('GET', '/v1/modules/$moduleId/skills');
+    return payload['data'] as List<dynamic>? ?? const [];
+  }
+
+  Future<List<dynamic>> listSkillExercises(String skillId) async {
+    final payload = await _authed('GET', '/v1/skills/$skillId/exercises');
+    return payload['data'] as List<dynamic>? ?? const [];
+  }
+
   Future<List<dynamic>> getExercises(String moduleId) async {
     final payload = await _authed('GET', '/v1/modules/$moduleId/exercises');
     return payload['data'] as List<dynamic>? ?? const [];
@@ -127,8 +147,16 @@ class ApiClient {
     return payload['data'] as List<dynamic>? ?? const [];
   }
 
-  Future<Map<String, dynamic>> createMockExam() async {
-    final payload = await _authed('POST', '/v1/mock-exams');
+  Future<List<dynamic>> listMockTests() async {
+    final payload = await _authed('GET', '/v1/mock-tests');
+    return payload['data'] as List<dynamic>? ?? const [];
+  }
+
+  Future<Map<String, dynamic>> createMockExam({String? mockTestId}) async {
+    final body = mockTestId != null && mockTestId.isNotEmpty
+        ? {'mock_test_id': mockTestId}
+        : <String, dynamic>{};
+    final payload = await _authed('POST', '/v1/mock-exams', body: body);
     return payload['data'] as Map<String, dynamic>;
   }
 

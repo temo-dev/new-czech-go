@@ -10,9 +10,14 @@ type PromptAsset = {
   sequence_no?: number;
 };
 
+type CmsModule = { id: string; title: string; course_id: string };
+type CmsSkill = { id: string; module_id: string; skill_kind: string; title: string };
+
 type Exercise = {
   id: string;
   module_id?: string;
+  skill_id?: string;
+  pool?: string;
   title: string;
   exercise_type: string;
   short_instruction: string;
@@ -21,6 +26,7 @@ type Exercise = {
   prep_time_sec?: number;
   recording_time_limit_sec?: number;
   sample_answer_enabled?: boolean;
+  sample_answer_text?: string;
   status?: string;
   assets?: PromptAsset[];
   prompt?: {
@@ -44,6 +50,7 @@ type ExerciseFormState = {
   shortInstruction: string;
   learnerInstruction: string;
   moduleId: string;
+  skillId: string;
   questions: string;
   scenarioTitle: string;
   scenarioPrompt: string;
@@ -56,6 +63,9 @@ type ExerciseFormState = {
   choiceScenarioPrompt: string;
   choiceOptions: string;
   expectedReasoningAxes: string;
+  sampleAnswerText: string;
+  status: string;
+  pool: string;
 };
 
 const exerciseTypeOptions: Array<{
@@ -92,6 +102,7 @@ function createInitialFormState(): ExerciseFormState {
     shortInstruction: 'Tra loi ngan gon va ro y.',
     learnerInstruction: 'Ban hay tra loi ngan gon theo chu de thoi tiet.',
     moduleId: 'module-day-1',
+    skillId: '',
     questions:
       'Jake pocasi mate dnes?\nCo delate, kdyz je venku hezky?\nMate rad/a zimu?\nJake pocasi bude zitra?',
     scenarioTitle: 'Navsteva kina',
@@ -111,6 +122,9 @@ function createInitialFormState(): ExerciseFormState {
     choiceOptions:
       'flat_a | Byt A | Levnejsi, ale daleko od centra.\nflat_b | Byt B | Blizko centra, ale mensi.\nflat_c | Byt C | Vetsi a klidny, ale drazsi.',
     expectedReasoningAxes: 'price\nlocation\nspace',
+    sampleAnswerText: '',
+    status: 'draft',
+    pool: 'course',
   };
 }
 
@@ -176,6 +190,7 @@ function formStateFromExercise(item: Exercise): ExerciseFormState {
     shortInstruction: item.short_instruction ?? '',
     learnerInstruction: item.learner_instruction ?? '',
     moduleId: item.module_id ?? 'module-day-1',
+    skillId: item.skill_id ?? '',
     questions: (prompt.question_prompts ?? []).join('\n'),
     scenarioTitle: String(detail.scenario_title ?? ''),
     scenarioPrompt: String(detail.scenario_prompt ?? ''),
@@ -210,6 +225,9 @@ function formStateFromExercise(item: Exercise): ExerciseFormState {
     expectedReasoningAxes: Array.isArray(detail.expected_reasoning_axes)
       ? (detail.expected_reasoning_axes as unknown[]).map(String).join('\n')
       : '',
+    sampleAnswerText: item.sample_answer_text ?? '',
+    status: item.status ?? 'draft',
+    pool: (item as { pool?: string }).pool ?? 'course',
   };
 }
 
@@ -217,6 +235,7 @@ function buildCreatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'uloha_1_topic_answers') {
     return {
       module_id: form.moduleId,
+      skill_id: form.skillId,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -225,6 +244,9 @@ function buildCreatePayload(form: ExerciseFormState) {
       prep_time_sec: 10,
       recording_time_limit_sec: 45,
       sample_answer_enabled: true,
+      sample_answer_text: form.sampleAnswerText.trim(),
+      status: form.status,
+      pool: form.pool,
       questions: parseLineList(form.questions),
     };
   }
@@ -232,6 +254,7 @@ function buildCreatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'uloha_2_dialogue_questions') {
     return {
       module_id: form.moduleId,
+      skill_id: form.skillId,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -240,6 +263,9 @@ function buildCreatePayload(form: ExerciseFormState) {
       prep_time_sec: 10,
       recording_time_limit_sec: 45,
       sample_answer_enabled: true,
+      sample_answer_text: form.sampleAnswerText.trim(),
+      status: form.status,
+      pool: form.pool,
       detail: {
         scenario_title: form.scenarioTitle,
         scenario_prompt: form.scenarioPrompt,
@@ -252,6 +278,7 @@ function buildCreatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'uloha_3_story_narration') {
     return {
       module_id: form.moduleId,
+      skill_id: form.skillId,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -260,6 +287,9 @@ function buildCreatePayload(form: ExerciseFormState) {
       prep_time_sec: 15,
       recording_time_limit_sec: 60,
       sample_answer_enabled: true,
+      sample_answer_text: form.sampleAnswerText.trim(),
+      status: form.status,
+      pool: form.pool,
       detail: {
         story_title: form.storyTitle,
         image_asset_ids: parseLineList(form.imageAssetIds),
@@ -279,6 +309,8 @@ function buildCreatePayload(form: ExerciseFormState) {
     prep_time_sec: 10,
     recording_time_limit_sec: 45,
     sample_answer_enabled: true,
+    sample_answer_text: form.sampleAnswerText.trim(),
+    status: form.status,
     detail: {
       scenario_prompt: form.choiceScenarioPrompt,
       options: parseChoiceOptions(form.choiceOptions),
@@ -291,6 +323,7 @@ function buildUpdatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'uloha_1_topic_answers') {
     return {
       module_id: form.moduleId,
+      skill_id: form.skillId,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -299,6 +332,9 @@ function buildUpdatePayload(form: ExerciseFormState) {
       prep_time_sec: 10,
       recording_time_limit_sec: 45,
       sample_answer_enabled: true,
+      sample_answer_text: form.sampleAnswerText.trim(),
+      status: form.status,
+      pool: form.pool,
       prompt: {
         topic_label: form.title,
         question_prompts: parseLineList(form.questions),
@@ -309,6 +345,7 @@ function buildUpdatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'uloha_2_dialogue_questions') {
     return {
       module_id: form.moduleId,
+      skill_id: form.skillId,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -317,6 +354,9 @@ function buildUpdatePayload(form: ExerciseFormState) {
       prep_time_sec: 10,
       recording_time_limit_sec: 45,
       sample_answer_enabled: true,
+      sample_answer_text: form.sampleAnswerText.trim(),
+      status: form.status,
+      pool: form.pool,
       detail: {
         scenario_title: form.scenarioTitle,
         scenario_prompt: form.scenarioPrompt,
@@ -329,6 +369,7 @@ function buildUpdatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'uloha_3_story_narration') {
     return {
       module_id: form.moduleId,
+      skill_id: form.skillId,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -337,6 +378,9 @@ function buildUpdatePayload(form: ExerciseFormState) {
       prep_time_sec: 15,
       recording_time_limit_sec: 60,
       sample_answer_enabled: true,
+      sample_answer_text: form.sampleAnswerText.trim(),
+      status: form.status,
+      pool: form.pool,
       detail: {
         story_title: form.storyTitle,
         image_asset_ids: parseLineList(form.imageAssetIds),
@@ -356,6 +400,8 @@ function buildUpdatePayload(form: ExerciseFormState) {
     prep_time_sec: 10,
     recording_time_limit_sec: 45,
     sample_answer_enabled: true,
+    sample_answer_text: form.sampleAnswerText.trim(),
+    status: form.status,
     detail: {
       scenario_prompt: form.choiceScenarioPrompt,
       options: parseChoiceOptions(form.choiceOptions),
@@ -373,6 +419,9 @@ export function ExerciseDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [assetError, setAssetError] = useState<string | null>(null);
   const [form, setForm] = useState<ExerciseFormState>(createInitialFormState);
+  const [availableModules, setAvailableModules] = useState<CmsModule[]>([]);
+  const [availableSkills, setAvailableSkills] = useState<CmsSkill[]>([]);
+  const [formTab, setFormTab] = useState(0);
 
   const editingItem = editingId ? items.find((item) => item.id === editingId) ?? null : null;
   const currentAssets = editingItem?.assets ?? [];
@@ -402,7 +451,35 @@ export function ExerciseDashboard() {
 
   useEffect(() => {
     loadExercises();
+    loadModules();
   }, []);
+
+  async function loadModules() {
+    try {
+      const res = await fetch('/api/admin/modules');
+      const j = await res.json();
+      setAvailableModules(j.data ?? []);
+    } catch { /* non-fatal */ }
+  }
+
+  async function loadSkillsForModule(moduleId: string) {
+    if (!moduleId) { setAvailableSkills([]); return; }
+    try {
+      const res = await fetch(`/api/admin/skills?module_id=${moduleId}`);
+      const j = await res.json();
+      setAvailableSkills(j.data ?? []);
+    } catch { setAvailableSkills([]); }
+  }
+
+  function handleModuleChange(moduleId: string) {
+    setForm(f => ({ ...f, moduleId, skillId: '' }));
+    loadSkillsForModule(moduleId);
+  }
+
+  function handleSkillChange(skillId: string) {
+    const skill = availableSkills.find(s => s.id === skillId);
+    setForm(f => ({ ...f, skillId, moduleId: skill?.module_id ?? f.moduleId }));
+  }
 
   function startEditing(item: Exercise) {
     setError(null);
@@ -615,6 +692,40 @@ export function ExerciseDashboard() {
             </div>
           ) : null}
 
+          {/* Tab bar */}
+          <div style={{
+            display: 'flex',
+            gap: 2,
+            padding: 4,
+            background: 'rgba(20,18,14,0.05)',
+            borderRadius: 999,
+            marginBottom: 4,
+          }}>
+            {['Đề bài', 'Bài mẫu', 'Metadata'].map((tab, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setFormTab(i)}
+                style={{
+                  flex: 1,
+                  padding: '8px 0',
+                  borderRadius: 999,
+                  border: 'none',
+                  background: formTab === i ? 'var(--surface)' : 'transparent',
+                  color: formTab === i ? 'var(--ink)' : 'var(--ink-3)',
+                  fontWeight: formTab === i ? 600 : 400,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  boxShadow: formTab === i ? '0 1px 4px rgba(40,28,16,0.10)' : 'none',
+                  transition: 'all 120ms ease',
+                }}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          {formTab === 0 && <>
           <label style={{ display: 'grid', gap: 6 }}>
             <span style={fieldLabelStyle}>Task type</span>
             <select
@@ -664,7 +775,97 @@ export function ExerciseDashboard() {
             />
           </label>
 
-          {form.exerciseType === 'uloha_1_topic_answers' ? (
+          </>} {/* end formTab === 0 prompt fields */}
+
+          {formTab === 1 && <>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span style={fieldLabelStyle}>Sample answer (cau tra loi mau)</span>
+            <textarea
+              rows={4}
+              value={form.sampleAnswerText}
+              onChange={(event) =>
+                setForm({ ...form, sampleAnswerText: event.target.value })
+              }
+              style={fieldStyle}
+              placeholder="Optional. Authored Czech model answer shown in review. Leave blank to auto-generate."
+            />
+            <span style={fieldHintStyle}>
+              When set, this overrides rule-based and LLM-generated model answers in the learner review.
+            </span>
+          </label>
+
+          </>} {/* end formTab === 1 sample fields */}
+
+          {formTab === 2 && (
+          <>{/* Module + Skill — only for pool=course */}
+          {form.pool === 'course' && (
+            <>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Module</span>
+                <select
+                  value={form.moduleId}
+                  onChange={(e) => handleModuleChange(e.target.value)}
+                  style={fieldStyle}
+                >
+                  <option value="">— Pick module —</option>
+                  {availableModules.map(m => (
+                    <option key={m.id} value={m.id}>{m.title}</option>
+                  ))}
+                </select>
+                <span style={fieldHintStyle}>Exercise belongs to this module&apos;s skill.</span>
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>Skill</span>
+                <select
+                  value={form.skillId}
+                  onChange={(e) => handleSkillChange(e.target.value)}
+                  style={fieldStyle}
+                  disabled={availableSkills.length === 0}
+                >
+                  <option value="">— Pick skill —</option>
+                  {availableSkills.map(s => (
+                    <option key={s.id} value={s.id}>{s.title} ({s.skill_kind})</option>
+                  ))}
+                </select>
+                <span style={fieldHintStyle}>Select a module first to load its skills.</span>
+              </label>
+            </>
+          )}
+
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span style={fieldLabelStyle}>Status</span>
+            <select
+              value={form.status}
+              onChange={(event) => setForm({ ...form, status: event.target.value })}
+              style={fieldStyle}
+            >
+              <option value="draft">draft</option>
+              <option value="published">published</option>
+              <option value="archived">archived</option>
+            </select>
+            <span style={fieldHintStyle}>
+              Only published exercises are surfaced to learners on the home screen. Archived items are hidden.
+            </span>
+          </label>
+
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span style={fieldLabelStyle}>Pool</span>
+            <select
+              value={form.pool}
+              onChange={(event) => setForm({ ...form, pool: event.target.value })}
+              style={fieldStyle}
+            >
+              <option value="course">Bài luyện khóa học (course)</option>
+              <option value="exam">Bài thi mock exam (exam)</option>
+            </select>
+            <span style={fieldHintStyle}>
+              course = dùng trong Course → Skill. exam = dùng trong MockTest → Section. Hai pool không dùng chung.
+            </span>
+          </label>
+
+          </> )} {/* end formTab === 2 metadata */}
+
+          {formTab === 0 && <>{form.exerciseType === 'uloha_1_topic_answers' ? (
             <label style={{ display: 'grid', gap: 6 }}>
               <span style={fieldLabelStyle}>Question prompts</span>
               <textarea
@@ -953,7 +1154,7 @@ export function ExerciseDashboard() {
                 </>
               )}
             </section>
-          ) : null}
+          ) : null}</>} {/* end formTab === 0 task-specific fields */}
 
           <button
             type="submit"

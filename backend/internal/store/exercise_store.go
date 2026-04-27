@@ -9,7 +9,8 @@ import (
 
 type ExerciseStore interface {
 	ExercisesByModule(moduleID string) []contracts.Exercise
-	ListExercises() []contracts.Exercise
+	// ListExercises returns all exercises. pool="" means no filter; "course" or "exam" filters by pool.
+	ListExercises(pool string) []contracts.Exercise
 	Exercise(id string) (contracts.Exercise, bool)
 	CreateExercise(exercise contracts.Exercise) contracts.Exercise
 	UpdateExercise(id string, update contracts.Exercise) (contracts.Exercise, bool)
@@ -39,19 +40,22 @@ func (s *memoryExerciseStore) ExercisesByModule(moduleID string) []contracts.Exe
 
 	items := make([]contracts.Exercise, 0)
 	for _, exercise := range s.exercises {
-		if exercise.ModuleID == moduleID && exercise.Status != "archived" {
+		if exercise.ModuleID == moduleID && exercise.Status == "published" {
 			items = append(items, cloneExercise(exercise))
 		}
 	}
 	return items
 }
 
-func (s *memoryExerciseStore) ListExercises() []contracts.Exercise {
+func (s *memoryExerciseStore) ListExercises(pool string) []contracts.Exercise {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	items := make([]contracts.Exercise, 0, len(s.exercises))
 	for _, exercise := range s.exercises {
+		if pool != "" && exercise.Pool != pool {
+			continue
+		}
 		items = append(items, cloneExercise(exercise))
 	}
 	return items
@@ -243,6 +247,12 @@ func mergeExerciseUpdate(current, update contracts.Exercise) contracts.Exercise 
 	if update.ModuleID != "" {
 		current.ModuleID = update.ModuleID
 	}
+	if update.SkillID != "" {
+		current.SkillID = update.SkillID
+	}
+	if update.Pool != "" {
+		current.Pool = update.Pool
+	}
 	if update.Status != "" {
 		current.Status = update.Status
 	}
@@ -257,6 +267,11 @@ func mergeExerciseUpdate(current, update contracts.Exercise) contracts.Exercise 
 	}
 	if update.SampleAnswerEnabled {
 		current.SampleAnswerEnabled = true
+	} else if update.DisableSampleAnswer {
+		current.SampleAnswerEnabled = false
+	}
+	if update.SampleAnswerText != "" {
+		current.SampleAnswerText = update.SampleAnswerText
 	}
 	if update.Detail != nil {
 		current.Detail = update.Detail

@@ -19,6 +19,8 @@ func main() {
 
 	var attemptStore store.AttemptStore
 	var exerciseStore store.ExerciseStore
+	var mockExamStore store.MockExamStore
+	var mockTestStore store.MockTestStore
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
 		persistentAttemptStore, err := store.NewPostgresAttemptStore(databaseURL)
 		if err != nil {
@@ -28,12 +30,28 @@ func main() {
 		if err != nil {
 			log.Fatalf("could not initialize postgres exercise store: %v", err)
 		}
+		persistentMockExamStore, err := store.NewPostgresMockExamStore(databaseURL)
+		if err != nil {
+			log.Fatalf("could not initialize postgres mock exam store: %v", err)
+		}
+		persistentMockTestStore, err := store.NewPostgresMockTestStore(databaseURL)
+		if err != nil {
+			log.Fatalf("could not initialize postgres mock test store: %v", err)
+		}
 		attemptStore = persistentAttemptStore
 		exerciseStore = persistentExerciseStore
-		log.Printf("attempt and exercise persistence enabled with Postgres")
+		mockExamStore = persistentMockExamStore
+		mockTestStore = persistentMockTestStore
+		log.Printf("attempt, exercise, mock exam, and mock test persistence enabled with Postgres")
 	}
 
 	repo := store.NewMemoryStoreWithStores(attemptStore, exerciseStore)
+	if mockExamStore != nil {
+		repo.SetMockExamStore(mockExamStore)
+	}
+	if mockTestStore != nil {
+		repo.SetMockTestStore(mockTestStore)
+	}
 	transcriber, err := processing.NewConfiguredTranscriber(context.Background())
 	if err != nil {
 		log.Fatalf("could not configure transcriber: %v", err)
@@ -50,18 +68,24 @@ func main() {
 	log.Printf("tts provider enabled: %s", processing.ConfiguredTTSProvider())
 	llmProvider, err := processing.NewConfiguredLLMFeedbackProvider()
 	if err != nil {
-		log.Fatalf("could not configure llm feedback provider: %v", err)
+		log.Printf("warning: llm feedback provider disabled, falling back to rule-based: %v", err)
+		llmProvider = nil
+	} else {
+		log.Printf("llm feedback provider enabled: %s", processing.ConfiguredLLMFeedbackProvider())
 	}
-	log.Printf("llm feedback provider enabled: %s", processing.ConfiguredLLMFeedbackProvider())
 	reviewProvider, err := processing.NewConfiguredLLMReviewProvider()
 	if err != nil {
-		log.Fatalf("could not configure llm review provider: %v", err)
+		log.Printf("warning: llm review provider disabled, falling back: %v", err)
+		reviewProvider = nil
 	}
 	uploadProvider, err := httpapi.NewConfiguredUploadTargetProvider(context.Background())
 	if err != nil {
 		log.Fatalf("could not configure upload target provider: %v", err)
 	}
 	audioSignSecret := httpapi.AudioSigningSecretFromEnv(log.Printf)
+	if os.Getenv("AUDIO_SIGN_SECRET") == "" {
+		log.Fatalf("AUDIO_SIGN_SECRET must be set; generate with: openssl rand -hex 32")
+	}
 	audioURLProvider, err := httpapi.NewConfiguredAudioURLProvider(context.Background(), audioSignSecret)
 	if err != nil {
 		log.Fatalf("could not configure audio url provider: %v", err)
