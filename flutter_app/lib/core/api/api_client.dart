@@ -1,8 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+const _kDefaultBaseUrl = String.fromEnvironment(
+  'API_BASE_URL',
+  defaultValue: 'http://localhost:8080',
+);
+
 class ApiClient {
-  ApiClient({this.baseUrl = 'http://localhost:8080'});
+  ApiClient({this.baseUrl = _kDefaultBaseUrl});
 
   final String baseUrl;
   String? _token;
@@ -140,6 +145,19 @@ class ApiClient {
   Future<Map<String, dynamic>> getAttempt(String attemptId) async {
     final payload = await _authed('GET', '/v1/attempts/$attemptId');
     return payload['data'] as Map<String, dynamic>;
+  }
+
+  /// Submit written text for psani_1_formular or psani_2_email.
+  /// [answers] = 3 strings for psani_1, [text] = full email for psani_2.
+  Future<void> submitText(
+    String attemptId, {
+    List<String>? answers,
+    String? text,
+  }) async {
+    final body = <String, dynamic>{};
+    if (answers != null) body['answers'] = answers;
+    if (text != null) body['text'] = text;
+    await _authed('POST', '/v1/attempts/$attemptId/submit-text', body: body);
   }
 
   Future<List<dynamic>> getAttempts() async {

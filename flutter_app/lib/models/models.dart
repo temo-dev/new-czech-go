@@ -44,7 +44,9 @@ class Skill {
   final int sequenceNo;
   final String status;
 
-  bool get isImplemented => skillKind == 'noi';
+  bool get isImplemented => skillKind == 'noi' || skillKind == 'viet';
+
+  bool get isWriting => skillKind == 'viet';
 
   factory Skill.fromJson(Map<String, dynamic> json) {
     return Skill(
@@ -329,6 +331,10 @@ class ExerciseDetail {
     required this.choiceScenarioPrompt,
     required this.choiceOptions,
     required this.expectedReasoningAxes,
+    this.writingQuestions = const [],
+    this.writingMinWords = 10,
+    this.emailPrompt = '',
+    this.emailTopics = const [],
   });
 
   final String id;
@@ -348,6 +354,13 @@ class ExerciseDetail {
   final String choiceScenarioPrompt;
   final List<ChoiceOptionView> choiceOptions;
   final List<String> expectedReasoningAxes;
+  final List<String> writingQuestions;
+  final int writingMinWords;
+  final String emailPrompt;
+  final List<String> emailTopics;
+
+  bool get isPsani1 => exerciseType == 'psani_1_formular';
+  bool get isPsani2 => exerciseType == 'psani_2_email';
 
   PromptAssetView? assetById(String assetId) {
     for (final asset in assets) {
@@ -403,6 +416,14 @@ class ExerciseDetail {
         (detail['expected_reasoning_axes'] as List<dynamic>? ?? const [])
             .map((item) => item.toString())
             .toList();
+    final writingQuestions =
+        (detail['questions'] as List<dynamic>? ?? const [])
+            .map((item) => item.toString())
+            .toList();
+    final emailTopics =
+        (detail['topics'] as List<dynamic>? ?? const [])
+            .map((item) => item.toString())
+            .toList();
     return ExerciseDetail(
       id: json['id'] as String,
       title: json['title'] as String,
@@ -421,6 +442,10 @@ class ExerciseDetail {
       choiceScenarioPrompt: detail['scenario_prompt'] as String? ?? '',
       choiceOptions: choiceOptions,
       expectedReasoningAxes: expectedReasoningAxes,
+      writingQuestions: writingQuestions,
+      writingMinWords: (detail['min_words'] as num?)?.toInt() ?? 10,
+      emailPrompt: detail['prompt'] as String? ?? '',
+      emailTopics: emailTopics,
     );
   }
 }
