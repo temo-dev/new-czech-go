@@ -204,6 +204,31 @@ class ApiClient {
     return payload['data'] as Map<String, dynamic>;
   }
 
+  /// Create a full exam session (písemná part done, compute score from attempt IDs).
+  Future<Map<String, dynamic>> createFullExam({
+    required String mockTestId,
+    required List<String> pisemnaAttemptIds,
+    List<int>? sectionMaxPoints,
+  }) async {
+    final body = <String, dynamic>{
+      'mock_test_id': mockTestId,
+      'pisemna_attempt_ids': pisemnaAttemptIds,
+      if (sectionMaxPoints != null) 'pisemna_section_max_points': sectionMaxPoints,
+    };
+    final payload = await _authed('POST', '/v1/full-exams', body: body);
+    return payload['data'] as Map<String, dynamic>;
+  }
+
+  /// Complete a full exam session by linking the ústní mock exam session.
+  Future<Map<String, dynamic>> completeFullExam(String fullExamId, String ustniSessionId) async {
+    final payload = await _authed(
+      'POST',
+      '/v1/full-exams/$fullExamId/complete',
+      body: {'ustni_mock_exam_session_id': ustniSessionId},
+    );
+    return payload['data'] as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> getMockExam(String id) async {
     final payload = await _authed('GET', '/v1/mock-exams/$id');
     return payload['data'] as Map<String, dynamic>;
