@@ -771,6 +771,20 @@ function buildUpdatePayload(form: ExerciseFormState) {
   };
 }
 
+function filterSelectStyle(active: boolean): React.CSSProperties {
+  return {
+    borderRadius: 8,
+    border: `1px solid ${active ? 'var(--brand)' : 'var(--border)'}`,
+    background: active ? 'rgba(255,106,20,0.06)' : 'var(--surface)',
+    padding: '6px 10px',
+    fontSize: 12,
+    cursor: 'pointer',
+    color: active ? 'var(--brand)' : 'var(--ink-3)',
+    fontWeight: active ? 700 : 400,
+    outline: 'none',
+  };
+}
+
 function WizardTypeStep({ form, allSkills, onSelectType, onBack }: {
   form: ExerciseFormState;
   allSkills: CmsSkill[];
@@ -834,6 +848,7 @@ export function ExerciseDashboard() {
   const [courses, setCourses] = useState<CmsCourse[]>([]);
   const [mockTests, setMockTests] = useState<CmsMockTest[]>([]);
   const [filterCourseId, setFilterCourseId] = useState('');
+  const [filterModuleId, setFilterModuleId] = useState('');
   const [filterSkillId, setFilterSkillId] = useState('');
   const [filterMockTestId, setFilterMockTestId] = useState('');
   const [filterText, setFilterText] = useState('');
@@ -1051,9 +1066,27 @@ export function ExerciseDashboard() {
     ? new Set((mockTests.find(t => t.id === filterMockTestId)?.sections ?? []).map(s => s.exercise_id))
     : null;
 
+  // Derived: modules for the selected course (used in filter bar + filteredItems)
+  const modulesForCourse = filterCourseId
+    ? availableModules.filter((m: CmsModule) => m.course_id === filterCourseId)
+    : availableModules;
+
+  // Derived: skills for the selected module (used in filter bar skill select)
+  const skillsForModule = filterModuleId
+    ? allSkills.filter(s => s.module_id === filterModuleId)
+    : filterCourseId
+      ? allSkills.filter(s => {
+          const mod = availableModules.find((m: CmsModule) => m.id === s.module_id);
+          return mod?.course_id === filterCourseId;
+        })
+      : allSkills;
+
   const filteredItems = items.filter(item => {
     if (filterSkillId && item.skill_id !== filterSkillId) return false;
-    if (filterCourseId) {
+    if (filterModuleId) {
+      const skill = allSkills.find(s => s.id === item.skill_id);
+      if (skill?.module_id !== filterModuleId) return false;
+    } else if (filterCourseId) {
       const skill = allSkills.find(s => s.id === item.skill_id);
       const mod = availableModules.find((m: CmsModule) => m.id === skill?.module_id);
       if (mod?.course_id !== filterCourseId) return false;
@@ -1894,30 +1927,70 @@ export function ExerciseDashboard() {
           </div>
         </div>
 
-        {/* Filter bar */}
-        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', background: 'var(--surface-alt)' }}>
-          <select value={filterCourseId} onChange={e => { setFilterCourseId(e.target.value); setFilterSkillId(''); setFilterMockTestId(''); }}
-            style={{ borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', padding: '6px 10px', fontSize: 12, cursor: 'pointer', color: filterCourseId ? 'var(--brand)' : 'var(--ink-3)' }}>
+        {/* Filter bar — cascade: Course → Module → Skill → Mock test */}
+        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', background: 'var(--surface-alt)' }}>
+          {/* Course */}
+          <select value={filterCourseId} onChange={e => {
+            setFilterCourseId(e.target.value);
+            setFilterModuleId('');
+            setFilterSkillId('');
+            setFilterMockTestId('');
+          }} style={filterSelectStyle(!!filterCourseId)}>
             <option value="">Khóa học</option>
             {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
           </select>
-          <select value={filterSkillId} onChange={e => { setFilterSkillId(e.target.value); setFilterMockTestId(''); }}
-            style={{ borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', padding: '6px 10px', fontSize: 12, cursor: 'pointer', color: filterSkillId ? 'var(--brand)' : 'var(--ink-3)' }}>
-            <option value="">Kỹ năng</option>
-            {allSkills.map(sk => <option key={sk.id} value={sk.id}>{SKILL_KIND_META[sk.skill_kind]?.icon} {sk.title}</option>)}
+
+          {/* Cascade arrow */}
+          <span style={{ color: 'var(--ink-4)', fontSize: 14, flexShrink: 0 }}>›</span>
+
+          {/* Module — cascade from course */}
+          <select value={filterModuleId} onChange={e => {
+            setFilterModuleId(e.target.value);
+            setFilterSkillId('');
+            setFilterMockTestId('');
+          }} style={filterSelectStyle(!!filterModuleId)} disabled={modulesForCourse.length === 0}>
+            <option value="">Module</option>
+            {modulesForCourse.map((m: CmsModule) => <option key={m.id} value={m.id}>{m.title}</option>)}
           </select>
-          <select value={filterMockTestId} onChange={e => { setFilterMockTestId(e.target.value); setFilterCourseId(''); setFilterSkillId(''); }}
-            style={{ borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', padding: '6px 10px', fontSize: 12, cursor: 'pointer', color: filterMockTestId ? 'var(--brand)' : 'var(--ink-3)' }}>
+
+          <span style={{ color: 'var(--ink-4)', fontSize: 14, flexShrink: 0 }}>›</span>
+
+          {/* Skill — cascade from module (or course) */}
+          <select value={filterSkillId} onChange={e => {
+            setFilterSkillId(e.target.value);
+            setFilterMockTestId('');
+          }} style={filterSelectStyle(!!filterSkillId)} disabled={skillsForModule.length === 0 && (!!filterModuleId || !!filterCourseId)}>
+            <option value="">Kỹ năng</option>
+            {skillsForModule.map(sk => (
+              <option key={sk.id} value={sk.id}>{SKILL_KIND_META[sk.skill_kind]?.icon} {sk.title}</option>
+            ))}
+          </select>
+
+          <span style={{ color: 'var(--ink-4)', fontSize: 14, flexShrink: 0 }}>|</span>
+
+          {/* Mock test — independent */}
+          <select value={filterMockTestId} onChange={e => {
+            setFilterMockTestId(e.target.value);
+            setFilterCourseId('');
+            setFilterModuleId('');
+            setFilterSkillId('');
+          }} style={filterSelectStyle(!!filterMockTestId)}>
             <option value="">Đề thi</option>
             {mockTests.map(mt => <option key={mt.id} value={mt.id}>{mt.title}</option>)}
           </select>
-          {(filterCourseId || filterSkillId || filterMockTestId || filterText) && (
-            <button type="button" onClick={() => { setFilterCourseId(''); setFilterSkillId(''); setFilterMockTestId(''); setFilterText(''); }}
-              style={{ background: 'none', border: 'none', color: 'var(--brand)', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '0 4px' }}>
+
+          {(filterCourseId || filterModuleId || filterSkillId || filterMockTestId || filterText) && (
+            <button type="button" onClick={() => {
+              setFilterCourseId('');
+              setFilterModuleId('');
+              setFilterSkillId('');
+              setFilterMockTestId('');
+              setFilterText('');
+            }} style={{ background: 'none', border: 'none', color: 'var(--brand)', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '0 4px', flexShrink: 0 }}>
               ✕ Xoá
             </button>
           )}
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-3)', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
             {filteredItems.length} / {items.length}
           </span>
         </div>
@@ -1943,6 +2016,7 @@ export function ExerciseDashboard() {
             const skill = allSkills.find(s => s.id === item.skill_id);
             const kind = skill?.skill_kind ?? '';
             const meta = SKILL_KIND_META[kind];
+            const modForRow = skill ? availableModules.find((m: CmsModule) => m.id === skill.module_id) : null;
             const typeColor: Record<string, string> = { noi: '#FF6A14', viet: '#0F3D3A', nghe: '#7C3AED', doc: '#0369A1' };
             const typeBg: Record<string, string> = { noi: '#fff5ef', viet: '#d9e5e3', nghe: '#f3e8ff', doc: '#e0f2fe' };
             const color = typeColor[kind] ?? 'var(--ink-3)';
@@ -1965,10 +2039,17 @@ export function ExerciseDashboard() {
                     <span style={{ fontSize: 12, color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.short_instruction}</span>
                   )}
                 </div>
-                {/* Skill */}
-                <span style={{ fontSize: 12, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {skill ? skill.title : <em style={{ color: 'var(--ink-4)' }}>—</em>}
-                </span>
+                {/* Skill + module */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {skill ? `${meta?.icon ?? ''} ${skill.title}` : <em style={{ color: 'var(--ink-4)' }}>—</em>}
+                  </span>
+                  {modForRow && (
+                    <span style={{ fontSize: 11, color: 'var(--ink-4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {modForRow.title}
+                    </span>
+                  )}
+                </div>
                 {/* Status */}
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', width: 'fit-content',
