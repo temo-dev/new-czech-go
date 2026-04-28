@@ -320,4 +320,174 @@ void main() {
     expect(met.met, isTrue);
     expect(met.comment, isEmpty);
   });
+
+  // ── V6: Vocab & Grammar exercise model tests ─────────────────────────────
+
+  test('ExerciseDetail parses quizcard_basic fields', () {
+    final detail = ExerciseDetail.fromJson({
+      'id': 'ex-quizcard-1',
+      'title': 'chodím',
+      'exercise_type': 'quizcard_basic',
+      'learner_instruction': 'Lật thẻ để xem nghĩa.',
+      'detail': {
+        'front_text': 'chodím',
+        'back_text': 'đi bộ',
+        'example_sentence': 'Já chodím do školy.',
+        'example_translation': 'Tôi đi bộ đến trường.',
+        'explanation': 'First person singular of chodít.',
+        'correct_answers': {'1': 'known'},
+      },
+    });
+
+    expect(detail.exerciseType, 'quizcard_basic');
+    expect(detail.isQuizcard, isTrue);
+    expect(detail.isVocabGrammar, isTrue);
+    expect(detail.flashcardFront, 'chodím');
+    expect(detail.flashcardBack, 'đi bộ');
+    expect(detail.flashcardExample, 'Já chodím do školy.');
+    expect(detail.flashcardExampleTranslation, 'Tôi đi bộ đến trường.');
+    // fillBlankExplanation reads detail['explanation'] which quizcard also has
+    expect(detail.fillBlankExplanation, 'First person singular of chodít.');
+    expect(detail.isMatching, isFalse);
+    expect(detail.isFillBlank, isFalse);
+    expect(detail.isChoiceWord, isFalse);
+  });
+
+  test('ExerciseDetail parses matching fields', () {
+    final detail = ExerciseDetail.fromJson({
+      'id': 'ex-matching-1',
+      'title': 'Ghép từ',
+      'exercise_type': 'matching',
+      'learner_instruction': 'Ghép từ với nghĩa.',
+      'detail': {
+        'pairs': [
+          {'left_id': '1', 'left': 'chodím', 'right_id': 'A', 'right': 'đi bộ'},
+          {'left_id': '2', 'left': 'jedu', 'right_id': 'B', 'right': 'đi xe'},
+          {'left_id': '3', 'left': 'letím', 'right_id': 'C', 'right': 'bay'},
+          {'left_id': '4', 'left': 'běžím', 'right_id': 'D', 'right': 'chạy'},
+        ],
+        'explanation': 'Các động từ di chuyển.',
+        'correct_answers': {'1': 'A', '2': 'B', '3': 'C', '4': 'D'},
+      },
+    });
+
+    expect(detail.isMatching, isTrue);
+    expect(detail.isVocabGrammar, isTrue);
+    expect(detail.matchingPairs.length, 4);
+    expect(detail.matchingPairs[0].leftId, '1');
+    expect(detail.matchingPairs[0].left, 'chodím');
+    expect(detail.matchingPairs[0].rightId, 'A');
+    expect(detail.matchingPairs[0].right, 'đi bộ');
+    expect(detail.matchingPairs[3].left, 'běžím');
+  });
+
+  test('ExerciseDetail parses fill_blank fields', () {
+    final detail = ExerciseDetail.fromJson({
+      'id': 'ex-fill-1',
+      'title': 'Điền từ',
+      'exercise_type': 'fill_blank',
+      'learner_instruction': 'Điền từ vào chỗ trống.',
+      'detail': {
+        'sentence': 'Já ___ do školy každý den.',
+        'hint': 'Động từ di chuyển ngôi thứ 1',
+        'explanation': "Ngôi thứ nhất số ít dùng 'chodím'.",
+        'correct_answers': {'1': 'chodím'},
+      },
+    });
+
+    expect(detail.isFillBlank, isTrue);
+    expect(detail.isVocabGrammar, isTrue);
+    expect(detail.fillBlankSentence, 'Já ___ do školy každý den.');
+    expect(detail.fillBlankHint, 'Động từ di chuyển ngôi thứ 1');
+    expect(detail.fillBlankExplanation, contains("chodím"));
+    expect(detail.isQuizcard, isFalse);
+  });
+
+  test('ExerciseDetail parses choice_word fields', () {
+    final detail = ExerciseDetail.fromJson({
+      'id': 'ex-choice-1',
+      'title': 'Chọn từ',
+      'exercise_type': 'choice_word',
+      'learner_instruction': 'Chọn từ đúng.',
+      'detail': {
+        'stem': 'Kde ___ Pavel dnes?',
+        'options': [
+          {'key': 'A', 'text': 'je'},
+          {'key': 'B', 'text': 'jsou'},
+          {'key': 'C', 'text': 'jsem'},
+          {'key': 'D', 'text': 'jste'},
+        ],
+        'grammar_note': 'Pavel là ngôi thứ 3 số ít.',
+        'explanation': "Dùng 'je' cho ngôi thứ 3 số ít.",
+        'correct_answers': {'1': 'A'},
+      },
+    });
+
+    expect(detail.isChoiceWord, isTrue);
+    expect(detail.isVocabGrammar, isTrue);
+    expect(detail.choiceWordStem, 'Kde ___ Pavel dnes?');
+    expect(detail.choiceWordGrammarNote, 'Pavel là ngôi thứ 3 số ít.');
+    expect(detail.choiceWordExplanation, contains("je"));
+    expect(detail.poslechOptions.length, 4);
+    expect(detail.poslechOptions[0].key, 'A');
+    expect(detail.poslechOptions[0].text, 'je');
+  });
+
+  test('Skill isImplemented includes tu_vung and ngu_phap', () {
+    final tuVung = Skill(
+      id: 'sk-1', moduleId: 'mod-1', skillKind: 'tu_vung',
+      title: 'Từ vựng', sequenceNo: 1, status: 'published',
+    );
+    expect(tuVung.isImplemented, isTrue);
+
+    final nguPhap = Skill(
+      id: 'sk-2', moduleId: 'mod-1', skillKind: 'ngu_phap',
+      title: 'Ngữ pháp', sequenceNo: 2, status: 'published',
+    );
+    expect(nguPhap.isImplemented, isTrue);
+
+    final tuVung2 = Skill(
+      id: 'sk-3', moduleId: 'mod-1', skillKind: 'tu_vung',
+      title: 'Từ vựng', sequenceNo: 3, status: 'published',
+    );
+    expect(tuVung2.isImplemented, isTrue);
+  });
+
+  test('MatchingPairView parses fromJson correctly', () {
+    final pair = MatchingPairView.fromJson({
+      'left_id': '3',
+      'left': 'letím',
+      'right_id': 'C',
+      'right': 'bay',
+    });
+
+    expect(pair.leftId, '3');
+    expect(pair.left, 'letím');
+    expect(pair.rightId, 'C');
+    expect(pair.right, 'bay');
+  });
+
+  test('MatchingPairView handles missing fields gracefully', () {
+    final pair = MatchingPairView.fromJson({});
+    expect(pair.leftId, isEmpty);
+    expect(pair.left, isEmpty);
+    expect(pair.rightId, isEmpty);
+    expect(pair.right, isEmpty);
+  });
+
+  test('ExerciseDetail V6 flags are false for non-vocab types', () {
+    final detail = ExerciseDetail.fromJson({
+      'id': 'ex-noi',
+      'title': 'Nói',
+      'exercise_type': 'uloha_1_topic_answers',
+      'learner_instruction': '',
+      'detail': <String, dynamic>{},
+    });
+
+    expect(detail.isVocabGrammar, isFalse);
+    expect(detail.isQuizcard, isFalse);
+    expect(detail.isMatching, isFalse);
+    expect(detail.isFillBlank, isFalse);
+    expect(detail.isChoiceWord, isFalse);
+  });
 }
