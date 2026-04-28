@@ -1,4 +1,4 @@
-# Todo — Skills Expansion V2→V5
+# Todo — Skills Expansion V2→V6
 
 Cập nhật: 2026-04-27. Xem chi tiết + AC trong `tasks/plan.md`.
 
@@ -48,12 +48,53 @@ Cập nhật: 2026-04-27. Xem chi tiết + AC trong `tasks/plan.md`.
 
 ---
 
+## V6 — LLM-Assisted Vocab & Grammar (tu_vung + ngu_phap)
+
+Chi tiết + AC đầy đủ trong `tasks/plan-vocab-grammar.md`.  
+Design: **Async LLM job** (Claude tool_use) → Admin review/edit per-type editor → Validate-all → Publish atomic
+
+Key decisions frozen: async+poll, auto-create skill, per-type editors, per-job-only-regen,
+source traceability on exercises, quizcard completion-only, 1-active-job-per-admin rate limit.
+
+- [ ] **VG-A** Migrations 013-016: `vocabulary_sets`, `vocabulary_items`, `grammar_rules`,
+  `content_generation_jobs` (full schema w/ token/cost fields), + `exercises` ADD `source_type`/`source_id`/`generation_job_id` nullable.
+  Go contracts: `VocabularySet`, `VocabularyItem`, `GrammarRule`, `ContentGenerationJob`,
+  `QuizcardBasicDetail`, `MatchingDetail`, `FillBlankDetail`, `ChoiceWordDetail`, `GeneratedExercise`.
+  Flutter `models.dart`: add `isVocabGrammar`/`isQuizcard`/etc flags + `isImplemented` tu_vung/ngu_phap.
+
+- [ ] **VG-B** Backend: `llm_content_generator.go` (goroutine, Claude tool_use, JSON schema enforced) +
+  `ensureSkill()` auto-create tu_vung/ngu_phap per module +
+  CRUD /admin/vocabulary-sets, /admin/grammar-rules +
+  POST /admin/content-generation-jobs (async, 409 if running) +
+  GET /admin/content-generation-jobs/:id (poll) +
+  PATCH .../draft + POST .../publish (validate-all atomic) + POST .../reject +
+  `skillKindForExerciseType` allowlist + quizcard always-1/1 scoring + source fields set on publish.
+
+- [ ] **VG-C** CMS `/vocabulary` page: VocabularySet list + modal (word list table, paste support) +
+  GenerationScopePanel + 2s poll spinner + `DraftReviewPanel` with per-type editors:
+  `QuizcardDraftEditor` / `ChoiceWordDraftEditor` / `FillBlankDraftEditor` / `MatchingDraftEditor`
+  (each with real-time validation) + [Save Draft] [Publish] [Reject] [New Generation] buttons.
+
+- [ ] **VG-D** CMS `/grammar` page: GrammarRule list + modal (conjugation key-value table, constraints) +
+  GenerationScopePanel (fill_blank + choice_word default, matching optional, no quizcard) +
+  same DraftReviewPanel + publish flow.
+
+- [ ] **VG-E** Flutter: `VocabGrammarExerciseScreen` router +
+  `QuizcardWidget` (200ms flip, Đã biết/Ôn lại, no score display, "Ghi nhận!") +
+  `MatchingWidget` (tap-to-connect, color-coded pairs, [Nộp] when all connected) +
+  reuse `FillInWidget` + `MultipleChoiceWidget` from V3 +
+  `_exerciseMatchesSkillKind` tu_vung/ngu_phap routing + 8 ARB i18n keys.
+
+**[CHECKPOINT VG]** `make backend-build && make backend-test && make cms-build && make flutter-analyze`
+
+---
+
 ## Backlog (sau V5)
 
 - [ ] Polly 2 voices cho `poslech_4` dialogs (upgrade từ Option B)
 - [ ] Polly đọc `model_answer_text` cho Writing
 - [ ] Learner history filter theo skill_kind
 - [ ] Admin analytics: pass rate per exercise_type
-- [ ] V5: FullExamIntroScreen capture real attempt_id (hiện dùng placeholder 'done-N')
+- [x] V5: FullExamIntroScreen capture real attempt_id (hiện dùng placeholder 'done-N')
 - [ ] V5: Auto-link ústní session sau khi mock exam speaking hoàn tất
 - [ ] V5: Postgres store cho full_exam_sessions (hiện in-memory)

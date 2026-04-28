@@ -367,3 +367,118 @@ Section 1: cteni_1 … cteni_5   (40 phút)
 Section 2: poslech_1 … poslech_5 (~40 phút)
 Section 3: psani_1 + psani_2   (25 phút)
 ```
+
+---
+
+## V6 — LLM-Assisted Vocab & Grammar (2026-04-28)
+
+Full plan: `tasks/plan-vocab-grammar.md`. Key decisions frozen below.
+
+### Objective
+
+Thêm 2 skill kinds mới (`tu_vung`, `ngu_phap`) với 4 exercise types
+(`quizcard_basic`, `matching`, `fill_blank`, `choice_word`) vào course flow.
+Admin authoring được hỗ trợ bởi LLM — không phải manual, không phải auto-publish.
+
+Target users: Admin nhập content Czech A2 tiếng Việt. Learner luyện từ vựng/ngữ pháp.
+
+### LLM Usage Boundary (frozen — do not cross)
+
+**ALLOWED (content authoring, admin-only):**
+- Vocabulary draft generation (flashcards, matching pairs, example sentences)
+- Grammar draft generation (fill_blank, choice_word, explanations, distractors)
+- Explanation generation for any exercise type
+
+**NOT ALLOWED:**
+- Objective exercise scoring at runtime (remains pure Go, deterministic)
+- Learner answer evaluation for fill_blank / choice_word / matching
+- Any LLM call in the attempt → submit-answers → result flow
+
+> LLM trong V6 = content authoring assistant. Scoring = Go `ScoreObjectiveAnswers`. Published content must pass admin review before learner sees it.
+
+### New Exercise Types
+
+| Type | Skills | Scoring |
+|------|--------|---------|
+| `quizcard_basic` | tu_vung only | Self-assessed: always 1/1. known/review stored in transcript_json. |
+| `matching` | tu_vung, ngu_phap | Objective: correct pairs / total. Uses `ScoreObjectiveAnswers`. |
+| `fill_blank` | tu_vung, ngu_phap | Objective: substring match. Same as cteni_5 pattern. |
+| `choice_word` | tu_vung, ngu_phap | Objective: exact option match. Same as poslech pattern. |
+
+Pool = course only. pool=exam rejected at creation.
+
+### Generation Flow (frozen)
+
+```
+POST /v1/admin/content-generation-jobs  →  202 { job_id }  (async, goroutine)
+GET  /v1/admin/content-generation-jobs/:id  →  poll every 2s
+status: pending → running → generated | failed → rejected | published
+```
+
+Rate limit: 1 active job per admin. 409 if another running.  
+Claude `tool_use` enforces JSON schema — no free text output.
+
+### Skill Auto-Creation (frozen)
+
+When admin creates VocabularySet or GrammarRule, backend calls `ensureSkill(moduleID, skillKind)`.
+If no tu_vung/ngu_phap skill exists for that module → auto-create with status=published.
+Admin never needs to visit /skills to create vocabulary/grammar skills.
+
+### Publish Behavior (frozen)
+
+`POST /admin/content-generation-jobs/:id/publish`:
+1. Validate ALL exercises in edited_payload_json (choice_word: 4 options, correct∈options; fill_blank: `___` in prompt; etc.)
+2. If any fail → 400 + `validation_errors[]`. Nothing published.
+3. If all pass → create exercises rows (source_type, source_id, generation_job_id set on each). Atomic.
+
+### Draft Editing UI (frozen)
+
+`GeneratedExerciseReviewTable` dispatches per exercise type:
+- `QuizcardDraftEditor` — front/back/explanation
+- `ChoiceWordDraftEditor` — prompt/4 options/correct selector/explanation
+- `FillBlankDraftEditor` — sentence(must have ___)/answer/explanation
+- `MatchingDraftEditor` — pair rows (term|definition), add/remove
+
+No per-exercise regenerate. Per-job only: reject + create new job.
+
+### New DB Migrations
+
+- 013: `vocabulary_sets`, `vocabulary_items`
+- 014: `grammar_rules`
+- 015: `content_generation_jobs` (with provider/model/tokens/cost/duration fields)
+- 016: `exercises` ADD `source_type TEXT`, `source_id TEXT`, `generation_job_id TEXT` (nullable)
+
+### New API Endpoints
+
+```
+POST/GET/PATCH/DELETE /v1/admin/vocabulary-sets
+POST/GET/PATCH/DELETE /v1/admin/vocabulary-sets/:id/items
+POST/GET/PATCH/DELETE /v1/admin/grammar-rules
+POST   /v1/admin/content-generation-jobs       (async, 409 guard)
+GET    /v1/admin/content-generation-jobs/:id   (poll)
+PATCH  /v1/admin/content-generation-jobs/:id/draft
+POST   /v1/admin/content-generation-jobs/:id/publish
+POST   /v1/admin/content-generation-jobs/:id/reject
+```
+
+### New CMS Pages
+
+- `/vocabulary` — VocabularySet CRUD + LLM generation + per-type review + publish
+- `/grammar` — GrammarRule CRUD (conjugation table) + LLM generation + review + publish
+
+### New Flutter
+
+- `VocabGrammarExerciseScreen` — routes by exerciseType
+- `QuizcardWidget` — flip card 200ms, Đã biết/Ôn lại, no ObjectiveResultCard
+- `MatchingWidget` — tap-to-pair, color-coded connections, submit when all paired
+- Reuse `FillInWidget` + `MultipleChoiceWidget` from V3
+
+### V6 Boundaries
+
+NEVER in V6:
+- LLM in scoring/grading flow
+- Auto-publish without admin review
+- Per-exercise regenerate
+- Quizcard mastery dashboard (backlog)
+- pool=exam for any new exercise type
+- Partial publish (all-or-nothing)
