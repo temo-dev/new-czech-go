@@ -245,13 +245,50 @@ export default function VocabularyPage() {
     setShowModal(true);
   }
 
+  async function openEdit(set: VocabSet) {
+    setEditingSet(set);
+    setFTitle(set.title);
+    setFLevel(set.level);
+    setFLang(set.explanation_lang);
+    setFModule(''); setFCourse('');
+    setFormErr('');
+    // Load existing items
+    const res = await adminFetch(`/api/admin/vocabulary-sets/${set.id}`).then(r => r.json());
+    const existingItems: VocabItem[] = res.data?.items ?? [];
+    setFItems(existingItems.length ? [...existingItems, { term: '', meaning: '' }] : [{ term: '', meaning: '' }]);
+    setShowModal(true);
+  }
+
   async function handleSave() {
-    if (!fTitle.trim() || !fModule) { setFormErr('Nhập tên và chọn module.'); return; }
+    const isEdit = editingSet !== null;
+    if (!fTitle.trim() || (!isEdit && !fModule)) { setFormErr(isEdit ? 'Nhập tên.' : 'Nhập tên và chọn module.'); return; }
     if (fItems.filter(i => i.term.trim() && i.meaning.trim()).length === 0) {
       setFormErr('Nhập ít nhất 1 từ.'); return;
     }
     setSaving(true); setFormErr('');
     const items = fItems.filter(i => i.term.trim() && i.meaning.trim());
+
+    if (isEdit && editingSet) {
+      // PATCH metadata
+      const patchRes = await adminFetch(`/api/admin/vocabulary-sets/${editingSet.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: fTitle, level: fLevel, explanation_lang: fLang }),
+      });
+      // POST new items (items without id are new)
+      const newItems = items.filter(i => !(i as VocabItem & { id?: string }).id);
+      for (const item of newItems) {
+        await adminFetch(`/api/admin/vocabulary-sets/${editingSet.id}/items`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item),
+        });
+      }
+      setSaving(false);
+      if (!patchRes.ok) { setFormErr('Lỗi khi cập nhật.'); return; }
+      setShowModal(false);
+      loadAll();
+      return;
+    }
     const body = { title: fTitle, module_id: fModule, level: fLevel, explanation_lang: fLang, items };
     const res = await adminFetch('/api/admin/vocabulary-sets', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -371,6 +408,10 @@ export default function VocabularyPage() {
               {s.status}
             </span>
             <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+              <button onClick={() => openEdit(s)}
+                style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}>
+                Sửa
+              </button>
               <button onClick={() => { setGenSetId(s.id); setGenPhase('scope'); setPublishOk(false); setPublishErr(''); setExercises([]); }}
                 style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                 Generate
@@ -402,29 +443,31 @@ export default function VocabularyPage() {
         <div onClick={() => setShowModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(20,18,14,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: 'var(--surface)', borderRadius: 24, border: '1px solid var(--border)', padding: 28, display: 'grid', gap: 16, position: 'relative' }}>
             <button onClick={() => setShowModal(false)} style={{ position: 'absolute', top: 14, right: 14, width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--surface-alt)', cursor: 'pointer', fontSize: 16 }}>×</button>
-            <h2 style={{ margin: 0, fontSize: 20 }}>Tạo bộ từ vựng mới</h2>
+            <h2 style={{ margin: 0, fontSize: 20 }}>{editingSet ? `Sửa: ${editingSet.title}` : 'Tạo bộ từ vựng mới'}</h2>
 
             <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>
               Tên bộ từ *
               <input value={fTitle} onChange={e => setFTitle(e.target.value)} style={inputStyle} placeholder="VD: Động từ di chuyển" />
             </label>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>
-                Khóa học *
-                <select value={fCourse} onChange={e => { setFCourse(e.target.value); setFModule(''); loadModules(e.target.value); }} style={inputStyle}>
-                  <option value="">— chọn —</option>
-                  {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                </select>
-              </label>
-              <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>
-                Module *
-                <select value={fModule} onChange={e => setFModule(e.target.value)} style={inputStyle}>
-                  <option value="">— chọn —</option>
-                  {filteredModules.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
-                </select>
-              </label>
-            </div>
+            {!editingSet && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>
+                  Khóa học *
+                  <select value={fCourse} onChange={e => { setFCourse(e.target.value); setFModule(''); loadModules(e.target.value); }} style={inputStyle}>
+                    <option value="">— chọn —</option>
+                    {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+                  </select>
+                </label>
+                <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>
+                  Module *
+                  <select value={fModule} onChange={e => setFModule(e.target.value)} style={inputStyle}>
+                    <option value="">— chọn —</option>
+                    {filteredModules.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
+                  </select>
+                </label>
+              </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>
@@ -464,7 +507,7 @@ export default function VocabularyPage() {
             {formErr && <p style={{ margin: 0, color: 'var(--error)', fontSize: 13 }}>{formErr}</p>}
             <button onClick={handleSave} disabled={saving}
               style={{ padding: '12px', borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer' }}>
-              {saving ? 'Đang lưu...' : 'Lưu & tiếp tục'}
+              {saving ? 'Đang lưu...' : editingSet ? 'Cập nhật' : 'Lưu & tiếp tục'}
             </button>
           </div>
         </div>
