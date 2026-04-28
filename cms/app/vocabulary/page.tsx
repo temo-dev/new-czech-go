@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { adminFetch } from '../../lib/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -214,8 +215,8 @@ export default function VocabularyPage() {
   async function loadAll() {
     setLoading(true);
     const [setsRes, coursesRes] = await Promise.all([
-      fetch('/api/admin/vocabulary-sets').then(r => r.json()),
-      fetch('/api/admin/courses').then(r => r.json()),
+      adminFetch('/api/admin/vocabulary-sets').then(r => r.json()),
+      adminFetch('/api/admin/courses').then(r => r.json()),
     ]);
     setSets(setsRes.data ?? []);
     setCourses(coursesRes.data ?? []);
@@ -224,12 +225,12 @@ export default function VocabularyPage() {
 
   async function loadModules(courseId: string) {
     if (!courseId) { setModules([]); return; }
-    const res = await fetch(`/api/admin/modules?course_id=${courseId}`).then(r => r.json());
+    const res = await adminFetch(`/api/admin/modules?course_id=${courseId}`).then(r => r.json());
     setModules(res.data ?? []);
   }
 
   async function handleDelete(id: string) {
-    const res = await fetch(`/api/admin/vocabulary-sets/${id}`, { method: 'DELETE' });
+    const res = await adminFetch(`/api/admin/vocabulary-sets/${id}`, { method: 'DELETE' });
     if (res.ok) {
       setSets(prev => prev.filter(s => s.id !== id));
     }
@@ -252,7 +253,7 @@ export default function VocabularyPage() {
     setSaving(true); setFormErr('');
     const items = fItems.filter(i => i.term.trim() && i.meaning.trim());
     const body = { title: fTitle, module_id: fModule, level: fLevel, explanation_lang: fLang, items };
-    const res = await fetch('/api/admin/vocabulary-sets', {
+    const res = await adminFetch('/api/admin/vocabulary-sets', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     const j = await res.json();
@@ -272,7 +273,7 @@ export default function VocabularyPage() {
     const numPerType: Record<string, number> = {};
     exerciseTypes.forEach(t => { numPerType[t] = genCount[t] ?? 5; });
     const body = { source_type: 'vocabulary_set', source_id: genSetId, module_id: modules.find(m => m.id === fModule)?.id ?? fModule, exercise_types: exerciseTypes, num_per_type: numPerType };
-    const res = await fetch('/api/admin/content-generation-jobs', {
+    const res = await adminFetch('/api/admin/content-generation-jobs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     const j = await res.json();
@@ -287,7 +288,7 @@ export default function VocabularyPage() {
   useEffect(() => {
     if (genPhase !== 'polling' || !jobId) return;
     const id = setInterval(async () => {
-      const res = await fetch(`/api/admin/content-generation-jobs/${jobId}`);
+      const res = await adminFetch(`/api/admin/content-generation-jobs/${jobId}`);
       const j = await res.json();
       const status = j.data?.status ?? '';
       setJobStatus(status);
@@ -307,7 +308,7 @@ export default function VocabularyPage() {
   }, [genPhase, jobId]);
 
   async function saveDraft() {
-    await fetch(`/api/admin/content-generation-jobs/${jobId}?action=draft`, {
+    await adminFetch(`/api/admin/content-generation-jobs/${jobId}?action=draft`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ edited_payload: { exercises } }),
     });
@@ -316,7 +317,7 @@ export default function VocabularyPage() {
   async function handlePublish() {
     await saveDraft();
     setPublishing(true); setPublishErr(''); setPublishOk(false);
-    const res = await fetch(`/api/admin/content-generation-jobs/${jobId}?action=publish`, { method: 'POST' });
+    const res = await adminFetch(`/api/admin/content-generation-jobs/${jobId}?action=publish`, { method: 'POST' });
     const j = await res.json();
     setPublishing(false);
     if (!res.ok) {
@@ -325,11 +326,13 @@ export default function VocabularyPage() {
       return;
     }
     setPublishOk(true);
-    loadAll();
+    await loadAll();
+    // Reset to list after showing success for 2s
+    setTimeout(() => { setGenPhase(null); setJobId(''); setPublishOk(false); }, 2000);
   }
 
   async function handleReject() {
-    await fetch(`/api/admin/content-generation-jobs/${jobId}?action=reject`, { method: 'POST' });
+    await adminFetch(`/api/admin/content-generation-jobs/${jobId}?action=reject`, { method: 'POST' });
     setGenPhase(null); setJobId('');
   }
 

@@ -414,6 +414,21 @@ func (s *Server) handlePublishGenJob(w http.ResponseWriter, jobID string) {
 	}
 
 	s.repo.UpdateGenerationJobPublished(jobID)
+
+	// Update the source (vocabulary_set / grammar_rule) status to "published"
+	switch job.SourceType {
+	case "vocabulary_set":
+		if set, ok := s.repo.GetVocabularySet(job.SourceID); ok {
+			set.Status = "published"
+			s.repo.UpdateVocabularySet(job.SourceID, set)
+		}
+	case "grammar_rule":
+		if rule, ok := s.repo.GetGrammarRule(job.SourceID); ok {
+			rule.Status = "published"
+			s.repo.UpdateGrammarRule(job.SourceID, rule)
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{"exercise_ids": exerciseIDs, "count": len(exerciseIDs)},
 		"meta": map[string]any{},
