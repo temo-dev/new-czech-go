@@ -316,6 +316,24 @@ func (s *MemoryStore) SetMockTestStore(ms MockTestStore) {
 	s.mockTests = ms
 }
 
+func (s *MemoryStore) SetVocabularyStore(vs VocabularyStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.vocabulary = vs
+}
+
+func (s *MemoryStore) SetGrammarStore(gs GrammarStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.grammar = gs
+}
+
+func (s *MemoryStore) SetGenerationJobStore(gjs GenerationJobStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.generationJobs = gjs
+}
+
 // Vocabulary delegates
 func (s *MemoryStore) CreateVocabularySet(set contracts.VocabularySet) (contracts.VocabularySet, error) {
 	return s.vocabulary.CreateVocabularySet(set)

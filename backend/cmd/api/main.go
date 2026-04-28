@@ -24,6 +24,9 @@ func main() {
 	var courseStore store.CourseStore
 	var moduleStore store.ModuleStore
 	var skillStore store.SkillStore
+	var vocabularyStore store.VocabularyStore
+	var grammarStore store.GrammarStore
+	var generationJobStore store.GenerationJobStore
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
 		persistentAttemptStore, err := store.NewPostgresAttemptStore(databaseURL)
 		if err != nil {
@@ -53,6 +56,18 @@ func main() {
 		if err != nil {
 			log.Fatalf("could not initialize postgres skill store: %v", err)
 		}
+		persistentVocabularyStore, err := store.NewPostgresVocabularyStore(databaseURL)
+		if err != nil {
+			log.Fatalf("could not initialize postgres vocabulary store: %v", err)
+		}
+		persistentGrammarStore, err := store.NewPostgresGrammarStore(databaseURL)
+		if err != nil {
+			log.Fatalf("could not initialize postgres grammar store: %v", err)
+		}
+		persistentGenerationJobStore, err := store.NewPostgresGenerationJobStore(databaseURL)
+		if err != nil {
+			log.Fatalf("could not initialize postgres generation job store: %v", err)
+		}
 		attemptStore = persistentAttemptStore
 		exerciseStore = persistentExerciseStore
 		mockExamStore = persistentMockExamStore
@@ -60,7 +75,10 @@ func main() {
 		courseStore = persistentCourseStore
 		moduleStore = persistentModuleStore
 		skillStore = persistentSkillStore
-		log.Printf("full Postgres persistence enabled (attempts, exercises, mock exams/tests, courses, modules, skills)")
+		vocabularyStore = persistentVocabularyStore
+		grammarStore = persistentGrammarStore
+		generationJobStore = persistentGenerationJobStore
+		log.Printf("full Postgres persistence enabled (attempts, exercises, mock exams/tests, courses, modules, skills, vocabulary, grammar, generation_jobs)")
 	}
 
 	repo := store.NewMemoryStoreWithStores(attemptStore, exerciseStore)
@@ -74,6 +92,11 @@ func main() {
 		repo.SetCourseStore(courseStore)
 		repo.SetModuleStore(moduleStore)
 		repo.SetSkillStore(skillStore)
+	}
+	if vocabularyStore != nil {
+		repo.SetVocabularyStore(vocabularyStore)
+		repo.SetGrammarStore(grammarStore)
+		repo.SetGenerationJobStore(generationJobStore)
 	}
 	transcriber, err := processing.NewConfiguredTranscriber(context.Background())
 	if err != nil {
