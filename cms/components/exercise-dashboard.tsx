@@ -1855,16 +1855,18 @@ export function ExerciseDashboard() {
             type="submit"
             disabled={saving}
             style={{
+              width: '100%',
               border: 0,
-              borderRadius: 18,
-              background: saving
-                ? 'color-mix(in srgb, var(--primary) 55%, white)'
-                : 'var(--primary)',
-              color: 'white',
+              borderRadius: 14,
+              background: saving ? 'rgba(240, 90, 40, 0.35)' : 'var(--brand)',
+              color: '#fff',
               padding: '14px 18px',
               cursor: saving ? 'wait' : 'pointer',
               fontWeight: 700,
-              boxShadow: '0 16px 28px rgba(240, 90, 40, 0.18)',
+              fontSize: 15,
+              letterSpacing: 0.2,
+              boxShadow: saving ? 'none' : '0 4px 16px rgba(255,106,20,0.25)',
+              transition: 'box-shadow 150ms, opacity 150ms',
             }}
           >
             {saving
@@ -1875,10 +1877,15 @@ export function ExerciseDashboard() {
           </button>
 
           {editingId ? (
+            // Cancel is secondary — text link, not full-width button
             <button
               type="button"
               onClick={resetForm}
-              style={{ borderRadius: 18, border: '1px solid var(--border)', background: 'var(--surface-muted)', color: 'var(--text)', padding: '12px 18px', cursor: 'pointer', fontWeight: 700 }}
+              style={{
+                background: 'none', border: 'none', color: 'var(--ink-3)',
+                cursor: 'pointer', fontSize: 13, padding: '4px 0', textAlign: 'center',
+                textDecoration: 'underline', textDecorationColor: 'var(--border)',
+              }}
             >
               {S.exercise.cancelEditing}
             </button>
@@ -2153,16 +2160,18 @@ function CteniFields({ form, setForm }: CteniFieldsProps) {
       )}
 
       <label style={{ display: 'grid', gap: 6 }}>
-        <span style={fieldLabelStyle}>Đáp án đúng (1=A, 2=B, ...)</span>
+        <span style={fieldLabelStyle}>Đáp án đúng — mỗi câu 1 dòng (số=key)</span>
         <textarea
           rows={6}
           value={form.cteniCorrectAnswers}
           onChange={e => setForm(f => ({ ...f, cteniCorrectAnswers: e.target.value }))}
-          style={fieldStyle}
+          style={{ ...fieldStyle, fontFamily: 'monospace', fontSize: 13 }}
           placeholder={isCteni5 ? '21=bramborový salát\n22=velkou cibuli' : '1=H\n2=A\n3=C\n4=D\n5=F'}
         />
         <span style={fieldHintStyle}>
-          {isCteni5 ? 'Fill-in: so khớp substring (không phân biệt hoa/thường).' : 'Multiple choice: exact match key (A/B/C/D).'}
+          {isCteni5
+            ? 'Điền từ: nhập nội dung đáp án — so khớp substring, không phân biệt hoa/thường.'
+            : 'Trắc nghiệm: nhập key chính xác A/B/C/D. Ví dụ: 1=A, 2=C, 3=D'}
         </span>
       </label>
     </>
@@ -2280,15 +2289,17 @@ function PoslechFields({ form, setForm, editingId, audioGenerating, audioGenMsg,
 
       {/* Correct answers */}
       <label style={{ display: 'grid', gap: 6 }}>
-        <span style={fieldLabelStyle}>Đáp án đúng (1=B, 2=A, ...)</span>
+        <span style={fieldLabelStyle}>Đáp án đúng — mỗi câu 1 dòng (số=key)</span>
         <textarea
           rows={5}
           value={form.poslechCorrectAnswers}
           onChange={e => setForm(f => ({ ...f, poslechCorrectAnswers: e.target.value }))}
-          style={fieldStyle}
+          style={{ ...fieldStyle, fontFamily: 'monospace', fontSize: 13 }}
           placeholder="1=B\n2=A\n3=D\n4=C\n5=B"
         />
-        <span style={fieldHintStyle}>Fill-in (poslech_5): nhập toàn bộ nội dung câu trả lời, so khớp substring.</span>
+        <span style={fieldHintStyle}>
+          Trắc nghiệm: key A/B/C/D. Điền từ (poslech_5): nhập đáp án đầy đủ, so khớp substring. Ví dụ: 1=B, 2=A
+        </span>
       </label>
     </>
   );
