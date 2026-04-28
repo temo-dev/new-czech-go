@@ -6,6 +6,7 @@ import { PoslechFields as PoslechFieldsNew } from './exercise-form/PoslechFields
 import { CteniFields as CteniFieldsNew } from './exercise-form/CteniFields';
 import { SpeakingFields } from './exercise-form/SpeakingFields';
 import { WritingFields } from './exercise-form/WritingFields';
+import { validateExercise } from './exercise-form/validation';
 
 type PromptAsset = {
   id: string;
@@ -1149,6 +1150,17 @@ export function ExerciseDashboard() {
     }
   }
 
+  // ── Validation (computed each render, cheap for CMS form) ─────────────────
+  const validationErrors: string[] = (() => {
+    if (wizardStep !== 'content' && !editingId) return [];
+    try {
+      const payload = buildCreatePayload(form);
+      return validateExercise(form.exerciseType, payload as Record<string, unknown>);
+    } catch (e) {
+      return [e instanceof Error ? e.message : 'Format nhập liệu không hợp lệ.'];
+    }
+  })();
+
   // ── Filtered inventory ─────────────────────────────────────────────────────
   const mtExerciseIds = filterMockTestId
     ? new Set((mockTests.find(t => t.id === filterMockTestId)?.sections ?? []).map(s => s.exercise_id))
@@ -1434,168 +1446,6 @@ export function ExerciseDashboard() {
             <SpeakingFields form={form as never} setForm={setForm as never} />
           )}
 
-          {/* ── Legacy uloha fallback (kept as reference, guarded to not render) ─ */}
-          {false && form.exerciseType === 'uloha_1_topic_answers' ? (
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={fieldLabelStyle}>{S.exercise.fieldQuestionPrompts}</span>
-              <textarea
-                rows={6}
-                value={form.questions}
-                onChange={(event) => setForm({ ...form, questions: event.target.value })}
-                style={fieldStyle}
-              />
-            </label>
-          ) : form.exerciseType === 'uloha_2_dialogue_questions' ? (
-            <>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Scenario title</span>
-                <input
-                  value={form.scenarioTitle}
-                  onChange={(event) =>
-                    setForm({ ...form, scenarioTitle: event.target.value })
-                  }
-                  style={fieldStyle}
-                />
-              </label>
-
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>{S.exercise.fieldScenarioPrompt}</span>
-                <textarea
-                  rows={5}
-                  value={form.scenarioPrompt}
-                  onChange={(event) =>
-                    setForm({ ...form, scenarioPrompt: event.target.value })
-                  }
-                  style={fieldStyle}
-                />
-              </label>
-
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Required info slots</span>
-                <textarea
-                  rows={6}
-                  value={form.requiredInfoSlots}
-                  onChange={(event) =>
-                    setForm({ ...form, requiredInfoSlots: event.target.value })
-                  }
-                  style={fieldStyle}
-                />
-              </label>
-
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>{S.exercise.fieldExtraQuestionHint}</span>
-                <input
-                  value={form.customQuestionHint}
-                  onChange={(event) =>
-                    setForm({ ...form, customQuestionHint: event.target.value })
-                  }
-                  style={fieldStyle}
-                />
-              </label>
-            </>
-          ) : form.exerciseType === 'uloha_3_story_narration' ? (
-            <>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Story title</span>
-                <input
-                  value={form.storyTitle}
-                  onChange={(event) =>
-                    setForm({ ...form, storyTitle: event.target.value })
-                  }
-                  style={fieldStyle}
-                />
-              </label>
-
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Image asset ids</span>
-                <textarea
-                  rows={5}
-                  value={form.imageAssetIds}
-                  onChange={(event) =>
-                    setForm({ ...form, imageAssetIds: event.target.value })
-                  }
-                  style={fieldStyle}
-                />
-                <span style={fieldHintStyle}>
-                  One asset id per line. Uploaded image ids can be inserted from the asset desk below.
-                </span>
-              </label>
-
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>{S.exercise.fieldNarrativeCheckpoints}</span>
-                <textarea
-                  rows={6}
-                  value={form.narrativeCheckpoints}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      narrativeCheckpoints: event.target.value,
-                    })
-                  }
-                  style={fieldStyle}
-                />
-              </label>
-
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Grammar focus</span>
-                <textarea
-                  rows={3}
-                  value={form.grammarFocus}
-                  onChange={(event) =>
-                    setForm({ ...form, grammarFocus: event.target.value })
-                  }
-                  style={fieldStyle}
-                />
-              </label>
-            </>
-          ) : (
-            <>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>{S.exercise.fieldScenarioPrompt}</span>
-                <textarea
-                  rows={5}
-                  value={form.choiceScenarioPrompt}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      choiceScenarioPrompt: event.target.value,
-                    })
-                  }
-                  style={fieldStyle}
-                />
-              </label>
-
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Choice options</span>
-                <textarea
-                  rows={6}
-                  value={form.choiceOptions}
-                  onChange={(event) =>
-                    setForm({ ...form, choiceOptions: event.target.value })
-                  }
-                  style={fieldStyle}
-                />
-                <span style={fieldHintStyle}>
-                  Format: <code>option_key | label | description | image_asset_id(optional)</code>
-                </span>
-              </label>
-
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Expected reasoning axes</span>
-                <textarea
-                  rows={4}
-                  value={form.expectedReasoningAxes}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      expectedReasoningAxes: event.target.value,
-                    })
-                  }
-                  style={fieldStyle}
-                />
-              </label>
-            </>
-          )}
 
           {(form.exerciseType === 'psani_1_formular' || form.exerciseType === 'psani_2_email') && (
             <WritingFields form={form as never} setForm={setForm as never} />
@@ -1845,21 +1695,30 @@ export function ExerciseDashboard() {
             </div>
           </details>
 
+          {/* Inline validation errors */}
+          {validationErrors.length > 0 && (
+            <div style={{ background: 'var(--error-bg)', borderRadius: 10, padding: '10px 14px', display: 'grid', gap: 4 }}>
+              {validationErrors.map((e, i) => (
+                <span key={i} style={{ fontSize: 13, color: 'var(--error)' }}>• {e}</span>
+              ))}
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || validationErrors.length > 0}
             style={{
               width: '100%',
               border: 0,
               borderRadius: 14,
-              background: saving ? 'rgba(240, 90, 40, 0.35)' : 'var(--brand)',
+              background: (saving || validationErrors.length > 0) ? 'rgba(240, 90, 40, 0.35)' : 'var(--brand)',
               color: '#fff',
               padding: '14px 18px',
-              cursor: saving ? 'wait' : 'pointer',
+              cursor: (saving || validationErrors.length > 0) ? 'not-allowed' : 'pointer',
               fontWeight: 700,
               fontSize: 15,
               letterSpacing: 0.2,
-              boxShadow: saving ? 'none' : '0 4px 16px rgba(255,106,20,0.25)',
+              boxShadow: (saving || validationErrors.length > 0) ? 'none' : '0 4px 16px rgba(255,106,20,0.25)',
               transition: 'box-shadow 150ms, opacity 150ms',
             }}
           >
@@ -2113,224 +1972,6 @@ export function ExerciseDashboard() {
   );
 }
 
-type CteniFieldsProps = {
-  form: ExerciseFormState;
-  setForm: React.Dispatch<React.SetStateAction<ExerciseFormState>>;
-};
-
-function CteniFields({ form, setForm }: CteniFieldsProps) {
-  const isCteni1 = form.exerciseType === 'cteni_1';
-  const isCteni3 = form.exerciseType === 'cteni_3';
-  const isCteni5 = form.exerciseType === 'cteni_5';
-  const needsText = form.exerciseType === 'cteni_2' || form.exerciseType === 'cteni_4' || isCteni5;
-  const needsItems = isCteni1 || isCteni3;
-
-  return (
-    <>
-      {needsText && (
-        <label style={{ display: 'grid', gap: 6 }}>
-          <span style={fieldLabelStyle}>Đoạn văn đọc</span>
-          <textarea
-            rows={8}
-            value={form.cteniText}
-            onChange={e => setForm(f => ({ ...f, cteniText: e.target.value }))}
-            style={fieldStyle}
-            placeholder="Přečtěte si text..."
-          />
-        </label>
-      )}
-
-      {needsItems && (
-        <label style={{ display: 'grid', gap: 6 }}>
-          <span style={fieldLabelStyle}>
-            {isCteni1 ? 'Các ảnh/tin nhắn (phân cách bằng ---)' : 'Các đoạn văn (phân cách bằng ---)'}
-          </span>
-          <textarea
-            rows={8}
-            value={form.cteniItems}
-            onChange={e => setForm(f => ({ ...f, cteniItems: e.target.value }))}
-            style={fieldStyle}
-            placeholder={'Item 1...\n---\nItem 2...\n---\nItem 3...'}
-          />
-          <span style={fieldHintStyle}>
-            {isCteni1 ? 'Cteni 1: 5 items. Dùng asset IDs hoặc text tin nhắn.' : 'Cteni 3: 4 đoạn văn.'}
-          </span>
-        </label>
-      )}
-
-      <label style={{ display: 'grid', gap: 6 }}>
-        <span style={fieldLabelStyle}>
-          {isCteni3 ? 'Nhân vật A-E (key | tên)' : isCteni1 ? 'Options A-H (key | nội dung)' : 'Options A-D (key | nội dung)'}
-        </span>
-        <textarea
-          rows={isCteni1 ? 8 : isCteni3 ? 5 : 4}
-          value={form.cteniOptions}
-          onChange={e => setForm(f => ({ ...f, cteniOptions: e.target.value }))}
-          style={fieldStyle}
-          placeholder={isCteni3 ? 'A | Jana (IT)\nB | Petr (student)' : 'A | Celodenní parkování zdarma.'}
-        />
-      </label>
-
-      {!isCteni1 && !isCteni3 && (
-        <label style={{ display: 'grid', gap: 6 }}>
-          <span style={fieldLabelStyle}>
-            {isCteni5 ? 'Câu hỏi fill-in (1 câu/dòng)' : 'Câu hỏi (1 câu/dòng)'}
-          </span>
-          <textarea
-            rows={6}
-            value={form.cteniQuestions}
-            onChange={e => setForm(f => ({ ...f, cteniQuestions: e.target.value }))}
-            style={fieldStyle}
-            placeholder={isCteni5 ? 'Podle receptu můžeme připravit...\nNa salát potřebujeme...' : 'Kdy se koná slavnostní otevření?\nKdo může zdarma...'}
-          />
-        </label>
-      )}
-
-      <label style={{ display: 'grid', gap: 6 }}>
-        <span style={fieldLabelStyle}>Đáp án đúng — mỗi câu 1 dòng (số=key)</span>
-        <textarea
-          rows={6}
-          value={form.cteniCorrectAnswers}
-          onChange={e => setForm(f => ({ ...f, cteniCorrectAnswers: e.target.value }))}
-          style={{ ...fieldStyle, fontFamily: 'monospace', fontSize: 13 }}
-          placeholder={isCteni5 ? '21=bramborový salát\n22=velkou cibuli' : '1=H\n2=A\n3=C\n4=D\n5=F'}
-        />
-        <span style={fieldHintStyle}>
-          {isCteni5
-            ? 'Điền từ: nhập nội dung đáp án — so khớp substring, không phân biệt hoa/thường.'
-            : 'Trắc nghiệm: nhập key chính xác A/B/C/D. Ví dụ: 1=A, 2=C, 3=D'}
-        </span>
-      </label>
-    </>
-  );
-}
-
-type PoslechFieldsProps = {
-  form: ExerciseFormState;
-  setForm: React.Dispatch<React.SetStateAction<ExerciseFormState>>;
-  editingId: string | null;
-  audioGenerating: boolean;
-  audioGenMsg: string | null;
-  onGenerateAudio: () => void;
-};
-
-function PoslechFields({ form, setForm, editingId, audioGenerating, audioGenMsg, onGenerateAudio }: PoslechFieldsProps) {
-  const isPoslech5 = form.exerciseType === 'poslech_5';
-  const isPoslech4 = form.exerciseType === 'poslech_4';
-  const isPoslech3 = form.exerciseType === 'poslech_3';
-
-  return (
-    <>
-      {/* Audio source */}
-      <div style={{ display: 'grid', gap: 6 }}>
-        <span style={fieldLabelStyle}>Nguồn audio</span>
-        <div style={{ display: 'flex', gap: 16 }}>
-          {(['text', 'upload'] as const).map(src => (
-            <label key={src} style={{ display: 'flex', gap: 6, cursor: 'pointer', alignItems: 'center' }}>
-              <input
-                type="radio"
-                value={src}
-                checked={form.poslechAudioSource === src}
-                onChange={() => setForm(f => ({ ...f, poslechAudioSource: src }))}
-              />
-              {src === 'text' ? 'Nhập text → Polly TTS' : 'Upload file audio'}
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* Text input for Polly */}
-      {form.poslechAudioSource === 'text' && (
-        <>
-          {isPoslech5 ? (
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={fieldLabelStyle}>Nội dung voicemail (mỗi dòng = 1 câu)</span>
-              <textarea
-                rows={6}
-                value={form.poslechVoicemailText}
-                onChange={e => setForm(f => ({ ...f, poslechVoicemailText: e.target.value }))}
-                style={fieldStyle}
-                placeholder="Ahoj Lído, tady Eva.&#10;Dostala jsem lístky na balet."
-              />
-            </label>
-          ) : (
-            <label style={{ display: 'grid', gap: 6 }}>
-              <span style={fieldLabelStyle}>Nội dung từng item (phân cách bằng dòng ---)</span>
-              <textarea
-                rows={8}
-                value={form.poslechItems}
-                onChange={e => setForm(f => ({ ...f, poslechItems: e.target.value }))}
-                style={fieldStyle}
-                placeholder={'Item 1 text...\n---\nItem 2 text...\n---\nItem 3 text...'}
-              />
-              <span style={fieldHintStyle}>Mỗi block là 1 câu hỏi. Dùng --- để phân cách.</span>
-            </label>
-          )}
-
-          {/* Generate audio button */}
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <button
-              type="button"
-              onClick={onGenerateAudio}
-              disabled={audioGenerating || !editingId}
-              style={{
-                ...secondaryActionStyle,
-                opacity: (audioGenerating || !editingId) ? 0.5 : 1,
-              }}
-            >
-              {audioGenerating ? 'Đang tạo...' : 'Tạo audio (Polly)'}
-            </button>
-            {audioGenMsg && <span style={fieldHintStyle}>{audioGenMsg}</span>}
-          </div>
-        </>
-      )}
-
-      {/* Options */}
-      {(isPoslech3 || isPoslech4) && (
-        <label style={{ display: 'grid', gap: 6 }}>
-          <span style={fieldLabelStyle}>
-            {isPoslech4 ? 'Options A-F (key | asset_id)' : 'Options A-G (key | label)'}
-          </span>
-          <textarea
-            rows={7}
-            value={form.poslechOptions}
-            onChange={e => setForm(f => ({ ...f, poslechOptions: e.target.value }))}
-            style={fieldStyle}
-            placeholder={isPoslech4 ? 'A | asset-id-1\nB | asset-id-2' : 'A | Koníček: běh\nB | Koníček: vaření'}
-          />
-        </label>
-      )}
-
-      {!isPoslech3 && !isPoslech4 && !isPoslech5 && (
-        <label style={{ display: 'grid', gap: 6 }}>
-          <span style={fieldLabelStyle}>Options A-D (key | text)</span>
-          <textarea
-            rows={4}
-            value={form.poslechOptions}
-            onChange={e => setForm(f => ({ ...f, poslechOptions: e.target.value }))}
-            style={fieldStyle}
-            placeholder="A | Možnost A\nB | Možnost B\nC | Možnost C\nD | Možnost D"
-          />
-        </label>
-      )}
-
-      {/* Correct answers */}
-      <label style={{ display: 'grid', gap: 6 }}>
-        <span style={fieldLabelStyle}>Đáp án đúng — mỗi câu 1 dòng (số=key)</span>
-        <textarea
-          rows={5}
-          value={form.poslechCorrectAnswers}
-          onChange={e => setForm(f => ({ ...f, poslechCorrectAnswers: e.target.value }))}
-          style={{ ...fieldStyle, fontFamily: 'monospace', fontSize: 13 }}
-          placeholder="1=B\n2=A\n3=D\n4=C\n5=B"
-        />
-        <span style={fieldHintStyle}>
-          Trắc nghiệm: key A/B/C/D. Điền từ (poslech_5): nhập đáp án đầy đủ, so khớp substring. Ví dụ: 1=B, 2=A
-        </span>
-      </label>
-    </>
-  );
-}
 
 const fieldStyle = {
   width: '100%',
