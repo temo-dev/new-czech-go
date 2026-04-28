@@ -1307,7 +1307,6 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 		writeJSON(w, http.StatusOK, map[string]any{"data": s.repo.ListExercises(pool), "meta": map[string]any{}})
 	case http.MethodPost:
 		var req struct {
-			ModuleID              string          `json:"module_id"`
 			ExerciseType          string          `json:"exercise_type"`
 			Title                 string          `json:"title"`
 			ShortInstruction      string          `json:"short_instruction"`
@@ -1332,7 +1331,6 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 			status = "draft"
 		}
 		exercise := contracts.Exercise{
-			ModuleID:               req.ModuleID,
 			ExerciseType:           req.ExerciseType,
 			Title:                  req.Title,
 			ShortInstruction:       req.ShortInstruction,

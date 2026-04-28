@@ -186,7 +186,19 @@ func (s *MemoryStore) ExercisesBySkill(skillID string) []contracts.Exercise {
 }
 
 func (s *MemoryStore) ExercisesByModule(moduleID string) []contracts.Exercise {
-	return s.exercises.ExercisesByModule(moduleID)
+	skills := s.skills.SkillsByModule(moduleID)
+	skillIDs := make(map[string]bool, len(skills))
+	for _, sk := range skills {
+		skillIDs[sk.ID] = true
+	}
+	all := s.exercises.ListExercises("")
+	var out []contracts.Exercise
+	for _, ex := range all {
+		if skillIDs[ex.SkillID] && ex.Status == "published" {
+			out = append(out, ex)
+		}
+	}
+	return out
 }
 
 func (s *MemoryStore) ListExercises(pool string) []contracts.Exercise {

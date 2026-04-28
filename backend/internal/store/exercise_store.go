@@ -114,7 +114,7 @@ func seedExercises() []contracts.Exercise {
 	return []contracts.Exercise{
 		{
 			ID:                    "exercise-uloha1-weather",
-			ModuleID:              "module-day-1",
+			SkillID:               "skill-dev-noi",
 			ExerciseType:          "uloha_1_topic_answers",
 			Title:                 "Pocasi 1",
 			ShortInstruction:      "Tra loi ngan gon theo chu de thoi tiet.",
@@ -141,7 +141,7 @@ func seedExercises() []contracts.Exercise {
 		},
 		{
 			ID:                    "exercise-uloha3-tv",
-			ModuleID:              "module-day-2",
+			SkillID:               "skill-dev-noi",
 			ExerciseType:          "uloha_3_story_narration",
 			Title:                 "Nakup televize",
 			ShortInstruction:      "Ke lai pribeh theo 4 tranh.",
@@ -175,7 +175,7 @@ func seedExercises() []contracts.Exercise {
 		},
 		{
 			ID:                    "exercise-uloha2-cinema",
-			ModuleID:              "module-day-1",
+			SkillID:               "skill-dev-noi",
 			ExerciseType:          "uloha_2_dialogue_questions",
 			Title:                 "Kino vecer",
 			ShortInstruction:      "Zeptejte se na chybejici informace o navsteve kina.",
@@ -203,7 +203,7 @@ func seedExercises() []contracts.Exercise {
 		},
 		{
 			ID:                    "exercise-uloha4-flat",
-			ModuleID:              "module-day-2",
+			SkillID:               "skill-dev-noi",
 			ExerciseType:          "uloha_4_choice_reasoning",
 			Title:                 "Bydleni v Praze",
 			ShortInstruction:      "Vyberte jednu moznost a vysvetlete proc.",
@@ -243,9 +243,6 @@ func mergeExerciseUpdate(current, update contracts.Exercise) contracts.Exercise 
 	}
 	if update.ExerciseType != "" {
 		current.ExerciseType = update.ExerciseType
-	}
-	if update.ModuleID != "" {
-		current.ModuleID = update.ModuleID
 	}
 	if update.SkillID != "" {
 		current.SkillID = update.SkillID
