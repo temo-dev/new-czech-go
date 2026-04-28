@@ -222,7 +222,7 @@ func (s *postgresMockTestStore) UpdateMockTest(id string, update contracts.MockT
 func (s *postgresMockTestStore) DeleteMockTest(id string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	res, err := s.db.ExecContext(ctx, `DELETE FROM mock_tests WHERE id = $1 AND status = 'draft'`, id)
+	res, err := s.db.ExecContext(ctx, `DELETE FROM mock_tests WHERE id = $1`, id)
 	if err != nil {
 		return false
 	}

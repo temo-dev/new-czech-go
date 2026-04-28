@@ -1224,7 +1224,7 @@ func (s *Server) handleAdminMockTestByID(w http.ResponseWriter, r *http.Request,
 	case http.MethodDelete:
 		if !s.repo.DeleteMockTest(id) {
 			writeJSON(w, http.StatusBadRequest, map[string]any{
-				"error": map[string]any{"code": "delete_failed", "message": "mock test not found or not in draft status"},
+				"error": map[string]any{"code": "delete_failed", "message": "mock test not found"},
 			})
 			return
 		}
