@@ -7,6 +7,7 @@ import { CteniFields as CteniFieldsNew } from './exercise-form/CteniFields';
 import { SpeakingFields } from './exercise-form/SpeakingFields';
 import { WritingFields } from './exercise-form/WritingFields';
 import { validateExercise } from './exercise-form/validation';
+import { adminFetch } from '../lib/api';
 
 type PromptAsset = {
   id: string;
@@ -942,7 +943,7 @@ export function ExerciseDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(adminApi);
+      const response = await adminFetch(adminApi);
       const payload = await response.json();
       if (!response.ok) {
         throw new Error(payload.error?.message ?? 'Could not load exercises.');
@@ -978,7 +979,7 @@ export function ExerciseDashboard() {
 
   async function loadModules() {
     try {
-      const res = await fetch('/api/admin/modules');
+      const res = await adminFetch('/api/admin/modules');
       const j = await res.json();
       setAvailableModules(j.data ?? []);
     } catch { /* non-fatal */ }
@@ -986,7 +987,7 @@ export function ExerciseDashboard() {
 
   async function loadCourses() {
     try {
-      const res = await fetch('/api/admin/courses');
+      const res = await adminFetch('/api/admin/courses');
       const j = await res.json();
       setCourses(j.data ?? []);
     } catch { /* non-fatal */ }
@@ -994,7 +995,7 @@ export function ExerciseDashboard() {
 
   async function loadMockTests() {
     try {
-      const res = await fetch('/api/admin/mock-tests');
+      const res = await adminFetch('/api/admin/mock-tests');
       const j = await res.json();
       setMockTests(j.data ?? []);
     } catch { /* non-fatal */ }
@@ -1019,7 +1020,7 @@ export function ExerciseDashboard() {
   async function loadSkillsForModule(moduleId: string) {
     if (!moduleId) { setAvailableSkills([]); return; }
     try {
-      const res = await fetch(`/api/admin/skills?module_id=${moduleId}`);
+      const res = await adminFetch(`/api/admin/skills?module_id=${moduleId}`);
       const j = await res.json();
       setAvailableSkills(j.data ?? []);
     } catch { setAvailableSkills([]); }
@@ -1060,7 +1061,7 @@ export function ExerciseDashboard() {
       formData.set('asset_kind', 'image');
       formData.set('sequence_no', String(currentAssets.length + 1));
 
-      const response = await fetch(`${adminApi}/${editingId}/assets/upload`, {
+      const response = await adminFetch(`${adminApi}/${editingId}/assets/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -1101,7 +1102,7 @@ export function ExerciseDashboard() {
 
     setError(null);
     try {
-      const response = await fetch(`${adminApi}/${id}`, { method: 'DELETE' });
+      const response = await adminFetch(`${adminApi}/${id}`, { method: 'DELETE' });
       const payload = await response.json();
       if (!response.ok) {
         throw new Error(payload.error?.message ?? 'Could not delete exercise.');
@@ -1121,7 +1122,7 @@ export function ExerciseDashboard() {
     setError(null);
 
     try {
-      const response = await fetch(editingId ? `${adminApi}/${editingId}` : adminApi, {
+      const response = await adminFetch(editingId ? `${adminApi}/${editingId}` : adminApi, {
         method: editingId ? 'PATCH' : 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1463,7 +1464,7 @@ export function ExerciseDashboard() {
                 if (!editingId) { setAudioGenMsg('Save the draft first.'); return; }
                 setAudioGenerating(true); setAudioGenMsg(null);
                 try {
-                  const res = await fetch(`${adminApi}/${editingId}/generate-audio`, { method: 'POST' });
+                  const res = await adminFetch(`${adminApi}/${editingId}/generate-audio`, { method: 'POST' });
                   const j = await res.json();
                   if (!res.ok) throw new Error(j.error?.message ?? 'Failed');
                   setAudioGenMsg(`Audio generated: ${j.data?.storage_key ?? 'ok'}`);
