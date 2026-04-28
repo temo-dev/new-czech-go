@@ -1,10 +1,8 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -23,7 +21,9 @@ export default function LoginPage() {
       });
 
       if (res.ok) {
-        router.push('/');
+        // Full page reload ensures cookie is sent with the next request
+        // and middleware correctly reads the admin_token cookie.
+        window.location.href = '/';
       } else {
         setError('Email hoặc mật khẩu không đúng.');
       }
