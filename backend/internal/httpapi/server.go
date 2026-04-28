@@ -28,6 +28,7 @@ type Server struct {
 	audioSignSecret  []byte
 	audioGenerator   processing.ExerciseAudioGenerator
 	fullExamScorer   *processing.FullExamScorer
+	contentGenerator processing.ContentGenerator
 	mux              *http.ServeMux
 }
 
@@ -51,6 +52,10 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 	if audioURLProvider == nil {
 		audioURLProvider = NewLocalSignedAudioURLProvider(audioSignSecret)
 	}
+	var contentGen processing.ContentGenerator
+	if apiKey := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY")); apiKey != "" {
+		contentGen = processing.NewClaudeContentGenerator(apiKey)
+	}
 	s := &Server{
 		repo:             repo,
 		processor:        processor,
@@ -59,8 +64,11 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 		audioSignSecret:  audioSignSecret,
 		audioGenerator:   processing.DevExerciseAudioGenerator{},
 		fullExamScorer:   processing.NewFullExamScorer(repo),
+		contentGenerator: contentGen,
 		mux:              http.NewServeMux(),
 	}
+	// Recover any jobs stuck in "running" from a previous server crash.
+	repo.MarkAllRunningJobsFailed("Server restarted while generation was running")
 	s.routes()
 	return s.withRequestLog(s.withCORS(s.mux))
 }
@@ -97,6 +105,13 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/admin/modules/", s.withRole("admin", s.handleAdminModuleByID))
 	s.mux.HandleFunc("/v1/admin/skills", s.withRole("admin", s.handleAdminSkills))
 	s.mux.HandleFunc("/v1/admin/skills/", s.withRole("admin", s.handleAdminSkillByID))
+	// V6: Vocab & Grammar content authoring
+	s.mux.HandleFunc("/v1/admin/vocabulary-sets", s.withRole("admin", s.handleAdminVocabSets))
+	s.mux.HandleFunc("/v1/admin/vocabulary-sets/", s.withRole("admin", s.handleAdminVocabSetByID))
+	s.mux.HandleFunc("/v1/admin/grammar-rules", s.withRole("admin", s.handleAdminGrammarRules))
+	s.mux.HandleFunc("/v1/admin/grammar-rules/", s.withRole("admin", s.handleAdminGrammarRuleByID))
+	s.mux.HandleFunc("/v1/admin/content-generation-jobs", s.withRole("admin", s.handleAdminGenJobs))
+	s.mux.HandleFunc("/v1/admin/content-generation-jobs/", s.withRole("admin", s.handleAdminGenJobByID))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
