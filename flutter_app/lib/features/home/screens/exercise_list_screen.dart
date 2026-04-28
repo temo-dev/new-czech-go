@@ -116,9 +116,22 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
     return exerciseType.split('_').take(2).join(' ').toUpperCase();
   }
 
+  static bool _exerciseMatchesSkillKind(String exerciseType, String skillKind) {
+    switch (skillKind) {
+      case 'noi':  return exerciseType.startsWith('uloha_');
+      case 'viet': return exerciseType.startsWith('psani_');
+      case 'nghe': return exerciseType.startsWith('poslech_');
+      case 'doc':  return exerciseType.startsWith('cteni_');
+      default:     return true;
+    }
+  }
+
   List<ExerciseSummary> get _filtered {
-    if (_filterTag == null || widget.skill.skillKind != 'noi') return _exercises;
-    return _exercises.where((e) => e.exerciseType.startsWith('uloha_$_filterTag')).toList();
+    final kindFiltered = _exercises
+        .where((e) => _exerciseMatchesSkillKind(e.exerciseType, widget.skill.skillKind))
+        .toList();
+    if (_filterTag == null || widget.skill.skillKind != 'noi') return kindFiltered;
+    return kindFiltered.where((e) => e.exerciseType.startsWith('uloha_$_filterTag')).toList();
   }
 
   int _estimatedMin(ExerciseSummary ex) {
