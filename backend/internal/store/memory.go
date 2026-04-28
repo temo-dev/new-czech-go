@@ -264,7 +264,7 @@ func (s *MemoryStore) ExercisesByModule(moduleID string) []contracts.Exercise {
 		skillIDs[sk.ID] = true
 	}
 	all := s.exercises.ListExercises("")
-	var out []contracts.Exercise
+	out := make([]contracts.Exercise, 0)
 	for _, ex := range all {
 		if skillIDs[ex.SkillID] && ex.Status == "published" {
 			out = append(out, ex)
