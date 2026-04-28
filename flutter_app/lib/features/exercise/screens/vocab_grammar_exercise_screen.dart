@@ -154,17 +154,23 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
                     l: l,
                   ),
                 ],
-                // Next exercise button
-                if (widget.onOpenNext != null) ...[
-                  const SizedBox(height: AppSpacing.x4),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: widget.onOpenNext,
-                      child: const Text('Bài tiếp theo →'),
-                    ),
-                  ),
-                ],
+                const SizedBox(height: AppSpacing.x4),
+                // Next exercise OR done button — always visible so user can exit
+                SizedBox(
+                  width: double.infinity,
+                  child: widget.onOpenNext != null
+                      ? FilledButton(
+                          onPressed: widget.onOpenNext,
+                          child: const Text('Bài tiếp theo →'),
+                        )
+                      : FilledButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF1F8A4D),
+                          ),
+                          child: const Text('Hoàn thành ✓'),
+                        ),
+                ),
               ],
             ),
           ),
