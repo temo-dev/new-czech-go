@@ -351,6 +351,26 @@ func (s *postgresSkillStore) AdminSkillsByModule(moduleID string) []contracts.Sk
 	return out
 }
 
+func (s *postgresSkillStore) AllAdminSkills() []contracts.Skill {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, module_id, skill_kind, title, sequence_no, status FROM skills
+		 ORDER BY module_id, sequence_no ASC`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []contracts.Skill
+	for rows.Next() {
+		var sk contracts.Skill
+		if err := rows.Scan(&sk.ID, &sk.ModuleID, &sk.SkillKind, &sk.Title, &sk.SequenceNo, &sk.Status); err == nil {
+			out = append(out, sk)
+		}
+	}
+	return out
+}
+
 func (s *postgresSkillStore) SkillByID(id string) (contracts.Skill, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

@@ -161,6 +161,9 @@ func (s *MemoryStore) SkillsByModule(moduleID string) []contracts.Skill {
 func (s *MemoryStore) AdminSkillsByModule(moduleID string) []contracts.Skill {
 	return s.skills.AdminSkillsByModule(moduleID)
 }
+func (s *MemoryStore) AllAdminSkills() []contracts.Skill {
+	return s.skills.AllAdminSkills()
+}
 func (s *MemoryStore) SkillByID(id string) (contracts.Skill, bool) {
 	return s.skills.SkillByID(id)
 }

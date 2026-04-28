@@ -150,6 +150,20 @@ const exerciseTypeOptions: Array<{
   { value: 'cteni_5', label: 'Čtení 5', hint: 'Reading: read text → fill info, 5 items (5 pts).' },
 ];
 
+const SKILL_KIND_EXERCISE_TYPES: Record<string, ExerciseType[]> = {
+  noi:  ['uloha_1_topic_answers', 'uloha_2_dialogue_questions', 'uloha_3_story_narration', 'uloha_4_choice_reasoning'],
+  viet: ['psani_1_formular', 'psani_2_email'],
+  nghe: ['poslech_1', 'poslech_2', 'poslech_3', 'poslech_4', 'poslech_5'],
+  doc:  ['cteni_1', 'cteni_2', 'cteni_3', 'cteni_4', 'cteni_5'],
+};
+
+const SKILL_KIND_META: Record<string, { label: string; icon: string; color: string }> = {
+  noi:  { label: 'Nói',   icon: '🎙️', color: '#FF6A14' },
+  viet: { label: 'Viết',  icon: '✏️', color: '#0F3D3A' },
+  nghe: { label: 'Nghe',  icon: '🎧', color: '#7C3AED' },
+  doc:  { label: 'Đọc',   icon: '📖', color: '#0369A1' },
+};
+
 function createInitialFormState(): ExerciseFormState {
   return {
     exerciseType: 'uloha_1_topic_answers',
@@ -742,6 +756,48 @@ function buildUpdatePayload(form: ExerciseFormState) {
   };
 }
 
+function WizardTypeStep({ form, allSkills, onSelectType, onBack }: {
+  form: ExerciseFormState;
+  allSkills: CmsSkill[];
+  onSelectType: (type: ExerciseType) => void;
+  onBack: () => void;
+}) {
+  const skill = allSkills.find(s => s.id === form.skillId);
+  const kind = skill?.skill_kind ?? '';
+  const meta = SKILL_KIND_META[kind];
+  const typeOptions = (SKILL_KIND_EXERCISE_TYPES[kind] ?? [])
+    .map(v => exerciseTypeOptions.find(o => o.value === v))
+    .filter((o): o is NonNullable<typeof o> => o != null);
+
+  return (
+    <div style={{ display: 'grid', gap: 16, padding: 24, borderRadius: 28, background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
+      <div>
+        <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'var(--primary)', textTransform: 'uppercase' }}>Bước 2 / 3</p>
+        <h2 style={{ margin: '0 0 4px', fontSize: 22 }}>Chọn dạng bài</h2>
+        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 14 }}>
+          Kỹ năng: <strong style={{ color: meta?.color }}>{meta?.icon} {skill?.title}</strong>
+        </p>
+      </div>
+      <div style={{ display: 'grid', gap: 8 }}>
+        {typeOptions.map(opt => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onSelectType(opt.value)}
+            style={{ textAlign: 'left', padding: '12px 16px', borderRadius: 12, border: `2px solid ${form.exerciseType === opt.value ? 'var(--primary)' : 'var(--border)'}`, background: form.exerciseType === opt.value ? 'rgba(255,106,20,0.08)' : 'var(--surface-muted)', cursor: 'pointer' }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{opt.label}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{opt.hint}</div>
+          </button>
+        ))}
+      </div>
+      <button type="button" onClick={onBack} style={{ alignSelf: 'start', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13, padding: 0 }}>
+        ← Quay lại chọn kỹ năng
+      </button>
+    </div>
+  );
+}
+
 export function ExerciseDashboard() {
   const S = useS();
   const [items, setItems] = useState<Exercise[]>([]);
@@ -757,6 +813,8 @@ export function ExerciseDashboard() {
   const [formTab, setFormTab] = useState(0);
   const [audioGenerating, setAudioGenerating] = useState(false);
   const [audioGenMsg, setAudioGenMsg] = useState<string | null>(null);
+  const [wizardStep, setWizardStep] = useState<'skill' | 'type' | 'content'>('skill');
+  const [allSkills, setAllSkills] = useState<CmsSkill[]>([]);
 
   const editingItem = editingId ? items.find((item) => item.id === editingId) ?? null : null;
   const currentAssets = editingItem?.assets ?? [];
@@ -765,6 +823,7 @@ export function ExerciseDashboard() {
     setEditingId(null);
     setAssetError(null);
     setForm(createInitialFormState());
+    setWizardStep('skill');
   }
 
   async function loadExercises() {
@@ -787,6 +846,7 @@ export function ExerciseDashboard() {
   useEffect(() => {
     loadExercises();
     loadModules();
+    loadAllSkills();
   }, []);
 
   async function loadModules() {
@@ -794,6 +854,14 @@ export function ExerciseDashboard() {
       const res = await fetch('/api/admin/modules');
       const j = await res.json();
       setAvailableModules(j.data ?? []);
+    } catch { /* non-fatal */ }
+  }
+
+  async function loadAllSkills() {
+    try {
+      const res = await fetch('/api/admin/skills');
+      const j = await res.json();
+      setAllSkills(j.data ?? []);
     } catch { /* non-fatal */ }
   }
 
@@ -821,6 +889,7 @@ export function ExerciseDashboard() {
     setAssetError(null);
     setEditingId(item.id);
     setForm(formStateFromExercise(item));
+    setWizardStep('content');
   }
 
   async function handleAssetUpload(file: File) {
@@ -983,7 +1052,64 @@ export function ExerciseDashboard() {
           alignItems: 'start',
         }}
       >
-        <form
+        {/* ── Wizard: Step 1 — pick skill (creation only) ─────────────── */}
+        {!editingId && wizardStep === 'skill' && (
+          <div style={{ display: 'grid', gap: 16, padding: 24, borderRadius: 28, background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
+            <div>
+              <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'var(--primary)', textTransform: 'uppercase' }}>Bước 1 / 3</p>
+              <h2 style={{ margin: '0 0 4px', fontSize: 22 }}>Chọn kỹ năng</h2>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 14 }}>Bài tập sẽ được gắn vào kỹ năng này.</p>
+            </div>
+            {allSkills.length === 0 ? (
+              <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Chưa có kỹ năng nào. Tạo skill trong Module trước.</p>
+            ) : (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {(['noi', 'viet', 'nghe', 'doc'] as const).map(kind => {
+                  const kindSkills = allSkills.filter(s => s.skill_kind === kind);
+                  if (kindSkills.length === 0) return null;
+                  const meta = SKILL_KIND_META[kind];
+                  return (
+                    <div key={kind}>
+                      <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: meta.color, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                        {meta.icon} {meta.label}
+                      </p>
+                      <div style={{ display: 'grid', gap: 6 }}>
+                        {kindSkills.map(sk => {
+                          const mod = availableModules.find(m => m.id === sk.module_id);
+                          return (
+                            <button
+                              key={sk.id}
+                              type="button"
+                              onClick={() => {
+                                setForm(f => ({ ...f, skillId: sk.id, moduleId: sk.module_id, exerciseType: SKILL_KIND_EXERCISE_TYPES[kind]?.[0] ?? f.exerciseType }));
+                                setWizardStep('type');
+                              }}
+                              style={{ textAlign: 'left', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface-muted)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                            >
+                              <span style={{ fontWeight: 600, fontSize: 14 }}>{sk.title}</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{mod?.title ?? sk.module_id}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Wizard: Step 2 — pick exercise type (creation only) ──────── */}
+        {!editingId && wizardStep === 'type' && <WizardTypeStep
+          form={form}
+          allSkills={allSkills}
+          onSelectType={type => { setForm(f => ({ ...f, exerciseType: type })); setWizardStep('content'); }}
+          onBack={() => setWizardStep('skill')}
+        />}
+
+        {/* ── Step 3: content form (always shown when editing, or after wizard) */}
+        {(editingId || wizardStep === 'content') && <form
           onSubmit={handleSubmit}
           style={{
             display: 'grid',
@@ -1619,20 +1745,20 @@ export function ExerciseDashboard() {
             <button
               type="button"
               onClick={resetForm}
-              style={{
-                borderRadius: 18,
-                border: '1px solid var(--border)',
-                background: 'var(--surface-muted)',
-                color: 'var(--text)',
-                padding: '12px 18px',
-                cursor: 'pointer',
-                fontWeight: 700,
-              }}
+              style={{ borderRadius: 18, border: '1px solid var(--border)', background: 'var(--surface-muted)', color: 'var(--text)', padding: '12px 18px', cursor: 'pointer', fontWeight: 700 }}
             >
               {S.exercise.cancelEditing}
             </button>
-          ) : null}
-        </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setWizardStep('type')}
+              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13, padding: 0, textAlign: 'left' }}
+            >
+              ← Quay lại chọn dạng bài
+            </button>
+          )}
+        </form>}
 
         <section
           style={{
