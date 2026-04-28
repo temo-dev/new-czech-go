@@ -22,6 +22,9 @@ type MemoryStore struct {
 	mockTests      MockTestStore
 	exerciseAudio  map[string]contracts.ExerciseAudio   // exercise_id → audio
 	fullExams      map[string]contracts.FullExamSession  // id → session
+	vocabulary     VocabularyStore
+	grammar        GrammarStore
+	generationJobs GenerationJobStore
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -74,10 +77,13 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 		skills:    newMemorySkillStore(seedSkills(seedDailyPlanModules())),
 		exercises: exercises,
 		attempts:  attempts,
-		mockExams:     newMemoryMockExamStore(exercises, attempts),
-		mockTests:     newMemoryMockTestStore(),
-		exerciseAudio: map[string]contracts.ExerciseAudio{},
-		fullExams:     map[string]contracts.FullExamSession{},
+		mockExams:      newMemoryMockExamStore(exercises, attempts),
+		mockTests:      newMemoryMockTestStore(),
+		exerciseAudio:  map[string]contracts.ExerciseAudio{},
+		fullExams:      map[string]contracts.FullExamSession{},
+		vocabulary:     newMemoryVocabularyStore(),
+		grammar:        newMemoryGrammarStore(),
+		generationJobs: newMemoryGenerationJobStore(),
 	}
 }
 
@@ -308,6 +314,81 @@ func (s *MemoryStore) SetMockTestStore(ms MockTestStore) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.mockTests = ms
+}
+
+// Vocabulary delegates
+func (s *MemoryStore) CreateVocabularySet(set contracts.VocabularySet) (contracts.VocabularySet, error) {
+	return s.vocabulary.CreateVocabularySet(set)
+}
+func (s *MemoryStore) GetVocabularySet(id string) (contracts.VocabularySet, bool) {
+	return s.vocabulary.GetVocabularySet(id)
+}
+func (s *MemoryStore) ListVocabularySets(skillID string) []contracts.VocabularySet {
+	return s.vocabulary.ListVocabularySets(skillID)
+}
+func (s *MemoryStore) UpdateVocabularySet(id string, update contracts.VocabularySet) (contracts.VocabularySet, bool) {
+	return s.vocabulary.UpdateVocabularySet(id, update)
+}
+func (s *MemoryStore) DeleteVocabularySet(id string) bool {
+	return s.vocabulary.DeleteVocabularySet(id)
+}
+func (s *MemoryStore) CreateVocabularyItem(item contracts.VocabularyItem) contracts.VocabularyItem {
+	return s.vocabulary.CreateVocabularyItem(item)
+}
+func (s *MemoryStore) ListVocabularyItems(setID string) []contracts.VocabularyItem {
+	return s.vocabulary.ListVocabularyItems(setID)
+}
+func (s *MemoryStore) DeleteVocabularyItem(id string) bool {
+	return s.vocabulary.DeleteVocabularyItem(id)
+}
+
+// Grammar delegates
+func (s *MemoryStore) CreateGrammarRule(rule contracts.GrammarRule) (contracts.GrammarRule, error) {
+	return s.grammar.CreateGrammarRule(rule)
+}
+func (s *MemoryStore) GetGrammarRule(id string) (contracts.GrammarRule, bool) {
+	return s.grammar.GetGrammarRule(id)
+}
+func (s *MemoryStore) ListGrammarRules(skillID string) []contracts.GrammarRule {
+	return s.grammar.ListGrammarRules(skillID)
+}
+func (s *MemoryStore) UpdateGrammarRule(id string, update contracts.GrammarRule) (contracts.GrammarRule, bool) {
+	return s.grammar.UpdateGrammarRule(id, update)
+}
+func (s *MemoryStore) DeleteGrammarRule(id string) bool {
+	return s.grammar.DeleteGrammarRule(id)
+}
+
+// GenerationJob delegates
+func (s *MemoryStore) CreateGenerationJob(job contracts.ContentGenerationJob) contracts.ContentGenerationJob {
+	return s.generationJobs.CreateJob(job)
+}
+func (s *MemoryStore) GetGenerationJob(id string) (contracts.ContentGenerationJob, bool) {
+	return s.generationJobs.GetJob(id)
+}
+func (s *MemoryStore) UpdateGenerationJobRunning(id string) {
+	s.generationJobs.UpdateJobRunning(id)
+}
+func (s *MemoryStore) UpdateGenerationJobGenerated(id string, payload []byte, inputTokens, outputTokens int, costUSD float64, durationMs int) {
+	s.generationJobs.UpdateJobGenerated(id, payload, inputTokens, outputTokens, costUSD, durationMs)
+}
+func (s *MemoryStore) UpdateGenerationJobFailed(id string, errMsg string) {
+	s.generationJobs.UpdateJobFailed(id, errMsg)
+}
+func (s *MemoryStore) UpdateGenerationJobDraft(id string, editedPayload []byte) bool {
+	return s.generationJobs.UpdateJobDraft(id, editedPayload)
+}
+func (s *MemoryStore) UpdateGenerationJobPublished(id string) bool {
+	return s.generationJobs.UpdateJobPublished(id)
+}
+func (s *MemoryStore) UpdateGenerationJobRejected(id string) bool {
+	return s.generationJobs.UpdateJobRejected(id)
+}
+func (s *MemoryStore) FindActiveGenerationJob(requestedBy, moduleID string) (contracts.ContentGenerationJob, bool) {
+	return s.generationJobs.FindActiveJob(requestedBy, moduleID)
+}
+func (s *MemoryStore) MarkAllRunningJobsFailed(errMsg string) {
+	s.generationJobs.MarkAllRunningFailed(errMsg)
 }
 
 func (s *MemoryStore) CreateMockExam(learnerID, mockTestID string) (contracts.MockExamSession, error) {

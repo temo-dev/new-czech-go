@@ -64,6 +64,10 @@ type Exercise struct {
 	Assets                 []PromptAsset   `json:"assets,omitempty"`
 	Detail                 any             `json:"detail,omitempty"`
 	ScoringTemplatePreview *ScoringPreview `json:"scoring_template_preview,omitempty"`
+	// V6: LLM generation provenance (nullable — omitted for manually created exercises)
+	SourceType      string `json:"source_type,omitempty"`       // vocabulary_set | grammar_rule | custom
+	SourceID        string `json:"source_id,omitempty"`
+	GenerationJobID string `json:"generation_job_id,omitempty"`
 }
 
 type PromptAsset struct {
@@ -510,4 +514,140 @@ type MockExamSessionItem struct {
 	AttemptID    string `json:"attempt_id,omitempty"`
 	SectionScore int    `json:"section_score,omitempty"`
 	Status       string `json:"status"`
+}
+
+// ── V6: Vocabulary & Grammar LLM-Assisted Authoring ─────────────────────────
+
+type VocabularySet struct {
+	ID              string `json:"id"`
+	SkillID         string `json:"skill_id"`
+	Title           string `json:"title"`
+	Level           string `json:"level"`           // A1 | A2 | B1
+	ExplanationLang string `json:"explanation_lang"` // vi | en | cs
+	Status          string `json:"status"`           // draft | published | archived
+	CreatedAt       string `json:"created_at,omitempty"`
+	UpdatedAt       string `json:"updated_at,omitempty"`
+}
+
+type VocabularyItem struct {
+	ID                 string `json:"id"`
+	SetID              string `json:"set_id"`
+	Term               string `json:"term"`
+	Meaning            string `json:"meaning"`
+	PartOfSpeech       string `json:"part_of_speech,omitempty"`
+	ExampleSentence    string `json:"example_sentence,omitempty"`
+	ExampleTranslation string `json:"example_translation,omitempty"`
+	SequenceNo         int    `json:"sequence_no"`
+}
+
+type GrammarRule struct {
+	ID              string            `json:"id"`
+	SkillID         string            `json:"skill_id"`
+	Title           string            `json:"title"`
+	Level           string            `json:"level"`
+	ExplanationVI   string            `json:"explanation_vi,omitempty"`
+	RuleTable       map[string]string `json:"rule_table,omitempty"` // e.g. {"já":"jsem","ty":"jsi"}
+	ConstraintsText string            `json:"constraints_text,omitempty"`
+	Status          string            `json:"status"`
+	CreatedAt       string            `json:"created_at,omitempty"`
+	UpdatedAt       string            `json:"updated_at,omitempty"`
+}
+
+type ContentGenerationJob struct {
+	ID                   string  `json:"id"`
+	ModuleID             string  `json:"module_id"`
+	SkillID              string  `json:"skill_id,omitempty"`
+	SourceType           string  `json:"source_type"` // vocabulary_set | grammar_rule
+	SourceID             string  `json:"source_id"`
+	RequestedBy          string  `json:"requested_by"`
+	InputPayload         []byte  `json:"-"` // raw JSON stored/retrieved from DB
+	GeneratedPayload     []byte  `json:"-"`
+	EditedPayload        []byte  `json:"-"`
+	Status               string  `json:"status"`
+	Provider             string  `json:"provider"`
+	Model                string  `json:"model"`
+	InputTokens          int     `json:"input_tokens,omitempty"`
+	OutputTokens         int     `json:"output_tokens,omitempty"`
+	EstimatedCostUSD     float64 `json:"estimated_cost_usd,omitempty"`
+	DurationMs           int     `json:"duration_ms,omitempty"`
+	ErrorMessage         string  `json:"error_message,omitempty"`
+	CreatedAt            string  `json:"created_at,omitempty"`
+	UpdatedAt            string  `json:"updated_at,omitempty"`
+	PublishedAt          string  `json:"published_at,omitempty"`
+}
+
+// GenerationJobInput is the body of POST /admin/content-generation-jobs.
+type GenerationJobInput struct {
+	SourceType    string         `json:"source_type"`    // vocabulary_set | grammar_rule
+	SourceID      string         `json:"source_id"`
+	ModuleID      string         `json:"module_id"`
+	ExerciseTypes []string       `json:"exercise_types"`  // subset of quizcard_basic/matching/fill_blank/choice_word
+	NumPerType    map[string]int `json:"num_per_type"`
+}
+
+// ── V6 Exercise Detail Types ────────────────────────────────────────────────
+
+type QuizcardBasicDetail struct {
+	FrontText          string            `json:"front_text"`
+	BackText           string            `json:"back_text"`
+	ExampleSentence    string            `json:"example_sentence,omitempty"`
+	ExampleTranslation string            `json:"example_translation,omitempty"`
+	Explanation        string            `json:"explanation,omitempty"`
+	CorrectAnswers     map[string]string `json:"correct_answers"` // always {"1":"known"}
+}
+
+// MatchingPair is one left→right pair in a matching exercise.
+// left_id and right_id are used as keys for submission and scoring.
+type MatchingPair struct {
+	LeftID  string `json:"left_id"`  // "1","2","3"... (fixed order, learner sees left in this order)
+	Left    string `json:"left"`     // Czech term
+	RightID string `json:"right_id"` // "A","B","C"... (learner sees right shuffled by Flutter)
+	Right   string `json:"right"`    // Vietnamese definition
+}
+
+// MatchingDetail stores pairs with option-key correct_answers for exact-match scoring.
+// correct_answers: {"1":"A","2":"B"} — learner submits same format.
+type MatchingDetail struct {
+	Pairs          []MatchingPair    `json:"pairs"`
+	Explanation    string            `json:"explanation,omitempty"`
+	CorrectAnswers map[string]string `json:"correct_answers"`
+}
+
+type FillBlankDetail struct {
+	Sentence       string            `json:"sentence"`        // must contain "___"
+	Hint           string            `json:"hint,omitempty"`
+	Explanation    string            `json:"explanation,omitempty"`
+	CorrectAnswers map[string]string `json:"correct_answers"` // {"1":"chodím"}
+}
+
+type ChoiceWordDetail struct {
+	Stem           string                 `json:"stem"`
+	Options        []MultipleChoiceOption `json:"options"`        // reuse existing type, key A/B/C/D
+	GrammarNote    string                 `json:"grammar_note,omitempty"`
+	Explanation    string                 `json:"explanation,omitempty"`
+	CorrectAnswers map[string]string      `json:"correct_answers"` // {"1":"B"}
+}
+
+// GeneratedExercise is one exercise in an LLM-generated draft payload.
+type GeneratedExercise struct {
+	ExerciseType  string        `json:"exercise_type"`
+	// quizcard fields
+	FrontText     string        `json:"front_text,omitempty"`
+	BackText      string        `json:"back_text,omitempty"`
+	ExampleSentence    string   `json:"example_sentence,omitempty"`
+	ExampleTranslation string   `json:"example_translation,omitempty"`
+	// fill_blank / choice_word fields
+	Prompt        string        `json:"prompt,omitempty"`
+	Options       []string      `json:"options,omitempty"`
+	CorrectAnswer string        `json:"correct_answer,omitempty"`
+	GrammarNote   string        `json:"grammar_note,omitempty"`
+	// matching fields
+	Pairs         []MatchingPair `json:"pairs,omitempty"`
+	// common
+	Explanation   string        `json:"explanation,omitempty"`
+}
+
+// GeneratedPayload is the full LLM output stored in a generation job.
+type GeneratedPayload struct {
+	Exercises []GeneratedExercise `json:"exercises"`
 }

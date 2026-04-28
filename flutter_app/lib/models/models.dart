@@ -44,7 +44,9 @@ class Skill {
   final int sequenceNo;
   final String status;
 
-  bool get isImplemented => skillKind == 'noi' || skillKind == 'viet' || skillKind == 'nghe' || skillKind == 'doc';
+  bool get isImplemented => skillKind == 'noi' || skillKind == 'viet' ||
+      skillKind == 'nghe' || skillKind == 'doc' ||
+      skillKind == 'tu_vung' || skillKind == 'ngu_phap';
 
   bool get isWriting => skillKind == 'viet';
 
@@ -380,6 +382,18 @@ class ExerciseDetail {
     this.cteniItems = const [],
     this.cteniOptions = const [],
     this.cteniQuestions = const [],
+    // V6: vocab & grammar
+    this.flashcardFront = '',
+    this.flashcardBack = '',
+    this.flashcardExample = '',
+    this.flashcardExampleTranslation = '',
+    this.matchingPairs = const [],
+    this.fillBlankSentence = '',
+    this.fillBlankHint = '',
+    this.fillBlankExplanation = '',
+    this.choiceWordStem = '',
+    this.choiceWordExplanation = '',
+    this.choiceWordGrammarNote = '',
   });
 
   final String id;
@@ -411,12 +425,38 @@ class ExerciseDetail {
   final List<PoslechOptionView> cteniOptions;
   final List<FillQuestionView> cteniQuestions;
 
+  // V6: quizcard_basic
+  final String flashcardFront;
+  final String flashcardBack;
+  final String flashcardExample;
+  final String flashcardExampleTranslation;
+
+  // V6: matching
+  final List<MatchingPairView> matchingPairs;
+
+  // V6: fill_blank
+  final String fillBlankSentence;
+  final String fillBlankHint;
+  final String fillBlankExplanation;
+
+  // V6: choice_word
+  final String choiceWordStem;
+  final String choiceWordExplanation;
+  final String choiceWordGrammarNote;
+
   bool get isPsani1 => exerciseType == 'psani_1_formular';
   bool get isPsani2 => exerciseType == 'psani_2_email';
   bool get isPoslech => exerciseType.startsWith('poslech_');
   bool get isPoslech5 => exerciseType == 'poslech_5';
   bool get isCteni => exerciseType.startsWith('cteni_');
   bool get isCteni5 => exerciseType == 'cteni_5';
+
+  // V6: Vocab & Grammar exercise types
+  bool get isQuizcard   => exerciseType == 'quizcard_basic';
+  bool get isMatching   => exerciseType == 'matching';
+  bool get isFillBlank  => exerciseType == 'fill_blank';
+  bool get isChoiceWord => exerciseType == 'choice_word';
+  bool get isVocabGrammar => isQuizcard || isMatching || isFillBlank || isChoiceWord;
 
   PromptAssetView? assetById(String assetId) {
     for (final asset in assets) {
@@ -521,6 +561,48 @@ class ExerciseDetail {
       cteniQuestions: (detail['questions'] as List<dynamic>? ?? const [])
           .map((e) => FillQuestionView.fromJson(e as Map<String, dynamic>))
           .toList(),
+      // V6: quizcard_basic
+      flashcardFront: detail['front_text'] as String? ?? '',
+      flashcardBack: detail['back_text'] as String? ?? '',
+      flashcardExample: detail['example_sentence'] as String? ?? '',
+      flashcardExampleTranslation: detail['example_translation'] as String? ?? '',
+      // V6: matching
+      matchingPairs: (detail['pairs'] as List<dynamic>? ?? const [])
+          .map((e) => MatchingPairView.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      // V6: fill_blank
+      fillBlankSentence: detail['sentence'] as String? ?? '',
+      fillBlankHint: detail['hint'] as String? ?? '',
+      fillBlankExplanation: detail['explanation'] as String? ?? '',
+      // V6: choice_word
+      choiceWordStem: detail['stem'] as String? ?? '',
+      choiceWordExplanation: detail['explanation'] as String? ?? '',
+      choiceWordGrammarNote: detail['grammar_note'] as String? ?? '',
+    );
+  }
+}
+
+// V6: One pair in a matching exercise.
+// leftId/rightId are the keys used for submission ("1","2"... / "A","B"...).
+class MatchingPairView {
+  const MatchingPairView({
+    required this.leftId,
+    required this.left,
+    required this.rightId,
+    required this.right,
+  });
+
+  final String leftId;
+  final String left;   // Czech term (displayed in fixed order on left)
+  final String rightId;
+  final String right;  // Vietnamese definition (shuffled by Flutter on right)
+
+  factory MatchingPairView.fromJson(Map<String, dynamic> json) {
+    return MatchingPairView(
+      leftId:  json['left_id']  as String? ?? '',
+      left:    json['left']     as String? ?? '',
+      rightId: json['right_id'] as String? ?? '',
+      right:   json['right']    as String? ?? '',
     );
   }
 }
