@@ -210,7 +210,30 @@ export default function VocabularyPage() {
   const [publishErr, setPublishErr] = useState('');
   const [publishOk, setPublishOk]   = useState(false);
 
-  useEffect(() => { loadAll(); }, []);
+  // Resumable draft jobs: setId → jobId (persisted in localStorage)
+  const [resumableJobs, setResumableJobs] = useState<Record<string, string>>({});
+
+  const LS_KEY = 'vocab-draft-jobs';
+
+  function saveDraftJob(setId: string, jid: string) {
+    const map = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') as Record<string, string>;
+    map[setId] = jid;
+    localStorage.setItem(LS_KEY, JSON.stringify(map));
+    setResumableJobs({ ...map });
+  }
+
+  function clearDraftJob(setId: string) {
+    const map = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') as Record<string, string>;
+    delete map[setId];
+    localStorage.setItem(LS_KEY, JSON.stringify(map));
+    setResumableJobs({ ...map });
+  }
+
+  useEffect(() => {
+    const map = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') as Record<string, string>;
+    setResumableJobs(map);
+    loadAll();
+  }, []);
 
   async function loadAll() {
     setLoading(true);
@@ -334,6 +357,8 @@ export default function VocabularyPage() {
         setExercises(payload?.exercises ?? []);
         setGenPhase('review');
         clearInterval(id);
+        // Persist so user can resume after refresh
+        saveDraftJob(genSetId, jobId);
       } else if (status === 'failed') {
         setJobError(j.data.error_message ?? 'Generation failed.');
         clearInterval(id);
@@ -342,7 +367,8 @@ export default function VocabularyPage() {
       }
     }, 2000);
     return () => clearInterval(id);
-  }, [genPhase, jobId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genPhase, jobId, genSetId]);
 
   async function saveDraft() {
     await adminFetch(`/api/admin/content-generation-jobs/${jobId}?action=draft`, {
@@ -363,6 +389,7 @@ export default function VocabularyPage() {
       return;
     }
     setPublishOk(true);
+    clearDraftJob(genSetId);
     await loadAll();
     // Reset to list after showing success for 2s
     setTimeout(() => { setGenPhase(null); setJobId(''); setPublishOk(false); }, 2000);
@@ -370,7 +397,23 @@ export default function VocabularyPage() {
 
   async function handleReject() {
     await adminFetch(`/api/admin/content-generation-jobs/${jobId}?action=reject`, { method: 'POST' });
+    clearDraftJob(genSetId);
     setGenPhase(null); setJobId('');
+  }
+
+  async function handleResume(setId: string, jid: string) {
+    const res = await adminFetch(`/api/admin/content-generation-jobs/${jid}`);
+    const j = await res.json();
+    if (!res.ok || !j.data) {
+      clearDraftJob(setId);
+      return;
+    }
+    const payload = j.data.edited_payload ?? j.data.generated_payload;
+    setExercises(payload?.exercises ?? []);
+    setGenSetId(setId);
+    setJobId(jid);
+    setGenPhase('review');
+    setPublishOk(false); setPublishErr('');
   }
 
   const filteredModules = modules.filter(m => !fCourse || m.course_id === fCourse);
@@ -407,7 +450,13 @@ export default function VocabularyPage() {
             <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 99, background: s.status === 'published' ? 'var(--ready-bg)' : 'var(--needs-bg)', color: s.status === 'published' ? 'var(--ready)' : 'var(--needs)', width: 'fit-content' }}>
               {s.status}
             </span>
-            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
+              {resumableJobs[s.id] && (
+                <button onClick={() => handleResume(s.id, resumableJobs[s.id])}
+                  style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  Tiếp tục review →
+                </button>
+              )}
               <button onClick={() => openEdit(s)}
                 style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}>
                 Sửa
