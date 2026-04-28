@@ -3,6 +3,9 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useS } from '../lib/i18n';
 import { PoslechFields as PoslechFieldsNew } from './exercise-form/PoslechFields';
+import { CteniFields as CteniFieldsNew } from './exercise-form/CteniFields';
+import { SpeakingFields } from './exercise-form/SpeakingFields';
+import { WritingFields } from './exercise-form/WritingFields';
 
 type PromptAsset = {
   id: string;
@@ -386,8 +389,10 @@ function formStateFromExercise(item: Exercise): ExerciseFormState {
     cteniCorrectAnswers: detail.correct_answers
       ? Object.entries(detail.correct_answers as Record<string, string>).map(([k, v]) => `${k}=${v}`).join('\n')
       : '',
-    // Pre-populate typePayload for poslech types so new PoslechFields can init from it
-    typePayload: item.exercise_type.startsWith('poslech_') ? (detail as Record<string, unknown>) : undefined,
+    // Pre-populate typePayload so new *Fields components can init from exercise.detail
+    typePayload: (item.exercise_type.startsWith('poslech_') || item.exercise_type.startsWith('cteni_'))
+      ? (detail as Record<string, unknown>)
+      : undefined,
   };
 }
 
@@ -519,8 +524,21 @@ function buildPoslechBase(form: ExerciseFormState) {
   };
 }
 
+function buildCteniBase(form: ExerciseFormState) {
+  return {
+    module_id: form.moduleId, skill_id: form.skillId,
+    exercise_type: form.exerciseType, title: form.title,
+    short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
+    estimated_duration_sec: 2400, sample_answer_enabled: false,
+    status: form.status, pool: form.pool,
+  };
+}
+
 function buildCreatePayload(form: ExerciseFormState) {
-  if (form.exerciseType.startsWith('cteni_')) return buildCteniPayload(form);
+  if (form.exerciseType.startsWith('cteni_')) {
+    if (form.typePayload !== undefined) return { ...buildCteniBase(form), detail: form.typePayload };
+    return buildCteniPayload(form);
+  }
   if (form.exerciseType.startsWith('poslech_')) {
     if (form.typePayload !== undefined) {
       return { ...buildPoslechBase(form), detail: form.typePayload };
@@ -657,7 +675,10 @@ function buildCreatePayload(form: ExerciseFormState) {
 }
 
 function buildUpdatePayload(form: ExerciseFormState) {
-  if (form.exerciseType.startsWith('cteni_')) return buildCteniPayload(form);
+  if (form.exerciseType.startsWith('cteni_')) {
+    if (form.typePayload !== undefined) return { ...buildCteniBase(form), detail: form.typePayload };
+    return buildCteniPayload(form);
+  }
   if (form.exerciseType.startsWith('poslech_')) {
     if (form.typePayload !== undefined) {
       return { ...buildPoslechBase(form), detail: form.typePayload };
@@ -1408,7 +1429,13 @@ export function ExerciseDashboard() {
               Nội dung bài tập
             </p>
 
-          {form.exerciseType === 'uloha_1_topic_answers' ? (
+          {/* ── Speaking: new structured SpeakingFields component ─────── */}
+          {(['uloha_1_topic_answers', 'uloha_2_dialogue_questions', 'uloha_3_story_narration', 'uloha_4_choice_reasoning'] as string[]).includes(form.exerciseType) && (
+            <SpeakingFields form={form as never} setForm={setForm as never} />
+          )}
+
+          {/* ── Legacy uloha fallback (kept as reference, guarded to not render) ─ */}
+          {false && form.exerciseType === 'uloha_1_topic_answers' ? (
             <label style={{ display: 'grid', gap: 6 }}>
               <span style={fieldLabelStyle}>{S.exercise.fieldQuestionPrompts}</span>
               <textarea
@@ -1570,78 +1597,9 @@ export function ExerciseDashboard() {
             </>
           )}
 
-          {form.exerciseType === 'psani_1_formular' ? (
-            <>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Câu hỏi (1 câu/dòng, cần đúng 3 câu)</span>
-                <textarea
-                  rows={5}
-                  value={form.formularQuestions}
-                  onChange={(e) => setForm({ ...form, formularQuestions: e.target.value })}
-                  style={fieldStyle}
-                  placeholder={'Câu hỏi 1\nCâu hỏi 2\nCâu hỏi 3'}
-                />
-                <span style={fieldHintStyle}>Mỗi câu trả lời phải có ít nhất {form.formularMinWords} từ.</span>
-              </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Số từ tối thiểu / câu</span>
-                <input
-                  type="number"
-                  min={5}
-                  max={50}
-                  value={form.formularMinWords}
-                  onChange={(e) => setForm({ ...form, formularMinWords: Number(e.target.value) })}
-                  style={fieldStyle}
-                />
-              </label>
-            </>
-          ) : form.exerciseType === 'psani_2_email' ? (
-            <>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Bối cảnh (context prompt)</span>
-                <textarea
-                  rows={3}
-                  value={form.emailPrompt}
-                  onChange={(e) => setForm({ ...form, emailPrompt: e.target.value })}
-                  style={fieldStyle}
-                  placeholder="Jste na dovolené a chcete napsat své kamarádce."
-                />
-              </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Chủ đề theo ảnh (1 chủ đề/dòng, cần 5 dòng)</span>
-                <textarea
-                  rows={6}
-                  value={form.emailTopics}
-                  onChange={(e) => setForm({ ...form, emailTopics: e.target.value })}
-                  style={fieldStyle}
-                  placeholder={'KDE JSTE?\nJAK DLOUHO TAM JSTE?\nKDE BYDLÍTE?\nCO DĚLÁTE DOPOLEDNE?\nCO DĚLÁTE ODPOLEDNE?'}
-                />
-                <span style={fieldHintStyle}>Mỗi dòng tương ứng với 1 ảnh gợi ý.</span>
-              </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Asset IDs ảnh gợi ý (1 id/dòng)</span>
-                <textarea
-                  rows={6}
-                  value={form.imageAssetIds}
-                  onChange={(e) => setForm({ ...form, imageAssetIds: e.target.value })}
-                  style={fieldStyle}
-                  placeholder="Upload ảnh bên dưới rồi copy asset id vào đây."
-                />
-                <span style={fieldHintStyle}>Cần 5 ảnh. Thứ tự tương ứng với thứ tự chủ đề bên trên.</span>
-              </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>Số từ tối thiểu tổng cộng</span>
-                <input
-                  type="number"
-                  min={20}
-                  max={100}
-                  value={form.emailMinWords}
-                  onChange={(e) => setForm({ ...form, emailMinWords: Number(e.target.value) })}
-                  style={fieldStyle}
-                />
-              </label>
-            </>
-          ) : null}
+          {(form.exerciseType === 'psani_1_formular' || form.exerciseType === 'psani_2_email') && (
+            <WritingFields form={form as never} setForm={setForm as never} />
+          )}
 
           {form.exerciseType.startsWith('poslech_') ? (
             <PoslechFieldsNew
@@ -1667,7 +1625,11 @@ export function ExerciseDashboard() {
           ) : null}
 
           {form.exerciseType.startsWith('cteni_') ? (
-            <CteniFields form={form} setForm={setForm} />
+            <CteniFieldsNew
+              exerciseType={form.exerciseType as 'cteni_1' | 'cteni_2' | 'cteni_3' | 'cteni_4' | 'cteni_5'}
+              initialData={form.typePayload ?? {}}
+              onChange={payload => setForm(f => ({ ...f, typePayload: payload }))}
+            />
           ) : null}
 
           {(form.exerciseType === 'uloha_3_story_narration' ||
