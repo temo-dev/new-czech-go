@@ -137,8 +137,8 @@ Important current limitations:
 - learner-surface feedback copy and `sample_answer_text` coverage for `Uloha 3` and `Uloha 4` lighter than `Uloha 1` / `Uloha 2`
 - **Postgres DB hiện đang trống** — admin cần nhập nội dung qua CMS trước khi test Flutter end-to-end
 - Listening exercise audio: `GET /v1/exercises/:id/audio` dùng in-memory store, không persist qua restart (cần Postgres backing)
-- V5 FullExamIntroScreen mark section "done" bằng placeholder, không capture real attempt_id; link ústní session cần làm tay
 - `full_exam_sessions` table chỉ in-memory, chưa có Postgres store (migration 011 tồn tại nhưng chưa wired)
+- V5 ústní session không auto-link với písemná session sau khi speaking mock exam hoàn tất
 
 ## Working Rules
 - Build in thin vertical slices.
@@ -224,17 +224,15 @@ V2 Writing ✅ V3 Listening ✅ V4 Reading ✅ V5 Full MockTest (MVP) ✅ — t�
 Backlog ưu tiên cao (xem `tasks/todo.md`):
 
 **V5 hardening:**
-1. Capture real attempt_id trong `FullExamIntroScreen` (hiện dùng placeholder `done-N`)
-2. Postgres backing cho `full_exam_sessions` (migration 011 đã có, cần wired vào store)
-3. Auto-link ústní session sau khi MockExamSession speaking hoàn tất
+1. Postgres backing cho `full_exam_sessions` (migration 011 đã có, cần wired vào store)
+2. Auto-link ústní session sau khi MockExamSession speaking hoàn tất
 
 **Infrastructure:**
-4. Postgres backing cho `exercise_audio` (migration 010 đã có)
-5. Polly 2 voices cho `poslech_4` dialogs (hiện 1 voice Option B)
+3. Postgres backing cho `exercise_audio` (migration 010 đã có)
+4. Polly 2 voices cho `poslech_4` dialogs (hiện 1 voice Option B)
 
 **Content:**
-6. Nhập nội dung mẫu qua CMS: ít nhất 1 exercise mỗi loại để test end-to-end
-7. Flutter i18n keys cho V2/V3/V4 screens (hiện hardcode Vietnamese UI strings)
+5. Nhập nội dung mẫu qua CMS: ít nhất 1 exercise mỗi loại để test end-to-end
 
 Full plan: `tasks/plan.md` + `tasks/todo.md` + `SPEC.md`.
 

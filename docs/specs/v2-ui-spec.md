@@ -14,13 +14,15 @@ Source: `docs/design/czech-app-2/` handoff bundle (claude.ai/design, 2026-04-27)
 
 ## 2. Navigation Architecture
 
-### Bottom Tabs (chỉ 2 tabs)
-| Tab | Screens trong stack |
-|---|---|
-| `home` | CourseList → ModuleList → ModuleDetail → ExerciseList → Exercise → Result |
-| `history` | HistoryScreen → Result |
+### Bottom Tabs (4 tabs)
+| Index | Tab | Screens trong stack |
+|---|---|---|
+| 0 | `home` | CourseList → CourseDetail → ModuleDetail → ExerciseList → Exercise → Result |
+| 1 | `history` | HistoryScreen → Result |
+| 2 | `mock` | MockTestList → MockTestIntro → MockExam → Result |
+| 3 | `profile` | ProfileScreen |
 
-**Tabs ẩn trên:** `exercise`, `analyzing`, `mock-exam`, `mock-intro`
+**Tabs ẩn trên:** `exercise`, `analyzing`, `mock-exam`, `mock-intro`, `full-exam-intro`, `full-exam-result`
 
 ### Full Route Map
 ```
