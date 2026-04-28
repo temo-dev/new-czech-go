@@ -71,10 +71,10 @@ source traceability on exercises, quizcard completion-only, 1-active-job-per-adm
 Chi tiết + AC đầy đủ trong `tasks/plan-admin-auth.md`.  
 Design: env-configured credentials → opaque token (crypto/rand) → HTTP-only cookie → CMS login page
 
-- [ ] **A1** Backend: `ADMIN_EMAIL`/`ADMIN_PASSWORD` env vars + `crypto/rand` token + 24h TTL expiry trong `UserByToken` (thay hardcoded "demo123"/"dev-admin-token")
-- [ ] **A2** CMS: `/login` page (email+password form) + `POST /api/auth/login` proxy route (set HTTP-only cookie) + `GET /api/auth/logout` (clear cookie)
-- [ ] **A3** CMS: thay `cms/middleware.ts` Basic Auth bằng cookie `admin_token` guard → redirect `/login` nếu missing
-- [ ] **A4** CMS: helper `cms/lib/auth.ts` `getAdminToken(req)` + thread token qua tất cả 15 proxy routes (xóa hardcoded `CMS_ADMIN_TOKEN` module-level const)
+- [x] **A1** Backend: `ADMIN_EMAIL`/`ADMIN_PASSWORD` env vars + `crypto/rand` token + 24h TTL expiry trong `UserByToken` (thay hardcoded "demo123"/"dev-admin-token") (2026-04-28)
+- [x] **A2** CMS: `/login` page (email+password form) + `POST /api/auth/login` proxy route (set HTTP-only cookie) + `GET /api/auth/logout` (clear cookie) (2026-04-28)
+- [x] **A3** CMS: thay `cms/middleware.ts` Basic Auth bằng cookie `admin_token` guard → redirect `/login` nếu missing (2026-04-28)
+- [x] **A4** CMS: helper `cms/lib/auth.ts` `getAdminToken(req)` + thread token qua 21 proxy routes (xóa hardcoded `CMS_ADMIN_TOKEN` module-level const) (2026-04-28)
 
 **[CHECKPOINT A]** `make verify` + manual: login → CRUD → logout → redirect to /login
 
