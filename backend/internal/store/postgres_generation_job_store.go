@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
@@ -40,7 +41,7 @@ func (s *postgresGenerationJobStore) CreateJob(job contracts.ContentGenerationJo
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	s.db.ExecContext(ctx,
+	_, insertErr := s.db.ExecContext(ctx,
 		`INSERT INTO content_generation_jobs
 		    (id, module_id, skill_id, source_type, source_id, requested_by,
 		     input_payload_json, status, provider, model)
@@ -48,8 +49,13 @@ func (s *postgresGenerationJobStore) CreateJob(job contracts.ContentGenerationJo
 		job.ID, job.ModuleID, job.SkillID, job.SourceType, job.SourceID,
 		job.RequestedBy, job.InputPayload, job.Status, job.Provider, job.Model,
 	)
-	got, _ := s.GetJob(job.ID)
-	return got
+	if insertErr != nil {
+		log.Printf("CreateJob INSERT failed for %s: %v", job.ID, insertErr)
+	}
+	// Return the job directly — do NOT re-fetch via GetJob.
+	// GetJob can fail on scan type mismatches, returning an empty ID that
+	// causes the goroutine to call UpdateJob with "" and silently no-op.
+	return job
 }
 
 func (s *postgresGenerationJobStore) GetJob(id string) (contracts.ContentGenerationJob, bool) {
