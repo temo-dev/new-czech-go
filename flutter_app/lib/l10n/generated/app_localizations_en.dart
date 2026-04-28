@@ -748,4 +748,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exerciseOpenError => 'Cannot open exercise. Please try again.';
+
+  @override
+  String get vocabKnown => 'Got it';
+
+  @override
+  String get vocabReview => 'Review';
+
+  @override
+  String get vocabFlip => 'Tap to see answer';
+
+  @override
+  String get vocabDone => 'Noted!';
+
+  @override
+  String get vocabMatchInstruction => 'Match each term to its definition';
+
+  @override
+  String get vocabFillInstruction => 'Fill in the blank';
+
+  @override
+  String get vocabChoiceInstruction => 'Choose the correct word';
+
+  @override
+  String get vocabExplanation => 'Explanation';
 }

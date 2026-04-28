@@ -10,6 +10,7 @@ import '../../../models/models.dart';
 import '../../exercise/screens/exercise_screen.dart' as exercise_feature;
 import '../../exercise/screens/listening_exercise_screen.dart';
 import '../../exercise/screens/reading_exercise_screen.dart';
+import '../../exercise/screens/vocab_grammar_exercise_screen.dart';
 import '../../exercise/screens/writing_exercise_screen.dart';
 
 class ExerciseListScreen extends StatefulWidget {
@@ -93,6 +94,17 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
       return;
     }
 
+    // Route V6 vocab/grammar exercises to VocabGrammarExerciseScreen.
+    if (detail.isVocabGrammar) {
+      // ignore: use_build_context_synchronously
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VocabGrammarExerciseScreen(client: widget.client, detail: detail),
+        ),
+      );
+      return;
+    }
+
     final idx = _exercises.indexOf(exercise);
     final next = (idx >= 0 && idx + 1 < _exercises.length) ? _exercises[idx + 1] : null;
     if (!mounted) return;
@@ -118,11 +130,13 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
 
   static bool _exerciseMatchesSkillKind(String exerciseType, String skillKind) {
     switch (skillKind) {
-      case 'noi':  return exerciseType.startsWith('uloha_');
-      case 'viet': return exerciseType.startsWith('psani_');
-      case 'nghe': return exerciseType.startsWith('poslech_');
-      case 'doc':  return exerciseType.startsWith('cteni_');
-      default:     return true;
+      case 'noi':      return exerciseType.startsWith('uloha_');
+      case 'viet':     return exerciseType.startsWith('psani_');
+      case 'nghe':     return exerciseType.startsWith('poslech_');
+      case 'doc':      return exerciseType.startsWith('cteni_');
+      case 'tu_vung':  return ['quizcard_basic', 'matching', 'fill_blank', 'choice_word'].contains(exerciseType);
+      case 'ngu_phap': return ['matching', 'fill_blank', 'choice_word'].contains(exerciseType);
+      default:         return true;
     }
   }
 

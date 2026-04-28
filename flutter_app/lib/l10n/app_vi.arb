@@ -346,5 +346,14 @@
     "exerciseListDailySprintTitle": "Luyện tập hàng ngày",
     "exerciseListDailySprintSubtitle": "Luyện tất cả bài tập cùng lúc và nhận phản hồi ngay từ AI coach.",
     "exerciseListDailySprintCta": "Bắt đầu tất cả",
-    "exerciseOpenError": "Không thể mở bài tập. Vui lòng thử lại."
+    "exerciseOpenError": "Không thể mở bài tập. Vui lòng thử lại.",
+
+    "vocabKnown": "Đã biết",
+    "vocabReview": "Ôn lại",
+    "vocabFlip": "Nhấn để xem đáp án",
+    "vocabDone": "Ghi nhận!",
+    "vocabMatchInstruction": "Ghép từ với nghĩa tương ứng",
+    "vocabFillInstruction": "Điền từ thích hợp vào chỗ trống",
+    "vocabChoiceInstruction": "Chọn từ đúng để hoàn thành câu",
+    "vocabExplanation": "Giải thích"
 }

@@ -748,4 +748,28 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get exerciseOpenError => 'Không thể mở bài tập. Vui lòng thử lại.';
+
+  @override
+  String get vocabKnown => 'Đã biết';
+
+  @override
+  String get vocabReview => 'Ôn lại';
+
+  @override
+  String get vocabFlip => 'Nhấn để xem đáp án';
+
+  @override
+  String get vocabDone => 'Ghi nhận!';
+
+  @override
+  String get vocabMatchInstruction => 'Ghép từ với nghĩa tương ứng';
+
+  @override
+  String get vocabFillInstruction => 'Điền từ thích hợp vào chỗ trống';
+
+  @override
+  String get vocabChoiceInstruction => 'Chọn từ đúng để hoàn thành câu';
+
+  @override
+  String get vocabExplanation => 'Giải thích';
 }

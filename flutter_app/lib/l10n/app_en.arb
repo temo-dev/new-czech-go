@@ -301,5 +301,14 @@
     "exerciseListDailySprintTitle": "Daily Sprint",
     "exerciseListDailySprintSubtitle": "Practice all exercises at once and get instant AI coach feedback.",
     "exerciseListDailySprintCta": "Start all",
-    "exerciseOpenError": "Cannot open exercise. Please try again."
+    "exerciseOpenError": "Cannot open exercise. Please try again.",
+
+    "vocabKnown": "Got it",
+    "vocabReview": "Review",
+    "vocabFlip": "Tap to see answer",
+    "vocabDone": "Noted!",
+    "vocabMatchInstruction": "Match each term to its definition",
+    "vocabFillInstruction": "Fill in the blank",
+    "vocabChoiceInstruction": "Choose the correct word",
+    "vocabExplanation": "Explanation"
 }

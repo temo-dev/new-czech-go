@@ -1444,6 +1444,54 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Không thể mở bài tập. Vui lòng thử lại.'**
   String get exerciseOpenError;
+
+  /// No description provided for @vocabKnown.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã biết'**
+  String get vocabKnown;
+
+  /// No description provided for @vocabReview.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ôn lại'**
+  String get vocabReview;
+
+  /// No description provided for @vocabFlip.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nhấn để xem đáp án'**
+  String get vocabFlip;
+
+  /// No description provided for @vocabDone.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ghi nhận!'**
+  String get vocabDone;
+
+  /// No description provided for @vocabMatchInstruction.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ghép từ với nghĩa tương ứng'**
+  String get vocabMatchInstruction;
+
+  /// No description provided for @vocabFillInstruction.
+  ///
+  /// In vi, this message translates to:
+  /// **'Điền từ thích hợp vào chỗ trống'**
+  String get vocabFillInstruction;
+
+  /// No description provided for @vocabChoiceInstruction.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chọn từ đúng để hoàn thành câu'**
+  String get vocabChoiceInstruction;
+
+  /// No description provided for @vocabExplanation.
+  ///
+  /// In vi, this message translates to:
+  /// **'Giải thích'**
+  String get vocabExplanation;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
