@@ -20,10 +20,12 @@ class VocabGrammarExerciseScreen extends StatefulWidget {
     super.key,
     required this.client,
     required this.detail,
+    this.onOpenNext,
   });
 
   final ApiClient client;
   final ExerciseDetail detail;
+  final VoidCallback? onOpenNext;
 
   @override
   State<VocabGrammarExerciseScreen> createState() => _VocabGrammarExerciseScreenState();
@@ -108,10 +110,16 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
               const SizedBox(height: 12),
               Text(l.vocabDone, style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 24),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Tiếp tục'),
-              ),
+              if (widget.onOpenNext != null)
+                FilledButton(
+                  onPressed: widget.onOpenNext,
+                  child: const Text('Bài tiếp theo →'),
+                )
+              else
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Tiếp tục'),
+                ),
             ],
           ),
         ),
@@ -135,7 +143,7 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
               children: [
                 ObjectiveResultCard(
                   result: _result!,
-                  onRetry: () => Navigator.of(context).pop(),
+                  onRetry: () => setState(() { _result = null; _answers.clear(); _fillController.clear(); }),
                 ),
                 // Show explanation if available
                 if (d.fillBlankExplanation.isNotEmpty || d.choiceWordExplanation.isNotEmpty) ...[
@@ -144,6 +152,17 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
                     explanation: d.isFillBlank ? d.fillBlankExplanation : d.choiceWordExplanation,
                     note: d.isChoiceWord ? d.choiceWordGrammarNote : null,
                     l: l,
+                  ),
+                ],
+                // Next exercise button
+                if (widget.onOpenNext != null) ...[
+                  const SizedBox(height: AppSpacing.x4),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: widget.onOpenNext,
+                      child: const Text('Bài tiếp theo →'),
+                    ),
                   ),
                 ],
               ],

@@ -94,19 +94,24 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
       return;
     }
 
+    final idx = _exercises.indexOf(exercise);
+    final next = (idx >= 0 && idx + 1 < _exercises.length) ? _exercises[idx + 1] : null;
+
     // Route V6 vocab/grammar exercises to VocabGrammarExerciseScreen.
     if (detail.isVocabGrammar) {
+      if (!mounted) return;
       // ignore: use_build_context_synchronously
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => VocabGrammarExerciseScreen(client: widget.client, detail: detail),
+          builder: (ctx) => VocabGrammarExerciseScreen(
+            client: widget.client,
+            detail: detail,
+            onOpenNext: next == null ? null : () => _openExercise(ctx, next),
+          ),
         ),
       );
       return;
     }
-
-    final idx = _exercises.indexOf(exercise);
-    final next = (idx >= 0 && idx + 1 < _exercises.length) ? _exercises[idx + 1] : null;
     if (!mounted) return;
     // ignore: use_build_context_synchronously
     await Navigator.of(context).push(
