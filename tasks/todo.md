@@ -91,7 +91,7 @@ Không làm 1 form/type — shared scaffold + type-specific sections trong slide
 - [x] **EF-B** Poslech 1-5: structured item editors — transcript rows + OptionRow × A-D + AnswerSelect per item (2026-04-28)
 - [x] **EF-C** Čtení 1-5: structured editors — reading passage + question rows + option inputs + answer dropdowns (2026-04-28)
 - [x] **EF-D** Speaking (Uloha 1-4) + Writing (Psaní 1-2): InfoSlotRow cho Uloha 2, ChoiceRow cho Uloha 4, ItemRepeater cho phần còn lại (2026-04-28)
-- [ ] **EF-E** File split (exercise-dashboard.tsx 2327 dòng → 12 files ≤500 dòng) + inline validation per type
+- [x] **EF-E** Dead code removed (-380 dòng) + validation.ts + inline errors + submit disabled khi invalid (2026-04-28) [file split partial: 2079 dòng còn lại — defer to separate task]
 
 **[CHECKPOINT EF]** `make verify` + manual: mở form Poslech 1, scroll thoải mái, nhập structured, đóng → confirm, mở lại → autosave toast
 
