@@ -859,9 +859,17 @@ export function ExerciseDashboard() {
 
   async function loadAllSkills() {
     try {
-      const res = await fetch('/api/admin/skills');
-      const j = await res.json();
-      setAllSkills(j.data ?? []);
+      const [skillsRes, modulesRes] = await Promise.all([
+        fetch('/api/admin/skills'),
+        fetch('/api/admin/modules'),
+      ]);
+      const [skillsJ, modulesJ] = await Promise.all([skillsRes.json(), modulesRes.json()]);
+      setAllSkills(skillsJ.data ?? []);
+      setAvailableModules(prev => {
+        const merged = new Map(prev.map((m: CmsModule) => [m.id, m]));
+        for (const m of (modulesJ.data ?? [])) merged.set(m.id, m);
+        return Array.from(merged.values());
+      });
     } catch { /* non-fatal */ }
   }
 
@@ -1063,7 +1071,7 @@ export function ExerciseDashboard() {
             {allSkills.length === 0 ? (
               <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Chưa có kỹ năng nào. Tạo skill trong Module trước.</p>
             ) : (
-              <div style={{ display: 'grid', gap: 8 }}>
+              <div style={{ display: 'grid', gap: 12 }}>
                 {(['noi', 'viet', 'nghe', 'doc'] as const).map(kind => {
                   const kindSkills = allSkills.filter(s => s.skill_kind === kind);
                   if (kindSkills.length === 0) return null;
@@ -1073,9 +1081,10 @@ export function ExerciseDashboard() {
                       <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: meta.color, textTransform: 'uppercase', letterSpacing: 0.8 }}>
                         {meta.icon} {meta.label}
                       </p>
-                      <div style={{ display: 'grid', gap: 6 }}>
+                      <div style={{ display: 'grid', gap: 4 }}>
                         {kindSkills.map(sk => {
-                          const mod = availableModules.find(m => m.id === sk.module_id);
+                          const mod = availableModules.find((m: CmsModule) => m.id === sk.module_id);
+                          const modLabel = mod?.title ?? `…${sk.module_id.slice(-8)}`;
                           return (
                             <button
                               key={sk.id}
@@ -1084,10 +1093,10 @@ export function ExerciseDashboard() {
                                 setForm(f => ({ ...f, skillId: sk.id, moduleId: sk.module_id, exerciseType: SKILL_KIND_EXERCISE_TYPES[kind]?.[0] ?? f.exerciseType }));
                                 setWizardStep('type');
                               }}
-                              style={{ textAlign: 'left', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface-muted)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                              style={{ textAlign: 'left', padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-muted)', cursor: 'pointer' }}
                             >
-                              <span style={{ fontWeight: 600, fontSize: 14 }}>{sk.title}</span>
-                              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{mod?.title ?? sk.module_id}</span>
+                              <div style={{ fontWeight: 600, fontSize: 13 }}>{sk.title}</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>Module: {modLabel}</div>
                             </button>
                           );
                         })}
