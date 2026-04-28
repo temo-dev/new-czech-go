@@ -63,8 +63,11 @@ export function ModuleDashboard() {
 
   async function del(id: string) {
     if (!confirm('Delete this module?')) return;
-    try { await fetch(`${API}/${id}`, { method: 'DELETE' }); await load(); }
-    catch { setError('Delete failed'); }
+    try {
+      const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json()).error?.message ?? 'Delete failed');
+      await load();
+    } catch (err) { setError(err instanceof Error ? err.message : 'Delete failed'); }
   }
 
   const courseTitle = (id: string) => courses.find(c => c.id === id)?.title ?? id;

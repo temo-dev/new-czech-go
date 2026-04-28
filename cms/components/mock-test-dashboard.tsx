@@ -92,9 +92,10 @@ export function MockTestDashboard() {
     try {
       const res = await fetch(MOCK_TEST_API);
       const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message ?? 'Failed to load mock tests.');
       setTests(json.data ?? []);
-    } catch {
-      setError('Failed to load mock tests.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load mock tests.');
     } finally {
       setLoading(false);
     }

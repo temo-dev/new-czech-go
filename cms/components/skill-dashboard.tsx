@@ -77,8 +77,11 @@ export function SkillDashboard() {
 
   async function del(id: string) {
     if (!confirm('Delete this skill?')) return;
-    try { await fetch(`${SKILLS_API}/${id}`, { method: 'DELETE' }); await loadSkills(filterModule); }
-    catch { setError('Delete failed'); }
+    try {
+      const res = await fetch(`${SKILLS_API}/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json()).error?.message ?? 'Delete failed');
+      await loadSkills(filterModule);
+    } catch (err) { setError(err instanceof Error ? err.message : 'Delete failed'); }
   }
 
   return (
