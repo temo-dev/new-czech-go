@@ -1364,6 +1364,7 @@ export function ExerciseDashboard() {
                               type="button"
                               onClick={() => {
                                 setForm(f => ({ ...f, skillId: sk.id, moduleId: sk.module_id, exerciseType: SKILL_KIND_EXERCISE_TYPES[kind]?.[0] ?? f.exerciseType }));
+                                loadSkillsForModule(sk.module_id);
                                 setWizardStep('type');
                               }}
                               style={{ textAlign: 'left', padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-muted)', cursor: 'pointer' }}
