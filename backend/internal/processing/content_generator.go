@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
@@ -59,10 +60,14 @@ type ClaudeContentGenerator struct {
 	client *http.Client
 }
 
+// contentGenerationTimeout is separate from llmRequestTimeout (30s for feedback).
+// Content generation can produce 20-40 exercises in one call — needs 2-3 minutes.
+const contentGenerationTimeout = 180 * time.Second
+
 func NewClaudeContentGenerator(apiKey string) *ClaudeContentGenerator {
 	return &ClaudeContentGenerator{
 		apiKey: apiKey,
-		client: &http.Client{Timeout: llmRequestTimeout},
+		client: &http.Client{Timeout: contentGenerationTimeout},
 	}
 }
 

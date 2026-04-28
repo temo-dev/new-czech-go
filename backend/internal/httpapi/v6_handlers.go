@@ -424,7 +424,7 @@ func (s *Server) handlePublishGenJob(w http.ResponseWriter, jobID string) {
 func (s *Server) runGenerationJob(jobID string, req contracts.GenerationJobInput) {
 	s.repo.UpdateGenerationJobRunning(jobID)
 	start := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Second)
 	defer cancel()
 
 	var payload *contracts.GeneratedPayload
