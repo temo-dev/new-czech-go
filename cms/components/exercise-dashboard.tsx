@@ -1287,180 +1287,13 @@ export function ExerciseDashboard() {
             </div>
           ) : null}
 
-          {/* Tab bar */}
-          <div style={{
-            display: 'flex',
-            gap: 2,
-            padding: 4,
-            background: 'rgba(20,18,14,0.05)',
-            borderRadius: 999,
-            marginBottom: 4,
-          }}>
-            {[S.exercise.tabPrompt, S.exercise.tabSample, S.exercise.tabMetadata].map((tab, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setFormTab(i)}
-                style={{
-                  flex: 1,
-                  padding: '8px 0',
-                  borderRadius: 999,
-                  border: 'none',
-                  background: formTab === i ? 'var(--surface)' : 'transparent',
-                  color: formTab === i ? 'var(--ink)' : 'var(--ink-3)',
-                  fontWeight: formTab === i ? 600 : 400,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  boxShadow: formTab === i ? '0 1px 4px rgba(40,28,16,0.10)' : 'none',
-                  transition: 'all 120ms ease',
-                }}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
+          {/* ── Section: Type-specific content (FIRST) ─────────────────── */}
+          <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16, marginBottom: 4 }}>
+            <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 700, letterSpacing: 0.8, color: 'var(--ink-3)', textTransform: 'uppercase' }}>
+              Nội dung bài tập
+            </p>
 
-          {formTab === 0 && <>
-          <label style={{ display: 'grid', gap: 6 }}>
-            <span style={fieldLabelStyle}>{S.exercise.fieldTaskType}</span>
-            <select
-              value={form.exerciseType}
-              onChange={(event) =>
-                setForm({ ...form, exerciseType: event.target.value as ExerciseType })
-              }
-              style={fieldStyle}
-            >
-              {exerciseTypeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label} - {option.hint}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label style={{ display: 'grid', gap: 6 }}>
-            <span style={fieldLabelStyle}>{S.exercise.fieldTitle}</span>
-            <input
-              value={form.title}
-              onChange={(event) => setForm({ ...form, title: event.target.value })}
-              style={fieldStyle}
-            />
-          </label>
-
-          <label style={{ display: 'grid', gap: 6 }}>
-            <span style={fieldLabelStyle}>{S.exercise.fieldShortInstruction}</span>
-            <input
-              value={form.shortInstruction}
-              onChange={(event) =>
-                setForm({ ...form, shortInstruction: event.target.value })
-              }
-              style={fieldStyle}
-            />
-          </label>
-
-          <label style={{ display: 'grid', gap: 6 }}>
-            <span style={fieldLabelStyle}>{S.exercise.fieldLearnerInstruction}</span>
-            <textarea
-              rows={4}
-              value={form.learnerInstruction}
-              onChange={(event) =>
-                setForm({ ...form, learnerInstruction: event.target.value })
-              }
-              style={fieldStyle}
-            />
-          </label>
-
-          </>} {/* end formTab === 0 prompt fields */}
-
-          {formTab === 1 && <>
-          <label style={{ display: 'grid', gap: 6 }}>
-            <span style={fieldLabelStyle}>{S.exercise.fieldSampleAnswer}</span>
-            <textarea
-              rows={4}
-              value={form.sampleAnswerText}
-              onChange={(event) =>
-                setForm({ ...form, sampleAnswerText: event.target.value })
-              }
-              style={fieldStyle}
-              placeholder="Optional. Authored Czech model answer shown in review. Leave blank to auto-generate."
-            />
-            <span style={fieldHintStyle}>
-              When set, this overrides rule-based and LLM-generated model answers in the learner review.
-            </span>
-          </label>
-
-          </>} {/* end formTab === 1 sample fields */}
-
-          {formTab === 2 && (
-          <>{/* Module + Skill — only for pool=course */}
-          {form.pool === 'course' && (
-            <>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>{S.exercise.fieldModule}</span>
-                <select
-                  value={form.moduleId}
-                  onChange={(e) => handleModuleChange(e.target.value)}
-                  style={fieldStyle}
-                >
-                  <option value="">{S.pick.module}</option>
-                  {availableModules.map(m => (
-                    <option key={m.id} value={m.id}>{m.title}</option>
-                  ))}
-                </select>
-                <span style={fieldHintStyle}>Exercise belongs to this module&apos;s skill.</span>
-              </label>
-              <label style={{ display: 'grid', gap: 6 }}>
-                <span style={fieldLabelStyle}>{S.exercise.fieldSkill}</span>
-                <select
-                  value={form.skillId}
-                  onChange={(e) => handleSkillChange(e.target.value)}
-                  style={fieldStyle}
-                  disabled={availableSkills.length === 0}
-                >
-                  <option value="">{S.pick.skill}</option>
-                  {availableSkills.map(s => (
-                    <option key={s.id} value={s.id}>{s.title} ({s.skill_kind})</option>
-                  ))}
-                </select>
-                <span style={fieldHintStyle}>Select a module first to load its skills.</span>
-              </label>
-            </>
-          )}
-
-          <label style={{ display: 'grid', gap: 6 }}>
-            <span style={fieldLabelStyle}>{S.exercise.fieldStatus}</span>
-            <select
-              value={form.status}
-              onChange={(event) => setForm({ ...form, status: event.target.value })}
-              style={fieldStyle}
-            >
-              <option value="draft">draft</option>
-              <option value="published">published</option>
-              <option value="archived">archived</option>
-            </select>
-            <span style={fieldHintStyle}>
-              Only published exercises are surfaced to learners on the home screen. Archived items are hidden.
-            </span>
-          </label>
-
-          <label style={{ display: 'grid', gap: 6 }}>
-            <span style={fieldLabelStyle}>{S.exercise.fieldPool}</span>
-            <select
-              value={form.pool}
-              onChange={(event) => setForm({ ...form, pool: event.target.value })}
-              style={fieldStyle}
-            >
-              <option value="course">Bài luyện khóa học (course)</option>
-              <option value="exam">Bài thi mock exam (exam)</option>
-            </select>
-            <span style={fieldHintStyle}>
-              course = dùng trong Course → Skill. exam = dùng trong MockTest → Section. Hai pool không dùng chung.
-            </span>
-          </label>
-
-          </> )} {/* end formTab === 2 metadata */}
-
-          {formTab === 0 && <>{form.exerciseType === 'uloha_1_topic_answers' ? (
+          {form.exerciseType === 'uloha_1_topic_answers' ? (
             <label style={{ display: 'grid', gap: 6 }}>
               <span style={fieldLabelStyle}>{S.exercise.fieldQuestionPrompts}</span>
               <textarea
@@ -1849,7 +1682,90 @@ export function ExerciseDashboard() {
                 </>
               )}
             </section>
-          ) : null}</>} {/* end formTab === 0 task-specific fields */}
+          ) : null}
+          </div>{/* end type-specific section */}
+
+          {/* ── Section: Thông tin chung ─────────────────────────────────── */}
+          <div style={{ display: 'grid', gap: 12 }}>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: 0.8, color: 'var(--ink-3)', textTransform: 'uppercase' }}>
+              Thông tin chung
+            </p>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={fieldLabelStyle}>{S.exercise.fieldTitle} *</span>
+              <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} style={fieldStyle} />
+            </label>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={fieldLabelStyle}>{S.exercise.fieldShortInstruction}</span>
+              <input value={form.shortInstruction} onChange={e => setForm({ ...form, shortInstruction: e.target.value })} style={fieldStyle} />
+            </label>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={fieldLabelStyle}>{S.exercise.fieldLearnerInstruction}</span>
+              <textarea rows={3} value={form.learnerInstruction} onChange={e => setForm({ ...form, learnerInstruction: e.target.value })} style={fieldStyle} />
+            </label>
+          </div>
+
+          {/* ── Section: Bài mẫu (collapsible) ──────────────────────────── */}
+          <details style={{ borderRadius: 12, border: '1px solid var(--border)', padding: '0' }}>
+            <summary style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ink-2)', userSelect: 'none', listStyle: 'none', display: 'flex', justifyContent: 'space-between' }}>
+              <span>📝 Bài mẫu <span style={{ fontWeight: 400, color: 'var(--ink-4)' }}>(tùy chọn)</span></span>
+              <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>▼</span>
+            </summary>
+            <div style={{ padding: '0 14px 14px', display: 'grid', gap: 8 }}>
+              <textarea
+                rows={4}
+                value={form.sampleAnswerText}
+                onChange={e => setForm({ ...form, sampleAnswerText: e.target.value })}
+                style={fieldStyle}
+                placeholder="Câu trả lời mẫu tiếng Czech. Để trống để AI tự sinh."
+              />
+              <span style={fieldHintStyle}>Override LLM/rule-based model answer trong review artifact của học viên.</span>
+            </div>
+          </details>
+
+          {/* ── Section: Cài đặt xuất bản (collapsible, open by default) ── */}
+          <details open style={{ borderRadius: 12, border: '1px solid var(--border)' }}>
+            <summary style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ink-2)', userSelect: 'none', listStyle: 'none', display: 'flex', justifyContent: 'space-between' }}>
+              <span>⚙️ Cài đặt xuất bản</span>
+              <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>▼</span>
+            </summary>
+            <div style={{ padding: '0 14px 14px', display: 'grid', gap: 12 }}>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>{S.exercise.fieldStatus} *</span>
+                <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={fieldStyle}>
+                  <option value="draft">Bản nháp (draft)</option>
+                  <option value="published">Xuất bản (published)</option>
+                  <option value="archived">Lưu trữ (archived)</option>
+                </select>
+                <span style={fieldHintStyle}>Chỉ published mới hiện trên Flutter app.</span>
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={fieldLabelStyle}>{S.exercise.fieldPool}</span>
+                <select value={form.pool} onChange={e => setForm({ ...form, pool: e.target.value })} style={fieldStyle}>
+                  <option value="course">Bài luyện khóa học (course)</option>
+                  <option value="exam">Bài thi mock exam (exam)</option>
+                </select>
+              </label>
+              {form.pool === 'course' && (
+                <>
+                  <label style={{ display: 'grid', gap: 6 }}>
+                    <span style={fieldLabelStyle}>{S.exercise.fieldModule}</span>
+                    <select value={form.moduleId} onChange={e => handleModuleChange(e.target.value)} style={fieldStyle}>
+                      <option value="">{S.pick.module}</option>
+                      {availableModules.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
+                    </select>
+                  </label>
+                  <label style={{ display: 'grid', gap: 6 }}>
+                    <span style={fieldLabelStyle}>{S.exercise.fieldSkill}</span>
+                    <select value={form.skillId} onChange={e => handleSkillChange(e.target.value)} style={fieldStyle} disabled={availableSkills.length === 0}>
+                      <option value="">{S.pick.skill}</option>
+                      {availableSkills.map(s => <option key={s.id} value={s.id}>{s.title} ({s.skill_kind})</option>)}
+                    </select>
+                    <span style={fieldHintStyle}>Chọn module trước để load skills.</span>
+                  </label>
+                </>
+              )}
+            </div>
+          </details>
 
           <button
             type="submit"
