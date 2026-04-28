@@ -46,7 +46,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
     }
   }
 
-  Future<void> _openExercise(BuildContext context, ExerciseSummary exercise) async {
+  Future<void> _openExercise(BuildContext context, ExerciseSummary exercise, {bool replace = false}) async {
     final ExerciseDetail detail;
     try {
       detail = ExerciseDetail.fromJson(await widget.client.getExercise(exercise.id));
@@ -98,18 +98,27 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
     final next = (idx >= 0 && idx + 1 < _exercises.length) ? _exercises[idx + 1] : null;
 
     // Route V6 vocab/grammar exercises to VocabGrammarExerciseScreen.
+    // Use pushReplacement for subsequent exercises so the stack stays flat:
+    //   ExerciseList → CurrentExercise (never deeper).
+    // Without this, pop from the last exercise returns to previous result screens
+    // which still show "Bài tiếp theo →" → infinite loop.
     if (detail.isVocabGrammar) {
       if (!mounted) return;
-      // ignore: use_build_context_synchronously
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (ctx) => VocabGrammarExerciseScreen(
-            client: widget.client,
-            detail: detail,
-            onOpenNext: next == null ? null : () => _openExercise(ctx, next),
-          ),
+      final route = MaterialPageRoute(
+        builder: (ctx) => VocabGrammarExerciseScreen(
+          client: widget.client,
+          detail: detail,
+          onOpenNext: next == null ? null : () => _openExercise(ctx, next, replace: true),
         ),
       );
+      // ignore: use_build_context_synchronously
+      if (replace) {
+        // ignore: use_build_context_synchronously
+        await Navigator.of(context).pushReplacement(route);
+      } else {
+        // ignore: use_build_context_synchronously
+        await Navigator.of(context).push(route);
+      }
       return;
     }
     if (!mounted) return;
