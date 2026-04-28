@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
@@ -60,9 +58,7 @@ type ClaudeContentGenerator struct {
 	client *http.Client
 }
 
-// contentGenerationTimeout is separate from llmRequestTimeout (30s for feedback).
-// Content generation can produce 20-40 exercises in one call — needs 2-3 minutes.
-const contentGenerationTimeout = 180 * time.Second
+// Timeout and model defaults are in llm_config.go. Prompts are in llm_prompts.go.
 
 func NewClaudeContentGenerator(apiKey string) *ClaudeContentGenerator {
 	return &ClaudeContentGenerator{
@@ -72,18 +68,16 @@ func NewClaudeContentGenerator(apiKey string) *ClaudeContentGenerator {
 }
 
 func (g *ClaudeContentGenerator) GenerateVocabulary(ctx context.Context, input VocabularyGenerationInput) (*contracts.GeneratedPayload, error) {
-	prompt := buildVocabPrompt(input)
-	return g.callClaude(ctx, prompt, input.ExerciseTypes)
+	return g.callClaude(ctx, VocabGenerationPrompt(input), input.ExerciseTypes)
 }
 
 func (g *ClaudeContentGenerator) GenerateGrammar(ctx context.Context, input GrammarGenerationInput) (*contracts.GeneratedPayload, error) {
-	prompt := buildGrammarPrompt(input)
-	return g.callClaude(ctx, prompt, input.ExerciseTypes)
+	return g.callClaude(ctx, GrammarGenerationPrompt(input), input.ExerciseTypes)
 }
 
 func (g *ClaudeContentGenerator) callClaude(ctx context.Context, prompt string, exerciseTypes []string) (*contracts.GeneratedPayload, error) {
 	reqBody := map[string]any{
-		"model":      "claude-sonnet-4-6",
+		"model":      LoadLLMModels().Content,
 		"max_tokens": 8192,
 		"tools": []map[string]any{
 			{
@@ -194,91 +188,4 @@ func buildExerciseToolSchema(exerciseTypes []string) map[string]any {
 	}
 }
 
-// ── Prompt builders ───────────────────────────────────────────────────────────
-
-func buildVocabPrompt(input VocabularyGenerationInput) string {
-	items := make([]string, len(input.Items))
-	for i, item := range input.Items {
-		items[i] = fmt.Sprintf("%s = %s", item.Term, item.Meaning)
-		if item.PartOfSpeech != "" {
-			items[i] += fmt.Sprintf(" (%s)", item.PartOfSpeech)
-		}
-	}
-
-	typeCounts := make([]string, 0)
-	for _, t := range input.ExerciseTypes {
-		if n := input.NumPerType[t]; n > 0 {
-			typeCounts = append(typeCounts, fmt.Sprintf("%d %s", n, t))
-		}
-	}
-
-	lang := map[string]string{"vi": "Vietnamese", "en": "English", "cs": "Czech"}[input.ExplanationLang]
-	if lang == "" {
-		lang = "Vietnamese"
-	}
-
-	return fmt.Sprintf(`You are a Czech language content creator for Vietnamese learners.
-Create exercises for these Czech vocabulary words at level %s:
-%s
-
-Generate %s.
-Rules:
-- Use simple, natural Czech sentences appropriate for level %s
-- All explanations must be in %s
-- For matching exercises: provide 4-6 pairs (left=Czech term, right=Vietnamese meaning)
-- For fill_blank: sentence must contain exactly ___ (three underscores)
-- For choice_word: provide exactly 4 options; correct_answer must equal the full text of the correct option
-- For quizcard_basic: front_text=Czech term, back_text=%s meaning
-- Distractors must come from the same semantic field
-- Each exercise must have a clear explanation of why the answer is correct`,
-		input.Level,
-		strings.Join(items, "\n"),
-		strings.Join(typeCounts, ", "),
-		input.Level,
-		lang,
-		lang,
-	)
-}
-
-func buildGrammarPrompt(input GrammarGenerationInput) string {
-	forms := make([]string, 0, len(input.Forms))
-	for pronoun, form := range input.Forms {
-		forms = append(forms, fmt.Sprintf("%s → %s", pronoun, form))
-	}
-
-	typeCounts := make([]string, 0)
-	for _, t := range input.ExerciseTypes {
-		if n := input.NumPerType[t]; n > 0 {
-			typeCounts = append(typeCounts, fmt.Sprintf("%d %s", n, t))
-		}
-	}
-
-	constraints := "Use simple, everyday Czech sentences."
-	if strings.TrimSpace(input.Constraints) != "" {
-		constraints = input.Constraints
-	}
-
-	return fmt.Sprintf(`You are a Czech grammar teacher for Vietnamese learners.
-Grammar rule: %s (level %s)
-%s
-
-Forms:
-%s
-
-Generate %s.
-Rules:
-- Each exercise targets exactly one grammatical form from the table
-- For fill_blank: sentence must contain exactly ___ where the correct form goes
-- For choice_word: provide exactly 4 options; the correct form plus 3 plausible distractors from the same paradigm
-- correct_answer for choice_word must be the FULL TEXT of the correct option
-- Explanation must state WHICH form is correct and WHY (reference person/number/case)
-- All explanations in Vietnamese
-- Constraints: %s`,
-		input.Title,
-		input.Level,
-		input.ExplanationVI,
-		strings.Join(forms, "\n"),
-		strings.Join(typeCounts, ", "),
-		constraints,
-	)
-}
+// VocabGenerationPrompt and GrammarGenerationPrompt are in llm_prompts.go.

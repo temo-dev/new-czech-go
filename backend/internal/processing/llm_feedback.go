@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
@@ -17,11 +16,8 @@ import (
 const (
 	llmProviderDev    = "dev"
 	llmProviderClaude = "claude"
-
-	defaultClaudeModel = "claude-haiku-4-5-20251001"
-	claudeAPIEndpoint  = "https://api.anthropic.com/v1/messages"
-	claudeAPIVersion   = "2023-06-01"
-	llmRequestTimeout  = 30 * time.Second
+	// API/timeout constants and model defaults are in llm_config.go.
+	// Prompt templates are in llm_prompts.go.
 )
 
 type LLMFeedbackProvider interface {
@@ -64,13 +60,9 @@ func NewClaudeLLMFeedbackProviderFromEnv() (*ClaudeLLMFeedbackProvider, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("ANTHROPIC_API_KEY is required when LLM_PROVIDER=claude")
 	}
-	model := strings.TrimSpace(os.Getenv("LLM_MODEL"))
-	if model == "" {
-		model = defaultClaudeModel
-	}
 	return &ClaudeLLMFeedbackProvider{
 		apiKey: apiKey,
-		model:  model,
+		model:  LoadLLMModels().Feedback,
 		client: &http.Client{Timeout: llmRequestTimeout},
 	}, nil
 }
@@ -108,7 +100,7 @@ type llmFeedbackJSON struct {
 }
 
 func (c *ClaudeLLMFeedbackProvider) GenerateFeedback(exercise contracts.Exercise, transcript contracts.Transcript, reliability transcriptReliability, locale string) (contracts.AttemptFeedback, error) {
-	systemPrompt := buildLLMSystemPrompt(locale)
+	systemPrompt := FeedbackSystemPrompt(locale)
 	userPrompt := buildLLMUserPrompt(exercise, transcript, reliability, locale)
 
 	reqBody := claudeMessageRequest{
@@ -174,39 +166,7 @@ func (c *ClaudeLLMFeedbackProvider) GenerateFeedback(exercise contracts.Exercise
 	}, nil
 }
 
-func buildLLMSystemPrompt(locale string) string {
-	targetLanguage := "Vietnamese"
-	audienceClause := "You are an expert Czech language coach for Vietnamese learners preparing for the Czech \"trvaly pobyt A2\" oral exam."
-	if locale == contracts.LocaleEN {
-		targetLanguage = "English"
-		audienceClause = "You are an expert Czech language coach for English-speaking learners preparing for the Czech \"trvaly pobyt A2\" oral exam."
-	}
-	languageClause := fmt.Sprintf("CRITICAL LANGUAGE RULE: overall_summary, strengths, improvements, retry_advice MUST be written ENTIRELY in %s. DO NOT write these fields in Czech. DO NOT mix languages. The ONLY field allowed to contain Czech is sample_answer (which must be natural Czech). If you quote a Czech word/phrase from the learner to explain an error, embed it inside a %s sentence (e.g. in %s: \"the phrase X is wrong — use Y\").", targetLanguage, targetLanguage, targetLanguage)
-	pointOfViewClause := "CRITICAL POINT-OF-VIEW RULE: address the learner DIRECTLY in the second person (\"you\", \"your\" / \"bạn\", \"của bạn\"). DO NOT refer to the learner in the third person (do NOT write \"the learner\", \"the student\", \"they\", \"he/she\", \"người học\"). Write feedback AS IF you are speaking TO the learner, not describing them to someone else."
-	return strings.Join([]string{
-		audienceClause,
-		"Evaluate the learner's response and return ONLY valid JSON — no markdown, no explanation, no prose outside the JSON object.",
-		languageClause,
-		pointOfViewClause,
-		"readiness_level MUST be one of: not_ready, almost_ready, ready_for_mock, exam_ready.",
-		fmt.Sprintf("strengths, improvements, retry_advice: arrays of 1-3 CONCISE %s strings each (one actionable idea per string, keep each string under 200 characters).", targetLanguage),
-		"overall_summary: one concise paragraph, under 400 characters.",
-		"sample_answer: one or two natural Czech sentences demonstrating the correct, exam-appropriate response.",
-		"",
-		"PRIMARY EVALUATION FOCUS (most important — majority of feedback must come from these two):",
-		"(A) Czech GRAMMAR correctness — be specific. Call out exact errors: wrong case endings (nominative/accusative/genitive/dative/locative/instrumental mismatches), wrong verb conjugation, wrong tense, wrong aspect (perfective/imperfective), wrong word order, missing reflexive 'se'/'si', wrong preposition-case pairing, subject-verb agreement, gender agreement on adjectives. Quote the learner's exact wrong phrase and give the corrected Czech form.",
-		"(B) PRONUNCIATION proxy inferred from the transcript — Czech speech-to-text output reveals pronunciation issues. Look for: missing or wrong diacritics (á/é/í/ó/ú/ů/ě/š/č/ř/ž/ý/ň/ť/ď) suggesting the learner skipped the sound, consonant cluster mistakes (especially ř, which is the hardest sound), wrong vowel length (short vs long — Czech distinguishes a/á, e/é, i/í, o/ó, u/ú, y/ý), softened consonants (d/ď, t/ť, n/ň) dropped, final devoicing errors, syllable omissions suggesting mumbled or rushed speech, and common Vietnamese-speaker patterns (dropping final consonants, tonal interference, confusing voiced/voiceless pairs like b/p, d/t, g/k, z/s). Name specific sounds the learner likely struggled with.",
-		"",
-		"SECONDARY DIMENSIONS (mention only briefly if relevant):",
-		"(C) task completion — did they address the required questions/topic",
-		"(D) naturalness and flow",
-		"(E) lesson relevance",
-		"",
-		"At least 2 of 3 'strengths' and at least 2 of 3 'improvements' MUST be about grammar or pronunciation specifically. Do not fill strengths/improvements with generic praise or task-completion notes when grammar/pronunciation issues are present.",
-		"Keep feedback concrete and actionable, cite exact Czech words/phrases, not generic advice.",
-		"Output schema: {\"readiness_level\":\"...\",\"overall_summary\":\"...\",\"strengths\":[\"...\"],\"improvements\":[\"...\"],\"retry_advice\":[\"...\"],\"sample_answer\":\"...\"}",
-	}, "\n")
-}
+// FeedbackSystemPrompt is in llm_prompts.go.
 
 func buildLLMUserPrompt(exercise contracts.Exercise, transcript contracts.Transcript, reliability transcriptReliability, locale string) string {
 	targetLanguage := "Vietnamese"

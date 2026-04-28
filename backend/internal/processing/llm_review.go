@@ -59,16 +59,9 @@ func NewClaudeLLMReviewProviderFromEnv() (*ClaudeLLMReviewProvider, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("ANTHROPIC_API_KEY is required when LLM_REVIEW_PROVIDER=claude")
 	}
-	model := strings.TrimSpace(os.Getenv("LLM_REVIEW_MODEL"))
-	if model == "" {
-		model = strings.TrimSpace(os.Getenv("LLM_MODEL"))
-	}
-	if model == "" {
-		model = defaultClaudeModel
-	}
 	return &ClaudeLLMReviewProvider{
 		apiKey: apiKey,
-		model:  model,
+		model:  LoadLLMModels().Review,
 		client: &http.Client{Timeout: llmRequestTimeout},
 	}, nil
 }
