@@ -149,8 +149,53 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
     final kindFiltered = _exercises
         .where((e) => _exerciseMatchesSkillKind(e.exerciseType, widget.skill.skillKind))
         .toList();
-    if (_filterTag == null || widget.skill.skillKind != 'noi') return kindFiltered;
-    return kindFiltered.where((e) => e.exerciseType.startsWith('uloha_$_filterTag')).toList();
+    if (_filterTag == null) return kindFiltered;
+    if (widget.skill.skillKind == 'noi') {
+      return kindFiltered.where((e) => e.exerciseType.startsWith('uloha_$_filterTag')).toList();
+    }
+    // vocab/grammar: filter by exact exercise type
+    return kindFiltered.where((e) => e.exerciseType == _filterTag).toList();
+  }
+
+  // Per-type metadata for vocab/grammar exercise cards
+  static _ExerciseTypeStyle _typeStyle(String exerciseType) {
+    switch (exerciseType) {
+      case 'quizcard_basic':
+        return const _ExerciseTypeStyle(
+          label: 'FLASHCARD',
+          icon: Icons.style_rounded,
+          color: Color(0xFF059669),
+          bg: Color(0xFFD1FAE5),
+        );
+      case 'matching':
+        return const _ExerciseTypeStyle(
+          label: 'GHÉP ĐÔI',
+          icon: Icons.compare_arrows_rounded,
+          color: Color(0xFF7C3AED),
+          bg: Color(0xFFEDE9FE),
+        );
+      case 'fill_blank':
+        return const _ExerciseTypeStyle(
+          label: 'ĐIỀN TỪ',
+          icon: Icons.edit_outlined,
+          color: Color(0xFF0369A1),
+          bg: Color(0xFFE0F2FE),
+        );
+      case 'choice_word':
+        return const _ExerciseTypeStyle(
+          label: 'CHỌN TỪ',
+          icon: Icons.check_circle_outline_rounded,
+          color: Color(0xFF0F3D3A),
+          bg: Color(0xFFD9E5E3),
+        );
+      default:
+        return const _ExerciseTypeStyle(
+          label: 'BÀI TẬP',
+          icon: Icons.school_rounded,
+          color: Color(0xFF4D4540),
+          bg: Color(0xFFF5F0EA),
+        );
+    }
   }
 
   int _estimatedMin(ExerciseSummary ex) {
@@ -180,9 +225,11 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
                   child: const Icon(Icons.arrow_back, size: 22),
                 ),
                 const Spacer(),
-                Text(l.exerciseListProgressLink,
-                    style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.primary, fontWeight: FontWeight.w600)),
+                // Only show speaking progress link for noi skill
+                if (widget.skill.skillKind == 'noi')
+                  Text(l.exerciseListProgressLink,
+                      style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.primary, fontWeight: FontWeight.w600)),
               ]),
             ),
 
@@ -191,16 +238,17 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryFixed,
-                      borderRadius: BorderRadius.circular(20),
+                  if (widget.skill.skillKind == 'noi')
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryFixed,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(l.exerciseListFlowBadge,
+                          style: AppTypography.labelUppercase.copyWith(
+                              color: AppColors.primary, fontSize: 10)),
                     ),
-                    child: Text(l.exerciseListFlowBadge,
-                        style: AppTypography.labelUppercase.copyWith(
-                            color: AppColors.primary, fontSize: 10)),
-                  ),
                   const SizedBox(height: AppSpacing.x2),
                   Text(widget.skill.title,
                       style: AppTypography.titleLarge.copyWith(
@@ -214,7 +262,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
 
             const SizedBox(height: AppSpacing.x4),
 
-            // ── Filter pills — only for speaking (noi) skill ─────────────────
+            // ── Filter pills ─────────────────────────────────────────────────
             if (widget.skill.skillKind == 'noi')
               SizedBox(
                 height: 38,
@@ -232,6 +280,35 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
                         onTap: () => setState(() => _filterTag = _filterTag == n ? null : n),
                       ),
                       if (n != '4') const SizedBox(width: AppSpacing.x2),
+                    ],
+                  ],
+                ),
+              ),
+
+            // Vocab/grammar type filter pills
+            if (widget.skill.skillKind == 'tu_vung' || widget.skill.skillKind == 'ngu_phap')
+              SizedBox(
+                height: 38,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: h),
+                  children: [
+                    _FilterPill(label: 'Tất cả', active: _filterTag == null,
+                        onTap: () => setState(() => _filterTag = null)),
+                    const SizedBox(width: AppSpacing.x2),
+                    for (final entry in [
+                      if (widget.skill.skillKind == 'tu_vung')
+                        ('quizcard_basic', 'Flashcard'),
+                      ('matching', 'Ghép đôi'),
+                      ('fill_blank', 'Điền từ'),
+                      ('choice_word', 'Chọn từ'),
+                    ]) ...[
+                      _FilterPill(
+                        label: entry.$2,
+                        active: _filterTag == entry.$1,
+                        onTap: () => setState(() => _filterTag = _filterTag == entry.$1 ? null : entry.$1),
+                      ),
+                      const SizedBox(width: AppSpacing.x2),
                     ],
                   ],
                 ),
@@ -271,6 +348,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
                                   exercise: ex,
                                   ulohaTag: _ulohaTag(ex.exerciseType),
                                   estimatedMin: _estimatedMin(ex),
+                                  skillKind: widget.skill.skillKind,
                                   onTap: () => _openExercise(context, ex),
                                 );
                               },
@@ -289,15 +367,27 @@ class _ExerciseCard extends StatelessWidget {
     required this.ulohaTag,
     required this.estimatedMin,
     required this.onTap,
+    this.skillKind = 'noi',
   });
 
   final ExerciseSummary exercise;
   final String ulohaTag;
   final int estimatedMin;
   final VoidCallback onTap;
+  final String skillKind;
 
   @override
   Widget build(BuildContext context) {
+    final isVocabGrammar = skillKind == 'tu_vung' || skillKind == 'ngu_phap';
+    final typeStyle = isVocabGrammar
+        ? _ExerciseListScreenState._typeStyle(exercise.exerciseType)
+        : null;
+
+    final iconColor = typeStyle?.color ?? AppColors.primary;
+    final iconBg = typeStyle?.bg ?? AppColors.primaryFixed;
+    final iconData = typeStyle?.icon ?? Icons.mic_rounded;
+    final badgeLabel = typeStyle?.label ?? ulohaTag;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -309,15 +399,15 @@ class _ExerciseCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Icon
+            // Icon — type-specific for vocab/grammar
             Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppColors.primaryFixed,
+                color: iconBg,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.mic_rounded, color: AppColors.primary, size: 20),
+              child: Icon(iconData, color: iconColor, size: 20),
             ),
             const SizedBox(width: AppSpacing.x3),
             Expanded(
@@ -328,12 +418,12 @@ class _ExerciseCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryFixed,
+                        color: iconBg,
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(ulohaTag,
+                      child: Text(badgeLabel,
                           style: AppTypography.labelUppercase.copyWith(
-                              fontSize: 9, color: AppColors.primary)),
+                              fontSize: 9, color: iconColor)),
                     ),
                     const Spacer(),
                     const Icon(Icons.timer_outlined, size: 12, color: AppColors.onSurfaceVariant),
@@ -444,4 +534,17 @@ class _DailySprintCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ExerciseTypeStyle {
+  const _ExerciseTypeStyle({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.bg,
+  });
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Color bg;
 }
