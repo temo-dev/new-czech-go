@@ -65,7 +65,7 @@ def create_course(token, title, slug, description):
 def create_module(token, course_id, slug, title, description, seq):
     r = req("POST", "/v1/admin/modules", {
         "course_id": course_id, "slug": slug, "title": title,
-        "description": description, "module_kind": "skill_group",
+        "description": description, "module_kind": "practice",
         "sequence_no": seq, "status": "published"
     }, token)
     if not r:
