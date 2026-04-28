@@ -5,7 +5,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 // ── Messages ───────────────────────────────────────────────────────────────────
 
 export interface Messages {
-  nav: { exercises: string; courses: string; mockTests: string; learners: string; modules: string; skills: string; guide: string };
+  nav: { exercises: string; courses: string; mockTests: string; learners: string; modules: string; skills: string; vocabulary: string; grammar: string; guide: string };
   action: { create: string; edit: string; save: string; saveChanges: string; saving: string; delete: string; cancel: string; update: string };
   status: { draft: string; published: string; archived: string };
   pick: { module: string; skill: string; course: string; exercise: string; moduleForSkills: string; allCourses: string };
@@ -20,7 +20,8 @@ export interface Messages {
 const VI: Messages = {
   nav: {
     exercises: 'Bài tập', courses: 'Khóa học', mockTests: 'Mock Test',
-    learners: 'Học viên', modules: 'Module', skills: 'Kỹ năng', guide: 'Hướng dẫn',
+    learners: 'Học viên', modules: 'Module', skills: 'Kỹ năng',
+    vocabulary: 'Từ vựng', grammar: 'Ngữ pháp', guide: 'Hướng dẫn',
   },
   action: {
     create: 'Tạo', edit: 'Chỉnh sửa', save: 'Lưu', saveChanges: 'Lưu thay đổi',
@@ -103,7 +104,8 @@ const VI: Messages = {
 const EN: Messages = {
   nav: {
     exercises: 'Exercises', courses: 'Courses', mockTests: 'Mock Tests',
-    learners: 'Learners', modules: 'Modules', skills: 'Skills', guide: 'Guide',
+    learners: 'Learners', modules: 'Modules', skills: 'Skills',
+    vocabulary: 'Vocabulary', grammar: 'Grammar', guide: 'Guide',
   },
   action: {
     create: 'Create', edit: 'Edit', save: 'Save', saveChanges: 'Save changes',

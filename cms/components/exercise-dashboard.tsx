@@ -57,7 +57,11 @@ type ExerciseType =
   | 'cteni_2'
   | 'cteni_3'
   | 'cteni_4'
-  | 'cteni_5';
+  | 'cteni_5'
+  | 'quizcard_basic'
+  | 'matching'
+  | 'fill_blank'
+  | 'choice_word';
 
 type ExerciseFormState = {
   exerciseType: ExerciseType;
@@ -149,21 +153,30 @@ const exerciseTypeOptions: Array<{
   { value: 'cteni_2', label: 'Čtení 2', hint: 'Reading: read text → choose A-D, 5 questions (5 pts).' },
   { value: 'cteni_3', label: 'Čtení 3', hint: 'Reading: match 4 texts → persons A-E (4 pts).' },
   { value: 'cteni_4', label: 'Čtení 4', hint: 'Reading: choose A-D, 6 questions (6 pts).' },
-  { value: 'cteni_5', label: 'Čtení 5', hint: 'Reading: read text → fill info, 5 items (5 pts).' },
+  { value: 'cteni_5',       label: 'Čtení 5',       hint: 'Reading: read text → fill info, 5 items (5 pts).' },
+  // V6: Vocab & Grammar
+  { value: 'quizcard_basic', label: 'Flashcard',    hint: 'Từ vựng — lật thẻ, biết/ôn lại.' },
+  { value: 'matching',       label: 'Ghép đôi',     hint: 'Ghép 4-6 cặp Czech→Vietnamese. Exact match.' },
+  { value: 'fill_blank',     label: 'Điền từ',      hint: 'Câu với ___ — điền từ thích hợp.' },
+  { value: 'choice_word',    label: 'Chọn từ',      hint: 'Câu + 4 lựa chọn A-D — chọn từ đúng.' },
 ];
 
 const SKILL_KIND_EXERCISE_TYPES: Record<string, ExerciseType[]> = {
-  noi:  ['uloha_1_topic_answers', 'uloha_2_dialogue_questions', 'uloha_3_story_narration', 'uloha_4_choice_reasoning'],
-  viet: ['psani_1_formular', 'psani_2_email'],
-  nghe: ['poslech_1', 'poslech_2', 'poslech_3', 'poslech_4', 'poslech_5'],
-  doc:  ['cteni_1', 'cteni_2', 'cteni_3', 'cteni_4', 'cteni_5'],
+  noi:     ['uloha_1_topic_answers', 'uloha_2_dialogue_questions', 'uloha_3_story_narration', 'uloha_4_choice_reasoning'],
+  viet:    ['psani_1_formular', 'psani_2_email'],
+  nghe:    ['poslech_1', 'poslech_2', 'poslech_3', 'poslech_4', 'poslech_5'],
+  doc:     ['cteni_1', 'cteni_2', 'cteni_3', 'cteni_4', 'cteni_5'],
+  tu_vung: ['quizcard_basic', 'matching', 'fill_blank', 'choice_word'],
+  ngu_phap:['matching', 'fill_blank', 'choice_word'],
 };
 
 const SKILL_KIND_META: Record<string, { label: string; icon: string; color: string }> = {
-  noi:  { label: 'Nói',   icon: '🎙️', color: '#FF6A14' },
-  viet: { label: 'Viết',  icon: '✏️', color: '#0F3D3A' },
-  nghe: { label: 'Nghe',  icon: '🎧', color: '#7C3AED' },
-  doc:  { label: 'Đọc',   icon: '📖', color: '#0369A1' },
+  noi:     { label: 'Nói',     icon: '🎙️', color: '#FF6A14' },
+  viet:    { label: 'Viết',    icon: '✏️', color: '#0F3D3A' },
+  nghe:    { label: 'Nghe',    icon: '🎧', color: '#7C3AED' },
+  doc:     { label: 'Đọc',     icon: '📖', color: '#0369A1' },
+  tu_vung: { label: 'Từ vựng', icon: '📚', color: '#059669' },
+  ngu_phap:{ label: 'Ngữ pháp',icon: '📝', color: '#DC2626' },
 };
 
 function createInitialFormState(): ExerciseFormState {
