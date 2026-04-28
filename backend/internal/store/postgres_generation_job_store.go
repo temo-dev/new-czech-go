@@ -63,7 +63,7 @@ func (s *postgresGenerationJobStore) GetJob(id string) (contracts.ContentGenerat
 	defer cancel()
 	var j contracts.ContentGenerationJob
 	var skillID sql.NullString
-	var genPayload, editPayload sql.RawBytes
+	var genPayload, editPayload []byte // sql.RawBytes not allowed on Row.Scan
 	var inputTokens, outputTokens sql.NullInt64
 	var costUSD sql.NullFloat64
 	var durationMs sql.NullInt64
