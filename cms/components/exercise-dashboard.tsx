@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useS } from '../lib/i18n';
 
 type PromptAsset = {
@@ -852,6 +852,9 @@ export function ExerciseDashboard() {
   const [filterSkillId, setFilterSkillId] = useState('');
   const [filterMockTestId, setFilterMockTestId] = useState('');
   const [filterText, setFilterText] = useState('');
+  const [showConfirmClose, setShowConfirmClose] = useState(false);
+  const [draftToast, setDraftToast] = useState(false);
+  const initialFormSnap = useRef<string>('');
 
   const editingItem = editingId ? items.find((item) => item.id === editingId) ?? null : null;
   const currentAssets = editingItem?.assets ?? [];
@@ -862,6 +865,30 @@ export function ExerciseDashboard() {
     setForm(createInitialFormState());
     setWizardStep('skill');
     setShowModal(false);
+    setShowConfirmClose(false);
+    initialFormSnap.current = '';
+    localStorage.removeItem('ef-draft-v2');
+  }
+
+  const requestClose = useCallback(() => {
+    const snap = initialFormSnap.current;
+    const dirty = snap !== '' && JSON.stringify(form) !== snap;
+    if (dirty) {
+      setShowConfirmClose(true);
+    } else {
+      resetForm();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form]);
+
+  function openCreate() {
+    const initial = createInitialFormState();
+    setForm(initial);
+    setEditingId(null);
+    setAssetError(null);
+    setWizardStep('skill');
+    initialFormSnap.current = JSON.stringify(initial);
+    setShowModal(true);
   }
 
   async function loadExercises() {
@@ -887,7 +914,20 @@ export function ExerciseDashboard() {
     loadAllSkills();
     loadCourses();
     loadMockTests();
+    // Check for stale draft on mount
+    if (localStorage.getItem('ef-draft-v2')) {
+      setDraftToast(true);
+    }
   }, []);
+
+  // Autosave every 10s while panel is open
+  useEffect(() => {
+    if (!showModal) return;
+    const id = setInterval(() => {
+      localStorage.setItem('ef-draft-v2', JSON.stringify({ form, editingId, wizardStep }));
+    }, 10000);
+    return () => clearInterval(id);
+  }, [showModal, form, editingId, wizardStep]);
 
   async function loadModules() {
     try {
@@ -952,7 +992,9 @@ export function ExerciseDashboard() {
     setError(null);
     setAssetError(null);
     setEditingId(item.id);
-    setForm(formStateFromExercise(item));
+    const state = formStateFromExercise(item);
+    setForm(state);
+    initialFormSnap.current = JSON.stringify(state);
     setWizardStep('content');
     setShowModal(true);
   }
@@ -1145,45 +1187,93 @@ export function ExerciseDashboard() {
         </div>
       </section>
 
-      {/* ── Modal overlay ──────────────────────────────────────────────── */}
+      {/* ── Slide-over backdrop ──────────────────────────────────────────── */}
       {showModal && (
         <div
-          onClick={resetForm}
+          onClick={requestClose}
           style={{
             position: 'fixed', inset: 0, zIndex: 100,
-            background: 'rgba(20,18,14,0.55)', backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-            padding: '40px 16px', overflowY: 'auto',
+            background: 'rgba(20,18,14,0.4)',
           }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
+        />
+      )}
+
+      {/* ── Slide-over panel ─────────────────────────────────────────────── */}
+      <aside
+        style={{
+          position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 101,
+          width: 'min(80vw, 960px)',
+          background: 'var(--surface)',
+          borderLeft: '1px solid var(--border)',
+          boxShadow: '-8px 0 32px rgba(20,18,14,0.12)',
+          overflowY: 'auto',
+          transform: showModal ? 'translateX(0)' : 'translateX(110%)',
+          transition: 'transform 250ms ease-out',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* Panel header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 24px', borderBottom: '1px solid var(--border)',
+          position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1,
+          flexShrink: 0,
+        }}>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--ink)' }}>
+            {editingId ? 'Chỉnh sửa bài tập' : 'Tạo bài tập mới'}
+          </h2>
+          <button
+            type="button"
+            onClick={requestClose}
+            aria-label="Đóng panel"
             style={{
-              width: '100%', maxWidth: 520,
-              background: 'var(--surface)',
-              borderRadius: 28,
-              border: '1px solid var(--border)',
-              boxShadow: '0 24px 64px rgba(20,18,14,0.22)',
-              display: 'grid', gap: 0,
-              position: 'relative',
+              background: 'none', border: '1px solid var(--border)', borderRadius: 8,
+              padding: '5px 12px', cursor: 'pointer', fontSize: 13,
+              color: 'var(--ink-2)', display: 'flex', alignItems: 'center', gap: 4,
             }}
           >
-            {/* Close button */}
-            <button
-              type="button"
-              onClick={resetForm}
-              style={{
-                position: 'absolute', top: 16, right: 16,
-                width: 32, height: 32, borderRadius: '50%',
-                border: '1px solid var(--border)',
-                background: 'var(--surface-muted)',
-                cursor: 'pointer', fontSize: 18, lineHeight: 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--text-secondary)',
-              }}
-            >×</button>
+            Đóng <span aria-hidden>×</span>
+          </button>
+        </div>
 
-            <div style={{ padding: 24, display: 'grid', gap: 16 }}>
+        {/* Draft restore toast */}
+        {draftToast && (
+          <div style={{
+            margin: '12px 24px 0', padding: '10px 14px',
+            background: 'var(--brand-soft)', borderRadius: 10,
+            display: 'flex', gap: 8, alignItems: 'center', fontSize: 13,
+            border: '1px solid var(--brand)',
+          }}>
+            <span style={{ flex: 1, color: 'var(--brand-ink)' }}>Có bản nháp chưa lưu. Khôi phục không?</span>
+            <button
+              onClick={() => {
+                const raw = localStorage.getItem('ef-draft-v2');
+                if (raw) {
+                  try {
+                    const { form: f, editingId: eid, wizardStep: ws } = JSON.parse(raw) as { form: ExerciseFormState; editingId: string | null; wizardStep: 'skill' | 'type' | 'content' };
+                    setForm(f);
+                    if (eid) setEditingId(eid);
+                    if (ws) setWizardStep(ws);
+                  } catch { /* ignore corrupt draft */ }
+                }
+                setDraftToast(false);
+              }}
+              style={{ background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+            >
+              Khôi phục
+            </button>
+            <button
+              onClick={() => { localStorage.removeItem('ef-draft-v2'); setDraftToast(false); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--ink-3)', padding: '4px 6px' }}
+            >
+              Bỏ qua
+            </button>
+          </div>
+        )}
+
+        {/* Panel body — replaces the old modal inner padding div */}
+        <div style={{ padding: 24, display: 'grid', gap: 16, flex: 1 }}>
         {/* ── Wizard: Step 1 — pick skill (creation only) ─────────────── */}
         {!editingId && wizardStep === 'skill' && (
           <div style={{ display: 'grid', gap: 16, padding: 24, borderRadius: 28, background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
@@ -1815,10 +1905,43 @@ export function ExerciseDashboard() {
             </button>
           )}
         </form>}
-            </div>{/* end modal inner padding */}
-          </div>{/* end modal card */}
+        </div>{/* end panel body */}
+      </aside>{/* end slide-over panel */}
+
+      {/* ── Confirm close dialog ─────────────────────────────────────────── */}
+      {showConfirmClose && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'rgba(20,18,14,0.65)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            background: 'var(--surface)', borderRadius: 16,
+            padding: 28, maxWidth: 380, width: '90%',
+            display: 'grid', gap: 16,
+            boxShadow: '0 16px 48px rgba(20,18,14,0.25)',
+          }}>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Đóng mà không lưu?</h3>
+            <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+              Bạn có thay đổi chưa lưu. Đóng sẽ mất các thay đổi này.
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowConfirmClose(false)}
+                style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 14 }}
+              >
+                Tiếp tục chỉnh sửa
+              </button>
+              <button
+                onClick={resetForm}
+                style={{ background: 'var(--error)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
+              >
+                Đóng không lưu
+              </button>
+            </div>
+          </div>
         </div>
-      )}{/* end modal overlay */}
+      )}
 
       {/* ── Inventory — full width ──────────────────────────────────────── */}
       <section style={{ background: 'var(--surface)', borderRadius: 28, border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)', overflow: 'hidden' }}>
@@ -1843,7 +1966,7 @@ export function ExerciseDashboard() {
               style={{ borderRadius: 12, border: '1px solid var(--border)', background: 'transparent', padding: '9px 14px', cursor: 'pointer', fontWeight: 600, fontSize: 13, color: 'var(--ink-2)' }}>
               ↺
             </button>
-            <button type="button" onClick={() => { resetForm(); setShowModal(true); }}
+            <button type="button" onClick={openCreate}
               style={{ borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', padding: '9px 18px', cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
               + {S.exercise.createCta}
             </button>
