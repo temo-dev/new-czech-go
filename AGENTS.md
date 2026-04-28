@@ -83,6 +83,7 @@ The implemented V1 foundation currently includes:
 - opt-in `S3 + Amazon Transcribe` path that has already been verified end-to-end on production
 - opt-in `LLMFeedbackProvider` backed by Claude (`LLM_PROVIDER=claude`, `ANTHROPIC_API_KEY`); falls back to rule-based feedback automatically on error or when unset
 - opt-in `LLMReviewProvider` that generates corrected transcript + model answer per exercise + learner response (`LLM_REVIEW_PROVIDER`, falls back to `LLM_PROVIDER` then to rule-based). Missing `ANTHROPIC_API_KEY` while `LLM_PROVIDER=claude` is no longer fatal: backend logs a warning and continues on the rule-based path.
+- opt-in `ContentGenerator` backed by Claude for V6 vocab/grammar exercise generation (async job, admin-triggered). Model and prompts are centralized in `processing/llm_config.go` and `processing/llm_prompts.go`.
 - task-aware review artifacts (corrected transcript + model answer + diff + speaking focus + Polly TTS) for all four oral task types; authored `Exercise.sample_answer_text` overrides the rule-based model answer when present
 - opt-in `Amazon Polly` TTS for model-answer audio in review artifacts (`TTS_PROVIDER=amazon_polly`)
 - CMS CRUD for all four oral task types, with a `Status` select (draft / published / archived); only `published` exercises surface to learners

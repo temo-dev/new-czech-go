@@ -365,7 +365,7 @@ Illustrative categories:
 - AWS region and bucket names
 - Transcribe config (e.g. `TRANSCRIBE_TIMEOUT`, default 3m)
 - Polly config
-- scoring provider config (`LLM_PROVIDER`, `LLM_REVIEW_PROVIDER`, `ANTHROPIC_API_KEY`, `LLM_MODEL`)
+- scoring provider config (`LLM_PROVIDER`, `LLM_REVIEW_PROVIDER`, `ANTHROPIC_API_KEY`, `LLM_MODEL`, `LLM_REVIEW_MODEL`, `LLM_CONTENT_MODEL`)
 - audio signing secret (`AUDIO_SIGN_SECRET`) — **required**; backend will fatal-exit at startup if unset. Generate with `openssl rand -hex 32`. Signed URLs are HMAC-protected; without a stable secret, URLs issued before a restart will fail to verify after it.
 
 Do not hard-code:
@@ -374,6 +374,19 @@ Do not hard-code:
 - environment URLs
 
 LLM provider degrades gracefully: when `LLM_PROVIDER=claude` but `ANTHROPIC_API_KEY` is missing, the backend logs a warning and continues with the rule-based feedback/review path instead of exiting.
+
+**LLM configuration is centralized** in `backend/internal/processing/`:
+- `llm_config.go` — all constants (API endpoint, timeouts, default models) + `LoadLLMModels()` reads env vars
+- `llm_prompts.go` — all prompt templates (feedback system prompt, vocab generation, grammar generation)
+
+| Env var | Purpose | Default |
+|---------|---------|---------|
+| `LLM_MODEL` | Feedback model (per-attempt, real-time) | `claude-haiku-4-5-20251001` |
+| `LLM_REVIEW_MODEL` | Review artifact model | → `LLM_MODEL` |
+| `LLM_CONTENT_MODEL` | Vocab/grammar batch generation | `claude-haiku-4-5-20251001` |
+
+To change a model: set the env var — no code change needed.
+To change a prompt: edit `llm_prompts.go` — single file, all templates together.
 
 ## Non-Goals for V1 Infrastructure
 - zero-downtime deployments

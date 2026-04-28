@@ -304,6 +304,40 @@ export function AdminGuide() {
         </ol>
       </div>
 
+      {/* LLM config */}
+      <details style={{ marginTop: 24 }}>
+        <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--ink-3)', userSelect: 'none', padding: '8px 0' }}>
+          Cấu hình AI Model (env vars)
+        </summary>
+        <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.6 }}>
+            Model và prompt được quản lý tập trung trong <Code>backend/internal/processing/llm_config.go</Code> và <Code>llm_prompts.go</Code>.
+            Thay đổi model qua env var — không cần sửa code.
+          </p>
+          <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r2)', overflow: 'hidden', fontSize: 13 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 200px', gap: 0, background: 'var(--surface-muted)', padding: '8px 14px', fontWeight: 700, color: 'var(--ink-3)', fontSize: 11, textTransform: 'uppercase' }}>
+              <span>Env var</span><span>Mục đích</span><span>Default</span>
+            </div>
+            {[
+              ['LLM_PROVIDER', 'Bật/tắt LLM feedback (claude hoặc để trống)', 'dev (tắt)'],
+              ['LLM_MODEL', 'Model feedback nói/viết (real-time, per-attempt)', 'claude-haiku-4-5-20251001'],
+              ['LLM_REVIEW_MODEL', 'Model review artifact generation', '→ LLM_MODEL'],
+              ['LLM_CONTENT_MODEL', 'Model generate từ vựng/ngữ pháp (batch)', 'claude-haiku-4-5-20251001'],
+              ['ANTHROPIC_API_KEY', 'API key của Anthropic — bắt buộc khi dùng Claude', '—'],
+            ].map(([k, desc, def]) => (
+              <div key={k} style={{ display: 'grid', gridTemplateColumns: '200px 1fr 200px', padding: '9px 14px', borderTop: '1px solid var(--border)', alignItems: 'center' }}>
+                <Code>{k}</Code>
+                <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>{desc}</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--ink-2)' }}>{def}</span>
+              </div>
+            ))}
+          </div>
+          <Callout type="info">
+            Để thay đổi prompt (hướng dẫn AI), sửa file <Code>llm_prompts.go</Code> — tất cả prompt template nằm trong một file duy nhất.
+          </Callout>
+        </div>
+      </details>
+
       {/* Troubleshooting */}
       <div style={{ marginTop: 24, padding: '20px 24px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r3)' }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.8, color: 'var(--ink-3)', textTransform: 'uppercase', marginBottom: 12 }}>Xử lý sự cố thường gặp</div>
