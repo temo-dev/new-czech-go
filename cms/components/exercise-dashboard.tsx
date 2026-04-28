@@ -11,8 +11,10 @@ type PromptAsset = {
   sequence_no?: number;
 };
 
+type CmsCourse = { id: string; title: string };
 type CmsModule = { id: string; title: string; course_id: string };
 type CmsSkill = { id: string; module_id: string; skill_kind: string; title: string };
+type CmsMockTest = { id: string; title: string; sections: Array<{ exercise_id: string }> };
 
 type Exercise = {
   id: string;
@@ -816,6 +818,11 @@ export function ExerciseDashboard() {
   const [wizardStep, setWizardStep] = useState<'skill' | 'type' | 'content'>('skill');
   const [allSkills, setAllSkills] = useState<CmsSkill[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [courses, setCourses] = useState<CmsCourse[]>([]);
+  const [mockTests, setMockTests] = useState<CmsMockTest[]>([]);
+  const [filterCourseId, setFilterCourseId] = useState('');
+  const [filterSkillId, setFilterSkillId] = useState('');
+  const [filterMockTestId, setFilterMockTestId] = useState('');
 
   const editingItem = editingId ? items.find((item) => item.id === editingId) ?? null : null;
   const currentAssets = editingItem?.assets ?? [];
@@ -849,6 +856,8 @@ export function ExerciseDashboard() {
     loadExercises();
     loadModules();
     loadAllSkills();
+    loadCourses();
+    loadMockTests();
   }, []);
 
   async function loadModules() {
@@ -856,6 +865,22 @@ export function ExerciseDashboard() {
       const res = await fetch('/api/admin/modules');
       const j = await res.json();
       setAvailableModules(j.data ?? []);
+    } catch { /* non-fatal */ }
+  }
+
+  async function loadCourses() {
+    try {
+      const res = await fetch('/api/admin/courses');
+      const j = await res.json();
+      setCourses(j.data ?? []);
+    } catch { /* non-fatal */ }
+  }
+
+  async function loadMockTests() {
+    try {
+      const res = await fetch('/api/admin/mock-tests');
+      const j = await res.json();
+      setMockTests(j.data ?? []);
     } catch { /* non-fatal */ }
   }
 
@@ -1006,6 +1031,22 @@ export function ExerciseDashboard() {
       setSaving(false);
     }
   }
+
+  // ── Filtered inventory ─────────────────────────────────────────────────────
+  const mtExerciseIds = filterMockTestId
+    ? new Set((mockTests.find(t => t.id === filterMockTestId)?.sections ?? []).map(s => s.exercise_id))
+    : null;
+
+  const filteredItems = items.filter(item => {
+    if (filterSkillId && item.skill_id !== filterSkillId) return false;
+    if (filterCourseId) {
+      const skill = allSkills.find(s => s.id === item.skill_id);
+      const mod = availableModules.find((m: CmsModule) => m.id === skill?.module_id);
+      if (mod?.course_id !== filterCourseId) return false;
+    }
+    if (mtExerciseIds && !mtExerciseIds.has(item.id)) return false;
+    return true;
+  });
 
   return (
     <main style={{ display: 'grid', gap: 24 }}>
@@ -1858,6 +1899,53 @@ export function ExerciseDashboard() {
             </div>
           </div>
 
+          {/* ── Filters ───────────────────────────────────────────────────── */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select
+              value={filterCourseId}
+              onChange={e => { setFilterCourseId(e.target.value); setFilterSkillId(''); setFilterMockTestId(''); }}
+              style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-muted)', padding: '7px 10px', fontSize: 13, cursor: 'pointer' }}
+            >
+              <option value="">Tất cả khóa học</option>
+              {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+            </select>
+
+            <select
+              value={filterSkillId}
+              onChange={e => { setFilterSkillId(e.target.value); setFilterMockTestId(''); }}
+              style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-muted)', padding: '7px 10px', fontSize: 13, cursor: 'pointer' }}
+            >
+              <option value="">Tất cả kỹ năng</option>
+              {allSkills.map(sk => (
+                <option key={sk.id} value={sk.id}>
+                  {SKILL_KIND_META[sk.skill_kind]?.icon} {sk.title}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filterMockTestId}
+              onChange={e => { setFilterMockTestId(e.target.value); setFilterCourseId(''); setFilterSkillId(''); }}
+              style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-muted)', padding: '7px 10px', fontSize: 13, cursor: 'pointer' }}
+            >
+              <option value="">Tất cả đề thi</option>
+              {mockTests.map(mt => <option key={mt.id} value={mt.id}>{mt.title}</option>)}
+            </select>
+
+            {(filterCourseId || filterSkillId || filterMockTestId) && (
+              <button
+                type="button"
+                onClick={() => { setFilterCourseId(''); setFilterSkillId(''); setFilterMockTestId(''); }}
+                style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: '0 4px' }}
+              >
+                ✕ Xoá filter
+              </button>
+            )}
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 4 }}>
+              {filteredItems.length} / {items.length} bài tập
+            </span>
+          </div>
+
           {error ? (
             <p style={{ margin: 0, color: 'var(--danger)' }}>{error}</p>
           ) : null}
@@ -1865,7 +1953,7 @@ export function ExerciseDashboard() {
           {loading ? <p style={{ margin: 0 }}>Loading exercises...</p> : null}
 
           <div style={{ display: 'grid', gap: 12 }}>
-            {items.map((item) => (
+            {filteredItems.map((item) => (
               <article
                 key={item.id}
                 style={{
