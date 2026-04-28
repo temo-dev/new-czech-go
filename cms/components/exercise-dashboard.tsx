@@ -815,6 +815,7 @@ export function ExerciseDashboard() {
   const [audioGenMsg, setAudioGenMsg] = useState<string | null>(null);
   const [wizardStep, setWizardStep] = useState<'skill' | 'type' | 'content'>('skill');
   const [allSkills, setAllSkills] = useState<CmsSkill[]>([]);
+  const [showModal, setShowModal] = useState(false);
 
   const editingItem = editingId ? items.find((item) => item.id === editingId) ?? null : null;
   const currentAssets = editingItem?.assets ?? [];
@@ -824,6 +825,7 @@ export function ExerciseDashboard() {
     setAssetError(null);
     setForm(createInitialFormState());
     setWizardStep('skill');
+    setShowModal(false);
   }
 
   async function loadExercises() {
@@ -898,6 +900,7 @@ export function ExerciseDashboard() {
     setEditingId(item.id);
     setForm(formStateFromExercise(item));
     setWizardStep('content');
+    setShowModal(true);
   }
 
   async function handleAssetUpload(file: File) {
@@ -1052,14 +1055,45 @@ export function ExerciseDashboard() {
         </div>
       </section>
 
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(320px, 420px) minmax(0, 1fr)',
-          gap: 20,
-          alignItems: 'start',
-        }}
-      >
+      {/* ── Modal overlay ──────────────────────────────────────────────── */}
+      {showModal && (
+        <div
+          onClick={resetForm}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            background: 'rgba(20,18,14,0.55)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            padding: '40px 16px', overflowY: 'auto',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 520,
+              background: 'var(--surface)',
+              borderRadius: 28,
+              border: '1px solid var(--border)',
+              boxShadow: '0 24px 64px rgba(20,18,14,0.22)',
+              display: 'grid', gap: 0,
+              position: 'relative',
+            }}
+          >
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={resetForm}
+              style={{
+                position: 'absolute', top: 16, right: 16,
+                width: 32, height: 32, borderRadius: '50%',
+                border: '1px solid var(--border)',
+                background: 'var(--surface-muted)',
+                cursor: 'pointer', fontSize: 18, lineHeight: 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--text-secondary)',
+              }}
+            >×</button>
+
+            <div style={{ padding: 24, display: 'grid', gap: 16 }}>
         {/* ── Wizard: Step 1 — pick skill (creation only) ─────────────── */}
         {!editingId && wizardStep === 'skill' && (
           <div style={{ display: 'grid', gap: 16, padding: 24, borderRadius: 28, background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
@@ -1768,19 +1802,24 @@ export function ExerciseDashboard() {
             </button>
           )}
         </form>}
+            </div>{/* end modal inner padding */}
+          </div>{/* end modal card */}
+        </div>
+      )}{/* end modal overlay */}
 
-        <section
-          style={{
-            display: 'grid',
-            gap: 14,
-            padding: 24,
-            borderRadius: 28,
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            boxShadow: 'var(--shadow)',
-            minHeight: 420,
-          }}
-        >
+      {/* ── Inventory — full width ──────────────────────────────────────── */}
+      <section
+        style={{
+          display: 'grid',
+          gap: 14,
+          padding: 24,
+          borderRadius: 28,
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow)',
+          minHeight: 420,
+        }}
+      >
           <div
             style={{
               display: 'flex',
@@ -1801,20 +1840,22 @@ export function ExerciseDashboard() {
                 {S.exercise.inventorySubtitle}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={loadExercises}
-              style={{
-                borderRadius: 16,
-                border: '1px solid var(--border)',
-                background: 'var(--surface-muted)',
-                padding: '10px 14px',
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
-            >
-              {S.exercise.refresh}
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={loadExercises}
+                style={{ borderRadius: 16, border: '1px solid var(--border)', background: 'var(--surface-muted)', padding: '10px 14px', cursor: 'pointer', fontWeight: 600 }}
+              >
+                {S.exercise.refresh}
+              </button>
+              <button
+                type="button"
+                onClick={() => { resetForm(); setShowModal(true); }}
+                style={{ borderRadius: 16, border: 'none', background: 'var(--primary)', color: '#fff', padding: '10px 18px', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
+              >
+                + {S.exercise.createCta}
+              </button>
+            </div>
           </div>
 
           {error ? (
@@ -1879,7 +1920,6 @@ export function ExerciseDashboard() {
             ))}
           </div>
         </section>
-      </section>
     </main>
   );
 }
