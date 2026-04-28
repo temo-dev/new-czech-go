@@ -16,11 +16,13 @@ The current stack is:
 Course  (nhiều khóa: "Giao tiếp cơ bản", "Đi urad", "Ôn thi A2", ...)
   └── Module  (chủ đề trong khóa)
        └── Skill  (nói | nghe | đọc | viết | từ vựng | ngữ pháp)
-            └── Exercise [pool=course]
+            └── Exercise [pool=course, skill_id = canonical parent]
 
 MockTest (đề thi)
   └── MockTestSection → Exercise [pool=exam]
 ```
+
+**DB linkage:** `exercises.skill_id` là liên kết duy nhất lên Module/Course — không còn `module_id` trên exercises (migration 012). `module_id` vẫn xuất hiện trong API response nhưng được derive qua JOIN với skills.
 
 **Implemented skills:**
 - `noi` (Speaking) — fully implemented: Úloha 1-4, AI scoring, review artifact, MockTest speaking flow

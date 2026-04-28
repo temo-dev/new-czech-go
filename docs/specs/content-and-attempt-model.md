@@ -224,8 +224,7 @@ The main learner-facing content unit. Each exercise belongs to a Skill (course e
 | Field | Type | Required | Notes |
 |------|------|----------|------|
 | `id` | `uuid` | yes | Primary identifier |
-| `skill_id` | `uuid` | no | FK to `Skill` — set for pool=course exercises |
-| `module_id` | `uuid` | no | Denormalized from skill; kept for backward compat |
+| `skill_id` | `uuid` | yes* | FK to `Skill` — required for pool=course; empty for pool=exam |
 | `pool` | `ExercisePool` | yes | `course` (default) or `exam` |
 | `exercise_type` | `ExerciseType` | yes | Must match skill_kind of parent Skill |
 | `title` | `string` | yes | Learner-visible |

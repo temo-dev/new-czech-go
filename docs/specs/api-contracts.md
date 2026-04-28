@@ -875,7 +875,6 @@ Returns exercise rows for the CMS table view.
 - `exercise_type` optional
 - `pool` optional: `course` or `exam`
 - `skill_id` optional
-- `module_id` optional (backward compat)
 
 ## POST /v1/admin/exercises
 Creates an exercise with common fields and task-specific detail.
@@ -883,7 +882,7 @@ Creates an exercise with common fields and task-specific detail.
 ### Request
 ```json
 {
-  "module_id": "a8b74ad2-2f5c-41c6-bdd9-cc1d5e388558",
+  "skill_id": "skill-abc123",
   "exercise_type": "uloha_3_story_narration",
   "title": "Nakup televize",
   "short_instruction": "Ke lai pribeh podle 4 obrazku.",
