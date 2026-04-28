@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useS } from '../lib/i18n';
+import { PoslechFields as PoslechFieldsNew } from './exercise-form/PoslechFields';
 
 type PromptAsset = {
   id: string;
@@ -107,6 +108,8 @@ type ExerciseFormState = {
   cteniOptions: string;        // options A-H / A-E (key | label)
   cteniQuestions: string;      // questions (cteni_2/4: prompt + A-D options; cteni_5: prompts)
   cteniCorrectAnswers: string; // 6=A\n7=B\n...
+  // Typed detail payload from new *Fields components (Option C pattern)
+  typePayload?: Record<string, unknown>;
 };
 
 const exerciseTypeOptions: Array<{
@@ -383,6 +386,8 @@ function formStateFromExercise(item: Exercise): ExerciseFormState {
     cteniCorrectAnswers: detail.correct_answers
       ? Object.entries(detail.correct_answers as Record<string, string>).map(([k, v]) => `${k}=${v}`).join('\n')
       : '',
+    // Pre-populate typePayload for poslech types so new PoslechFields can init from it
+    typePayload: item.exercise_type.startsWith('poslech_') ? (detail as Record<string, unknown>) : undefined,
   };
 }
 
@@ -504,9 +509,24 @@ function buildCteniPayload(form: ExerciseFormState) {
   return { ...base, detail: { text: form.cteniText.trim(), questions, correct_answers: correct } };
 }
 
+function buildPoslechBase(form: ExerciseFormState) {
+  return {
+    module_id: form.moduleId, skill_id: form.skillId,
+    exercise_type: form.exerciseType, title: form.title,
+    short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
+    estimated_duration_sec: 1800, sample_answer_enabled: false,
+    status: form.status, pool: form.pool,
+  };
+}
+
 function buildCreatePayload(form: ExerciseFormState) {
   if (form.exerciseType.startsWith('cteni_')) return buildCteniPayload(form);
-  if (form.exerciseType.startsWith('poslech_')) return buildPoslechPayload(form);
+  if (form.exerciseType.startsWith('poslech_')) {
+    if (form.typePayload !== undefined) {
+      return { ...buildPoslechBase(form), detail: form.typePayload };
+    }
+    return buildPoslechPayload(form);
+  }
   if (form.exerciseType === 'uloha_1_topic_answers') {
     return {
       module_id: form.moduleId,
@@ -638,7 +658,12 @@ function buildCreatePayload(form: ExerciseFormState) {
 
 function buildUpdatePayload(form: ExerciseFormState) {
   if (form.exerciseType.startsWith('cteni_')) return buildCteniPayload(form);
-  if (form.exerciseType.startsWith('poslech_')) return buildPoslechPayload(form);
+  if (form.exerciseType.startsWith('poslech_')) {
+    if (form.typePayload !== undefined) {
+      return { ...buildPoslechBase(form), detail: form.typePayload };
+    }
+    return buildPoslechPayload(form);
+  }
   if (form.exerciseType === 'uloha_1_topic_answers') {
     return {
       module_id: form.moduleId,
@@ -1619,9 +1644,10 @@ export function ExerciseDashboard() {
           ) : null}
 
           {form.exerciseType.startsWith('poslech_') ? (
-            <PoslechFields
-              form={form}
-              setForm={setForm}
+            <PoslechFieldsNew
+              exerciseType={form.exerciseType as 'poslech_1' | 'poslech_2' | 'poslech_3' | 'poslech_4' | 'poslech_5'}
+              initialData={form.typePayload ?? {}}
+              onChange={payload => setForm(f => ({ ...f, typePayload: payload }))}
               editingId={editingId}
               audioGenerating={audioGenerating}
               audioGenMsg={audioGenMsg}
