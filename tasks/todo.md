@@ -56,19 +56,29 @@ Design: **Async LLM job** (Claude tool_use) → Admin review/edit per-type edito
 Key decisions frozen: async+poll, auto-create skill, per-type editors, per-job-only-regen,
 source traceability on exercises, quizcard completion-only, 1-active-job-per-admin rate limit.
 
-- [ ] **VG-A** Migrations 013-016: `vocabulary_sets`, `vocabulary_items`, `grammar_rules`,
-  `content_generation_jobs` (full schema w/ token/cost fields), + `exercises` ADD `source_type`/`source_id`/`generation_job_id` nullable.
+- [ ] **VG-A** Migrations 013-016 (Go-side ID, no DB DEFAULT):
+  013: `vocabulary_sets` + `vocabulary_items`;
+  014: `grammar_rules`;
+  015: `content_generation_jobs` (provider/model/tokens/cost/duration fields);
+  016: `exercises` ADD `source_type`/`source_id`/`generation_job_id` NULL.
   Go contracts: `VocabularySet`, `VocabularyItem`, `GrammarRule`, `ContentGenerationJob`,
-  `QuizcardBasicDetail`, `MatchingDetail`, `FillBlankDetail`, `ChoiceWordDetail`, `GeneratedExercise`.
-  Flutter `models.dart`: add `isVocabGrammar`/`isQuizcard`/etc flags + `isImplemented` tu_vung/ngu_phap.
+  `MatchingDetail` (pairs with left_id/right_id, correct_answers option-key), `QuizcardBasicDetail`,
+  `FillBlankDetail`, `ChoiceWordDetail`, `GeneratedExercise`, `GeneratedPayload`.
+  Store interfaces: `VocabularyStore`, `GrammarStore`, `GenerationJobStore` + memory impls.
+  Update `postgres_exercises.go` CreateExercise/UpdateExercise for 3 new columns.
+  Flutter `models.dart`: `isVocabGrammar`/`isQuizcard`/`isMatching`/`isFillBlank`/`isChoiceWord` + parsed fields + `MatchingPairView`.
 
-- [ ] **VG-B** Backend: `llm_content_generator.go` (goroutine, Claude tool_use, JSON schema enforced) +
-  `ensureSkill()` auto-create tu_vung/ngu_phap per module +
-  CRUD /admin/vocabulary-sets, /admin/grammar-rules +
-  POST /admin/content-generation-jobs (async, 409 if running) +
-  GET /admin/content-generation-jobs/:id (poll) +
-  PATCH .../draft + POST .../publish (validate-all atomic) + POST .../reject +
-  `skillKindForExerciseType` allowlist + quizcard always-1/1 scoring + source fields set on publish.
+- [ ] **VG-B** Backend API + LLM:
+  `content_generator.go`: `ContentGenerator` interface + `ClaudeContentGenerator` (tool_use) + `MockContentGenerator`.
+  `exercise_validator.go`: `ValidateExercisePayload()` + `BuildExerciseFromDraft()` — shared by HTTP handler + publish.
+  `ensureSkill(moduleID, skillKind)` auto-create.
+  Server startup: `repo.MarkAllRunningJobsFailed("Server restarted")`.
+  CRUD routes: /admin/vocabulary-sets (+items), /admin/grammar-rules.
+  POST /admin/content-generation-jobs: rate limit per-admin-per-module (409), spawn goroutine.
+  GET .../jobs/:id (poll), PATCH .../draft, POST .../publish (validate-all atomic), POST .../reject.
+  `skillKindForExerciseType` allowlist for 4 new types.
+  Quizcard: score=1/1, store known/review in transcript_json.quizcard_result.
+  Source fields (source_type/source_id/generation_job_id) set on every exercise created at publish.
 
 - [ ] **VG-C** CMS `/vocabulary` page: VocabularySet list + modal (word list table, paste support) +
   GenerationScopePanel + 2s poll spinner + `DraftReviewPanel` with per-type editors:

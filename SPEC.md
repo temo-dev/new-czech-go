@@ -473,12 +473,50 @@ POST   /v1/admin/content-generation-jobs/:id/reject
 - `MatchingWidget` — tap-to-pair, color-coded connections, submit when all paired
 - Reuse `FillInWidget` + `MultipleChoiceWidget` from V3
 
+### Matching Exercise Contract (frozen)
+
+```json
+// Stored in exercises.detail
+{
+  "pairs": [
+    { "left_id": "1", "left": "chodím", "right_id": "A", "right": "đi bộ" },
+    { "left_id": "2", "left": "běžím",  "right_id": "B", "right": "chạy"  }
+  ],
+  "correct_answers": { "1": "A", "2": "B" }
+}
+
+// Learner submits (Flutter shuffles right-side display, left stays fixed)
+{ "answers": { "1": "C", "2": "A" } }
+
+// Scoring: exact match on right_id key (single char → exact in ScoreObjectiveAnswers)
+```
+
+Flutter shuffles `right_id`/`right` display order. `left_id` order is fixed. Server stores deterministic pairs.
+
+### Store Architecture (V6, frozen)
+
+Three new interfaces following existing `SkillStore` pattern:
+- `VocabularyStore` — CRUD for vocabulary_sets + vocabulary_items
+- `GrammarStore` — CRUD for grammar_rules
+- `GenerationJobStore` — job lifecycle + `MarkAllRunningFailed(msg)` called on server start
+
+`ContentGenerator` interface with `ClaudeContentGenerator` (prod) + `MockContentGenerator` (tests).
+
+Shared `ValidateExercisePayload()` + `BuildExerciseFromDraft()` used by both HTTP handler and publish endpoint.
+
+### Rate Limit Scope (frozen)
+
+Per admin per module: `WHERE requested_by='admin' AND module_id=$1 AND status IN ('pending','running')`.
+Admin can generate for different modules simultaneously.
+
 ### V6 Boundaries
 
 NEVER in V6:
 - LLM in scoring/grading flow
 - Auto-publish without admin review
-- Per-exercise regenerate
+- Per-exercise regenerate (per-job only)
 - Quizcard mastery dashboard (backlog)
 - pool=exam for any new exercise type
 - Partial publish (all-or-nothing)
+- Full-text matching answers (use option key A/B/C)
+- Goroutine left stuck on server restart (must recover on boot)

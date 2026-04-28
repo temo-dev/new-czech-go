@@ -1,11 +1,11 @@
-# V6 — LLM-Assisted Vocab & Grammar (Final Plan)
+# V6 — LLM-Assisted Vocab & Grammar (Implementation-Ready Plan)
 
-**Updated**: 2026-04-28 — incorporates all 10 finalized decisions.  
+**Updated**: 2026-04-28 — all decisions finalized. Ready for VG-A.  
 **Design**: Admin input → Async LLM job → Admin review/edit → Validate → Publish
 
 ---
 
-## Finalized Decisions
+## All Finalized Decisions
 
 | # | Decision | Final |
 |---|----------|-------|
@@ -19,6 +19,17 @@
 | 8 | LLM boundary | **Authoring only** — never objective scoring. Published content scored deterministically in Go. |
 | 9 | Publish behavior | **Validate all first**, then publish all atomically. Fail = 400 + error list, nothing published. |
 | 10 | Flutter reuse | **Reuse** `FillInWidget` + `MultipleChoiceWidget` from V3. New: `QuizcardWidget` + `MatchingWidget`. |
+| B1 | Matching format | **Option key A/B/C** — `correct_answers: {"1":"A","2":"B"}`. Exact match. No full text. |
+| B2 | postgres_exercises.go | **Update** CreateExercise/UpdateExercise to write source_type/source_id/generation_job_id |
+| B3 | Goroutine recovery | **On server start**: mark all `status='running'` jobs as `failed` (anti-leak) |
+| B4 | Shared validation | **Extract** `ValidateExercisePayload()` + `BuildExerciseFromDraft()` — shared by HTTP handler + publish endpoint |
+| G1 | Module selector | **In modal**: course dropdown → module dropdown cascade. No URL param. |
+| G2 | Matching shuffle | **Flutter-side** — server stores deterministic pairs; Flutter shuffles right-side options for display |
+| G3 | CMS polling | **useEffect + setInterval(2s)** — stop on terminal status, cleanup on unmount |
+| G4 | Store interfaces | **3 interfaces**: `VocabularyStore`, `GrammarStore`, `GenerationJobStore` (with memory fallback) |
+| G5 | ID generation | **Go-side** prefixed IDs: `vocset-`, `vocitem-`, `grammar-`, `genjob-` |
+| M1 | ContentGenerator | **Interface + MockContentGenerator** for unit tests (no Claude calls in tests) |
+| M2 | Rate limit scope | **Per admin per module** — `WHERE requested_by='admin' AND module_id=$1 AND status IN ('pending','running')` |
 
 ---
 
@@ -57,6 +68,246 @@ Admin (CMS)
           ▼
   ObjectiveResultCard (score + explanation)
 ```
+
+---
+
+## Implementation Contracts (previously missing, now locked)
+
+### Matching Exercise — Full Contract
+
+**Exercise payload stored in DB** (`MatchingDetail`):
+```json
+{
+  "pairs": [
+    { "left_id": "1", "left": "chodím", "right_id": "A", "right": "đi bộ" },
+    { "left_id": "2", "left": "běžím",  "right_id": "B", "right": "chạy"  },
+    { "left_id": "3", "left": "jedu",   "right_id": "C", "right": "đi (xe)" },
+    { "left_id": "4", "left": "letím",  "right_id": "D", "right": "bay"   }
+  ],
+  "correct_answers": { "1": "A", "2": "B", "3": "C", "4": "D" }
+}
+```
+
+**Flutter rendering**:
+- Left column: Czech terms in `left_id` order (fixed, not shuffled)
+- Right column: Vietnamese options shuffled from `right_id`/`right` pairs
+- Learner taps a left term → taps a right option → creates pair
+- Submit: `answers = {"1": "C", "2": "A", "3": "D", "4": "B"}` (whatever learner chose)
+
+**Scoring** (exact match, `len(correct) <= 1 char` rule → exact):
+```go
+// right_id values are "A"/"B"/"C"/"D" — single char → exact match in ScoreObjectiveAnswers
+correct_answers["1"] = "A"
+learner_answers["1"] = "A"  // ✓ or "C" // ✗
+```
+
+No substring match. No fuzzy. Pure exact match inherited from existing scorer.
+
+---
+
+### Store Interfaces (Go — new in VG-A)
+
+```go
+type VocabularyStore interface {
+    CreateVocabularySet(set contracts.VocabularySet) (contracts.VocabularySet, error)
+    GetVocabularySet(id string) (contracts.VocabularySet, bool)
+    ListVocabularySets(moduleID string) []contracts.VocabularySet
+    UpdateVocabularySet(id string, update contracts.VocabularySet) (contracts.VocabularySet, bool)
+    DeleteVocabularySet(id string) bool
+    CreateVocabularyItem(item contracts.VocabularyItem) contracts.VocabularyItem
+    ListVocabularyItems(setID string) []contracts.VocabularyItem
+    DeleteVocabularyItem(id string) bool
+}
+
+type GrammarStore interface {
+    CreateGrammarRule(rule contracts.GrammarRule) (contracts.GrammarRule, error)
+    GetGrammarRule(id string) (contracts.GrammarRule, bool)
+    ListGrammarRules(moduleID string) []contracts.GrammarRule
+    UpdateGrammarRule(id string, update contracts.GrammarRule) (contracts.GrammarRule, bool)
+    DeleteGrammarRule(id string) bool
+}
+
+type GenerationJobStore interface {
+    CreateJob(job contracts.ContentGenerationJob) contracts.ContentGenerationJob
+    GetJob(id string) (contracts.ContentGenerationJob, bool)
+    UpdateJobRunning(id string)
+    UpdateJobGenerated(id string, payload json.RawMessage, tokens, outputTokens int, costUSD float64, durationMs int)
+    UpdateJobFailed(id string, errMsg string)
+    UpdateJobDraft(id string, editedPayload json.RawMessage) bool
+    UpdateJobPublished(id string, publishedAt time.Time) bool
+    UpdateJobRejected(id string) bool
+    FindActiveJob(requestedBy, moduleID string) (contracts.ContentGenerationJob, bool)
+    MarkAllRunningFailed(errMsg string)  // called on server start
+}
+```
+
+---
+
+### ContentGenerator Interface + Mock (Go)
+
+```go
+// backend/internal/processing/content_generator.go
+
+type VocabularyGenerationInput struct {
+    Items           []contracts.VocabularyItem
+    Level           string   // A1/A2/B1
+    ExplanationLang string   // vi/en/cs
+    ExerciseTypes   []string
+    NumPerType      map[string]int
+}
+
+type GrammarGenerationInput struct {
+    Title       string
+    Level       string
+    Forms       map[string]string // "já":"jsem","ty":"jsi"
+    Constraints string
+    ExerciseTypes []string
+    NumPerType    map[string]int
+}
+
+type ContentGenerator interface {
+    GenerateVocabulary(ctx context.Context, input VocabularyGenerationInput) (*contracts.GeneratedPayload, error)
+    GenerateGrammar(ctx context.Context, input GrammarGenerationInput) (*contracts.GeneratedPayload, error)
+}
+
+// Production impl: ClaudeContentGenerator (uses tool_use)
+// Test impl:
+type MockContentGenerator struct {
+    Payload *contracts.GeneratedPayload
+    Err     error
+}
+func (m *MockContentGenerator) GenerateVocabulary(_ context.Context, _ VocabularyGenerationInput) (*contracts.GeneratedPayload, error) {
+    return m.Payload, m.Err
+}
+func (m *MockContentGenerator) GenerateGrammar(_ context.Context, _ GrammarGenerationInput) (*contracts.GeneratedPayload, error) {
+    return m.Payload, m.Err
+}
+```
+
+---
+
+### Shared Exercise Validation (Go — extracted from handleAdminExercises)
+
+```go
+// backend/internal/processing/exercise_validator.go
+
+func ValidateExercisePayload(exerciseType string, ex contracts.GeneratedExercise) []string {
+    var errs []string
+    switch exerciseType {
+    case "quizcard_basic":
+        if ex.FrontText == "" { errs = append(errs, "front_text required") }
+        if ex.BackText  == "" { errs = append(errs, "back_text required") }
+    case "choice_word":
+        if ex.Prompt == "" { errs = append(errs, "prompt required") }
+        if len(ex.Options) < 2 { errs = append(errs, "need ≥2 options") }
+        if !slices.Contains(ex.Options, ex.CorrectAnswer) { errs = append(errs, "correct_answer not in options") }
+        if hasDuplicates(ex.Options) { errs = append(errs, "duplicate options") }
+    case "fill_blank":
+        if !strings.Contains(ex.Prompt, "___") { errs = append(errs, "prompt must contain ___") }
+        if ex.CorrectAnswer == "" { errs = append(errs, "correct_answer required") }
+    case "matching":
+        if len(ex.Pairs) < 2 { errs = append(errs, "need ≥2 pairs") }
+        // check no duplicate left or right
+    }
+    if ex.Explanation == "" { errs = append(errs, "explanation required") }
+    return errs
+}
+
+func BuildExerciseFromDraft(ex contracts.GeneratedExercise, skillID, jobID, sourceType, sourceID string) (contracts.Exercise, error) {
+    // Build contracts.Exercise with correct Detail struct per type
+    // Set SkillID, SourceType, SourceID, GenerationJobID
+    // Set Status = "published", Pool = "course"
+    // Generate ID with prefix (vocset- etc)
+}
+```
+
+Used by:
+- `handleAdminExercises` POST (manual creation via CMS form)
+- `handlePublishGenerationJob` (publish endpoint)
+
+---
+
+### CMS Polling Hook Pattern
+
+```tsx
+// In vocabulary/grammar pages — no SWR/React Query needed
+
+function useJobPoller(jobId: string | null, onComplete: (job: GenerationJob) => void) {
+  const [job, setJob] = useState<GenerationJob | null>(null);
+
+  useEffect(() => {
+    if (!jobId) return;
+    const TERMINAL = ['generated', 'failed', 'rejected', 'published'];
+    const id = setInterval(async () => {
+      const res = await fetch(`/api/admin/content-generation-jobs/${jobId}`);
+      const j = await res.json();
+      setJob(j.data);
+      if (TERMINAL.includes(j.data?.status)) {
+        clearInterval(id);
+        onComplete(j.data);
+      }
+    }, 2000);
+    return () => clearInterval(id);  // cleanup on unmount
+  }, [jobId]);
+
+  return job;
+}
+```
+
+---
+
+### Server Startup Recovery
+
+```go
+// In main.go or repo initialization, after DB connection established:
+if err := repo.MarkAllRunningJobsFailed("Server restarted while generation was running"); err != nil {
+    log.Printf("warn: failed to recover stuck jobs: %v", err)
+    // non-fatal, continue startup
+}
+```
+
+SQL executed:
+```sql
+UPDATE content_generation_jobs
+SET status = 'failed',
+    error_message = $1,
+    updated_at = NOW()
+WHERE status = 'running';
+```
+
+---
+
+### ID Generation Prefixes
+
+```go
+// Go-side, consistent with newUUIDLikeID() pattern
+func newVocSetID()    string { return "vocset-"  + newUUIDLikeID() }
+func newVocItemID()   string { return "vocitem-" + newUUIDLikeID() }
+func newGrammarID()   string { return "grammar-" + newUUIDLikeID() }
+func newGenJobID()    string { return "genjob-"  + newUUIDLikeID() }
+```
+
+Migration SQL: no DEFAULT for id column — let Go set it.
+
+---
+
+### CMS Module Selector (in VocabularySetModal + GrammarRuleModal)
+
+```
+VocabularySetModal fields (in order):
+1. Course     <select> — load from GET /api/admin/courses
+2. Module     <select> — load from GET /api/admin/modules?course_id={courseId} on course change
+3. Title      <input>
+4. Level      <select>  A1 / A2 / B1
+5. Topic      <input>  (optional, used in LLM prompt)
+6. Explanation lang  <select>  VI / EN / CS
+7. Word list table  (term | meaning | POS columns, add/remove row)
+
+On Save: POST /admin/vocabulary-sets { module_id, title, level, topic, explanation_lang, items[] }
+Backend auto-creates tu_vung skill if module doesn't have one.
+```
+
+Same pattern for GrammarRuleModal with explanation_vi + rule_table key-value pairs.
 
 ---
 
