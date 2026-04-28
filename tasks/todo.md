@@ -66,6 +66,20 @@ source traceability on exercises, quizcard completion-only, 1-active-job-per-adm
 
 ---
 
+## Admin Login Feature
+
+Chi tiết + AC đầy đủ trong `tasks/plan-admin-auth.md`.  
+Design: env-configured credentials → opaque token (crypto/rand) → HTTP-only cookie → CMS login page
+
+- [ ] **A1** Backend: `ADMIN_EMAIL`/`ADMIN_PASSWORD` env vars + `crypto/rand` token + 24h TTL expiry trong `UserByToken` (thay hardcoded "demo123"/"dev-admin-token")
+- [ ] **A2** CMS: `/login` page (email+password form) + `POST /api/auth/login` proxy route (set HTTP-only cookie) + `GET /api/auth/logout` (clear cookie)
+- [ ] **A3** CMS: thay `cms/middleware.ts` Basic Auth bằng cookie `admin_token` guard → redirect `/login` nếu missing
+- [ ] **A4** CMS: helper `cms/lib/auth.ts` `getAdminToken(req)` + thread token qua tất cả 15 proxy routes (xóa hardcoded `CMS_ADMIN_TOKEN` module-level const)
+
+**[CHECKPOINT A]** `make verify` + manual: login → CRUD → logout → redirect to /login
+
+---
+
 ## Backlog (sau V5)
 
 - [ ] Polly 2 voices cho `poslech_4` dialogs (upgrade từ Option B)

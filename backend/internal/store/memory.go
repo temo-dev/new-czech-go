@@ -1,7 +1,10 @@
 package store
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +15,9 @@ import (
 type MemoryStore struct {
 	mu             sync.RWMutex
 	usersByToken   map[string]contracts.User
+	tokenExpiry    map[string]time.Time // only set for dynamically issued tokens
+	adminEmail     string
+	adminPassword  string
 	plan           contracts.LearningPlan
 	courses        CourseStore
 	modules        ModuleStore
@@ -20,8 +26,8 @@ type MemoryStore struct {
 	attempts       AttemptStore
 	mockExams      MockExamStore
 	mockTests      MockTestStore
-	exerciseAudio  map[string]contracts.ExerciseAudio   // exercise_id → audio
-	fullExams      map[string]contracts.FullExamSession  // id → session
+	exerciseAudio  map[string]contracts.ExerciseAudio  // exercise_id → audio
+	fullExams      map[string]contracts.FullExamSession // id → session
 	vocabulary     VocabularyStore
 	grammar        GrammarStore
 	generationJobs GenerationJobStore
@@ -43,7 +49,19 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 		exercises = newMemoryExerciseStore(seedExercises())
 	}
 
+	adminEmail := strings.TrimSpace(os.Getenv("ADMIN_EMAIL"))
+	if adminEmail == "" {
+		adminEmail = "admin@example.com"
+	}
+	adminPassword := strings.TrimSpace(os.Getenv("ADMIN_PASSWORD"))
+	if adminPassword == "" {
+		adminPassword = "demo123"
+	}
+
 	return &MemoryStore{
+		adminEmail:    adminEmail,
+		adminPassword: adminPassword,
+		tokenExpiry:   map[string]time.Time{},
 		usersByToken: map[string]contracts.User{
 			"dev-learner-token": {
 				ID:                "user-learner-1",
@@ -59,6 +77,7 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 				DisplayName:       "Tran Binh",
 				PreferredLanguage: "vi",
 			},
+			// dev-admin-token stays valid for backward compat (tests, local CMS dev)
 			"dev-admin-token": {
 				ID:                "user-admin-1",
 				Role:              "admin",
@@ -88,24 +107,65 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 }
 
 func (s *MemoryStore) Login(email, password string) (string, contracts.User, bool) {
-	if password != "demo123" {
-		return "", contracts.User{}, false
+	email = strings.ToLower(strings.TrimSpace(email))
+
+	// Admin login — credentials from env (fallback: admin@example.com / demo123)
+	if email == strings.ToLower(s.adminEmail) && password == s.adminPassword {
+		token := newRandomToken()
+		user := contracts.User{
+			ID:                "user-admin-1",
+			Role:              "admin",
+			Email:             s.adminEmail,
+			DisplayName:       "CMS Admin",
+			PreferredLanguage: "vi",
+		}
+		s.mu.Lock()
+		s.usersByToken[token] = user
+		s.tokenExpiry[token] = time.Now().Add(24 * time.Hour)
+		s.mu.Unlock()
+		return token, user, true
 	}
-	switch strings.ToLower(strings.TrimSpace(email)) {
+
+	// Learner dev login (static tokens, no expiry)
+	switch email {
 	case "learner@example.com":
-		return "dev-learner-token", s.usersByToken["dev-learner-token"], true
-	case "admin@example.com":
-		return "dev-admin-token", s.usersByToken["dev-admin-token"], true
-	default:
-		return "", contracts.User{}, false
+		if password == "demo123" {
+			return "dev-learner-token", s.usersByToken["dev-learner-token"], true
+		}
+	case "learner2@example.com":
+		if password == "demo123" {
+			return "dev-learner-2-token", s.usersByToken["dev-learner-2-token"], true
+		}
 	}
+
+	return "", contracts.User{}, false
 }
 
 func (s *MemoryStore) UserByToken(token string) (contracts.User, bool) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
+	expiry, hasExpiry := s.tokenExpiry[token]
 	user, ok := s.usersByToken[token]
-	return user, ok
+	s.mu.RUnlock()
+
+	if !ok {
+		return contracts.User{}, false
+	}
+	if hasExpiry && time.Now().After(expiry) {
+		s.mu.Lock()
+		delete(s.usersByToken, token)
+		delete(s.tokenExpiry, token)
+		s.mu.Unlock()
+		return contracts.User{}, false
+	}
+	return user, true
+}
+
+func newRandomToken() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("token-%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b)
 }
 
 func (s *MemoryStore) Course() contracts.Course {
