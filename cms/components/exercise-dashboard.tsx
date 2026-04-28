@@ -823,6 +823,7 @@ export function ExerciseDashboard() {
   const [filterCourseId, setFilterCourseId] = useState('');
   const [filterSkillId, setFilterSkillId] = useState('');
   const [filterMockTestId, setFilterMockTestId] = useState('');
+  const [filterText, setFilterText] = useState('');
 
   const editingItem = editingId ? items.find((item) => item.id === editingId) ?? null : null;
   const currentAssets = editingItem?.assets ?? [];
@@ -1045,6 +1046,8 @@ export function ExerciseDashboard() {
       if (mod?.course_id !== filterCourseId) return false;
     }
     if (mtExerciseIds && !mtExerciseIds.has(item.id)) return false;
+    if (filterText && !item.title.toLowerCase().includes(filterText.toLowerCase())
+        && !item.exercise_type.toLowerCase().includes(filterText.toLowerCase())) return false;
     return true;
   });
 
@@ -1849,165 +1852,135 @@ export function ExerciseDashboard() {
       )}{/* end modal overlay */}
 
       {/* ── Inventory — full width ──────────────────────────────────────── */}
-      <section
-        style={{
-          display: 'grid',
-          gap: 14,
-          padding: 24,
-          borderRadius: 28,
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          boxShadow: 'var(--shadow)',
-          minHeight: 420,
-        }}
-      >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: 12,
-            }}
-          >
-            <div>
-              <span style={eyebrowStyle}>{S.exercise.inventoryEyebrow}</span>
-              <h2 style={{ margin: '6px 0 0' }}>{S.exercise.inventoryTitle}</h2>
-              <p
-                style={{
-                  margin: '6px 0 0',
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                {S.exercise.inventorySubtitle}
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                onClick={loadExercises}
-                style={{ borderRadius: 16, border: '1px solid var(--border)', background: 'var(--surface-muted)', padding: '10px 14px', cursor: 'pointer', fontWeight: 600 }}
-              >
-                {S.exercise.refresh}
-              </button>
-              <button
-                type="button"
-                onClick={() => { resetForm(); setShowModal(true); }}
-                style={{ borderRadius: 16, border: 'none', background: 'var(--primary)', color: '#fff', padding: '10px 18px', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}
-              >
-                + {S.exercise.createCta}
-              </button>
-            </div>
+      <section style={{ background: 'var(--surface)', borderRadius: 28, border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)', overflow: 'hidden' }}>
+
+        {/* Toolbar */}
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ flex: '0 0 auto' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'var(--brand)', textTransform: 'uppercase' }}>{S.exercise.inventoryEyebrow}</span>
+            <h2 style={{ margin: '2px 0 0', fontSize: 20, fontWeight: 700 }}>{S.exercise.inventoryTitle}</h2>
           </div>
-
-          {/* ── Filters ───────────────────────────────────────────────────── */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <select
-              value={filterCourseId}
-              onChange={e => { setFilterCourseId(e.target.value); setFilterSkillId(''); setFilterMockTestId(''); }}
-              style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-muted)', padding: '7px 10px', fontSize: 13, cursor: 'pointer' }}
-            >
-              <option value="">Tất cả khóa học</option>
-              {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-            </select>
-
-            <select
-              value={filterSkillId}
-              onChange={e => { setFilterSkillId(e.target.value); setFilterMockTestId(''); }}
-              style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-muted)', padding: '7px 10px', fontSize: 13, cursor: 'pointer' }}
-            >
-              <option value="">Tất cả kỹ năng</option>
-              {allSkills.map(sk => (
-                <option key={sk.id} value={sk.id}>
-                  {SKILL_KIND_META[sk.skill_kind]?.icon} {sk.title}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filterMockTestId}
-              onChange={e => { setFilterMockTestId(e.target.value); setFilterCourseId(''); setFilterSkillId(''); }}
-              style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-muted)', padding: '7px 10px', fontSize: 13, cursor: 'pointer' }}
-            >
-              <option value="">Tất cả đề thi</option>
-              {mockTests.map(mt => <option key={mt.id} value={mt.id}>{mt.title}</option>)}
-            </select>
-
-            {(filterCourseId || filterSkillId || filterMockTestId) && (
-              <button
-                type="button"
-                onClick={() => { setFilterCourseId(''); setFilterSkillId(''); setFilterMockTestId(''); }}
-                style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: '0 4px' }}
-              >
-                ✕ Xoá filter
-              </button>
-            )}
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 4 }}>
-              {filteredItems.length} / {items.length} bài tập
-            </span>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <input
+              type="search"
+              placeholder="Tìm theo tên, loại bài..."
+              value={filterText}
+              onChange={e => setFilterText(e.target.value)}
+              style={{ width: '100%', padding: '9px 14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface-alt)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+            />
           </div>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button type="button" onClick={loadExercises}
+              style={{ borderRadius: 12, border: '1px solid var(--border)', background: 'transparent', padding: '9px 14px', cursor: 'pointer', fontWeight: 600, fontSize: 13, color: 'var(--ink-2)' }}>
+              ↺
+            </button>
+            <button type="button" onClick={() => { resetForm(); setShowModal(true); }}
+              style={{ borderRadius: 12, border: 'none', background: 'var(--brand)', color: '#fff', padding: '9px 18px', cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
+              + {S.exercise.createCta}
+            </button>
+          </div>
+        </div>
 
-          {error ? (
-            <p style={{ margin: 0, color: 'var(--danger)' }}>{error}</p>
-          ) : null}
+        {/* Filter bar */}
+        <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', background: 'var(--surface-alt)' }}>
+          <select value={filterCourseId} onChange={e => { setFilterCourseId(e.target.value); setFilterSkillId(''); setFilterMockTestId(''); }}
+            style={{ borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', padding: '6px 10px', fontSize: 12, cursor: 'pointer', color: filterCourseId ? 'var(--brand)' : 'var(--ink-3)' }}>
+            <option value="">Khóa học</option>
+            {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+          </select>
+          <select value={filterSkillId} onChange={e => { setFilterSkillId(e.target.value); setFilterMockTestId(''); }}
+            style={{ borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', padding: '6px 10px', fontSize: 12, cursor: 'pointer', color: filterSkillId ? 'var(--brand)' : 'var(--ink-3)' }}>
+            <option value="">Kỹ năng</option>
+            {allSkills.map(sk => <option key={sk.id} value={sk.id}>{SKILL_KIND_META[sk.skill_kind]?.icon} {sk.title}</option>)}
+          </select>
+          <select value={filterMockTestId} onChange={e => { setFilterMockTestId(e.target.value); setFilterCourseId(''); setFilterSkillId(''); }}
+            style={{ borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', padding: '6px 10px', fontSize: 12, cursor: 'pointer', color: filterMockTestId ? 'var(--brand)' : 'var(--ink-3)' }}>
+            <option value="">Đề thi</option>
+            {mockTests.map(mt => <option key={mt.id} value={mt.id}>{mt.title}</option>)}
+          </select>
+          {(filterCourseId || filterSkillId || filterMockTestId || filterText) && (
+            <button type="button" onClick={() => { setFilterCourseId(''); setFilterSkillId(''); setFilterMockTestId(''); setFilterText(''); }}
+              style={{ background: 'none', border: 'none', color: 'var(--brand)', cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '0 4px' }}>
+              ✕ Xoá
+            </button>
+          )}
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-3)', fontVariantNumeric: 'tabular-nums' }}>
+            {filteredItems.length} / {items.length}
+          </span>
+        </div>
 
-          {loading ? <p style={{ margin: 0 }}>Loading exercises...</p> : null}
+        {/* Table header */}
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 100px 96px', gap: 0, padding: '8px 24px', background: 'var(--surface-alt)', borderBottom: '1px solid var(--border)' }}>
+          {['Bài tập', 'Kỹ năng', 'Trạng thái', ''].map((h, i) => (
+            <span key={i} style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', letterSpacing: 0.5, textTransform: 'uppercase' }}>{h}</span>
+          ))}
+        </div>
 
-          <div style={{ display: 'grid', gap: 12 }}>
-            {filteredItems.map((item) => (
-              <article
-                key={item.id}
-                style={{
-                  display: 'grid',
-                  gap: 10,
-                  padding: 18,
-                  borderRadius: 20,
-                  background: 'var(--surface-muted)',
-                  border: '1px solid var(--border)',
-                }}
+        {/* Table body */}
+        {error && <p style={{ margin: '16px 24px', color: 'var(--error)' }}>{error}</p>}
+        {loading && <p style={{ margin: '24px', color: 'var(--ink-3)' }}>Đang tải...</p>}
+        {!loading && filteredItems.length === 0 && (
+          <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--ink-3)' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+            <p style={{ margin: 0, fontWeight: 600 }}>Không tìm thấy bài tập nào</p>
+          </div>
+        )}
+        <div>
+          {filteredItems.map((item, idx) => {
+            const skill = allSkills.find(s => s.id === item.skill_id);
+            const kind = skill?.skill_kind ?? '';
+            const meta = SKILL_KIND_META[kind];
+            const typeColor: Record<string, string> = { noi: '#FF6A14', viet: '#0F3D3A', nghe: '#7C3AED', doc: '#0369A1' };
+            const typeBg: Record<string, string> = { noi: '#fff5ef', viet: '#d9e5e3', nghe: '#f3e8ff', doc: '#e0f2fe' };
+            const color = typeColor[kind] ?? 'var(--ink-3)';
+            const bg = typeBg[kind] ?? 'var(--surface-alt)';
+            return (
+              <div key={item.id}
+                style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 100px 96px', gap: 0, padding: '14px 24px', borderBottom: idx < filteredItems.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center', transition: 'background 120ms' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-alt)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                  }}
-                >
-                  <strong style={{ fontSize: 18 }}>{item.title}</strong>
-                  <span style={badgeStyle}>{S.status[item.status as keyof typeof S.status] ?? item.status}</span>
+                {/* Title + type */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: bg, color, letterSpacing: 0.3, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      {meta?.icon} {item.exercise_type.replace(/_/g, ' ').toUpperCase()}
+                    </span>
+                    <strong style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</strong>
+                  </div>
+                  {item.short_instruction && (
+                    <span style={{ fontSize: 12, color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.short_instruction}</span>
+                  )}
                 </div>
-                <span style={{ color: 'var(--accent)', fontWeight: 700 }}>
-                  {item.exercise_type}
+                {/* Skill */}
+                <span style={{ fontSize: 12, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {skill ? skill.title : <em style={{ color: 'var(--ink-4)' }}>—</em>}
                 </span>
-                <p
-                  style={{
-                    margin: 0,
-                    color: 'var(--text-secondary)',
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {item.short_instruction}
-                </p>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    onClick={() => startEditing(item)}
-                    style={secondaryActionStyle}
-                  >
+                {/* Status */}
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', width: 'fit-content',
+                  fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 99, letterSpacing: 0.3,
+                  background: item.status === 'published' ? 'var(--ready-bg)' : item.status === 'archived' ? 'var(--surface-alt)' : 'var(--needs-bg)',
+                  color: item.status === 'published' ? 'var(--ready)' : item.status === 'archived' ? 'var(--ink-3)' : 'var(--needs)',
+                }}>
+                  {S.status[item.status as keyof typeof S.status] ?? item.status}
+                </span>
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => startEditing(item)}
+                    style={{ padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
                     {S.action.edit}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(item.id)}
-                    style={dangerActionStyle}
-                  >
+                  <button type="button" onClick={() => handleDelete(item.id)}
+                    style={{ padding: '5px 10px', borderRadius: 8, border: 'none', background: 'var(--error-bg)', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--error)' }}>
                     {S.action.delete}
                   </button>
                 </div>
-                <code style={{ color: 'var(--text-secondary)' }}>{item.id}</code>
-              </article>
-            ))}
-          </div>
-        </section>
+              </div>
+            );
+          })}
+        </div>
+      </section>
     </main>
   );
 }
