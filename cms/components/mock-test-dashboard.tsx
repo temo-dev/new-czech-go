@@ -171,7 +171,7 @@ export function MockTestDashboard() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this draft mock test?')) return;
+    if (!confirm('Delete this mock test? This cannot be undone.')) return;
     try {
       const res = await fetch(`${MOCK_TEST_API}/${id}`, { method: 'DELETE' });
       if (!res.ok) {
@@ -260,9 +260,7 @@ export function MockTestDashboard() {
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                   <button onClick={() => openEdit(t)} style={btnStyle('secondary')}>{S.action.edit}</button>
-                  {t.status === 'draft' && (
-                    <button onClick={() => handleDelete(t.id)} style={btnStyle('danger')}>{S.action.delete}</button>
-                  )}
+                  <button onClick={() => handleDelete(t.id)} style={btnStyle('danger')}>{S.action.delete}</button>
                 </div>
               </div>
               {t.sections && t.sections.length > 0 && (
