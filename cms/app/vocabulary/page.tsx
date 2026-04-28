@@ -193,6 +193,9 @@ export default function VocabularyPage() {
   const [saving, setSaving]     = useState(false);
   const [formErr, setFormErr]   = useState('');
 
+  // Delete state
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   // Generation state
   const [genPhase, setGenPhase] = useState<'scope' | 'polling' | 'review' | null>(null);
   const [genSetId, setGenSetId] = useState('');
@@ -223,6 +226,14 @@ export default function VocabularyPage() {
     if (!courseId) { setModules([]); return; }
     const res = await fetch(`/api/admin/modules?course_id=${courseId}`).then(r => r.json());
     setModules(res.data ?? []);
+  }
+
+  async function handleDelete(id: string) {
+    const res = await fetch(`/api/admin/vocabulary-sets/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setSets(prev => prev.filter(s => s.id !== id));
+    }
+    setDeletingId(null);
   }
 
   function openCreate() {
@@ -349,18 +360,35 @@ export default function VocabularyPage() {
           <p style={{ padding: '32px 20px', color: 'var(--ink-3)', margin: 0, textAlign: 'center' }}>Chưa có bộ từ nào. Tạo mới để bắt đầu.</p>
         )}
         {sets.map(s => (
-          <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '2fr 80px 80px 100px 120px', padding: '12px 20px', borderBottom: '1px solid var(--border)', alignItems: 'center', fontSize: 14 }}>
+          <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '2fr 80px 80px 100px 1fr', padding: '12px 20px', borderBottom: '1px solid var(--border)', alignItems: 'center', fontSize: 14 }}>
             <strong style={{ fontWeight: 600 }}>{s.title}</strong>
             <span style={{ color: 'var(--ink-2)' }}>{s.level}</span>
             <span style={{ color: 'var(--ink-2)' }}>{s.explanation_lang.toUpperCase()}</span>
             <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 99, background: s.status === 'published' ? 'var(--ready-bg)' : 'var(--needs-bg)', color: s.status === 'published' ? 'var(--ready)' : 'var(--needs)', width: 'fit-content' }}>
               {s.status}
             </span>
-            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
               <button onClick={() => { setGenSetId(s.id); setGenPhase('scope'); setPublishOk(false); setPublishErr(''); setExercises([]); }}
                 style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                 Generate
               </button>
+              {deletingId === s.id ? (
+                <>
+                  <button onClick={() => handleDelete(s.id)}
+                    style={{ padding: '4px 10px', borderRadius: 8, border: 'none', background: 'var(--error)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                    Xác nhận xóa
+                  </button>
+                  <button onClick={() => setDeletingId(null)}
+                    style={{ padding: '4px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}>
+                    Hủy
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => setDeletingId(s.id)}
+                  style={{ padding: '4px 8px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: 12, color: 'var(--error)' }}>
+                  Xóa
+                </button>
+              )}
             </div>
           </div>
         ))}
