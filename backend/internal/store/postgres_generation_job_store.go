@@ -86,6 +86,7 @@ func (s *postgresGenerationJobStore) GetJob(id string) (contracts.ContentGenerat
 		&j.CreatedAt, &j.UpdatedAt, &publishedAt,
 	)
 	if err != nil {
+		log.Printf("GetJob scan error for id=%q: %v", id, err)
 		return contracts.ContentGenerationJob{}, false
 	}
 	j.SkillID = skillID.String
