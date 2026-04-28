@@ -21,7 +21,7 @@ const (
 // Content generation uses a more capable model since it runs in batch (admin-triggered).
 const (
 	DefaultFeedbackModel = "claude-haiku-4-5-20251001" // real-time, per-attempt
-	DefaultContentModel  = "claude-sonnet-4-6"          // batch, admin-triggered
+	DefaultContentModel  = "claude-haiku-4-5-20251001" // batch, admin-triggered
 )
 
 // ── Request timeouts ──────────────────────────────────────────────────────────
