@@ -87,8 +87,8 @@ Design: slide-over panel + autosave + structured row editors + inline validation
 Không làm 1 form/type — shared scaffold + type-specific sections trong slide-over panel.
 
 - [x] **EF-0** Slide-over panel (modal → aside, 80vw, full-height scroll) + localStorage autosave 10s + dismiss confirm khi isDirty (2026-04-28)
-- [ ] **EF-A** Shared components: `ItemRepeater` (add/remove/reorder), `OptionRow`, `AnswerSelect` (pure controlled)
-- [ ] **EF-B** Poslech 1-5: structured item editors — transcript rows + OptionRow × A-D + AnswerSelect per item
+- [x] **EF-A** Shared components: `ItemRepeater` (add/remove/reorder), `OptionRow`, `AnswerSelect` (pure controlled) (2026-04-28)
+- [x] **EF-B** Poslech 1-5: structured item editors — transcript rows + OptionRow × A-D + AnswerSelect per item (2026-04-28)
 - [ ] **EF-C** Čtení 1-5: structured editors — reading passage + question rows + option inputs + answer dropdowns
 - [ ] **EF-D** Speaking (Uloha 1-4) + Writing (Psaní 1-2): `InfoSlotRow` cho Uloha 2, `ChoiceOptionRow` cho Uloha 4, `ItemRepeater` cho phần còn lại
 - [ ] **EF-E** File split (exercise-dashboard.tsx 2327 dòng → 12 files ≤500 dòng) + inline validation per type
