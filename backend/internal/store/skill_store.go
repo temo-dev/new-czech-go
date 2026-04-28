@@ -8,7 +8,8 @@ import (
 )
 
 type SkillStore interface {
-	SkillsByModule(moduleID string) []contracts.Skill
+	SkillsByModule(moduleID string) []contracts.Skill        // published only — learner endpoint
+	AdminSkillsByModule(moduleID string) []contracts.Skill   // all statuses — admin endpoint
 	SkillByID(id string) (contracts.Skill, bool)
 	CreateSkill(s contracts.Skill) (contracts.Skill, error)
 	UpdateSkill(id string, update contracts.Skill) (contracts.Skill, bool)
@@ -39,6 +40,18 @@ func (s *memorySkillStore) SkillsByModule(moduleID string) []contracts.Skill {
 	out := make([]contracts.Skill, 0)
 	for _, sk := range s.skills {
 		if sk.ModuleID == moduleID && sk.Status == "published" {
+			out = append(out, *sk)
+		}
+	}
+	return out
+}
+
+func (s *memorySkillStore) AdminSkillsByModule(moduleID string) []contracts.Skill {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]contracts.Skill, 0)
+	for _, sk := range s.skills {
+		if sk.ModuleID == moduleID {
 			out = append(out, *sk)
 		}
 	}

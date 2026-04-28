@@ -158,6 +158,9 @@ func (s *MemoryStore) DeleteModule(id string) bool {
 func (s *MemoryStore) SkillsByModule(moduleID string) []contracts.Skill {
 	return s.skills.SkillsByModule(moduleID)
 }
+func (s *MemoryStore) AdminSkillsByModule(moduleID string) []contracts.Skill {
+	return s.skills.AdminSkillsByModule(moduleID)
+}
 func (s *MemoryStore) SkillByID(id string) (contracts.Skill, bool) {
 	return s.skills.SkillByID(id)
 }

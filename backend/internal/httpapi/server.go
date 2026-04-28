@@ -2059,11 +2059,9 @@ func (s *Server) handleAdminSkills(w http.ResponseWriter, r *http.Request, _ con
 		moduleID := r.URL.Query().Get("module_id")
 		var skills []contracts.Skill
 		if moduleID != "" {
-			skills = s.repo.SkillsByModule(moduleID)
+			skills = s.repo.AdminSkillsByModule(moduleID)
 		} else {
-			// return all (admin view)
-			writeJSON(w, http.StatusOK, map[string]any{"data": []contracts.Skill{}, "meta": map[string]any{}})
-			return
+			skills = []contracts.Skill{}
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"data": skills, "meta": map[string]any{}})
 	case http.MethodPost:

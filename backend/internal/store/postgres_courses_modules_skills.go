@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"sort"
 	"time"
 
@@ -59,6 +60,10 @@ func (s *postgresCourseStore) ListCourses(status string) []contracts.Course {
 		if err := rows.Scan(&c.ID, &c.Slug, &c.Title, &c.Description, &c.Status, &c.SequenceNo); err == nil {
 			out = append(out, c)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("postgresCourseStore.ListCourses rows error: %v", err)
+		return nil
 	}
 	return out
 }
@@ -188,6 +193,10 @@ func (s *postgresModuleStore) ListModules(kind, courseID string) []contracts.Mod
 			out = append(out, m)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		log.Printf("postgresModuleStore.ListModules rows error: %v", err)
+		return nil
+	}
 	sort.Slice(out, func(i, j int) bool { return out[i].SequenceNo < out[j].SequenceNo })
 	return out
 }
@@ -309,6 +318,35 @@ func (s *postgresSkillStore) SkillsByModule(moduleID string) []contracts.Skill {
 		if err := rows.Scan(&sk.ID, &sk.ModuleID, &sk.SkillKind, &sk.Title, &sk.SequenceNo, &sk.Status); err == nil {
 			out = append(out, sk)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("postgresSkillStore.SkillsByModule rows error: %v", err)
+		return nil
+	}
+	return out
+}
+
+func (s *postgresSkillStore) AdminSkillsByModule(moduleID string) []contracts.Skill {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, module_id, skill_kind, title, sequence_no, status FROM skills
+		 WHERE module_id = $1
+		 ORDER BY sequence_no ASC`, moduleID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []contracts.Skill
+	for rows.Next() {
+		var sk contracts.Skill
+		if err := rows.Scan(&sk.ID, &sk.ModuleID, &sk.SkillKind, &sk.Title, &sk.SequenceNo, &sk.Status); err == nil {
+			out = append(out, sk)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("postgresSkillStore.AdminSkillsByModule rows error: %v", err)
+		return nil
 	}
 	return out
 }
