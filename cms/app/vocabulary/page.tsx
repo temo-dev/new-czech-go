@@ -584,7 +584,7 @@ export default function VocabularyPage() {
                   {i + 1}
                 </div>
                 <span style={{ fontSize: 12, fontWeight: genPhase === p ? 700 : 400, color: genPhase === p ? 'var(--ink)' : 'var(--ink-3)' }}>
-                  {p === 'scope' ? 'Cấu hình' : p === 'polling' ? 'Đang tạo...' : 'Review & Publish'}
+                  {p === 'scope' ? 'Cấu hình' : p === 'polling' ? 'Đang tạo...' : 'Chỉnh sửa & Publish'}
                 </span>
                 {i < 2 && <span style={{ color: 'var(--ink-4)' }}>→</span>}
               </div>
@@ -636,16 +636,29 @@ export default function VocabularyPage() {
             </div>
           )}
 
-          {/* Review panel */}
+          {/* Review / Edit draft panel */}
           {genPhase === 'review' && (
             <div style={{ display: 'grid', gap: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0 }}>Review {exercises.length} bài tập</h3>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={handleReject} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}>Từ chối</button>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <h3 style={{ margin: 0 }}>Chỉnh sửa nháp — {exercises.length} bài tập</h3>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>
+                    Sửa trực tiếp từng bài, rồi Lưu nháp hoặc Publish.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button onClick={() => { setGenPhase(null); setJobId(''); }}
+                    style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}>
+                    ← Thoát
+                  </button>
+                  <button onClick={handleReject}
+                    style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: 12, color: 'var(--error)' }}>
+                    Từ chối
+                  </button>
                   <button onClick={() => saveDraft(true)} disabled={savingDraft}
                     style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)', background: draftSaved ? 'var(--ready-bg)' : 'transparent', color: draftSaved ? 'var(--ready)' : 'inherit', cursor: savingDraft ? 'wait' : 'pointer', fontSize: 12 }}>
-                    {savingDraft ? 'Đang lưu...' : draftSaved ? '✓ Đã lưu' : 'Lưu nháp'}
+                    {savingDraft ? 'Đang lưu...' : draftSaved ? '✓ Đã lưu nháp' : 'Lưu nháp'}
                   </button>
                   <button onClick={handlePublish} disabled={publishing}
                     style={{ padding: '8px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', cursor: publishing ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700 }}>
@@ -653,6 +666,11 @@ export default function VocabularyPage() {
                   </button>
                 </div>
               </div>
+              {draftSaved && (
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--ready)' }}>
+                  ✓ Đã lưu nháp — bạn có thể tiếp tục chỉnh sửa hoặc ấn Publish khi xong.
+                </p>
+              )}
               {publishErr && <p style={{ color: 'var(--error)', fontSize: 13, margin: 0 }}>{publishErr}</p>}
               {publishOk && <p style={{ color: 'var(--ready)', fontSize: 13, margin: 0 }}>✓ Publish thành công! Bài tập đã vào inventory.</p>}
 
