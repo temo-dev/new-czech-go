@@ -56,46 +56,13 @@ Design: **Async LLM job** (Claude tool_use) → Admin review/edit per-type edito
 Key decisions frozen: async+poll, auto-create skill, per-type editors, per-job-only-regen,
 source traceability on exercises, quizcard completion-only, 1-active-job-per-admin rate limit.
 
-- [ ] **VG-A** Migrations 013-016 (Go-side ID, no DB DEFAULT):
-  013: `vocabulary_sets` + `vocabulary_items`;
-  014: `grammar_rules`;
-  015: `content_generation_jobs` (provider/model/tokens/cost/duration fields);
-  016: `exercises` ADD `source_type`/`source_id`/`generation_job_id` NULL.
-  Go contracts: `VocabularySet`, `VocabularyItem`, `GrammarRule`, `ContentGenerationJob`,
-  `MatchingDetail` (pairs with left_id/right_id, correct_answers option-key), `QuizcardBasicDetail`,
-  `FillBlankDetail`, `ChoiceWordDetail`, `GeneratedExercise`, `GeneratedPayload`.
-  Store interfaces: `VocabularyStore`, `GrammarStore`, `GenerationJobStore` + memory impls.
-  Update `postgres_exercises.go` CreateExercise/UpdateExercise for 3 new columns.
-  Flutter `models.dart`: `isVocabGrammar`/`isQuizcard`/`isMatching`/`isFillBlank`/`isChoiceWord` + parsed fields + `MatchingPairView`.
+- [x] **VG-A** Migrations 013-016 + Go contracts (VocabularySet/GrammarRule/ContentGenerationJob/4 exercise details) + 3 store interfaces + memory impls + Postgres impls + Flutter models.dart V6 flags. (2026-04-28)
+- [x] **VG-B** Backend: llm_config.go + llm_prompts.go + content_generator.go (Claude tool_use) + exercise_validator.go + v6_handlers.go (CRUD vocab/grammar/jobs + publish/reject) + main.go wiring. (2026-04-28)
+- [x] **VG-C** CMS `/vocabulary`: VocabularySet list/modal + word table + 3-phase generate→review→publish with per-type editors (Quizcard/ChoiceWord/FillBlank/Matching) + 2s poll. (2026-04-28)
+- [x] **VG-D** CMS `/grammar`: GrammarRule list/modal (conjugation table, constraints) + same generate→review→publish flow. (2026-04-28)
+- [x] **VG-E** Flutter: VocabGrammarExerciseScreen + QuizcardWidget (200ms flip) + MatchingWidget (color-coded pairs) + filter pills tu_vung/ngu_phap + pushReplacement navigation + "Hoàn thành ✓" on last. (2026-04-28)
 
-- [ ] **VG-B** Backend API + LLM:
-  `content_generator.go`: `ContentGenerator` interface + `ClaudeContentGenerator` (tool_use) + `MockContentGenerator`.
-  `exercise_validator.go`: `ValidateExercisePayload()` + `BuildExerciseFromDraft()` — shared by HTTP handler + publish.
-  `ensureSkill(moduleID, skillKind)` auto-create.
-  Server startup: `repo.MarkAllRunningJobsFailed("Server restarted")`.
-  CRUD routes: /admin/vocabulary-sets (+items), /admin/grammar-rules.
-  POST /admin/content-generation-jobs: rate limit per-admin-per-module (409), spawn goroutine.
-  GET .../jobs/:id (poll), PATCH .../draft, POST .../publish (validate-all atomic), POST .../reject.
-  `skillKindForExerciseType` allowlist for 4 new types.
-  Quizcard: score=1/1, store known/review in transcript_json.quizcard_result.
-  Source fields (source_type/source_id/generation_job_id) set on every exercise created at publish.
-
-- [ ] **VG-C** CMS `/vocabulary` page: VocabularySet list + modal (word list table, paste support) +
-  GenerationScopePanel + 2s poll spinner + `DraftReviewPanel` with per-type editors:
-  `QuizcardDraftEditor` / `ChoiceWordDraftEditor` / `FillBlankDraftEditor` / `MatchingDraftEditor`
-  (each with real-time validation) + [Save Draft] [Publish] [Reject] [New Generation] buttons.
-
-- [ ] **VG-D** CMS `/grammar` page: GrammarRule list + modal (conjugation key-value table, constraints) +
-  GenerationScopePanel (fill_blank + choice_word default, matching optional, no quizcard) +
-  same DraftReviewPanel + publish flow.
-
-- [ ] **VG-E** Flutter: `VocabGrammarExerciseScreen` router +
-  `QuizcardWidget` (200ms flip, Đã biết/Ôn lại, no score display, "Ghi nhận!") +
-  `MatchingWidget` (tap-to-connect, color-coded pairs, [Nộp] when all connected) +
-  reuse `FillInWidget` + `MultipleChoiceWidget` from V3 +
-  `_exerciseMatchesSkillKind` tu_vung/ngu_phap routing + 8 ARB i18n keys.
-
-**[CHECKPOINT VG]** `make backend-build && make backend-test && make cms-build && make flutter-analyze`
+**[CHECKPOINT VG]** ✅ Passed — 2026-04-28
 
 ---
 
