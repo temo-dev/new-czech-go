@@ -1378,6 +1378,72 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'≥{pass}'**
   String fullExamPassSymbol(int pass);
+
+  /// No description provided for @skillModulesLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'KỸ NĂNG'**
+  String get skillModulesLabel;
+
+  /// No description provided for @skillModulesTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phát triển kỹ năng'**
+  String get skillModulesTitle;
+
+  /// No description provided for @skillModulesSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chọn kỹ năng bạn muốn luyện tập hôm nay.'**
+  String get skillModulesSubtitle;
+
+  /// No description provided for @exerciseListProgressLink.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tiến trình nói'**
+  String get exerciseListProgressLink;
+
+  /// No description provided for @exerciseListFlowBadge.
+  ///
+  /// In vi, this message translates to:
+  /// **'LIÊN TỤC'**
+  String get exerciseListFlowBadge;
+
+  /// No description provided for @exerciseListSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tập trung vào sự trôi chảy và phát âm đúng trong các tình huống thực tế.'**
+  String get exerciseListSubtitle;
+
+  /// No description provided for @exerciseListDailySprintLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'CHẾ ĐỘ ĐỀ XUẤT'**
+  String get exerciseListDailySprintLabel;
+
+  /// No description provided for @exerciseListDailySprintTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Luyện tập hàng ngày'**
+  String get exerciseListDailySprintTitle;
+
+  /// No description provided for @exerciseListDailySprintSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Luyện tất cả bài tập cùng lúc và nhận phản hồi ngay từ AI coach.'**
+  String get exerciseListDailySprintSubtitle;
+
+  /// No description provided for @exerciseListDailySprintCta.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bắt đầu tất cả'**
+  String get exerciseListDailySprintCta;
+
+  /// No description provided for @exerciseOpenError.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể mở bài tập. Vui lòng thử lại.'**
+  String get exerciseOpenError;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -107,15 +107,15 @@ class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
                           children: [
                             const SizedBox(height: AppSpacing.x4),
                             // Section label
-                            Text('SKILL MODULES',
+                            Text(l.skillModulesLabel,
                                 style: AppTypography.labelUppercase.copyWith(
                                     color: AppColors.primary, fontSize: 11, letterSpacing: 1.2)),
                             const SizedBox(height: AppSpacing.x2),
-                            Text('Rozvíjejte své dovednosti',
+                            Text(l.skillModulesTitle,
                                 style: AppTypography.titleLarge.copyWith(fontSize: 26, fontWeight: FontWeight.w700)),
                             const SizedBox(height: AppSpacing.x1),
                             Text(
-                              'Vyberte si oblast, kterou chcete dnes procvičovat.',
+                              l.skillModulesSubtitle,
                               style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant),
                             ),
                             const SizedBox(height: AppSpacing.x5),

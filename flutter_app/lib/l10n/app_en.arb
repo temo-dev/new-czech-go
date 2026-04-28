@@ -289,5 +289,17 @@
     "fullExamPassSymbol": "≥{pass}",
     "@fullExamPassSymbol": {
         "placeholders": { "pass": { "type": "int" } }
-    }
+    },
+
+    "skillModulesLabel": "SKILLS",
+    "skillModulesTitle": "Develop your skills",
+    "skillModulesSubtitle": "Choose the skill you want to practice today.",
+    "exerciseListProgressLink": "Speaking Progress",
+    "exerciseListFlowBadge": "FLOW",
+    "exerciseListSubtitle": "Focus on fluency and correct pronunciation in real situations.",
+    "exerciseListDailySprintLabel": "RECOMMENDED MODE",
+    "exerciseListDailySprintTitle": "Daily Sprint",
+    "exerciseListDailySprintSubtitle": "Practice all exercises at once and get instant AI coach feedback.",
+    "exerciseListDailySprintCta": "Start all",
+    "exerciseOpenError": "Cannot open exercise. Please try again."
 }

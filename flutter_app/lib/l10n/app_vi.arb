@@ -334,5 +334,17 @@
     "fullExamPassSymbol": "≥{pass}",
     "@fullExamPassSymbol": {
         "placeholders": { "pass": { "type": "int" } }
-    }
+    },
+
+    "skillModulesLabel": "KỸ NĂNG",
+    "skillModulesTitle": "Phát triển kỹ năng",
+    "skillModulesSubtitle": "Chọn kỹ năng bạn muốn luyện tập hôm nay.",
+    "exerciseListProgressLink": "Tiến trình nói",
+    "exerciseListFlowBadge": "LIÊN TỤC",
+    "exerciseListSubtitle": "Tập trung vào sự trôi chảy và phát âm đúng trong các tình huống thực tế.",
+    "exerciseListDailySprintLabel": "CHẾ ĐỘ ĐỀ XUẤT",
+    "exerciseListDailySprintTitle": "Luyện tập hàng ngày",
+    "exerciseListDailySprintSubtitle": "Luyện tất cả bài tập cùng lúc và nhận phản hồi ngay từ AI coach.",
+    "exerciseListDailySprintCta": "Bắt đầu tất cả",
+    "exerciseOpenError": "Không thể mở bài tập. Vui lòng thử lại."
 }

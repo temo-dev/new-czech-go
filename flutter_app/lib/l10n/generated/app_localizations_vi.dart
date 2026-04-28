@@ -715,4 +715,37 @@ class AppLocalizationsVi extends AppLocalizations {
   String fullExamPassSymbol(int pass) {
     return '≥$pass';
   }
+
+  @override
+  String get skillModulesLabel => 'KỸ NĂNG';
+
+  @override
+  String get skillModulesTitle => 'Phát triển kỹ năng';
+
+  @override
+  String get skillModulesSubtitle => 'Chọn kỹ năng bạn muốn luyện tập hôm nay.';
+
+  @override
+  String get exerciseListProgressLink => 'Tiến trình nói';
+
+  @override
+  String get exerciseListFlowBadge => 'LIÊN TỤC';
+
+  @override
+  String get exerciseListSubtitle => 'Tập trung vào sự trôi chảy và phát âm đúng trong các tình huống thực tế.';
+
+  @override
+  String get exerciseListDailySprintLabel => 'CHẾ ĐỘ ĐỀ XUẤT';
+
+  @override
+  String get exerciseListDailySprintTitle => 'Luyện tập hàng ngày';
+
+  @override
+  String get exerciseListDailySprintSubtitle => 'Luyện tất cả bài tập cùng lúc và nhận phản hồi ngay từ AI coach.';
+
+  @override
+  String get exerciseListDailySprintCta => 'Bắt đầu tất cả';
+
+  @override
+  String get exerciseOpenError => 'Không thể mở bài tập. Vui lòng thử lại.';
 }

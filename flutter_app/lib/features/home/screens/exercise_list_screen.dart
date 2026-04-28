@@ -46,7 +46,18 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
   }
 
   Future<void> _openExercise(BuildContext context, ExerciseSummary exercise) async {
-    final detail = ExerciseDetail.fromJson(await widget.client.getExercise(exercise.id));
+    final ExerciseDetail detail;
+    try {
+      detail = ExerciseDetail.fromJson(await widget.client.getExercise(exercise.id));
+    } catch (_) {
+      if (!mounted) return;
+      // ignore: use_build_context_synchronously
+      ScaffoldMessenger.of(context).showSnackBar(
+        // ignore: use_build_context_synchronously
+        SnackBar(content: Text(AppLocalizations.of(context).exerciseOpenError)),
+      );
+      return;
+    }
     if (!mounted) return;
 
     // Route reading exercises to ReadingExerciseScreen.
@@ -106,7 +117,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
   }
 
   List<ExerciseSummary> get _filtered {
-    if (_filterTag == null) return _exercises;
+    if (_filterTag == null || widget.skill.skillKind != 'noi') return _exercises;
     return _exercises.where((e) => e.exerciseType.startsWith('uloha_$_filterTag')).toList();
   }
 
@@ -137,7 +148,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
                   child: const Icon(Icons.arrow_back, size: 22),
                 ),
                 const Spacer(),
-                Text('Pokrok v mluvení',
+                Text(l.exerciseListProgressLink,
                     style: AppTypography.bodySmall.copyWith(
                         color: AppColors.primary, fontWeight: FontWeight.w600)),
               ]),
@@ -154,7 +165,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
                       color: AppColors.primaryFixed,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text('PROUD',
+                    child: Text(l.exerciseListFlowBadge,
                         style: AppTypography.labelUppercase.copyWith(
                             color: AppColors.primary, fontSize: 10)),
                   ),
@@ -163,7 +174,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
                       style: AppTypography.titleLarge.copyWith(
                           fontSize: 30, fontWeight: FontWeight.w700)),
                   const SizedBox(height: AppSpacing.x1),
-                  Text('Zaměřte se na plynulost a správnou výslovnost v reálných situacích.',
+                  Text(l.exerciseListSubtitle,
                       style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant)),
                 ],
               ),
@@ -171,27 +182,28 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
 
             const SizedBox(height: AppSpacing.x4),
 
-            // ── Filter pills ─────────────────────────────────────────────────
-            SizedBox(
-              height: 38,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.symmetric(horizontal: h),
-                children: [
-                  _FilterPill(label: 'Tất cả', active: _filterTag == null,
-                      onTap: () => setState(() => _filterTag = null)),
-                  const SizedBox(width: AppSpacing.x2),
-                  for (final n in ['1', '2', '3', '4']) ...[
-                    _FilterPill(
-                      label: 'Úloha $n',
-                      active: _filterTag == n,
-                      onTap: () => setState(() => _filterTag = _filterTag == n ? null : n),
-                    ),
-                    if (n != '4') const SizedBox(width: AppSpacing.x2),
+            // ── Filter pills — only for speaking (noi) skill ─────────────────
+            if (widget.skill.skillKind == 'noi')
+              SizedBox(
+                height: 38,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: h),
+                  children: [
+                    _FilterPill(label: 'Tất cả', active: _filterTag == null,
+                        onTap: () => setState(() => _filterTag = null)),
+                    const SizedBox(width: AppSpacing.x2),
+                    for (final n in ['1', '2', '3', '4']) ...[
+                      _FilterPill(
+                        label: 'Úloha $n',
+                        active: _filterTag == n,
+                        onTap: () => setState(() => _filterTag = _filterTag == n ? null : n),
+                      ),
+                      if (n != '4') const SizedBox(width: AppSpacing.x2),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
 
             const SizedBox(height: AppSpacing.x3),
 
@@ -360,6 +372,7 @@ class _DailySprintCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.x5),
       padding: const EdgeInsets.all(AppSpacing.x5),
@@ -370,15 +383,15 @@ class _DailySprintCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('DOPORUČENÝ REŽIM',
+          Text(l.exerciseListDailySprintLabel,
               style: AppTypography.labelUppercase.copyWith(
                   color: AppColors.inverseOnSurfaceLight.withAlpha(160), fontSize: 10)),
           const SizedBox(height: AppSpacing.x2),
-          Text('Denní Sprint',
+          Text(l.exerciseListDailySprintTitle,
               style: AppTypography.titleLarge.copyWith(
                   color: AppColors.inverseOnSurfaceLight, fontWeight: FontWeight.w700, fontSize: 22)),
           const SizedBox(height: AppSpacing.x1),
-          Text('Procvičte si všechny úkoly najednou a získejte okamžitou zpětnou vazbu od AI kouče.',
+          Text(l.exerciseListDailySprintSubtitle,
               style: AppTypography.bodySmall.copyWith(
                   color: AppColors.inverseOnSurfaceLight.withAlpha(200))),
           const SizedBox(height: AppSpacing.x4),
@@ -387,7 +400,7 @@ class _DailySprintCard extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: onTap,
               icon: const Icon(Icons.flash_on_rounded, size: 18),
-              label: const Text('Spustit vše'),
+              label: Text(l.exerciseListDailySprintCta),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.onPrimary,

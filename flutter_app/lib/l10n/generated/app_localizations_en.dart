@@ -715,4 +715,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String fullExamPassSymbol(int pass) {
     return '≥$pass';
   }
+
+  @override
+  String get skillModulesLabel => 'SKILLS';
+
+  @override
+  String get skillModulesTitle => 'Develop your skills';
+
+  @override
+  String get skillModulesSubtitle => 'Choose the skill you want to practice today.';
+
+  @override
+  String get exerciseListProgressLink => 'Speaking Progress';
+
+  @override
+  String get exerciseListFlowBadge => 'FLOW';
+
+  @override
+  String get exerciseListSubtitle => 'Focus on fluency and correct pronunciation in real situations.';
+
+  @override
+  String get exerciseListDailySprintLabel => 'RECOMMENDED MODE';
+
+  @override
+  String get exerciseListDailySprintTitle => 'Daily Sprint';
+
+  @override
+  String get exerciseListDailySprintSubtitle => 'Practice all exercises at once and get instant AI coach feedback.';
+
+  @override
+  String get exerciseListDailySprintCta => 'Start all';
+
+  @override
+  String get exerciseOpenError => 'Cannot open exercise. Please try again.';
 }
