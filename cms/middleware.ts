@@ -1,55 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-function unauthorizedResponse() {
-  return new NextResponse('Authentication required.', {
-    status: 401,
-    headers: {
-      'WWW-Authenticate': 'Basic realm="A2 Mluveni CMS"',
-    },
-  });
-}
-
-function parseBasicAuth(headerValue: string) {
-  if (!headerValue.startsWith('Basic ')) {
-    return null;
-  }
-
-  try {
-    const decoded = atob(headerValue.slice('Basic '.length));
-    const separatorIndex = decoded.indexOf(':');
-    if (separatorIndex === -1) {
-      return null;
-    }
-
-    return {
-      username: decoded.slice(0, separatorIndex),
-      password: decoded.slice(separatorIndex + 1),
-    };
-  } catch {
-    return null;
-  }
-}
-
 export function middleware(request: NextRequest) {
-  const expectedUser = process.env.CMS_BASIC_AUTH_USER?.trim();
-  const expectedPassword = process.env.CMS_BASIC_AUTH_PASSWORD?.trim();
+  const { pathname } = request.nextUrl;
 
-  if (!expectedUser || !expectedPassword) {
+  // Allow login page and auth API routes through without a token check
+  if (
+    pathname === '/login' ||
+    pathname.startsWith('/api/auth/') ||
+    pathname.startsWith('/api/healthz')
+  ) {
     return NextResponse.next();
   }
 
-  const credentials = parseBasicAuth(request.headers.get('authorization') ?? '');
-  if (!credentials) {
-    return unauthorizedResponse();
-  }
-
-  if (credentials.username !== expectedUser || credentials.password !== expectedPassword) {
-    return unauthorizedResponse();
+  const token = request.cookies.get('admin_token')?.value;
+  if (!token) {
+    const loginUrl = new URL('/login', request.url);
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/((?!api/healthz|_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };

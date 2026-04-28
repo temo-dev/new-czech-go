@@ -1,7 +1,5 @@
 import { NextRequest } from 'next/server';
-
-const apiBaseUrl = process.env.API_BASE_URL ?? 'http://localhost:8080';
-const adminToken = process.env.CMS_ADMIN_TOKEN ?? 'dev-admin-token';
+import { getAdminToken, apiBaseUrl } from '@/lib/auth';
 
 type Ctx = { params: Promise<{ ruleId: string }> };
 
@@ -11,7 +9,7 @@ async function proxy(method: string, req: NextRequest, ctx: Ctx) {
   const url = `${apiBaseUrl}/v1/admin/grammar-rules/${ruleId}`;
   const res = await fetch(url, {
     method, cache: 'no-store',
-    headers: { Authorization: `Bearer ${adminToken}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    headers: { Authorization: `Bearer ${getAdminToken(req)}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
     body,
   });
   return new Response(await res.text(), { status: res.status, headers: { 'Content-Type': 'application/json' } });

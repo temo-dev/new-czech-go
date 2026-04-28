@@ -1,7 +1,5 @@
 import { NextRequest } from 'next/server';
-
-const apiBaseUrl = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
-const adminToken = process.env.CMS_ADMIN_TOKEN ?? process.env.NEXT_PUBLIC_ADMIN_TOKEN ?? 'dev-admin-token';
+import { getAdminToken, apiBaseUrl } from '@/lib/auth';
 
 type RouteContext = {
   params: Promise<{
@@ -10,14 +8,14 @@ type RouteContext = {
   }>;
 };
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext) {
   const { exerciseId, assetId } = await context.params;
 
   const response = await fetch(`${apiBaseUrl}/v1/admin/exercises/${exerciseId}/assets/${assetId}/file`, {
     method: 'GET',
     cache: 'no-store',
     headers: {
-      Authorization: `Bearer ${adminToken}`,
+      Authorization: `Bearer ${getAdminToken(request)}`,
     },
     redirect: 'follow',
   });
