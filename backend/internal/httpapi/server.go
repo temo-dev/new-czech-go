@@ -1300,6 +1300,23 @@ func (s *Server) handleMockExamComplete(w http.ResponseWriter, r *http.Request, 
 	writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})
 }
 
+// skillKindForExerciseType returns the expected skill_kind for an exercise type.
+// Returns "" for unknown types (no constraint applied).
+func skillKindForExerciseType(exerciseType string) string {
+	switch {
+	case strings.HasPrefix(exerciseType, "uloha_"):
+		return "noi"
+	case strings.HasPrefix(exerciseType, "psani_"):
+		return "viet"
+	case strings.HasPrefix(exerciseType, "poslech_"):
+		return "nghe"
+	case strings.HasPrefix(exerciseType, "cteni_"):
+		return "doc"
+	default:
+		return ""
+	}
+}
+
 func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ contracts.User) {
 	switch r.Method {
 	case http.MethodGet:
@@ -1317,12 +1334,25 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 			SampleAnswerEnabled   bool            `json:"sample_answer_enabled"`
 			SampleAnswerText      string          `json:"sample_answer_text"`
 			Status                string          `json:"status"`
+			SkillID               string          `json:"skill_id"`
 			Detail                json.RawMessage `json:"detail"`
 			Questions             []string        `json:"questions"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Title == "" || req.ExerciseType == "" {
 			writeError(w, http.StatusBadRequest, "validation_error", "Title and exercise type are required.", false)
 			return
+		}
+		if req.SkillID != "" {
+			sk, ok := s.repo.SkillByID(req.SkillID)
+			if !ok {
+				writeError(w, http.StatusBadRequest, "validation_error", "skill_id not found.", false)
+				return
+			}
+			if expected := skillKindForExerciseType(req.ExerciseType); expected != "" && sk.SkillKind != expected {
+				writeError(w, http.StatusBadRequest, "validation_error",
+					fmt.Sprintf("Exercise type %q requires skill_kind %q, but skill has kind %q.", req.ExerciseType, expected, sk.SkillKind), false)
+				return
+			}
 		}
 		status := strings.TrimSpace(req.Status)
 		switch status {
@@ -1408,6 +1438,7 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 				exercise.Detail = detail
 			}
 		}
+		exercise.SkillID = req.SkillID
 		created := s.repo.CreateExercise(exercise)
 		writeJSON(w, http.StatusCreated, map[string]any{"data": created, "meta": map[string]any{}})
 	default:
@@ -1458,6 +1489,18 @@ func (s *Server) handleAdminExerciseByID(w http.ResponseWriter, r *http.Request,
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				writeError(w, http.StatusBadRequest, "validation_error", "Invalid exercise update payload.", false)
 				return
+			}
+			if req.SkillID != "" && req.ExerciseType != "" {
+				sk, ok := s.repo.SkillByID(req.SkillID)
+				if !ok {
+					writeError(w, http.StatusBadRequest, "validation_error", "skill_id not found.", false)
+					return
+				}
+				if expected := skillKindForExerciseType(req.ExerciseType); expected != "" && sk.SkillKind != expected {
+					writeError(w, http.StatusBadRequest, "validation_error",
+						fmt.Sprintf("Exercise type %q requires skill_kind %q, but skill has kind %q.", req.ExerciseType, expected, sk.SkillKind), false)
+					return
+				}
 			}
 			exercise, ok := s.repo.UpdateExercise(id, req)
 			if !ok {
