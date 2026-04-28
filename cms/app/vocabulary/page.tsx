@@ -209,6 +209,8 @@ export default function VocabularyPage() {
   const [publishing, setPublishing] = useState(false);
   const [publishErr, setPublishErr] = useState('');
   const [publishOk, setPublishOk]   = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftSaved, setDraftSaved]   = useState(false);
 
   // Resumable draft jobs: setId → jobId (persisted in localStorage)
   const [resumableJobs, setResumableJobs] = useState<Record<string, string>>({});
@@ -370,11 +372,17 @@ export default function VocabularyPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [genPhase, jobId, genSetId]);
 
-  async function saveDraft() {
+  async function saveDraft(showFeedback = false) {
+    if (showFeedback) setSavingDraft(true);
     await adminFetch(`/api/admin/content-generation-jobs/${jobId}?action=draft`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ edited_payload: { exercises } }),
     });
+    if (showFeedback) {
+      setSavingDraft(false);
+      setDraftSaved(true);
+      setTimeout(() => setDraftSaved(false), 2500);
+    }
   }
 
   async function handlePublish() {
@@ -450,11 +458,11 @@ export default function VocabularyPage() {
             <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 99, background: s.status === 'published' ? 'var(--ready-bg)' : 'var(--needs-bg)', color: s.status === 'published' ? 'var(--ready)' : 'var(--needs)', width: 'fit-content' }}>
               {s.status}
             </span>
-            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
               {resumableJobs[s.id] && (
                 <button onClick={() => handleResume(s.id, resumableJobs[s.id])}
                   style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-                  Tiếp tục review →
+                  Draft →
                 </button>
               )}
               <button onClick={() => openEdit(s)}
@@ -635,7 +643,10 @@ export default function VocabularyPage() {
                 <h3 style={{ margin: 0 }}>Review {exercises.length} bài tập</h3>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={handleReject} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}>Từ chối</button>
-                  <button onClick={saveDraft} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: 12 }}>Lưu nháp</button>
+                  <button onClick={() => saveDraft(true)} disabled={savingDraft}
+                    style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)', background: draftSaved ? 'var(--ready-bg)' : 'transparent', color: draftSaved ? 'var(--ready)' : 'inherit', cursor: savingDraft ? 'wait' : 'pointer', fontSize: 12 }}>
+                    {savingDraft ? 'Đang lưu...' : draftSaved ? '✓ Đã lưu' : 'Lưu nháp'}
+                  </button>
                   <button onClick={handlePublish} disabled={publishing}
                     style={{ padding: '8px 14px', borderRadius: 10, border: 'none', background: 'var(--brand)', color: '#fff', cursor: publishing ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700 }}>
                     {publishing ? 'Đang publish...' : `Publish ${exercises.length} bài`}
