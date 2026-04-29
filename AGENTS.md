@@ -26,10 +26,11 @@ MockTest (đề thi)
 
 **Implemented skills:**
 - `noi` (Speaking) — fully implemented: Úloha 1-4, AI scoring, review artifact, MockTest speaking flow
-- `viet` (Writing) — V2: `psani_1_formular` + `psani_2_email`, LLM scoring, `WritingExerciseScreen`
-- `nghe` (Listening) — V3: `poslech_1-5`, Polly TTS exercise audio, objective scoring, `ListeningExerciseScreen`
+- `viet` (Writing) — V2: `psani_1_formular` + `psani_2_email`, LLM scoring, `WritingExerciseScreen`, Polly TTS for model_answer_text
+- `nghe` (Listening) — V3: `poslech_1-5`, Polly TTS exercise audio (2 voices for poslech_4 dialogs), objective scoring, `ListeningExerciseScreen`
 - `doc` (Reading) — V4: `cteni_1-5`, objective scoring (substring fill-in), `ReadingExerciseScreen`
-- `tu_vung`, `ngu_phap` — data model defined, UI placeholder only
+- `tu_vung` — V6: fully implemented. CMS `/vocabulary` với VocabularySet CRUD + AI generation (Claude tool_use async job) + inline review/publish. Flutter: `VocabGrammarExerciseScreen` với `QuizcardWidget`, `MatchingWidget`, filter pills.
+- `ngu_phap` — V6: fully implemented. CMS `/grammar` với GrammarRule CRUD (conjugation table, constraints) + same AI flow. Exercises: matching + fill_blank + choice_word.
 
 **Exercise types** come from Modelový test A2 (NPI ČR, platný od dubna 2026). See `docs/specs/content-and-attempt-model.md` for full list.
 
@@ -131,17 +132,48 @@ The implemented V1 foundation currently includes:
   - `MockTest.session_type`: `speaking` | `pisemna` | `full`
   - `FullExamSession`: tracks pisemna_score (≥42/70) + ustni_score (≥24/40), computes `overall_passed`
   - API: `POST /v1/full-exams`, `GET /v1/full-exams/:id`, `POST /v1/full-exams/:id/complete`
-  - DB: migration `011_full_exam.sql`
+  - DB: migration `011_full_exam.sql` — **now Postgres-persisted** via `FullExamStore` interface
   - CMS: `session_type` dropdown trong MockTest form; `DEFAULT_MAX_POINTS` cho tất cả exercise types
   - Flutter: `FullExamIntroScreen` (section list + submit), `FullExamResultScreen` (2-panel PASS/FAIL)
+  - **Auto-link**: `handleMockExamComplete` tự động link speaking session vào open `FullExamSession` của cùng learner (`FindOpenFullExamForAutoLink`)
+
+- **V6 LLM-Assisted Vocab & Grammar — 2026-04-28:**
+  - Async LLM job (Claude tool_use) → Admin review/edit → Publish atomic
+  - Postgres backing: `vocabulary_sets`, `vocabulary_items`, `grammar_rules`, `content_generation_jobs` tables
+  - CMS `/vocabulary`: VocabularySet list + edit/delete + Generate → inline editors → Lưu nháp / Draft resume / Publish
+  - CMS `/grammar`: GrammarRule (conjugation table + constraints) + same flow, full parity với vocabulary
+  - Flutter: `VocabGrammarExerciseScreen` + `QuizcardWidget` (flip) + `MatchingWidget` + filter pills
+  - Rate limit: 1 active generation job per admin per module
+
+- **Admin login (CMS auth) — 2026-04-28:**
+  - CMS `/login` page với email/password form. Cookie `admin_token` (HTTP-only, 24h) thay cho Basic Auth.
+  - Backend: `ADMIN_EMAIL`/`ADMIN_PASSWORD` env vars; `crypto/rand` token; 24h TTL
+  - Middleware: redirect `/login` nếu không có cookie; `dev-admin-token` vẫn hợp lệ cho backward compat
+  - `lib/auth.ts` `getAdminToken(request)` threads cookie qua 21 admin proxy routes
+
+- **Exercise form upgrade — 2026-04-28:**
+  - Slide-over panel (80vw, full height) thay cramped modal; `localStorage` autosave 10s; dismiss confirm
+  - Structured inputs per exercise type: `ItemRepeater`, `OptionRow`, `AnswerSelect` shared components
+  - `PoslechFields`/`CteniFields` (Option C pattern — own typed state + `onChange(payload)`); `SpeakingFields`/`WritingFields`
+  - Inline validation: `validateExercise()` per type; submit disabled khi invalid
+
+- **Infrastructure hardening — 2026-04-29:**
+  - `ExerciseAudioStore` interface + `postgresExerciseAudioStore`: exercise audio persists qua restart
+  - `FullExamStore` interface + `postgresFullExamStore`: full exam sessions persist
+  - Polly 2 voices for poslech_4: `DialogExerciseAudioGenerator` + `GenerateDialogAudio()` alternating voices + MP3 concat
+  - Polly TTS for writing `model_answer_text`: `ProcessWritingAttempt` generates TTS audio (same pattern as speaking)
+  - `POLLY_VOICE_ID_2` env var for second Czech voice (default: Tomáš)
+
+- **CMS analytics & UX — 2026-04-29:**
+  - Analytics tab trong learners dashboard: pass rate per exercise_type (table + color bar)
+  - Flutter history: skill_kind filter pills trên `HistoryScreen` (Nói/Viết/Nghe/Đọc/Từ vựng/Ngữ pháp)
+  - CMS guide page updated: login, slide-over panel, vocab edit/delete/draft, analytics
 
 Important current limitations:
 - local strict real-transcript mode still depends on valid AWS credentials plus `transcribe:*` IAM on the active local identity
 - learner-surface feedback copy and `sample_answer_text` coverage for `Uloha 3` and `Uloha 4` lighter than `Uloha 1` / `Uloha 2`
 - **Postgres DB hiện đang trống** — admin cần nhập nội dung qua CMS trước khi test Flutter end-to-end
-- Listening exercise audio: `GET /v1/exercises/:id/audio` dùng in-memory store, không persist qua restart (cần Postgres backing)
-- `full_exam_sessions` table chỉ in-memory, chưa có Postgres store (migration 011 tồn tại nhưng chưa wired)
-- V5 ústní session không auto-link với písemná session sau khi speaking mock exam hoàn tất
+- Exercise form file split (exercise-dashboard.tsx ~2000 dòng) deferred — chức năng hoạt động đúng nhưng file chưa được split
 
 ## Working Rules
 - Build in thin vertical slices.
@@ -222,20 +254,16 @@ Do not mix these in one change unless the human asks:
 If you notice adjacent cleanup, note it separately instead of silently expanding scope.
 
 ## Good Next Steps
-V2 Writing ✅ V3 Listening ✅ V4 Reading ✅ V5 Full MockTest (MVP) ✅ — tất cả 16 tasks (W1-W4, L1-L4, R1-R4, M1-M4) hoàn thành.
+V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ — tất cả planned slices hoàn thành (2026-04-29).
+Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 
-Backlog ưu tiên cao (xem `tasks/todo.md`):
+**Remaining backlog (low priority):**
+1. Exercise form file split: `exercise-dashboard.tsx` ~2000 dòng → nhiều file ≤500 dòng (deferred từ EF-E)
+2. Nhập nội dung mẫu qua CMS: ít nhất 1 exercise mỗi loại để test Flutter end-to-end
+3. Polly audio upload flow cho `exercise_audio` (hiện chỉ text→Polly, upload không persist)
 
-**V5 hardening:**
-1. Postgres backing cho `full_exam_sessions` (migration 011 đã có, cần wired vào store)
-2. Auto-link ústní session sau khi MockExamSession speaking hoàn tất
-
-**Infrastructure:**
-3. Postgres backing cho `exercise_audio` (migration 010 đã có)
-4. Polly 2 voices cho `poslech_4` dialogs (hiện 1 voice Option B)
-
-**Content:**
-5. Nhập nội dung mẫu qua CMS: ít nhất 1 exercise mỗi loại để test end-to-end
+**Next coaching slice (if expanding):**
+Đọc `docs/ideas/attempt-repair-and-shadowing.md` + spec/plan files trước khi bắt đầu.
 
 Full plan: `tasks/plan.md` + `tasks/todo.md` + `SPEC.md`.
 
