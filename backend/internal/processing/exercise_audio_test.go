@@ -1,6 +1,7 @@
 package processing
 
 import (
+	"os"
 	"testing"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
@@ -103,5 +104,29 @@ func TestBuildExerciseAudioText_NonListening_Empty(t *testing.T) {
 	exercise := contracts.Exercise{ExerciseType: "psani_1_formular"}
 	if got := BuildExerciseAudioText(exercise); got != "" {
 		t.Errorf("expected empty for non-listening type, got %q", got)
+	}
+}
+
+func TestDevExerciseAudioGenerator_WritesFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LOCAL_ASSETS_DIR", dir)
+	gen := DevExerciseAudioGenerator{}
+	audio, err := gen.GenerateAudio("test-exercise-123", "ignored text")
+	if err != nil {
+		t.Fatalf("GenerateAudio error: %v", err)
+	}
+	if audio.StorageKey == "" {
+		t.Fatal("expected non-empty storage key")
+	}
+	if audio.MimeType == "" {
+		t.Fatal("expected non-empty mime type")
+	}
+	filePath := localExerciseAudioPath(audio.StorageKey)
+	info, statErr := os.Stat(filePath)
+	if statErr != nil {
+		t.Fatalf("expected file at %s: %v", filePath, statErr)
+	}
+	if info.Size() == 0 {
+		t.Fatal("expected non-empty stub audio file")
 	}
 }

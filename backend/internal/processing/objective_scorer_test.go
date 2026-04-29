@@ -96,6 +96,42 @@ func TestReadinessLevelFromObjective(t *testing.T) {
 	}
 }
 
+func TestMatchObjectiveAnswer_ShortFillIn_UsesSubstring(t *testing.T) {
+	// Short Czech name like "Eva" should use substring, not exact match.
+	// Learner writes full name; correct answer is first name only.
+	correct := map[string]string{"1": "Eva"}
+	learner := map[string]string{"1": "Eva Nováková"}
+	result := ScoreObjectiveAnswers(learner, correct)
+	if result.Score != 1 {
+		t.Errorf("Score = %d, want 1 (substring: %q contains %q)", result.Score, "Eva Nováková", "Eva")
+	}
+}
+
+func TestMatchObjectiveAnswer_ChoiceKey_ExactOnly(t *testing.T) {
+	// A-H single-letter keys use exact match.
+	cases := []struct {
+		learner, correct string
+		want             bool
+	}{
+		{"B", "B", true},
+		{"b", "B", true},   // case-insensitive
+		{"B", "A", false},
+		{"AB", "A", false}, // not exact
+		{"G", "G", true},
+		{"H", "H", true},   // cteni_2 uses A-H
+		{"AI", "I", true},  // I not in A-H → substring: "ai" contains "i"
+		{"X", "I", false},  // I not in A-H → substring: "x" doesn't contain "i"
+	}
+	for _, c := range cases {
+		correct := map[string]string{"1": c.correct}
+		learner := map[string]string{"1": c.learner}
+		got := ScoreObjectiveAnswers(learner, correct).Score == 1
+		if got != c.want {
+			t.Errorf("learner=%q correct=%q: got %v, want %v", c.learner, c.correct, got, c.want)
+		}
+	}
+}
+
 func TestBuildObjectiveFeedback_Basic(t *testing.T) {
 	result := contracts.ObjectiveResult{Score: 3, MaxScore: 5}
 	fb := BuildObjectiveFeedback(result)

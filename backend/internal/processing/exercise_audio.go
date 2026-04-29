@@ -2,6 +2,7 @@ package processing
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -133,17 +134,44 @@ type DialogExerciseAudioGenerator interface {
 	GenerateDialogAudio(exerciseID string, dialogTexts []string) (*contracts.ExerciseAudio, error)
 }
 
-// DevExerciseAudioGenerator is a no-op used in development.
+// DevExerciseAudioGenerator writes a stub silent WAV file for use in development.
 type DevExerciseAudioGenerator struct{}
 
 func (DevExerciseAudioGenerator) GenerateAudio(exerciseID, _ string) (*contracts.ExerciseAudio, error) {
+	storageKey := fmt.Sprintf("exercise-audio/%s/audio.wav", exerciseID)
+	dst := localExerciseAudioPath(storageKey)
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return nil, fmt.Errorf("dev audio dir: %w", err)
+	}
+	if err := os.WriteFile(dst, devSilentWAV(), 0o644); err != nil {
+		return nil, fmt.Errorf("dev audio write: %w", err)
+	}
 	return &contracts.ExerciseAudio{
 		ExerciseID:  exerciseID,
-		StorageKey:  fmt.Sprintf("exercise-audio/%s/audio.mp3", exerciseID),
-		MimeType:    "audio/mpeg",
+		StorageKey:  storageKey,
+		MimeType:    "audio/wav",
 		SourceType:  "dev",
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 	}, nil
+}
+
+// devSilentWAV returns a minimal valid 44-byte WAV file (0 audio samples).
+func devSilentWAV() []byte {
+	buf := make([]byte, 44)
+	copy(buf[0:4], "RIFF")
+	binary.LittleEndian.PutUint32(buf[4:8], 36) // file size - 8
+	copy(buf[8:12], "WAVE")
+	copy(buf[12:16], "fmt ")
+	binary.LittleEndian.PutUint32(buf[16:20], 16)    // fmt chunk size
+	binary.LittleEndian.PutUint16(buf[20:22], 1)     // PCM
+	binary.LittleEndian.PutUint16(buf[22:24], 1)     // mono
+	binary.LittleEndian.PutUint32(buf[24:28], 44100) // sample rate
+	binary.LittleEndian.PutUint32(buf[28:32], 88200) // byte rate
+	binary.LittleEndian.PutUint16(buf[32:34], 2)     // block align
+	binary.LittleEndian.PutUint16(buf[34:36], 16)    // bits/sample
+	copy(buf[36:40], "data")
+	binary.LittleEndian.PutUint32(buf[40:44], 0) // data size: 0 samples
+	return buf
 }
 
 // PollyExerciseAudioGenerator generates exercise audio via Amazon Polly.

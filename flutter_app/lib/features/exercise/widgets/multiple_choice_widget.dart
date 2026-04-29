@@ -52,7 +52,11 @@ class MultipleChoiceWidget extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      opt.text.isNotEmpty ? opt.text : opt.label,
+                      opt.text.isNotEmpty
+                          ? opt.text
+                          : opt.label.isNotEmpty
+                              ? opt.label
+                              : opt.assetId,
                       style: AppTypography.bodyMedium,
                     ),
                   ),

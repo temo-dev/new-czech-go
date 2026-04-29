@@ -103,8 +103,6 @@ type ExerciseFormState = {
   poslechOptions: string;      // one option per line: A | Label (or A | asset_id for poslech_4)
   poslechCorrectAnswers: string; // one per line: 1=B, 2=A, ...
   poslechAudioSource: 'text' | 'upload'; // how audio is provided
-  poslechGeneratingAudio: boolean;
-  poslechAudioReady: boolean;
   // poslech_5 voicemail
   poslechVoicemailText: string;
   // cteni_* shared
@@ -226,8 +224,6 @@ function createInitialFormState(): ExerciseFormState {
     poslechOptions: 'A | Možnost A\nB | Možnost B\nC | Možnost C\nD | Možnost D',
     poslechCorrectAnswers: '1=B\n2=A\n3=D\n4=C\n5=B',
     poslechAudioSource: 'text',
-    poslechGeneratingAudio: false,
-    poslechAudioReady: false,
     poslechVoicemailText: 'Ahoj Lído, tady Eva. Dostala jsem lístky na balet.',
     cteniText: 'Přečtěte si text...',
     cteniItems: 'Položka 1\n---\nPoložka 2\n---\nPoložka 3\n---\nPoložka 4\n---\nPoložka 5',
@@ -358,8 +354,6 @@ function formStateFromExercise(item: Exercise): ExerciseFormState {
           .join('\n')
       : '',
     poslechAudioSource: 'text',
-    poslechGeneratingAudio: false,
-    poslechAudioReady: !!(item as unknown as Record<string, unknown>).hasAudio,
     poslechVoicemailText: (() => {
       const segs = (detail.audio_source as Record<string, unknown> | undefined)?.segments;
       return Array.isArray(segs)

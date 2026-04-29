@@ -37,17 +37,22 @@ func ScoreObjectiveAnswers(learner, correct map[string]string) contracts.Objecti
 	}
 }
 
-// matchObjectiveAnswer: short keys → exact match; long fill-in → substring.
+// matchObjectiveAnswer: single-letter A-H = exact match (choice key); anything else = bidirectional substring (fill-in).
 func matchObjectiveAnswer(learner, correct string) bool {
 	l := strings.ToLower(strings.TrimSpace(learner))
 	c := strings.ToLower(strings.TrimSpace(correct))
 	if l == "" || c == "" {
 		return false
 	}
-	if len(c) <= 4 {
+	if isChoiceKey(c) {
 		return l == c
 	}
 	return strings.Contains(l, c) || strings.Contains(c, l)
+}
+
+// isChoiceKey returns true for single-letter option keys A-H (case-insensitive).
+func isChoiceKey(s string) bool {
+	return len(s) == 1 && s[0] >= 'a' && s[0] <= 'h'
 }
 
 func sortBreakdown(breakdown []contracts.QuestionResult) {

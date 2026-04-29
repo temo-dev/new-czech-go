@@ -55,6 +55,7 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
   }
 
   Future<void> _loadAudio() async {
+    setState(() { _audioLoading = true; _audioError = false; });
     try {
       await _player.setAudioSource(
         AudioSource.uri(
@@ -139,7 +140,7 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
             ],
 
             // Audio player
-            _AudioPlayerBar(player: _player, loading: _audioLoading, error: _audioError),
+            _AudioPlayerBar(player: _player, loading: _audioLoading, error: _audioError, onRetry: _loadAudio),
             const SizedBox(height: AppSpacing.x4),
 
             // Answer UI
@@ -215,10 +216,11 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
 }
 
 class _AudioPlayerBar extends StatefulWidget {
-  const _AudioPlayerBar({required this.player, required this.loading, required this.error});
+  const _AudioPlayerBar({required this.player, required this.loading, required this.error, this.onRetry});
   final AudioPlayer player;
   final bool loading;
   final bool error;
+  final VoidCallback? onRetry;
 
   @override
   State<_AudioPlayerBar> createState() => _AudioPlayerBarState();
@@ -262,6 +264,13 @@ class _AudioPlayerBarState extends State<_AudioPlayerBar> {
                     ? Text(AppLocalizations.of(context).audioLoading, style: AppTypography.bodySmall)
                     : Text(AppLocalizations.of(context).audioHint, style: AppTypography.bodySmall),
           ),
+          if (widget.error && widget.onRetry != null)
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              color: AppColors.secondary,
+              tooltip: 'Thử lại',
+              onPressed: widget.onRetry,
+            ),
           if (!widget.error && !widget.loading) ...[
             IconButton(
               icon: Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
