@@ -528,4 +528,92 @@ void main() {
     expect(makeWriting('psani_1_formular').writingMinWords, 10);
     expect(makeWriting('psani_2_email').writingMinWords, 35);
   });
+
+  // ── _hasEnoughWords logic (pure function, tested via model layer) ──────────
+
+  test('poslechQuestions fromJson handles empty questions list', () {
+    final detail = ExerciseDetail.fromJson(<String, dynamic>{
+      'id': 'p1',
+      'title': 'Poslech',
+      'exercise_type': 'poslech_1',
+      'detail': <String, dynamic>{'questions': []},
+    });
+    expect(detail.poslechQuestions, isEmpty);
+  });
+
+  test('poslechQuestions fromJson parses well-formed map list', () {
+    final detail = ExerciseDetail.fromJson(<String, dynamic>{
+      'id': 'p2',
+      'title': 'Poslech 2',
+      'exercise_type': 'poslech_2',
+      'detail': <String, dynamic>{
+        'questions': [
+          {'question_no': 1, 'prompt': 'Co říká muž?'},
+          {'question_no': 2, 'prompt': 'Kde to je?'},
+        ],
+      },
+    });
+    expect(detail.poslechQuestions.length, 2);
+    expect(detail.poslechQuestions[0].questionNo, 1);
+    expect(detail.poslechQuestions[0].prompt, 'Co říká muž?');
+    expect(detail.poslechQuestions[1].questionNo, 2);
+  });
+
+  test('cteniQuestions fromJson parses well-formed map list', () {
+    final detail = ExerciseDetail.fromJson(<String, dynamic>{
+      'id': 'c1',
+      'title': 'Čtení 3',
+      'exercise_type': 'cteni_3',
+      'detail': <String, dynamic>{
+        'questions': [
+          {'question_no': 3, 'prompt': 'Kdo napsal?'},
+        ],
+      },
+    });
+    expect(detail.cteniQuestions.length, 1);
+    expect(detail.cteniQuestions[0].questionNo, 3);
+    expect(detail.cteniQuestions[0].prompt, 'Kdo napsal?');
+  });
+
+  test('FillQuestionView.fromJson handles missing fields gracefully', () {
+    // question_no defaults to 0 (int), prompt defaults to empty string.
+    final q = FillQuestionView.fromJson(<String, dynamic>{});
+    expect(q.questionNo, 0);
+    expect(q.prompt, '');
+  });
+
+  test('AttemptReviewArtifactView.diffChunks parses list of diff chunks', () {
+    final artifact = AttemptReviewArtifactView.fromJson({
+      'status': 'ready',
+      'source_transcript_text': 'Já jít do školy.',
+      'corrected_transcript_text': 'Já jdu do školy.',
+      'model_answer_text': 'Já jdu do školy.',
+      'diff_chunks': [
+        {'kind': 'unchanged', 'source_text': 'Já ', 'target_text': 'Já '},
+        {'kind': 'deleted', 'source_text': 'jít', 'target_text': ''},
+        {'kind': 'inserted', 'source_text': '', 'target_text': 'jdu'},
+        {'kind': 'unchanged', 'source_text': ' do školy.', 'target_text': ' do školy.'},
+      ],
+      'repair_provider': 'writing_scorer_v1',
+      'generated_at': '2026-04-29T00:00:00Z',
+    });
+    expect(artifact.diffChunks.length, 4);
+    expect(artifact.diffChunks[0].kind, 'unchanged');
+    expect(artifact.diffChunks[1].kind, 'deleted');
+    expect(artifact.diffChunks[1].sourceText, 'jít');
+    expect(artifact.diffChunks[2].kind, 'inserted');
+    expect(artifact.diffChunks[2].targetText, 'jdu');
+  });
+
+  test('AttemptReviewArtifactView.diffChunks defaults to empty list when absent', () {
+    final artifact = AttemptReviewArtifactView.fromJson({
+      'status': 'ready',
+      'source_transcript_text': 'text',
+      'corrected_transcript_text': 'text',
+      'model_answer_text': '',
+      'repair_provider': 'writing_scorer_v1',
+      'generated_at': '2026-04-29T00:00:00Z',
+    });
+    expect(artifact.diffChunks, isEmpty);
+  });
 }
