@@ -525,7 +525,7 @@ class _MockExamResultView extends StatelessWidget {
           const SizedBox(height: AppSpacing.x2),
           Center(
             child: Text(
-              'Ngưỡng đạt: ${session.passThresholdPercent}%',
+              l.mockExamResultPassThreshold(session.passThresholdPercent),
               style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
             ),
           ),

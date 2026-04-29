@@ -273,8 +273,16 @@ Do not mix these in one change unless the human asks:
 If you notice adjacent cleanup, note it separately instead of silently expanding scope.
 
 ## Good Next Steps
-V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ — tất cả planned slices hoàn thành (2026-04-29).
+V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ — tất cả planned slices hoàn thành (2026-04-29).
 Xem `tasks/todo.md` để theo dõi backlog chi tiết.
+
+**V7 Flexible Sprint MockTest — 2026-04-29:**
+- `pass_threshold_percent` per MockTest (default 80 sprint / 60 full exam chuẩn)
+- Admin tự chọn bất kỳ exercise types nào cho từng section (không bị lock theo session_type)
+- Flutter `MockExamScreen` route section đến đúng screen (speaking/listening/reading/writing)
+- `computeScoring` dùng threshold động thay vì hardcode ≥24
+- CMS: bỏ `session_type` select, thêm `pass_threshold_percent` input
+- Intro screen passScore tính động từ threshold; result hiển thị % ngưỡng đạt
 
 **Remaining backlog (low priority):**
 1. Exercise form file split: `exercise-dashboard.tsx` ~2000 dòng → nhiều file ≤500 dòng (deferred từ EF-E)

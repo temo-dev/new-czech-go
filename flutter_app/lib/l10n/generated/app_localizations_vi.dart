@@ -194,6 +194,11 @@ class AppLocalizationsVi extends AppLocalizations {
   String get mockExamFailLabel => 'CHƯA ĐẠT';
 
   @override
+  String mockExamResultPassThreshold(int pct) {
+    return 'Ngưỡng đạt: $pct%';
+  }
+
+  @override
   String mockExamSectionScoreLabel(int n, int score, int max) {
     return 'Úloha $n: $score/$max điểm';
   }

@@ -158,7 +158,8 @@ class MockTest {
     required this.estimatedDurationMinutes,
     required this.status,
     required this.sections,
-    this.sessionType = 'speaking',
+    this.sessionType = '',
+    this.passThresholdPercent = 60,
   });
 
   final String id;
@@ -166,7 +167,8 @@ class MockTest {
   final String description;
   final int estimatedDurationMinutes;
   final String status;
-  final String sessionType; // speaking | pisemna | full
+  final String sessionType;
+  final int passThresholdPercent;
   final List<MockTestSection> sections;
 
   int get totalMaxPoints => sections.fold(0, (s, sec) => s + sec.maxPoints);
@@ -181,7 +183,8 @@ class MockTest {
       description: json['description'] as String? ?? '',
       estimatedDurationMinutes: (json['estimated_duration_minutes'] as num?)?.toInt() ?? 15,
       status: json['status'] as String? ?? 'draft',
-      sessionType: json['session_type'] as String? ?? 'speaking',
+      sessionType: json['session_type'] as String? ?? '',
+      passThresholdPercent: (json['pass_threshold_percent'] as num?)?.toInt() ?? 60,
       sections: raw.map((e) => MockTestSection.fromJson(e as Map<String, dynamic>)).toList(),
     );
   }

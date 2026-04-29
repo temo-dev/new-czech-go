@@ -75,6 +75,8 @@
     },
     "mockExamPassLabel": "PASS",
     "mockExamFailLabel": "FAIL",
+    "mockExamResultPassThreshold": "Pass threshold: {pct}%",
+    "@mockExamResultPassThreshold": { "placeholders": { "pct": { "type": "int" } } },
     "mockExamSectionScoreLabel": "Úloha {n}: {score}/{max} pts",
     "mockExamSectionDetail": "Section {n} Analysis",
     "@mockExamSectionDetail": { "placeholders": { "n": { "type": "int" } } },

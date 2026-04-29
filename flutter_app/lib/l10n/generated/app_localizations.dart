@@ -425,6 +425,12 @@ abstract class AppLocalizations {
   /// **'CHƯA ĐẠT'**
   String get mockExamFailLabel;
 
+  /// No description provided for @mockExamResultPassThreshold.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ngưỡng đạt: {pct}%'**
+  String mockExamResultPassThreshold(int pct);
+
   /// No description provided for @mockExamSectionScoreLabel.
   ///
   /// In vi, this message translates to:

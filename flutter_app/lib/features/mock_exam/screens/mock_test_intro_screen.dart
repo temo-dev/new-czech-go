@@ -54,7 +54,7 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
     final l = AppLocalizations.of(context);
     final test = widget.test;
     final totalPts = test.totalMaxPoints + 3;
-    final passScore = 24; // fixed A2 standard
+    final passScore = ((test.totalMaxPoints * test.passThresholdPercent) / 100).ceil();
     final h = AppSpacing.pagePaddingH(context);
 
     return Scaffold(

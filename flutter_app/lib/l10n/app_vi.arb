@@ -87,6 +87,8 @@
     },
     "mockExamPassLabel": "ĐẠT",
     "mockExamFailLabel": "CHƯA ĐẠT",
+    "mockExamResultPassThreshold": "Ngưỡng đạt: {pct}%",
+    "@mockExamResultPassThreshold": { "placeholders": { "pct": { "type": "int" } } },
     "mockExamSectionScoreLabel": "Úloha {n}: {score}/{max} điểm",
     "mockExamSectionDetail": "Phân tích Phần {n}",
     "@mockExamSectionDetail": { "placeholders": { "n": { "type": "int" } } },
