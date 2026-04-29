@@ -101,7 +101,7 @@ Không làm 1 form/type — shared scaffold + type-specific sections trong slide
 
 - [x] Polly 2 voices cho `poslech_4` dialogs — DialogExerciseAudioGenerator interface + alternating voice per item + MP3 concat + POLLY_VOICE_ID_2 env (2026-04-29)
 - [x] Listening audio persistence: ExerciseAudioStore interface + postgresExerciseAudioStore (2026-04-29)
-- [ ] Polly đọc `model_answer_text` cho Writing
+- [x] Polly đọc `model_answer_text` cho Writing — ProcessWritingAttempt generates TTS via p.ttsProvider after buildWritingReviewArtifact (2026-04-29)
 - [ ] Learner history filter theo skill_kind
 - [ ] Admin analytics: pass rate per exercise_type
 - [x] V5: FullExamIntroScreen capture real attempt_id (hiện dùng placeholder 'done-N')
