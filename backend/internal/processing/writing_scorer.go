@@ -28,22 +28,32 @@ func writingText(exerciseType string, sub contracts.WritingSubmission) string {
 // psani_1_formular: must have exactly 3 answers, each ≥10 words.
 // psani_2_email: Text must be ≥35 words.
 func ValidateWritingSubmission(exerciseType string, sub contracts.WritingSubmission) error {
+	const maxWordsPerAnswer = 500
+	const maxWordsEmail = 500
 	switch exerciseType {
 	case "psani_1_formular":
 		if len(sub.Answers) != 3 {
 			return fmt.Errorf("psani_1_formular requires exactly 3 answers, got %d", len(sub.Answers))
 		}
 		for i, a := range sub.Answers {
-			if countWords(a) < 10 {
-				return fmt.Errorf("answer %d has %d words, minimum is 10", i+1, countWords(a))
+			wc := countWords(a)
+			if wc < 10 {
+				return fmt.Errorf("answer %d has %d words, minimum is 10", i+1, wc)
+			}
+			if wc > maxWordsPerAnswer {
+				return fmt.Errorf("answer %d has %d words, maximum is %d", i+1, wc, maxWordsPerAnswer)
 			}
 		}
 	case "psani_2_email":
 		if sub.Text == "" {
 			return fmt.Errorf("psani_2_email requires a non-empty text field")
 		}
-		if countWords(sub.Text) < 35 {
-			return fmt.Errorf("psani_2_email text has %d words, minimum is 35", countWords(sub.Text))
+		wc := countWords(sub.Text)
+		if wc < 35 {
+			return fmt.Errorf("psani_2_email text has %d words, minimum is 35", wc)
+		}
+		if wc > maxWordsEmail {
+			return fmt.Errorf("psani_2_email text has %d words, maximum is %d", wc, maxWordsEmail)
 		}
 	default:
 		return fmt.Errorf("unsupported writing exercise type: %s", exerciseType)

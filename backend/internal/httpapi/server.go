@@ -1130,6 +1130,8 @@ func (s *Server) handleSubmitText(w http.ResponseWriter, r *http.Request, user c
 		writeError(w, http.StatusBadRequest, "validation_error", "Exercise type does not support text submission.", false)
 		return
 	}
+	const maxSubmitTextBytes = 64 * 1024 // 64 KB — generous for A2 Czech
+	r.Body = http.MaxBytesReader(w, r.Body, maxSubmitTextBytes)
 	var sub contracts.WritingSubmission
 	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
 		writeError(w, http.StatusBadRequest, "validation_error", "Invalid submission body.", false)

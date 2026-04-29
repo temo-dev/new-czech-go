@@ -806,7 +806,8 @@ class _DiffTextBlock extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ));
-        } else if (chunk.kind == 'unchanged') {
+        } else {
+          // unchanged or any future/unknown kind: render without highlight
           spans.add(TextSpan(text: text, style: AppTypography.bodyMedium));
         }
       }

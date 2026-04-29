@@ -57,12 +57,13 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 	if adminPassword == "" {
 		adminPassword = "demo123"
 	}
+	if os.Getenv("ENV") == "production" && (adminPassword == "" || adminPassword == "demo123") {
+		log.Fatal("ADMIN_PASSWORD must be set to a strong value in production (not empty or 'demo123')")
+	}
 
-	return &MemoryStore{
-		adminEmail:    adminEmail,
-		adminPassword: adminPassword,
-		tokenExpiry:   map[string]time.Time{},
-		usersByToken: map[string]contracts.User{
+	devTokens := map[string]contracts.User{}
+	if os.Getenv("ENV") != "production" {
+		devTokens = map[string]contracts.User{
 			"dev-learner-token": {
 				ID:                "user-learner-1",
 				Role:              "learner",
@@ -77,7 +78,6 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 				DisplayName:       "Tran Binh",
 				PreferredLanguage: "vi",
 			},
-			// dev-admin-token stays valid for backward compat (tests, local CMS dev)
 			"dev-admin-token": {
 				ID:                "user-admin-1",
 				Role:              "admin",
@@ -85,7 +85,14 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 				DisplayName:       "CMS Admin",
 				PreferredLanguage: "vi",
 			},
-		},
+		}
+	}
+
+	return &MemoryStore{
+		adminEmail:    adminEmail,
+		adminPassword: adminPassword,
+		tokenExpiry:   map[string]time.Time{},
+		usersByToken:  devTokens,
 		plan: contracts.LearningPlan{
 			StartDate:  time.Now().Format("2006-01-02"),
 			CurrentDay: 1,
