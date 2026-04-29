@@ -105,5 +105,5 @@ Không làm 1 form/type — shared scaffold + type-specific sections trong slide
 - [x] Learner history filter theo skill_kind — filter pills on HistoryScreen, toggle, stats update (2026-04-29)
 - [x] Admin analytics: pass rate per exercise_type — Analytics tab in learners dashboard, groupByExerciseType, color-coded table + bar (2026-04-29)
 - [x] V5: FullExamIntroScreen capture real attempt_id (hiện dùng placeholder 'done-N')
-- [ ] V5: Auto-link ústní session sau khi mock exam speaking hoàn tất
+- [x] V5: Auto-link ústní session sau khi mock exam speaking hoàn tất — FindOpenFullExamForAutoLink + handleMockExamComplete wires user (2026-04-29)
 - [x] V5: Postgres store cho full_exam_sessions — FullExamStore interface + postgresFullExamStore + wire main.go (2026-04-29)
