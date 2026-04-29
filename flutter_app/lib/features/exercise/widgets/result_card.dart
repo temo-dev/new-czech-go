@@ -799,7 +799,12 @@ class _DiffTextBlock extends StatelessWidget {
       }
       body = spans.isEmpty
           ? Text(fallback, style: AppTypography.bodyMedium)
-          : RichText(text: TextSpan(children: spans));
+          : RichText(
+              text: TextSpan(
+                style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurface),
+                children: spans,
+              ),
+            );
     }
 
     return Container(
