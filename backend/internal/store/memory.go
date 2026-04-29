@@ -4,12 +4,14 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type MemoryStore struct {
@@ -113,11 +115,23 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 	}
 }
 
+// checkAdminPassword verifies a candidate password against the stored value.
+// If the stored value is a bcrypt hash (starts with $2), uses bcrypt comparison.
+// Otherwise falls back to direct string comparison (development convenience only).
+func (s *MemoryStore) checkAdminPassword(candidate string) bool {
+	stored := s.adminPassword
+	if strings.HasPrefix(stored, "$2") {
+		return bcrypt.CompareHashAndPassword([]byte(stored), []byte(candidate)) == nil
+	}
+	return stored == candidate
+}
+
 func (s *MemoryStore) Login(email, password string) (string, contracts.User, bool) {
 	email = strings.ToLower(strings.TrimSpace(email))
 
-	// Admin login — credentials from env (fallback: admin@example.com / demo123)
-	if email == strings.ToLower(s.adminEmail) && password == s.adminPassword {
+	// Admin login — credentials from env.
+	// ADMIN_PASSWORD may be a bcrypt hash ($2a$/b$/y$ prefix) or plaintext (dev only).
+	if email == strings.ToLower(s.adminEmail) && s.checkAdminPassword(password) {
 		token := newRandomToken()
 		user := contracts.User{
 			ID:                "user-admin-1",

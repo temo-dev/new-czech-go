@@ -366,7 +366,7 @@ func (s *Server) handleAttemptByID(w http.ResponseWriter, r *http.Request, user 
 		return
 	}
 	if strings.HasSuffix(path, "/recording-started") {
-		s.handleRecordingStarted(w, r, strings.TrimSuffix(path, "/recording-started"))
+		s.handleRecordingStarted(w, r, user, strings.TrimSuffix(path, "/recording-started"))
 		return
 	}
 	if strings.HasSuffix(path, "/audio/url") {
@@ -378,15 +378,15 @@ func (s *Server) handleAttemptByID(w http.ResponseWriter, r *http.Request, user 
 		return
 	}
 	if strings.HasSuffix(path, "/audio") {
-		s.handleAttemptAudioUpload(w, r, strings.TrimSuffix(path, "/audio"))
+		s.handleAttemptAudioUpload(w, r, user, strings.TrimSuffix(path, "/audio"))
 		return
 	}
 	if strings.HasSuffix(path, "/upload-url") {
-		s.handleUploadURL(w, r, strings.TrimSuffix(path, "/upload-url"))
+		s.handleUploadURL(w, r, user, strings.TrimSuffix(path, "/upload-url"))
 		return
 	}
 	if strings.HasSuffix(path, "/upload-complete") {
-		s.handleUploadComplete(w, r, strings.TrimSuffix(path, "/upload-complete"))
+		s.handleUploadComplete(w, r, user, strings.TrimSuffix(path, "/upload-complete"))
 		return
 	}
 	if strings.HasSuffix(path, "/submit-text") {
@@ -757,9 +757,12 @@ func (s *Server) handleAttemptAudioFile(w http.ResponseWriter, r *http.Request, 
 	http.ServeContent(w, r, audio.StoredFilePath, stat.ModTime(), file)
 }
 
-func (s *Server) handleRecordingStarted(w http.ResponseWriter, r *http.Request, attemptID string) {
+func (s *Server) handleRecordingStarted(w http.ResponseWriter, r *http.Request, user contracts.User, attemptID string) {
 	if r.Method != http.MethodPost {
 		writeMethodNotAllowed(w)
+		return
+	}
+	if _, ok := s.authorizedAttemptForUser(w, user, attemptID); !ok {
 		return
 	}
 	var req struct {
@@ -782,9 +785,12 @@ func (s *Server) handleRecordingStarted(w http.ResponseWriter, r *http.Request, 
 	})
 }
 
-func (s *Server) handleUploadURL(w http.ResponseWriter, r *http.Request, attemptID string) {
+func (s *Server) handleUploadURL(w http.ResponseWriter, r *http.Request, user contracts.User, attemptID string) {
 	if r.Method != http.MethodPost {
 		writeMethodNotAllowed(w)
+		return
+	}
+	if _, ok := s.authorizedAttemptForUser(w, user, attemptID); !ok {
 		return
 	}
 	var req struct {
@@ -794,10 +800,6 @@ func (s *Server) handleUploadURL(w http.ResponseWriter, r *http.Request, attempt
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.MimeType == "" {
 		writeError(w, http.StatusBadRequest, "validation_error", "Upload metadata is required.", false)
-		return
-	}
-	if _, ok := s.repo.Attempt(attemptID); !ok {
-		writeNotFound(w)
 		return
 	}
 	target, err := s.uploadProvider.CreateAttemptUploadTarget(r.Context(), AttemptUploadTargetInput{
@@ -830,13 +832,12 @@ func (s *Server) handleUploadURL(w http.ResponseWriter, r *http.Request, attempt
 	})
 }
 
-func (s *Server) handleAttemptAudioUpload(w http.ResponseWriter, r *http.Request, attemptID string) {
+func (s *Server) handleAttemptAudioUpload(w http.ResponseWriter, r *http.Request, user contracts.User, attemptID string) {
 	if r.Method != http.MethodPut {
 		writeMethodNotAllowed(w)
 		return
 	}
-	if _, ok := s.repo.Attempt(attemptID); !ok {
-		writeNotFound(w)
+	if _, ok := s.authorizedAttemptForUser(w, user, attemptID); !ok {
 		return
 	}
 	mimeType := strings.TrimSpace(r.Header.Get("Content-Type"))
@@ -888,9 +889,13 @@ func (s *Server) handleAttemptAudioUpload(w http.ResponseWriter, r *http.Request
 	})
 }
 
-func (s *Server) handleUploadComplete(w http.ResponseWriter, r *http.Request, attemptID string) {
+func (s *Server) handleUploadComplete(w http.ResponseWriter, r *http.Request, user contracts.User, attemptID string) {
 	if r.Method != http.MethodPost {
 		writeMethodNotAllowed(w)
+		return
+	}
+	attempt, ok := s.authorizedAttemptForUser(w, user, attemptID)
+	if !ok {
 		return
 	}
 	var req struct {
@@ -904,11 +909,6 @@ func (s *Server) handleUploadComplete(w http.ResponseWriter, r *http.Request, at
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "validation_error", "Upload completion payload is required.", false)
-		return
-	}
-	attempt, ok := s.repo.Attempt(attemptID)
-	if !ok {
-		writeNotFound(w)
 		return
 	}
 	expectedStorageKey := strings.TrimSpace(attempt.PendingUploadStorageKey)
@@ -1802,11 +1802,36 @@ func (s *Server) authenticatedUser(r *http.Request) (contracts.User, bool) {
 	return s.repo.UserByToken(token)
 }
 
+// withCORS enforces an origin allowlist. Set CORS_ALLOWED_ORIGINS to a
+// comma-separated list of allowed origins (e.g. "https://cms.example.com").
+// When ENV=production and CORS_ALLOWED_ORIGINS is unset, only same-origin
+// requests are served (no ACAO header emitted). In non-production with no
+// env var, * is used for convenience.
 func (s *Server) withCORS(next http.Handler) http.Handler {
+	allowedSet := map[string]struct{}{}
+	if raw := strings.TrimSpace(os.Getenv("CORS_ALLOWED_ORIGINS")); raw != "" {
+		for _, origin := range strings.Split(raw, ",") {
+			if o := strings.TrimSpace(origin); o != "" {
+				allowedSet[o] = struct{}{}
+			}
+		}
+	}
+	isProduction := os.Getenv("ENV") == "production"
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := r.Header.Get("Origin")
+		if len(allowedSet) > 0 {
+			if _, ok := allowedSet[origin]; ok {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Vary", "Origin")
+			}
+			// else: no ACAO header — browser will block cross-origin request
+		} else if !isProduction {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		}
+		// production with no allowlist: no ACAO header (same-origin only)
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Client-Version")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, OPTIONS, DELETE")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
