@@ -26,8 +26,8 @@ type MemoryStore struct {
 	attempts       AttemptStore
 	mockExams      MockExamStore
 	mockTests      MockTestStore
-	exerciseAudio  map[string]contracts.ExerciseAudio // exercise_id → audio
-	fullExamStore  FullExamStore                      // Postgres-backed when available
+	exerciseAudioStore ExerciseAudioStore // Postgres-backed when available
+	fullExamStore      FullExamStore      // Postgres-backed when available
 	vocabulary     VocabularyStore
 	grammar        GrammarStore
 	generationJobs GenerationJobStore
@@ -98,8 +98,8 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 		attempts:  attempts,
 		mockExams:      newMemoryMockExamStore(exercises, attempts),
 		mockTests:      newMemoryMockTestStore(),
-		exerciseAudio: map[string]contracts.ExerciseAudio{},
-		fullExamStore: newMemoryFullExamStore(),
+		exerciseAudioStore: newMemoryExerciseAudioStore(),
+		fullExamStore:      newMemoryFullExamStore(),
 		vocabulary:    newMemoryVocabularyStore(),
 		grammar:        newMemoryGrammarStore(),
 		generationJobs: newMemoryGenerationJobStore(),
@@ -526,24 +526,22 @@ func (s *MemoryStore) ListFullExamSessions(learnerID string) []contracts.FullExa
 	return s.fullExamStore.ListFullExamSessions(learnerID)
 }
 
-// ExerciseAudio methods
+// ExerciseAudio methods — delegate to exerciseAudioStore (memory or Postgres)
+
+func (s *MemoryStore) SetExerciseAudioStore(store ExerciseAudioStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.exerciseAudioStore = store
+}
 
 func (s *MemoryStore) ExerciseAudioByExercise(exerciseID string) (*contracts.ExerciseAudio, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	a, ok := s.exerciseAudio[exerciseID]
-	if !ok {
-		return nil, false
-	}
-	cp := a
-	return &cp, true
+	return s.exerciseAudioStore.ExerciseAudioByExercise(exerciseID)
 }
 
 func (s *MemoryStore) SetExerciseAudio(exerciseID string, audio contracts.ExerciseAudio) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.exerciseAudio[exerciseID] = audio
+	s.exerciseAudioStore.SetExerciseAudio(exerciseID, audio)
 }
+
 
 func rollupReadiness(levels []string) (string, string) {
 	if len(levels) == 0 {

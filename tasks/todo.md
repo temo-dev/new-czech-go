@@ -105,4 +105,4 @@ Không làm 1 form/type — shared scaffold + type-specific sections trong slide
 - [ ] Admin analytics: pass rate per exercise_type
 - [x] V5: FullExamIntroScreen capture real attempt_id (hiện dùng placeholder 'done-N')
 - [ ] V5: Auto-link ústní session sau khi mock exam speaking hoàn tất
-- [ ] V5: Postgres store cho full_exam_sessions (hiện in-memory)
+- [x] V5: Postgres store cho full_exam_sessions — FullExamStore interface + postgresFullExamStore + wire main.go (2026-04-29)
