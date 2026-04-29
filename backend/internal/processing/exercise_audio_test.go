@@ -127,9 +127,15 @@ func TestHasMultipleSpeakers_Dialog(t *testing.T) {
 	if !HasMultipleSpeakers(exercise) {
 		t.Error("expected HasMultipleSpeakers = true for Muž/Žena dialog")
 	}
-	lines := BuildExerciseDialogLines(exercise)
-	if len(lines) != 2 {
-		t.Errorf("BuildExerciseDialogLines = %d lines, want 2", len(lines))
+	segs := BuildExerciseDialogSegments(exercise)
+	if len(segs) != 2 {
+		t.Errorf("BuildExerciseDialogSegments = %d segments, want 2", len(segs))
+	}
+	if segs[0].Speaker != "Muž" {
+		t.Errorf("segment 0 speaker = %q, want Muž", segs[0].Speaker)
+	}
+	if segs[1].Speaker != "Žena" {
+		t.Errorf("segment 1 speaker = %q, want Žena", segs[1].Speaker)
 	}
 }
 

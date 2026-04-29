@@ -131,7 +131,9 @@ type ExerciseAudioGenerator interface {
 // Implemented by PollyExerciseAudioGenerator when a second voice is configured.
 type DialogExerciseAudioGenerator interface {
 	ExerciseAudioGenerator
-	GenerateDialogAudio(exerciseID string, dialogTexts []string) (*contracts.ExerciseAudio, error)
+	// GenerateDialogAudio synthesizes each segment with speaker-based or index-based
+	// voice alternation, then concatenates into one MP3.
+	GenerateDialogAudio(exerciseID string, segments []contracts.AudioSegment) (*contracts.ExerciseAudio, error)
 }
 
 // HasMultipleSpeakers returns true when the exercise has segments with ≥2 distinct
@@ -149,16 +151,16 @@ func HasMultipleSpeakers(exercise contracts.Exercise) bool {
 	return false
 }
 
-// BuildExerciseDialogLines returns each non-empty segment's text as a separate
-// dialog turn for 2-voice TTS alternation.
-func BuildExerciseDialogLines(exercise contracts.Exercise) []string {
-	var lines []string
+// BuildExerciseDialogSegments returns each non-empty segment as a dialog turn,
+// preserving speaker labels for voice assignment.
+func BuildExerciseDialogSegments(exercise contracts.Exercise) []contracts.AudioSegment {
+	var out []contracts.AudioSegment
 	for _, seg := range allExerciseSegments(exercise) {
 		if t := strings.TrimSpace(seg.Text); t != "" {
-			lines = append(lines, t)
+			out = append(out, contracts.AudioSegment{Speaker: seg.Speaker, Text: t})
 		}
 	}
-	return lines
+	return out
 }
 
 // allExerciseSegments collects every AudioSegment from any poslech_* exercise.
@@ -210,7 +212,7 @@ func (DevExerciseAudioGenerator) GenerateAudio(exerciseID, _ string) (*contracts
 }
 
 // GenerateDialogAudio for dev: same stub WAV regardless of dialog content.
-func (DevExerciseAudioGenerator) GenerateDialogAudio(exerciseID string, _ []string) (*contracts.ExerciseAudio, error) {
+func (DevExerciseAudioGenerator) GenerateDialogAudio(exerciseID string, _ []contracts.AudioSegment) (*contracts.ExerciseAudio, error) {
 	return (DevExerciseAudioGenerator{}).GenerateAudio(exerciseID, "")
 }
 
@@ -297,24 +299,24 @@ func localExerciseAudioPath(storageKey string) string {
 
 // ── Poslech 4 — 2-voice dialog support ───────────────────────────────────────
 
-// BuildExerciseDialogTexts returns one text string per dialog item for poslech_4.
-// Returns nil for other exercise types.
+// BuildExerciseDialogTexts returns one segment per dialog item for poslech_4.
+// Speaker is empty (index-based alternation). Returns nil for other types.
 // Uploaded items (AssetID set) are excluded.
-func BuildExerciseDialogTexts(exercise contracts.Exercise) []string {
+func BuildExerciseDialogTexts(exercise contracts.Exercise) []contracts.AudioSegment {
 	if exercise.ExerciseType != "poslech_4" {
 		return nil
 	}
 	items := toListening4Items(exercise.Detail)
-	var texts []string
+	var segs []contracts.AudioSegment
 	for _, item := range items {
 		if item.AudioSource.AssetID != "" {
 			continue
 		}
 		if t := joinSegments(item.AudioSource.Segments); t != "" {
-			texts = append(texts, t)
+			segs = append(segs, contracts.AudioSegment{Text: t})
 		}
 	}
-	return texts
+	return segs
 }
 
 // concatMP3 concatenates multiple MP3 byte slices.
@@ -323,22 +325,47 @@ func concatMP3(parts [][]byte) []byte {
 	return bytes.Join(parts, nil)
 }
 
-// GenerateDialogAudio generates a 2-voice MP3 for poslech_4 by alternating
-// between two TTS providers per dialog item. Falls back to single-voice if
-// ttsB is nil.
-func (g *PollyExerciseAudioGenerator) GenerateDialogAudio(exerciseID string, dialogTexts []string) (*contracts.ExerciseAudio, error) {
-	if len(dialogTexts) == 0 {
-		return nil, fmt.Errorf("exercise %s: no dialog texts", exerciseID)
+// GenerateDialogAudio synthesizes each segment with speaker-based voice assignment
+// when speaker labels are present, otherwise falls back to index alternation.
+// Voice mapping: first unique speaker → ttsB (custom voice), second → tts (primary).
+// This ensures [Muž] (typically first) uses the cloned voice and [Žena] uses Polly.
+func (g *PollyExerciseAudioGenerator) GenerateDialogAudio(exerciseID string, segments []contracts.AudioSegment) (*contracts.ExerciseAudio, error) {
+	if len(segments) == 0 {
+		return nil, fmt.Errorf("exercise %s: no dialog segments", exerciseID)
+	}
+
+	// Build speaker → provider mapping from first two unique speakers.
+	// First speaker → ttsB (custom/cloned voice), second → tts (primary).
+	speakerVoice := map[string]TTSProvider{}
+	for _, seg := range segments {
+		if seg.Speaker == "" {
+			continue
+		}
+		if _, seen := speakerVoice[seg.Speaker]; seen {
+			continue
+		}
+		if len(speakerVoice) == 0 {
+			speakerVoice[seg.Speaker] = g.ttsB // first speaker → voice B (e.g. ElevenLabs male)
+		} else {
+			speakerVoice[seg.Speaker] = g.tts // second speaker → voice A (e.g. Polly female)
+			break
+		}
 	}
 
 	var audioParts [][]byte
-	for i, text := range dialogTexts {
-		// Alternate voices: even index → voice A (g.tts), odd → voice B (g.ttsB if set)
-		provider := g.tts
-		if g.ttsB != nil && i%2 == 1 {
-			provider = g.ttsB
+	for i, seg := range segments {
+		var provider TTSProvider
+		if seg.Speaker != "" {
+			provider = speakerVoice[seg.Speaker]
 		}
-		result, err := provider.Generate(fmt.Sprintf("%s-dialog-%d", exerciseID, i), text)
+		if provider == nil {
+			// No speaker label or first speaker has no ttsB: index-based fallback.
+			provider = g.tts
+			if g.ttsB != nil && i%2 == 1 {
+				provider = g.ttsB
+			}
+		}
+		result, err := provider.Generate(fmt.Sprintf("%s-dialog-%d", exerciseID, i), seg.Text)
 		if err != nil {
 			return nil, fmt.Errorf("generate dialog item %d: %w", i, err)
 		}

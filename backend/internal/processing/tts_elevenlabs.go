@@ -73,7 +73,13 @@ func (p *ElevenLabsTTSProvider) Generate(attemptID, text string) (*contracts.Rev
 		return nil, fmt.Errorf("elevenlabs marshal: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/text-to-speech/%s", elevenLabsBaseURL, p.voiceID)
+	// output_format=mp3_22050_32 matches Amazon Polly's default 22050 Hz sample rate
+	// so concatenated dialog audio plays correctly without sample-rate mismatch.
+	outputFmt := strings.TrimSpace(os.Getenv("ELEVENLABS_OUTPUT_FORMAT"))
+	if outputFmt == "" {
+		outputFmt = "mp3_22050_32"
+	}
+	url := fmt.Sprintf("%s/text-to-speech/%s?output_format=%s", elevenLabsBaseURL, p.voiceID, outputFmt)
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(reqBody))
 	if err != nil {
 		return nil, fmt.Errorf("elevenlabs new request: %w", err)

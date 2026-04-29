@@ -26,11 +26,11 @@ func TestBuildExerciseDialogTexts_Poslech4(t *testing.T) {
 	if len(texts) != 2 { // item 3 skipped (uploaded)
 		t.Fatalf("expected 2 dialog texts, got %d", len(texts))
 	}
-	if texts[0] != "Ahoj, jak se máš?" {
-		t.Errorf("item 1 wrong: %q", texts[0])
+	if texts[0].Text != "Ahoj, jak se máš?" {
+		t.Errorf("item 1 wrong: %q", texts[0].Text)
 	}
-	if texts[1] != "Dobře, díky." {
-		t.Errorf("item 2 wrong: %q", texts[1])
+	if texts[1].Text != "Dobře, díky." {
+		t.Errorf("item 2 wrong: %q", texts[1].Text)
 	}
 }
 

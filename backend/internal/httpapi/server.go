@@ -989,15 +989,15 @@ func (s *Server) handleAdminGenerateAudio(w http.ResponseWriter, r *http.Request
 	// - any poslech_* has segments with ≥2 distinct speaker labels (e.g. [Muž]/[Žena]).
 	var audio *contracts.ExerciseAudio
 	if dialogGen, ok := s.audioGenerator.(processing.DialogExerciseAudioGenerator); ok {
-		var dialogTexts []string
+		var segs []contracts.AudioSegment
 		if exercise.ExerciseType == "poslech_4" {
-			dialogTexts = processing.BuildExerciseDialogTexts(exercise)
+			segs = processing.BuildExerciseDialogTexts(exercise)
 		} else if processing.HasMultipleSpeakers(exercise) {
-			dialogTexts = processing.BuildExerciseDialogLines(exercise)
+			segs = processing.BuildExerciseDialogSegments(exercise)
 		}
-		if len(dialogTexts) > 0 {
+		if len(segs) > 0 {
 			var err error
-			audio, err = dialogGen.GenerateDialogAudio(exerciseID, dialogTexts)
+			audio, err = dialogGen.GenerateDialogAudio(exerciseID, segs)
 			if err != nil {
 				log.Printf("generate-dialog-audio exercise %s: %v", exerciseID, err)
 				writeError(w, http.StatusInternalServerError, "internal_error", "Dialog audio generation failed.", true)
