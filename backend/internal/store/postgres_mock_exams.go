@@ -83,10 +83,14 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 
 	var sections []contracts.MockExamSessionItem
 
+	threshold := 60
 	if mockTestID != "" && mockTests != nil {
 		mt, ok := mockTests.MockTestByID(mockTestID)
 		if !ok {
 			return contracts.MockExamSession{}, fmt.Errorf("mock test not found: %s", mockTestID)
+		}
+		if mt.PassThresholdPercent > 0 {
+			threshold = mt.PassThresholdPercent
 		}
 		sections = make([]contracts.MockExamSessionItem, 0, len(mt.Sections))
 		for _, mts := range mt.Sections {
@@ -128,13 +132,6 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 		return contracts.MockExamSession{}, fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback()
-
-	threshold := 60
-	if mockTestID != "" && mockTests != nil {
-		if mt, ok := mockTests.MockTestByID(mockTestID); ok && mt.PassThresholdPercent > 0 {
-			threshold = mt.PassThresholdPercent
-		}
-	}
 
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO mock_exam_sessions (id, learner_id, status, mock_test_id, pass_threshold_percent) VALUES ($1, $2, 'in_progress', $3, $4)`,

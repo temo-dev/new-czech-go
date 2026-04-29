@@ -97,6 +97,9 @@ func (s *memoryMockTestStore) CreateMockTest(t contracts.MockTest) (contracts.Mo
 	if t.Status == "" {
 		t.Status = "draft"
 	}
+	if t.PassThresholdPercent <= 0 || t.PassThresholdPercent > 100 {
+		t.PassThresholdPercent = 60
+	}
 	cp := t
 	s.tests[t.ID] = &cp
 	return cp, nil

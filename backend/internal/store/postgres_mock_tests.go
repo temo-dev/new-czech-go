@@ -77,7 +77,7 @@ func (s *postgresMockTestStore) CreateMockTest(t contracts.MockTest) (contracts.
 	defer tx.Rollback()
 
 	threshold := t.PassThresholdPercent
-	if threshold <= 0 {
+	if threshold <= 0 || threshold > 100 {
 		threshold = 60
 	}
 	if _, err := tx.ExecContext(ctx,
@@ -195,7 +195,7 @@ func (s *postgresMockTestStore) UpdateMockTest(id string, update contracts.MockT
 	defer tx.Rollback()
 
 	updateThreshold := update.PassThresholdPercent
-	if updateThreshold <= 0 {
+	if updateThreshold <= 0 || updateThreshold > 100 {
 		updateThreshold = 60
 	}
 	res, err := tx.ExecContext(ctx,

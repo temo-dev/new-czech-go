@@ -101,12 +101,17 @@ class _MockExamScreenState extends State<MockExamScreen> {
   }
 
   Future<void> _advanceSection(String attemptId) async {
-    final payload = await widget.client.advanceMockExam(_session!.id, attemptId: attemptId);
-    if (!mounted) return;
-    setState(() {
-      _session = MockExamSessionView.fromJson(payload);
-      _error = null;
-    });
+    try {
+      final payload = await widget.client.advanceMockExam(_session!.id, attemptId: attemptId);
+      if (!mounted) return;
+      setState(() {
+        _session = MockExamSessionView.fromJson(payload);
+        _error = null;
+      });
+    } catch (err) {
+      if (!mounted) return;
+      setState(() => _error = err.toString());
+    }
   }
 
   Future<void> _runSection(MockExamSection section) async {
@@ -436,10 +441,13 @@ class _MockExamResultView extends StatelessWidget {
   ApiClient _client(BuildContext context) => client;
 
   IconData _sectionIcon(String exerciseType) => switch (exerciseType) {
-    String t when t.contains('uloha_1') => Icons.person_outline_rounded,
-    String t when t.contains('uloha_2') => Icons.image_outlined,
-    String t when t.contains('uloha_3') => Icons.people_outline_rounded,
-    String t when t.contains('uloha_4') => Icons.mic_none_rounded,
+    String t when t.startsWith('uloha_1') => Icons.person_outline_rounded,
+    String t when t.startsWith('uloha_2') => Icons.image_outlined,
+    String t when t.startsWith('uloha_3') => Icons.people_outline_rounded,
+    String t when t.startsWith('uloha_4') => Icons.mic_none_rounded,
+    String t when t.startsWith('poslech_') => Icons.headphones_outlined,
+    String t when t.startsWith('cteni_')   => Icons.menu_book_outlined,
+    String t when t.startsWith('psani_')   => Icons.edit_outlined,
     _ => Icons.school_outlined,
   };
 

@@ -54,7 +54,6 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
     final l = AppLocalizations.of(context);
     final test = widget.test;
     final totalPts = test.totalMaxPoints + 3;
-    final passScore = ((test.totalMaxPoints * test.passThresholdPercent) / 100).ceil();
     final h = AppSpacing.pagePaddingH(context);
 
     return Scaffold(
@@ -112,7 +111,7 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
                 const SizedBox(width: AppSpacing.x2),
                 Expanded(child: _StatBox(
                   icon: Icons.flag_outlined,
-                  value: '$passScore điểm',
+                  value: '≥${test.passThresholdPercent}%',
                   label: 'Điểm đỗ',
                   valueColor: AppColors.success,
                 )),
