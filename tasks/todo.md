@@ -99,7 +99,7 @@ Không làm 1 form/type — shared scaffold + type-specific sections trong slide
 
 ## Backlog (sau V5)
 
-- [ ] Polly 2 voices cho `poslech_4` dialogs (upgrade từ Option B)
+- [x] Polly 2 voices cho `poslech_4` dialogs — DialogExerciseAudioGenerator interface + alternating voice per item + MP3 concat + POLLY_VOICE_ID_2 env (2026-04-29)
 - [x] Listening audio persistence: ExerciseAudioStore interface + postgresExerciseAudioStore (2026-04-29)
 - [ ] Polly đọc `model_answer_text` cho Writing
 - [ ] Learner history filter theo skill_kind
