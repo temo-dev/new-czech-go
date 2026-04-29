@@ -43,26 +43,35 @@ func readinessToFraction(level string) float64 {
 
 // computeScoring calculates overall_score and passed for a completed session.
 // levels and maxPoints must be the same length and same order as sections.
+// thresholdPercent: pass if overallScore >= sum(maxPoints)*thresholdPercent/100.
 // Returns (sectionScores, pronunciationBonus, overallScore, passed).
-func computeScoring(levels []string, maxPoints []int) ([]int, int, int, bool) {
+func computeScoring(levels []string, maxPoints []int, thresholdPercent int) ([]int, int, int, bool) {
 	n := len(levels)
 	if n == 0 {
 		return nil, 0, 0, false
 	}
+	if thresholdPercent <= 0 {
+		thresholdPercent = 60
+	}
 	sectionScores := make([]int, n)
 	totalFrac := 0.0
 	total := 0
+	totalMax := 0
 	for i, lv := range levels {
 		f := readinessToFraction(lv)
 		totalFrac += f
 		pts := int(math.Round(f * float64(maxPoints[i])))
 		sectionScores[i] = pts
 		total += pts
+		totalMax += maxPoints[i]
 	}
 	avgFrac := totalFrac / float64(n)
 	pronunciationBonus := int(math.Round(avgFrac * 3.0))
 	overallScore := total + pronunciationBonus
-	passed := overallScore >= 24
+	var passed bool
+	if totalMax > 0 {
+		passed = overallScore*100 >= totalMax*thresholdPercent
+	}
 	return sectionScores, pronunciationBonus, overallScore, passed
 }
 

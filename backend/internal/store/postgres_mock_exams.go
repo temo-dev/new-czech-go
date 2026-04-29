@@ -65,9 +65,10 @@ CREATE TABLE IF NOT EXISTS mock_exam_sections (
 );
 
 ALTER TABLE mock_exam_sessions
-    ADD COLUMN IF NOT EXISTS mock_test_id   TEXT    NOT NULL DEFAULT '',
-    ADD COLUMN IF NOT EXISTS overall_score  INTEGER NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS passed         BOOLEAN NOT NULL DEFAULT false;
+    ADD COLUMN IF NOT EXISTS mock_test_id            TEXT    NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS overall_score           INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS passed                  BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS pass_threshold_percent  INTEGER NOT NULL DEFAULT 60;
 
 ALTER TABLE mock_exam_sections
     ADD COLUMN IF NOT EXISTS max_points    INTEGER NOT NULL DEFAULT 0,
@@ -128,9 +129,16 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 	}
 	defer tx.Rollback()
 
+	threshold := 60
+	if mockTestID != "" && mockTests != nil {
+		if mt, ok := mockTests.MockTestByID(mockTestID); ok && mt.PassThresholdPercent > 0 {
+			threshold = mt.PassThresholdPercent
+		}
+	}
+
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO mock_exam_sessions (id, learner_id, status, mock_test_id) VALUES ($1, $2, 'in_progress', $3)`,
-		id, learnerID, mockTestID,
+		`INSERT INTO mock_exam_sessions (id, learner_id, status, mock_test_id, pass_threshold_percent) VALUES ($1, $2, 'in_progress', $3, $4)`,
+		id, learnerID, mockTestID, threshold,
 	); err != nil {
 		return contracts.MockExamSession{}, fmt.Errorf("insert mock exam session: %w", err)
 	}
@@ -149,10 +157,11 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 	}
 
 	return contracts.MockExamSession{
-		ID:         id,
-		Status:     "in_progress",
-		MockTestID: mockTestID,
-		Sections:   sections,
+		ID:                   id,
+		Status:               "in_progress",
+		MockTestID:           mockTestID,
+		PassThresholdPercent: threshold,
+		Sections:             sections,
 	}, nil
 }
 
@@ -162,9 +171,9 @@ func (s *postgresMockExamStore) MockExamByID(id string) (contracts.MockExamSessi
 
 	var session contracts.MockExamSession
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, status, mock_test_id, overall_score, passed, overall_readiness_level, overall_summary FROM mock_exam_sessions WHERE id = $1`,
+		`SELECT id, status, mock_test_id, overall_score, passed, pass_threshold_percent, overall_readiness_level, overall_summary FROM mock_exam_sessions WHERE id = $1`,
 		id,
-	).Scan(&session.ID, &session.Status, &session.MockTestID, &session.OverallScore, &session.Passed, &session.OverallReadinessLevel, &session.OverallSummary)
+	).Scan(&session.ID, &session.Status, &session.MockTestID, &session.OverallScore, &session.Passed, &session.PassThresholdPercent, &session.OverallReadinessLevel, &session.OverallSummary)
 	if err == sql.ErrNoRows {
 		return contracts.MockExamSession{}, false
 	}
@@ -283,8 +292,15 @@ func (s *postgresMockExamStore) CompleteMockExam(id string) (contracts.MockExamS
 		}
 	}
 
+	var threshold int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT pass_threshold_percent FROM mock_exam_sessions WHERE id = $1`, id,
+	).Scan(&threshold); err != nil || threshold <= 0 {
+		threshold = 60
+	}
+
 	level, summary := rollupReadiness(levels)
-	sectionScores, _, overallScore, passed := computeScoring(levels, maxPoints)
+	sectionScores, _, overallScore, passed := computeScoring(levels, maxPoints, threshold)
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

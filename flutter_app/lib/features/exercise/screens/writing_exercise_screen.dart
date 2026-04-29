@@ -98,7 +98,6 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
         );
       }
 
-      widget.onAttemptCompleted?.call(attemptId);
       if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
@@ -108,6 +107,8 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
           ),
         ),
       );
+      // Fire after AnalysisScreen pops — writing attempt is completed by then.
+      if (mounted) widget.onAttemptCompleted?.call(attemptId);
     } catch (e) {
       if (!mounted) return;
       setState(() { _error = e.toString(); });

@@ -455,8 +455,9 @@ type MockTest struct {
 	Title                    string            `json:"title"`
 	Description              string            `json:"description"`
 	EstimatedDurationMinutes int               `json:"estimated_duration_minutes"`
-	Status                   string            `json:"status"`       // draft, published
-	SessionType              string            `json:"session_type"` // speaking | pisemna | full
+	Status                   string            `json:"status"`                // draft, published
+	SessionType              string            `json:"session_type,omitempty"` // speaking | pisemna | full | "" (sprint)
+	PassThresholdPercent     int               `json:"pass_threshold_percent"` // 0 = use default 60
 	Sections                 []MockTestSection `json:"sections"`
 }
 
@@ -473,6 +474,7 @@ type MockExamSession struct {
 	MockTestID            string                `json:"mock_test_id,omitempty"`
 	OverallScore          int                   `json:"overall_score,omitempty"`
 	Passed                bool                  `json:"passed,omitempty"`
+	PassThresholdPercent  int                   `json:"pass_threshold_percent,omitempty"`
 	OverallReadinessLevel string                `json:"overall_readiness_level,omitempty"`
 	OverallSummary        string                `json:"overall_summary,omitempty"`
 	Sections              []MockExamSessionItem `json:"sections"`

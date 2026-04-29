@@ -260,6 +260,7 @@ class MockExamSessionView {
     required this.mockTestId,
     required this.overallScore,
     required this.passed,
+    required this.passThresholdPercent,
     required this.overallReadinessLevel,
     required this.overallSummary,
     required this.sections,
@@ -270,6 +271,7 @@ class MockExamSessionView {
   final String mockTestId;
   final int overallScore;
   final bool passed;
+  final int passThresholdPercent;
   final String overallReadinessLevel;
   final String overallSummary;
   final List<MockExamSection> sections;
@@ -293,6 +295,7 @@ class MockExamSessionView {
       mockTestId: json['mock_test_id'] as String? ?? '',
       overallScore: (json['overall_score'] as num?)?.toInt() ?? 0,
       passed: json['passed'] as bool? ?? false,
+      passThresholdPercent: (json['pass_threshold_percent'] as num?)?.toInt() ?? 60,
       overallReadinessLevel: json['overall_readiness_level'] as String? ?? '',
       overallSummary: json['overall_summary'] as String? ?? '',
       sections: raw.map((e) => MockExamSection.fromJson(e as Map<String, dynamic>)).toList(),

@@ -48,10 +48,14 @@ func (s *memoryMockExamStore) CreateMockExam(learnerID, mockTestID string, mockT
 
 	var sections []contracts.MockExamSessionItem
 
+	threshold := 60
 	if mockTestID != "" && mockTests != nil {
 		mt, ok := mockTests.MockTestByID(mockTestID)
 		if !ok {
 			return contracts.MockExamSession{}, fmt.Errorf("mock test not found: %s", mockTestID)
+		}
+		if mt.PassThresholdPercent > 0 {
+			threshold = mt.PassThresholdPercent
 		}
 		sections = make([]contracts.MockExamSessionItem, 0, len(mt.Sections))
 		for _, mts := range mt.Sections {
@@ -84,10 +88,11 @@ func (s *memoryMockExamStore) CreateMockExam(learnerID, mockTestID string, mockT
 	id := fmt.Sprintf("mock-session-%d", s.nextSession)
 	s.nextSession++
 	session := &contracts.MockExamSession{
-		ID:         id,
-		Status:     "in_progress",
-		MockTestID: mockTestID,
-		Sections:   sections,
+		ID:                   id,
+		Status:               "in_progress",
+		MockTestID:           mockTestID,
+		PassThresholdPercent: threshold,
+		Sections:             sections,
 	}
 	s.sessions[id] = session
 	return *session, nil
@@ -159,7 +164,7 @@ func (s *memoryMockExamStore) CompleteMockExam(id string) (contracts.MockExamSes
 		levels = append(levels, attempt.Feedback.ReadinessLevel)
 	}
 	level, summary := rollupReadiness(levels)
-	sectionScores, _, overallScore, passed := computeScoring(levels, maxPoints)
+	sectionScores, _, overallScore, passed := computeScoring(levels, maxPoints, session.PassThresholdPercent)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

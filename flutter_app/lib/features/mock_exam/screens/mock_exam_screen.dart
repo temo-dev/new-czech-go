@@ -9,6 +9,9 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../../../shared/widgets/info_pill.dart';
 import '../../exercise/screens/exercise_screen.dart' as exercise_feature;
+import '../../exercise/screens/listening_exercise_screen.dart';
+import '../../exercise/screens/reading_exercise_screen.dart';
+import '../../exercise/screens/writing_exercise_screen.dart';
 import 'mock_exam_section_detail_screen.dart';
 
 class _PendingAnalysis {
@@ -89,6 +92,23 @@ class _MockExamScreenState extends State<MockExamScreen> {
     }
   }
 
+  static String _skillKind(String exerciseType) {
+    if (exerciseType.startsWith('uloha_')) return 'noi';
+    if (exerciseType.startsWith('poslech_')) return 'nghe';
+    if (exerciseType.startsWith('cteni_')) return 'doc';
+    if (exerciseType.startsWith('psani_')) return 'viet';
+    return 'noi';
+  }
+
+  Future<void> _advanceSection(String attemptId) async {
+    final payload = await widget.client.advanceMockExam(_session!.id, attemptId: attemptId);
+    if (!mounted) return;
+    setState(() {
+      _session = MockExamSessionView.fromJson(payload);
+      _error = null;
+    });
+  }
+
   Future<void> _runSection(MockExamSection section) async {
     final navigator = Navigator.of(context);
     try {
@@ -97,38 +117,68 @@ class _MockExamScreenState extends State<MockExamScreen> {
       );
       if (!mounted) return;
 
-      _PendingAnalysis? recorded;
-      await navigator.push(
-        MaterialPageRoute(
-          builder: (_) => exercise_feature.ExerciseScreen(
-            client: widget.client,
-            detail: detail,
-            onRecordingReady: (attemptId, audioPath, fileSizeBytes, durationMs) {
-              recorded = _PendingAnalysis(
-                attemptId: attemptId,
-                audioPath: audioPath,
-                fileSizeBytes: fileSizeBytes,
-                durationMs: durationMs,
-              );
-            },
+      final kind = _skillKind(section.exerciseType);
+
+      if (kind == 'noi') {
+        // Speaking: collect recording, bulk-analyze after all sections done.
+        _PendingAnalysis? recorded;
+        await navigator.push(
+          MaterialPageRoute(
+            builder: (_) => exercise_feature.ExerciseScreen(
+              client: widget.client,
+              detail: detail,
+              onRecordingReady: (attemptId, audioPath, fileSizeBytes, durationMs) {
+                recorded = _PendingAnalysis(
+                  attemptId: attemptId,
+                  audioPath: audioPath,
+                  fileSizeBytes: fileSizeBytes,
+                  durationMs: durationMs,
+                );
+              },
+            ),
           ),
-        ),
-      );
-      if (!mounted) return;
+        );
+        if (!mounted) return;
 
-      final rec = recorded;
-      if (rec == null) return; // user backed out without recording
+        final rec = recorded;
+        if (rec == null) return; // user backed out
 
-      final payload = await widget.client.advanceMockExam(
-        _session!.id,
-        attemptId: rec.attemptId,
-      );
-      if (!mounted) return;
-      setState(() {
-        _session = MockExamSessionView.fromJson(payload);
-        _pendingAnalyses.add(rec);
-        _error = null;
-      });
+        final payload = await widget.client.advanceMockExam(
+          _session!.id,
+          attemptId: rec.attemptId,
+        );
+        if (!mounted) return;
+        setState(() {
+          _session = MockExamSessionView.fromJson(payload);
+          _pendingAnalyses.add(rec);
+          _error = null;
+        });
+      } else {
+        // Non-speaking: route to correct screen; callback advances session in background.
+        await navigator.push(MaterialPageRoute(builder: (_) {
+          if (kind == 'nghe') {
+            return ListeningExerciseScreen(
+              client: widget.client,
+              detail: detail,
+              onAttemptCompleted: (id) async { await _advanceSection(id); },
+            );
+          } else if (kind == 'doc') {
+            return ReadingExerciseScreen(
+              client: widget.client,
+              detail: detail,
+              onAttemptCompleted: (id) async { await _advanceSection(id); },
+            );
+          } else {
+            return WritingExerciseScreen(
+              client: widget.client,
+              detail: detail,
+              onAttemptCompleted: (id) async { await _advanceSection(id); },
+            );
+          }
+        }));
+        if (!mounted) return;
+        // If user backed out without completing, _session remains unchanged (nextPending != null).
+      }
 
       if (_session!.nextPending == null) {
         await _bulkAnalyze();
@@ -394,10 +444,13 @@ class _MockExamResultView extends StatelessWidget {
   };
 
   Color _sectionIconBg(String exerciseType) => switch (exerciseType) {
-    String t when t.contains('uloha_1') => AppColors.primaryFixed,
-    String t when t.contains('uloha_2') => AppColors.infoContainer,
-    String t when t.contains('uloha_3') => AppColors.warningContainer,
-    String t when t.contains('uloha_4') => AppColors.successContainer,
+    String t when t.startsWith('uloha_1') => AppColors.primaryFixed,
+    String t when t.startsWith('uloha_2') => AppColors.infoContainer,
+    String t when t.startsWith('uloha_3') => AppColors.warningContainer,
+    String t when t.startsWith('uloha_4') => AppColors.successContainer,
+    String t when t.startsWith('poslech_') => AppColors.infoContainer,
+    String t when t.startsWith('cteni_')   => AppColors.tertiaryContainer,
+    String t when t.startsWith('psani_')   => AppColors.secondaryContainer,
     _ => AppColors.surfaceContainerHigh,
   };
 
@@ -467,6 +520,13 @@ class _MockExamResultView extends StatelessWidget {
                       color: passColor, fontSize: 13, letterSpacing: 1.2, fontWeight: FontWeight.w700),
                 ),
               ]),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.x2),
+          Center(
+            child: Text(
+              'Ngưỡng đạt: ${session.passThresholdPercent}%',
+              style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
             ),
           ),
           const SizedBox(height: AppSpacing.x3),

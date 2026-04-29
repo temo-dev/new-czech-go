@@ -23,7 +23,8 @@ type MockTest = {
   description: string;
   estimated_duration_minutes: number;
   status: 'draft' | 'published';
-  session_type: 'speaking' | 'pisemna' | 'full';
+  session_type?: string;
+  pass_threshold_percent?: number;
   sections: MockTestSection[];
 };
 
@@ -59,7 +60,7 @@ type FormState = {
   description: string;
   estimated_duration_minutes: number;
   status: 'draft' | 'published';
-  session_type: 'speaking' | 'pisemna' | 'full';
+  pass_threshold_percent: number;
   sections: MockTestSection[];
 };
 
@@ -68,7 +69,7 @@ const emptyForm = (): FormState => ({
   description: '',
   estimated_duration_minutes: 15,
   status: 'draft',
-  session_type: 'speaking',
+  pass_threshold_percent: 80,
   sections: [],
 });
 
@@ -124,7 +125,7 @@ export function MockTestDashboard() {
       description: t.description,
       estimated_duration_minutes: t.estimated_duration_minutes,
       status: t.status,
-      session_type: t.session_type ?? 'speaking',
+      pass_threshold_percent: t.pass_threshold_percent ?? 80,
       sections: [...(t.sections ?? [])],
     });
     setShowForm(true);
@@ -147,7 +148,7 @@ export function MockTestDashboard() {
         description: form.description,
         estimated_duration_minutes: form.estimated_duration_minutes,
         status: form.status,
-        session_type: form.session_type,
+        pass_threshold_percent: form.pass_threshold_percent,
         sections: form.sections,
       };
       const url = editingId ? `${MOCK_TEST_API}/${editingId}` : MOCK_TEST_API;
@@ -253,8 +254,8 @@ export function MockTestDashboard() {
                   <p style={{ margin: '4px 0', fontSize: 13, color: '#9ca3af' }}>
                     {t.estimated_duration_minutes} min · {t.sections?.length ?? 0} sections ·{' '}
                     {t.sections?.reduce((s, sec) => s + sec.max_points, 0) ?? 0} pts ·{' '}
-                    <span style={{ color: t.session_type === 'pisemna' ? '#0f3d3a' : t.session_type === 'full' ? '#3060b8' : '#6b7280' }}>
-                      {t.session_type ?? 'speaking'}
+                    <span style={{ color: '#3b82f6', fontWeight: 600 }}>
+                      pass ≥{t.pass_threshold_percent ?? 60}%
                     </span>
                   </p>
                 </div>
@@ -313,16 +314,16 @@ export function MockTestDashboard() {
               />
             </div>
             <div>
-              <label style={labelStyle}>Loại kỳ thi</label>
-              <select
-                value={form.session_type}
-                onChange={e => setForm(f => ({ ...f, session_type: e.target.value as FormState['session_type'] }))}
+              <label style={labelStyle}>Ngưỡng pass (%)</label>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={form.pass_threshold_percent}
+                onChange={e => setForm(f => ({ ...f, pass_threshold_percent: parseInt(e.target.value) || 80 }))}
                 style={inputStyle}
-              >
-                <option value="speaking">Mluvení (nói) — 40đ</option>
-                <option value="pisemna">Písemná (đọc+viết+nghe) — 70đ</option>
-                <option value="full">Full exam (cả 2 phần)</option>
-              </select>
+                title="Pass threshold percent (default 80 for sprint, 60 for full A2 exam)"
+              />
             </div>
             <div>
               <label style={labelStyle}>Status</label>
@@ -336,17 +337,9 @@ export function MockTestDashboard() {
               </select>
             </div>
           </div>
-
-          {form.session_type === 'pisemna' && (
-            <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0' }}>
-              Písemná: thêm cteni_* (25đ) + psani_* (20đ) + poslech_* (25đ) sections. Pass ≥42/70.
-            </p>
-          )}
-          {form.session_type === 'full' && (
-            <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0' }}>
-              Full exam: admin tạo 2 MockTest riêng (pisemna + speaking), app ghép khi học viên thi.
-            </p>
-          )}
+          <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0' }}>
+            Sprint luyện tập: 80%. Đề thi chuẩn A2 (full speaking): 60%.
+          </p>
 
           <div style={{ marginTop: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
