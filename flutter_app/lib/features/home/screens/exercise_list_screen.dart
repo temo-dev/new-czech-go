@@ -394,7 +394,7 @@ class _ExerciseCard extends StatelessWidget {
 
     final iconColor = typeStyle?.color ?? AppColors.primary;
     final iconBg = typeStyle?.bg ?? AppColors.primaryFixed;
-    final iconData = typeStyle?.icon ?? Icons.mic_rounded;
+    final iconData = typeStyle?.icon ?? _skillIcon(skillKind);
     final badgeLabel = typeStyle?.label ?? ulohaTag;
 
     return GestureDetector(
@@ -461,6 +461,16 @@ class _ExerciseCard extends StatelessWidget {
     );
   }
 }
+
+IconData _skillIcon(String skillKind) => switch (skillKind) {
+  'noi'      => Icons.mic_rounded,
+  'nghe'     => Icons.headphones_rounded,
+  'viet'     => Icons.edit_rounded,
+  'doc'      => Icons.menu_book_rounded,
+  'tu_vung'  => Icons.style_rounded,
+  'ngu_phap' => Icons.school_rounded,
+  _          => Icons.mic_rounded,
+};
 
 class _FilterPill extends StatelessWidget {
   const _FilterPill({required this.label, required this.active, required this.onTap});
