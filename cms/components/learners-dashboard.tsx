@@ -36,7 +36,7 @@ type LearnerStat = {
 };
 
 type ReadinessFilter = 'all' | 'ready' | 'almost_ready' | 'needs_work' | 'not_ready';
-type ViewMode = 'attempts' | 'learners';
+type ViewMode = 'attempts' | 'learners' | 'analytics';
 
 const FILTERS: { key: ReadinessFilter; label: string }[] = [
   { key: 'all',          label: 'Tất cả' },
@@ -111,6 +111,38 @@ function groupByLearner(attempts: Attempt[]): LearnerStat[] {
   }).sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime());
 }
 
+type ExerciseStat = {
+  exerciseType: string;
+  total: number;
+  completed: number;
+  passed: number;
+  passRate: number; // 0-100
+};
+
+function groupByExerciseType(attempts: Attempt[]): ExerciseStat[] {
+  const map = new Map<string, { total: number; completed: number; passed: number }>();
+  for (const a of attempts) {
+    const key = a.exercise_type ?? '(unknown)';
+    const prev = map.get(key) ?? { total: 0, completed: 0, passed: 0 };
+    const completed = a.status === 'completed';
+    const level = a.feedback?.readiness_level ?? a.readiness_level ?? '';
+    map.set(key, {
+      total: prev.total + 1,
+      completed: prev.completed + (completed ? 1 : 0),
+      passed: prev.passed + (completed && (isReady(level) || isAlmost(level)) ? 1 : 0),
+    });
+  }
+  return Array.from(map.entries())
+    .map(([exerciseType, s]) => ({
+      exerciseType,
+      total: s.total,
+      completed: s.completed,
+      passed: s.passed,
+      passRate: s.completed > 0 ? Math.round((s.passed / s.completed) * 100) : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
+}
+
 export function LearnersDashboard() {
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,6 +182,7 @@ export function LearnersDashboard() {
       });
 
   const learners = groupByLearner(attempts);
+  const exerciseStats = groupByExerciseType(attempts);
 
   const completed = attempts.filter(a => a.status === 'completed');
   const readyCnt  = completed.filter(a => isReady(a.feedback?.readiness_level ?? a.readiness_level ?? '')).length;
@@ -200,7 +233,11 @@ export function LearnersDashboard() {
 
       {/* View toggle */}
       <div style={{ display: 'flex', gap: 0, marginBottom: 20, background: 'rgba(20,18,14,0.05)', borderRadius: 999, padding: 4, width: 'fit-content' }}>
-        {(['attempts', 'learners'] as const).map(v => (
+        {([
+          ['attempts',  'Lượt nộp'],
+          ['learners',  'Học viên'],
+          ['analytics', 'Analytics'],
+        ] as const).map(([v, label]) => (
           <button
             key={v}
             onClick={() => setView(v)}
@@ -217,7 +254,7 @@ export function LearnersDashboard() {
               transition: 'all 120ms ease',
             }}
           >
-            {v === 'attempts' ? 'Lượt nộp' : 'Học viên'}
+            {label}
           </button>
         ))}
       </div>
@@ -260,6 +297,67 @@ export function LearnersDashboard() {
           onToggle={(uid) => setExpandedUser(expandedUser === uid ? null : uid)}
         />
       )}
+
+      {view === 'analytics' && (
+        <AnalyticsTable stats={exerciseStats} totalAttempts={attempts.length} />
+      )}
+    </div>
+  );
+}
+
+// ── Analytics table ───────────────────────────────────────────────────────────
+
+function AnalyticsTable({ stats, totalAttempts }: { stats: ExerciseStat[]; totalAttempts: number }) {
+  if (stats.length === 0) {
+    return <p style={{ color: 'var(--ink-3)', textAlign: 'center', padding: '40px 0' }}>Chưa có dữ liệu.</p>;
+  }
+
+  const skillKindOf = (t: string) => {
+    if (t.startsWith('uloha_'))   return 'Nói';
+    if (t.startsWith('psani_'))   return 'Viết';
+    if (t.startsWith('poslech_')) return 'Nghe';
+    if (t.startsWith('cteni_'))   return 'Đọc';
+    if (['quizcard_basic','matching','fill_blank','choice_word'].includes(t)) return 'Từ vựng/Ngữ pháp';
+    return '—';
+  };
+
+  return (
+    <div className="card" style={{ overflow: 'hidden' }}>
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        Pass rate theo loại bài tập ({totalAttempts} lượt tổng)
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: 'var(--surface-alt)' }}>
+              {['Loại bài', 'Kỹ năng', 'Tổng lượt', 'Hoàn thành', 'Đạt (ready/almost)', 'Pass rate', 'Bar'].map(h => (
+                <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: 0.4, whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {stats.map((s, i) => (
+              <tr key={s.exerciseType} style={{ borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
+                <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: 12 }}>{s.exerciseType}</td>
+                <td style={{ padding: '10px 12px', color: 'var(--ink-3)', fontSize: 12 }}>{skillKindOf(s.exerciseType)}</td>
+                <td style={{ padding: '10px 12px', fontWeight: 600 }}>{s.total}</td>
+                <td style={{ padding: '10px 12px' }}>{s.completed}</td>
+                <td style={{ padding: '10px 12px' }}>{s.passed}</td>
+                <td style={{ padding: '10px 12px', fontWeight: 700, color: s.passRate >= 70 ? 'var(--ready)' : s.passRate >= 40 ? 'var(--almost)' : 'var(--not-ready)' }}>
+                  {s.completed > 0 ? `${s.passRate}%` : '—'}
+                </td>
+                <td style={{ padding: '10px 12px', minWidth: 100 }}>
+                  {s.completed > 0 && (
+                    <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${s.passRate}%`, background: s.passRate >= 70 ? 'var(--ready)' : s.passRate >= 40 ? 'var(--almost)' : 'var(--not-ready)', borderRadius: 4, transition: 'width 400ms ease' }} />
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
