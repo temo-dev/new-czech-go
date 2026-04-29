@@ -119,78 +119,8 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
             ),
             const SizedBox(height: AppSpacing.x5),
 
-            // Part breakdown
-            Text(
-              '${test.sections.length} PHẦN THI',
-              style: AppTypography.labelUppercase.copyWith(
-                fontSize: 11, color: AppColors.onSurfaceVariant, letterSpacing: 0.8),
-            ),
-            const SizedBox(height: AppSpacing.x3),
-
-            ...test.sections.map((sec) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.x2),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.x3, vertical: AppSpacing.x3),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLowest,
-                  borderRadius: AppRadius.mdAll,
-                  border: Border.all(
-                      color: AppColors.outlineVariant.withValues(alpha: 0.6)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryContainer,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        '${sec.sequenceNo}',
-                        style: AppTypography.bodySmall.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.x3),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _ulohaLabel(sec.exerciseType),
-                            style: AppTypography.bodySmall.copyWith(
-                              fontSize: 10,
-                              color: AppColors.onSurfaceVariant,
-                              letterSpacing: 0.4,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            _exerciseTypeLabel(sec.exerciseType, l),
-                            style: AppTypography.bodyMedium.copyWith(
-                                fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      '${sec.maxPoints}đ',
-                      style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                        fontFamily: 'monospace',
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )),
+            // Part breakdown — grouped by skill_kind
+            ..._buildSkillGroups(test, l),
 
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.x3),
@@ -230,19 +160,114 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
     );
   }
 
-  String _ulohaLabel(String type) => switch (type) {
-    'uloha_2_dialogue_questions' => 'ÚLOHA 2',
-    'uloha_3_story_narration'   => 'ÚLOHA 3',
-    'uloha_4_choice_reasoning'  => 'ÚLOHA 4',
-    _                           => 'ÚLOHA 1',
+  static const _skillKindOrder = ['noi', 'nghe', 'doc', 'viet'];
+
+  static String _skillGroupLabel(String kind) => switch (kind) {
+    'noi'  => 'Nói (Speaking)',
+    'nghe' => 'Nghe (Listening)',
+    'doc'  => 'Đọc (Reading)',
+    'viet' => 'Viết (Writing)',
+    _      => kind.toUpperCase(),
   };
 
-  String _exerciseTypeLabel(String type, AppLocalizations l) => switch (type) {
-    'uloha_2_dialogue_questions' => l.exerciseUloha2Label,
-    'uloha_3_story_narration'   => l.exerciseUloha3Label,
-    'uloha_4_choice_reasoning'  => l.exerciseUloha4Label,
-    _                           => l.exerciseUloha1Label,
+  static Color _skillGroupColor(String kind) => switch (kind) {
+    'noi'  => AppColors.primary,
+    'nghe' => AppColors.info,
+    'doc'  => AppColors.warning,
+    'viet' => AppColors.success,
+    _      => AppColors.onSurfaceVariant,
   };
+
+  static IconData _skillGroupIcon(String kind) => switch (kind) {
+    'noi'  => Icons.mic_none_rounded,
+    'nghe' => Icons.headphones_outlined,
+    'doc'  => Icons.menu_book_outlined,
+    'viet' => Icons.edit_outlined,
+    _      => Icons.school_outlined,
+  };
+
+  List<Widget> _buildSkillGroups(MockTest test, AppLocalizations l) {
+    // Collect unique skill_kinds in canonical order
+    final grouped = <String, List<MockTestSection>>{};
+    for (final kind in _skillKindOrder) {
+      final secs = test.sections.where((s) => s.skillKind == kind).toList();
+      if (secs.isNotEmpty) grouped[kind] = secs;
+    }
+    // Also include any unknown kinds at end
+    for (final sec in test.sections) {
+      if (!_skillKindOrder.contains(sec.skillKind)) {
+        (grouped[sec.skillKind] ??= []).add(sec);
+      }
+    }
+
+    if (grouped.isEmpty) {
+      return [
+        Text('${test.sections.length} PHẦN THI',
+            style: AppTypography.labelUppercase.copyWith(
+                fontSize: 11, color: AppColors.onSurfaceVariant, letterSpacing: 0.8)),
+        const SizedBox(height: AppSpacing.x3),
+      ];
+    }
+
+    final widgets = <Widget>[
+      Text('${grouped.length} PHẦN THI',
+          style: AppTypography.labelUppercase.copyWith(
+              fontSize: 11, color: AppColors.onSurfaceVariant, letterSpacing: 0.8)),
+      const SizedBox(height: AppSpacing.x3),
+    ];
+
+    for (final kind in [..._skillKindOrder, ...grouped.keys.where((k) => !_skillKindOrder.contains(k))]) {
+      final secs = grouped[kind];
+      if (secs == null) continue;
+      final totalPts = secs.fold(0, (s, x) => s + x.maxPoints);
+      final color = _skillGroupColor(kind);
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.x2),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.x3, vertical: AppSpacing.x3),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLowest,
+            borderRadius: AppRadius.mdAll,
+            border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
+          ),
+          child: Row(children: [
+            Container(
+              width: 32, height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(_skillGroupIcon(kind), size: 16, color: color),
+            ),
+            const SizedBox(width: AppSpacing.x3),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(
+                  _skillGroupLabel(kind),
+                  style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  '${secs.length} bài luyện',
+                  style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
+                ),
+              ]),
+            ),
+            Text(
+              '$totalPts đ',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.onSurfaceVariant,
+                fontFamily: 'monospace',
+                fontSize: 12,
+              ),
+            ),
+          ]),
+        ),
+      ));
+    }
+    return widgets;
+  }
 }
 
 class _StatBox extends StatelessWidget {
