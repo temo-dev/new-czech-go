@@ -103,6 +103,15 @@ func (p *Processor) ProcessWritingAttempt(attemptID string, sub contracts.Writin
 
 	artifact := buildWritingReviewArtifact(text, feedback)
 	if artifact.Status == "ready" {
+		// Generate Polly TTS for the model answer so learners can hear it
+		// (same pattern as speaking review artifacts in processor.go).
+		if artifact.ModelAnswerText != "" {
+			if audio, err := p.ttsProvider.Generate(attemptID, artifact.ModelAnswerText); err != nil {
+				log.Printf("writing attempt %s: model answer TTS failed: %v", attemptID, err)
+			} else {
+				artifact.TTSAudio = audio
+			}
+		}
 		p.repo.UpsertReviewArtifact(attemptID, artifact)
 	}
 
@@ -111,7 +120,7 @@ func (p *Processor) ProcessWritingAttempt(attemptID string, sub contracts.Writin
 
 // buildWritingReviewArtifact constructs the review artifact for a writing attempt.
 // Reuses AttemptReviewArtifact — SourceTranscriptText carries the learner text,
-// CorrectedTranscriptText carries the LLM correction. TTSAudio is always nil.
+// CorrectedTranscriptText carries the LLM correction. TTSAudio is set by the caller.
 func buildWritingReviewArtifact(learnerText string, feedback contracts.AttemptFeedback) contracts.AttemptReviewArtifact {
 	if learnerText == "" {
 		return contracts.AttemptReviewArtifact{Status: "failed", FailureCode: "empty_text"}
