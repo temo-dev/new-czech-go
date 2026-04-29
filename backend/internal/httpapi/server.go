@@ -56,13 +56,23 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 	if apiKey := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY")); apiKey != "" {
 		contentGen = processing.NewClaudeContentGenerator(apiKey)
 	}
+	// Exercise audio generator: Polly when TTS is configured, dev otherwise.
+	var audioGen processing.ExerciseAudioGenerator = processing.DevExerciseAudioGenerator{}
+	if ttsProvider := processor.TTSProvider(); ttsProvider != nil {
+		pollyGen := processing.NewPollyExerciseAudioGenerator(ttsProvider)
+		// Wire second voice for poslech_4 dialogs (POLLY_VOICE_ID_2, default "Tomáš").
+		if ttsB := processing.NewAmazonPollyTTSProviderWithVoice("Tomáš"); ttsB != nil {
+			pollyGen = pollyGen.WithDialogVoice(ttsB)
+		}
+		audioGen = pollyGen
+	}
 	s := &Server{
 		repo:             repo,
 		processor:        processor,
 		uploadProvider:   uploadProvider,
 		audioURLProvider: audioURLProvider,
 		audioSignSecret:  audioSignSecret,
-		audioGenerator:   processing.DevExerciseAudioGenerator{},
+		audioGenerator:   audioGen,
 		fullExamScorer:   processing.NewFullExamScorer(repo),
 		contentGenerator: contentGen,
 		mux:              http.NewServeMux(),
@@ -969,16 +979,38 @@ func (s *Server) handleAdminGenerateAudio(w http.ResponseWriter, r *http.Request
 		writeNotFound(w)
 		return
 	}
-	text := processing.BuildExerciseAudioText(exercise)
-	if text == "" {
-		writeError(w, http.StatusBadRequest, "validation_error", "No text segments found in exercise detail.", false)
-		return
+	// Poslech 4: use 2-voice dialog generation when generator supports it.
+	var audio *contracts.ExerciseAudio
+	if exercise.ExerciseType == "poslech_4" {
+		if dialogGen, ok := s.audioGenerator.(processing.DialogExerciseAudioGenerator); ok {
+			dialogTexts := processing.BuildExerciseDialogTexts(exercise)
+			if len(dialogTexts) == 0 {
+				writeError(w, http.StatusBadRequest, "validation_error", "No dialog text segments found.", false)
+				return
+			}
+			var err error
+			audio, err = dialogGen.GenerateDialogAudio(exerciseID, dialogTexts)
+			if err != nil {
+				log.Printf("generate-dialog-audio exercise %s: %v", exerciseID, err)
+				writeError(w, http.StatusInternalServerError, "internal_error", "Dialog audio generation failed.", true)
+				return
+			}
+		}
 	}
-	audio, err := s.audioGenerator.GenerateAudio(exerciseID, text)
-	if err != nil {
-		log.Printf("generate-audio exercise %s: %v", exerciseID, err)
-		writeError(w, http.StatusInternalServerError, "internal_error", "Audio generation failed.", true)
-		return
+	if audio == nil {
+		// Standard single-voice path for all other types (and poslech_4 fallback)
+		text := processing.BuildExerciseAudioText(exercise)
+		if text == "" {
+			writeError(w, http.StatusBadRequest, "validation_error", "No text segments found in exercise detail.", false)
+			return
+		}
+		var genErr error
+		audio, genErr = s.audioGenerator.GenerateAudio(exerciseID, text)
+		if genErr != nil {
+			log.Printf("generate-audio exercise %s: %v", exerciseID, genErr)
+			writeError(w, http.StatusInternalServerError, "internal_error", "Audio generation failed.", true)
+			return
+		}
 	}
 	s.repo.SetExerciseAudio(exerciseID, *audio)
 	writeJSON(w, http.StatusOK, map[string]any{

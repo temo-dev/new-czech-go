@@ -42,6 +42,14 @@ func NewProcessor(repo attemptRepository, transcriber Transcriber, ttsProvider T
 	return &Processor{repo: repo, transcriber: transcriber, ttsProvider: ttsProvider, llmProvider: llmProvider, reviewProvider: reviewProvider}
 }
 
+// TTSProvider returns the configured TTS provider, or nil if it is the dev no-op.
+func (p *Processor) TTSProvider() TTSProvider {
+	if _, isDev := p.ttsProvider.(DevTTSProvider); isDev {
+		return nil
+	}
+	return p.ttsProvider
+}
+
 func (p *Processor) ProcessAttempt(attemptID string) error {
 	attempt, ok := p.repo.Attempt(attemptID)
 	if !ok {

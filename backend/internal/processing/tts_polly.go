@@ -33,12 +33,10 @@ func NewAmazonPollyTTSProviderFromEnv() (TTSProvider, error) {
 	if region == "" {
 		return nil, fmt.Errorf("AWS_REGION is required when TTS_PROVIDER=amazon_polly")
 	}
-
 	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(region))
 	if err != nil {
 		return nil, fmt.Errorf("load AWS config for polly: %w", err)
 	}
-
 	return &AmazonPollyTTSProvider{
 		client:     polly.NewFromConfig(cfg),
 		voiceID:    envOrDefault("POLLY_VOICE_ID", "Jitka"),
@@ -46,6 +44,32 @@ func NewAmazonPollyTTSProviderFromEnv() (TTSProvider, error) {
 		outputFmt:  pollytypes.OutputFormatMp3,
 		sampleRate: envOrDefault("POLLY_SAMPLE_RATE", "22050"),
 	}, nil
+}
+
+// NewAmazonPollyTTSProviderWithVoice creates a Polly provider with an explicit voiceID.
+// Used for the second voice in poslech_4 dialog generation.
+// POLLY_VOICE_ID_2 env var overrides the voiceID parameter.
+// Returns nil (not an error) when TTS_PROVIDER != amazon_polly or AWS_REGION is unset.
+func NewAmazonPollyTTSProviderWithVoice(voiceID string) TTSProvider {
+	region := strings.TrimSpace(os.Getenv("AWS_REGION"))
+	if region == "" {
+		return nil
+	}
+	override := strings.TrimSpace(os.Getenv("POLLY_VOICE_ID_2"))
+	if override != "" {
+		voiceID = override
+	}
+	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(region))
+	if err != nil {
+		return nil
+	}
+	return &AmazonPollyTTSProvider{
+		client:     polly.NewFromConfig(cfg),
+		voiceID:    voiceID,
+		engine:     pollytypes.EngineNeural,
+		outputFmt:  pollytypes.OutputFormatMp3,
+		sampleRate: envOrDefault("POLLY_SAMPLE_RATE", "22050"),
+	}
 }
 
 func (p *AmazonPollyTTSProvider) Generate(attemptID, text string) (*contracts.ReviewArtifactAudio, error) {
