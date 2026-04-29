@@ -578,12 +578,21 @@ class _ReviewArtifactSectionState extends State<_ReviewArtifactSection> {
             isError: true,
           )
         else ...[
-          _TextBlock(title: l.reviewSourceTitle, body: _sourceText(context, artifact)),
+          _DiffTextBlock(
+            title: l.reviewSourceTitle,
+            chunks: artifact.diffChunks,
+            getText: (c) => c.sourceText,
+            highlightKind: 'deleted',
+            fallback: _sourceText(context, artifact),
+          ),
           const SizedBox(height: AppSpacing.x3),
-          _TextBlock(
+          _DiffTextBlock(
             title: l.reviewCorrectedTitle,
-            body: artifact.correctedTranscriptText,
-            highlight: true,
+            chunks: artifact.diffChunks,
+            getText: (c) => c.targetText,
+            highlightKind: 'added',
+            containerHighlight: true,
+            fallback: artifact.correctedTranscriptText,
           ),
           const SizedBox(height: AppSpacing.x3),
           _TextBlock(title: l.reviewModelTitle, body: artifact.modelAnswerText),
@@ -704,10 +713,9 @@ class _CriteriaChecklist extends StatelessWidget {
 }
 
 class _TextBlock extends StatelessWidget {
-  const _TextBlock({required this.title, required this.body, this.highlight = false});
+  const _TextBlock({required this.title, required this.body});
   final String title;
   final String body;
-  final bool highlight;
 
   @override
   Widget build(BuildContext context) {
@@ -715,7 +723,7 @@ class _TextBlock extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.x4),
       decoration: BoxDecoration(
-        color: highlight ? AppColors.primaryContainer : AppColors.surfaceContainerLow,
+        color: AppColors.surfaceContainerLow,
         borderRadius: AppRadius.mdAll,
       ),
       child: Column(
@@ -723,12 +731,87 @@ class _TextBlock extends StatelessWidget {
         children: [
           Text(
             title,
-            style: AppTypography.labelMedium.copyWith(
-              color: highlight ? AppColors.onPrimaryContainer : AppColors.onSurfaceVariant,
-            ),
+            style: AppTypography.labelMedium.copyWith(color: AppColors.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.x2),
           Text(body, style: AppTypography.bodyMedium),
+        ],
+      ),
+    );
+  }
+}
+
+/// Renders source or corrected text with diff-chunk highlighting.
+///
+/// [highlightKind] = 'deleted' → red highlight on source errors.
+/// [highlightKind] = 'added'   → green highlight on corrected additions.
+/// Falls back to plain [fallback] string when [chunks] is empty.
+class _DiffTextBlock extends StatelessWidget {
+  const _DiffTextBlock({
+    required this.title,
+    required this.chunks,
+    required this.getText,
+    required this.highlightKind,
+    required this.fallback,
+    this.containerHighlight = false,
+  });
+
+  final String title;
+  final List<DiffChunkView> chunks;
+  final String Function(DiffChunkView) getText;
+  final String highlightKind; // 'deleted' | 'added'
+  final String fallback;
+  final bool containerHighlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = containerHighlight
+        ? AppColors.primaryContainer
+        : AppColors.surfaceContainerLow;
+    final titleColor = containerHighlight
+        ? AppColors.onPrimaryContainer
+        : AppColors.onSurfaceVariant;
+
+    Widget body;
+    if (chunks.isEmpty) {
+      body = Text(fallback, style: AppTypography.bodyMedium);
+    } else {
+      final spans = <TextSpan>[];
+      for (final chunk in chunks) {
+        final text = getText(chunk);
+        if (text.isEmpty) continue;
+        if (chunk.kind == highlightKind) {
+          spans.add(TextSpan(
+            text: text,
+            style: AppTypography.bodyMedium.copyWith(
+              backgroundColor: highlightKind == 'deleted'
+                  ? AppColors.errorContainer
+                  : AppColors.successContainer,
+              color: highlightKind == 'deleted'
+                  ? AppColors.error
+                  : AppColors.success,
+              fontWeight: FontWeight.w600,
+            ),
+          ));
+        } else if (chunk.kind == 'unchanged') {
+          spans.add(TextSpan(text: text, style: AppTypography.bodyMedium));
+        }
+      }
+      body = spans.isEmpty
+          ? Text(fallback, style: AppTypography.bodyMedium)
+          : RichText(text: TextSpan(children: spans));
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.x4),
+      decoration: BoxDecoration(color: bgColor, borderRadius: AppRadius.mdAll),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: AppTypography.labelMedium.copyWith(color: titleColor)),
+          const SizedBox(height: AppSpacing.x2),
+          body,
         ],
       ),
     );
