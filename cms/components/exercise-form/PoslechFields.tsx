@@ -33,10 +33,11 @@ function initState(exerciseType: PoslechType, detail: Record<string, unknown>): 
     const rawItems = (detail.items ?? []) as Array<Record<string, unknown>>;
     const items: P12Item[] = Array.from({ length: ITEM_COUNT }, (_, i) => {
       const raw = rawItems[i] as Record<string, unknown> | undefined;
-      const segs = ((raw?.audio_source as Record<string, unknown>)?.segments ?? []) as Array<{ text: string }>;
+      const segs = ((raw?.audio_source as Record<string, unknown>)?.segments ?? []) as Array<{ speaker?: string; text: string }>;
       const opts = (raw?.options ?? []) as Array<{ key: string; text?: string }>;
       const get = (k: string) => opts.find(o => o.key === k)?.text ?? '';
-      return { question: String(raw?.question ?? ''), text: segs.map(s => s.text).join('\n'), optA: get('A'), optB: get('B'), optC: get('C'), optD: get('D'), answer: ca[String(i + 1)] ?? '' };
+      const text = segs.map(s => s.speaker ? `[${s.speaker}]: ${s.text}` : s.text).join('\n');
+      return { question: String(raw?.question ?? ''), text, optA: get('A'), optB: get('B'), optC: get('C'), optD: get('D'), answer: ca[String(i + 1)] ?? '' };
     });
     return { type: exerciseType, items };
   }
@@ -51,8 +52,9 @@ function initState(exerciseType: PoslechType, detail: Record<string, unknown>): 
     });
     const items: MatchItem[] = Array.from({ length: ITEM_COUNT }, (_, i) => {
       const raw = rawItems[i] as Record<string, unknown> | undefined;
-      const segs = ((raw?.audio_source as Record<string, unknown>)?.segments ?? []) as Array<{ text: string }>;
-      return { text: segs.map(s => s.text).join('\n'), answer: ca[String(i + 1)] ?? '' };
+      const segs = ((raw?.audio_source as Record<string, unknown>)?.segments ?? []) as Array<{ speaker?: string; text: string }>;
+      const text = segs.map(s => s.speaker ? `[${s.speaker}]: ${s.text}` : s.text).join('\n');
+      return { text, answer: ca[String(i + 1)] ?? '' };
     });
     return { type: exerciseType, items, options };
   }

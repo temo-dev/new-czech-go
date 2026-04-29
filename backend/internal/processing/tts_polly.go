@@ -47,9 +47,10 @@ func NewAmazonPollyTTSProviderFromEnv() (TTSProvider, error) {
 }
 
 // NewAmazonPollyTTSProviderWithVoice creates a Polly provider with an explicit voiceID.
-// Used for the second voice in poslech_4 dialog generation.
+// Used for the second voice in dialog generation.
 // POLLY_VOICE_ID_2 env var overrides the voiceID parameter.
-// Returns nil (not an error) when TTS_PROVIDER != amazon_polly or AWS_REGION is unset.
+// Returns nil when AWS_REGION is unset.
+// Uses Standard engine because Tomáš (Czech male) does not support Neural.
 func NewAmazonPollyTTSProviderWithVoice(voiceID string) TTSProvider {
 	region := strings.TrimSpace(os.Getenv("AWS_REGION"))
 	if region == "" {
@@ -64,11 +65,12 @@ func NewAmazonPollyTTSProviderWithVoice(voiceID string) TTSProvider {
 		return nil
 	}
 	return &AmazonPollyTTSProvider{
-		client:     polly.NewFromConfig(cfg),
-		voiceID:    voiceID,
-		engine:     pollytypes.EngineNeural,
-		outputFmt:  pollytypes.OutputFormatMp3,
-		sampleRate: envOrDefault("POLLY_SAMPLE_RATE", "22050"),
+		client:    polly.NewFromConfig(cfg),
+		voiceID:   voiceID,
+		engine:    pollytypes.EngineStandard, // Tomáš (cs-CZ male) only supports Standard
+		outputFmt: pollytypes.OutputFormatMp3,
+		// Standard engine requires 8000 or 16000 Hz; use 16000 for better quality.
+		sampleRate: envOrDefault("POLLY_SAMPLE_RATE_2", "16000"),
 	}
 }
 
