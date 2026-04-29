@@ -109,19 +109,28 @@ The implemented V1 foundation currently includes:
 - **`criteria_results`** from `task_completion` now parsed in Flutter `AttemptFeedbackView` as `CriterionCheckView` list; displayed as met/unmet checklist in Feedback tab
 - **Admin content guide**: `docs/admin-guide.md` — luồng nhập Course → Module → Skill → Exercise → MockTest
 
-- **V2 Writing (psaní) — 2026-04-27:**
+- **V2 Writing (psaní) — 2026-04-27, bug fixes 2026-04-29:**
   - exercise types: `psani_1_formular` (3 câu hỏi ≥10 từ, 8đ), `psani_2_email` (email theo 5 ảnh ≥35 từ, 12đ)
   - Backend: `POST /v1/attempts/:id/submit-text`, `writing_scorer.go`, LLM feedback (highlight lỗi + corrected text)
-  - CMS: forms riêng cho psani_1/2 với image upload
+  - CMS: forms riêng cho psani_1/2 với image upload; `WritingFields.tsx` hint dùng template literal
   - Flutter: `WritingExerciseScreen` với word-count gate, `_WritingResultPoller`
+  - **Bug fixes (2026-04-29):**
+    - `ExerciseDetail.fromJson` crash khi mở psani_1: `poslechQuestions` + `cteniQuestions` dùng `.whereType<Map<String,dynamic>>()` — `detail['questions']` là `[]string` với psani_1 nhưng `[]Map` với poslech/cteni
+    - `writingMinWords` default fix: psani_1 = 10, psani_2 = 35 (trước đó cả hai fallback về 10)
+    - `_WritingResultPoller` timeout 2 phút (60 retries × 2s) + i18n key `scoringTimeout`; trước đó poll vô hạn nếu backend stuck
+    - `WritingExerciseScreen` dùng `LocaleScope.of(context).code` thay `'vi'` hardcode để đồng nhất với speaking
+    - `ProcessWritingAttempt` goroutine: thêm `defer recover()` để FailAttempt nếu panic; bỏ duplicate `ValidateWritingSubmission` call trong goroutine
+    - `handleSubmitText`: thêm `http.MaxBytesReader(64KB)` + max 500 words trong `ValidateWritingSubmission` ngăn OOM và LLM credit abuse
+    - **Diff highlight trong repair tab**: `_DiffTextBlock` widget dùng `RichText`/`TextSpan` — `deleted`+`replaced` → đỏ, `inserted`+`replaced` → xanh, `unchanged` → plain; fallback về plain text khi `diff_chunks` rỗng
 
-- **V3 Listening (poslech) — 2026-04-27:**
+- **V3 Listening (poslech) — 2026-04-27, bug fix 2026-04-29:**
   - exercise types: `poslech_1-5` (5 dạng nghe khác nhau, tổng 25đ)
   - Backend: `POST /v1/attempts/:id/submit-answers` (sync scoring), `objective_scorer.go`, `exercise_audio.go`
   - API: `GET /v1/exercises/:id/audio`, `POST /v1/admin/exercises/:id/generate-audio` (Polly TTS)
   - DB: migration `010_exercise_audio.sql`
   - CMS: audio source radio (upload / text→Polly), options, correct_answers
   - Flutter: `ListeningExerciseScreen` với `AudioPlayerWidget` (just_audio + auth headers), `MultipleChoiceWidget`, `FillInWidget`, `ObjectiveResultCard`
+  - **Bug fix (2026-04-29):** `poslechQuestions` parser trong `ExerciseDetail.fromJson` dùng `.whereType<Map>()` — cùng fix với psani_1 ở trên (shared `detail['questions']` key, khác kiểu item)
 
 - **V4 Reading (čtení) — 2026-04-27:**
   - exercise types: `cteni_1-5` (5 dạng đọc, tổng 25đ)
@@ -148,7 +157,7 @@ The implemented V1 foundation currently includes:
 - **Admin login (CMS auth) — 2026-04-28:**
   - CMS `/login` page với email/password form. Cookie `admin_token` (HTTP-only, 24h) thay cho Basic Auth.
   - Backend: `ADMIN_EMAIL`/`ADMIN_PASSWORD` env vars; `crypto/rand` token; 24h TTL
-  - Middleware: redirect `/login` nếu không có cookie; `dev-admin-token` vẫn hợp lệ cho backward compat
+  - Middleware: redirect `/login` nếu không có cookie; `dev-admin-token` hợp lệ chỉ khi `ENV != production`
   - `lib/auth.ts` `getAdminToken(request)` threads cookie qua 21 admin proxy routes
 
 - **Exercise form upgrade — 2026-04-28:**
@@ -169,11 +178,21 @@ The implemented V1 foundation currently includes:
   - Flutter history: skill_kind filter pills trên `HistoryScreen` (Nói/Viết/Nghe/Đọc/Từ vựng/Ngữ pháp)
   - CMS guide page updated: login, slide-over panel, vocab edit/delete/draft, analytics
 
+- **Security hardening — 2026-04-29:**
+  - Dev tokens (`dev-admin-token`, `dev-learner-token`, `dev-learner-2-token`) chỉ seed khi `ENV != production`; `ENV=production` bắt buộc set trước khi deploy
+  - `ADMIN_PASSWORD` startup guard: fatal exit nếu empty hoặc `"demo123"` trong production
+  - Admin password hỗ trợ bcrypt (`$2a$`/`$2b$` prefix) via `golang.org/x/crypto/bcrypt`; dev vẫn dùng plaintext
+  - `handleSubmitText`: `http.MaxBytesReader(64KB)` ngăn OOM payload; max 500 từ trong `ValidateWritingSubmission`
+  - CORS: `withCORS` đọc `CORS_ALLOWED_ORIGINS` env var (comma-separated); production không có var → no ACAO header; dev không có var → wildcard `*`
+  - Audio upload ownership: `handleRecordingStarted`, `handleUploadURL`, `handleAttemptAudioUpload`, `handleUploadComplete` thêm `user` param + `authorizedAttemptForUser` check — ngăn learner A ghi đè audio learner B
+  - CMS `admin_token` cookie: thêm `secure: true` khi `NODE_ENV=production`
+  - `CORS_ALLOWED_ORIGINS` cần set trong `.env.ec2` production (vd: `https://cmscz.hadoo.eu`)
+
 Important current limitations:
 - local strict real-transcript mode still depends on valid AWS credentials plus `transcribe:*` IAM on the active local identity
-- learner-surface feedback copy and `sample_answer_text` coverage for `Uloha 3` and `Uloha 4` lighter than `Uloha 1` / `Uloha 2`
-- **Postgres DB hiện đang trống** — admin cần nhập nội dung qua CMS trước khi test Flutter end-to-end
+- learner-surface feedback copy and `sample_answer_text` coverage for `Uloha 3` và `Uloha 4` lighter than `Uloha 1` / `Uloha 2`
 - Exercise form file split (exercise-dashboard.tsx ~2000 dòng) deferred — chức năng hoạt động đúng nhưng file chưa được split
+- `_DiffTextBlock` chỉ highlight khi LLM trả về `diff_chunks` khác nhau; nếu learner text và corrected giống nhau hoàn toàn → all `unchanged` → không có highlight (đúng behavior)
 
 ## Working Rules
 - Build in thin vertical slices.
