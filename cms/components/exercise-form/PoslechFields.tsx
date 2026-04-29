@@ -8,7 +8,7 @@ import { OptionRow } from './OptionRow';
 
 type PoslechType = 'poslech_1' | 'poslech_2' | 'poslech_3' | 'poslech_4' | 'poslech_5';
 
-type P12Item = { text: string; optA: string; optB: string; optC: string; optD: string; answer: string };
+type P12Item = { question: string; text: string; optA: string; optB: string; optC: string; optD: string; answer: string };
 type MatchItem = { text: string; answer: string };
 type SharedOption = { key: string; label: string };
 type FillSlot = { answer: string };
@@ -36,7 +36,7 @@ function initState(exerciseType: PoslechType, detail: Record<string, unknown>): 
       const segs = ((raw?.audio_source as Record<string, unknown>)?.segments ?? []) as Array<{ text: string }>;
       const opts = (raw?.options ?? []) as Array<{ key: string; text?: string }>;
       const get = (k: string) => opts.find(o => o.key === k)?.text ?? '';
-      return { text: segs.map(s => s.text).join('\n'), optA: get('A'), optB: get('B'), optC: get('C'), optD: get('D'), answer: ca[String(i + 1)] ?? '' };
+      return { question: String(raw?.question ?? ''), text: segs.map(s => s.text).join('\n'), optA: get('A'), optB: get('B'), optC: get('C'), optD: get('D'), answer: ca[String(i + 1)] ?? '' };
     });
     return { type: exerciseType, items };
   }
@@ -71,7 +71,7 @@ function buildDetail(state: PoslechState, audioSource: 'text' | 'upload'): Recor
     const correct: Record<string, string> = {};
     const items = state.items.map((item, i) => {
       if (item.answer) correct[String(i + 1)] = item.answer;
-      return { question_no: i + 1, audio_source: { type: audioSource, segments: seg(item.text) }, options: [{ key: 'A', text: item.optA }, { key: 'B', text: item.optB }, { key: 'C', text: item.optC }, { key: 'D', text: item.optD }] };
+      return { question_no: i + 1, question: item.question, audio_source: { type: audioSource, segments: seg(item.text) }, options: [{ key: 'A', text: item.optA }, { key: 'B', text: item.optB }, { key: 'C', text: item.optC }, { key: 'D', text: item.optD }] };
     });
     return { items, correct_answers: correct };
   }
@@ -155,6 +155,10 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
         return (
           <div key={i} style={sectionStyle}>
             <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Câu {i + 1}</span>
+            <label style={{ display: 'grid', gap: 4 }}>
+              <span style={labelStyle}>Câu hỏi (hiển thị cho học viên)</span>
+              <input type="text" value={item.question} onChange={e => patch({ question: e.target.value })} placeholder="Ví dụ: Co se dozvíte z tohoto sdělení?" style={{ padding: '8px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }} />
+            </label>
             {audioSource === 'text' && (
               <label style={{ display: 'grid', gap: 4 }}>
                 <span style={labelStyle}>Transcript</span>

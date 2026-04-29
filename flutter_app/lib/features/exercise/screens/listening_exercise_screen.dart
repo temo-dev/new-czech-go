@@ -197,11 +197,21 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
       final opts = item.options.isNotEmpty ? item.options : d.poslechOptions;
       return Padding(
         padding: const EdgeInsets.only(bottom: AppSpacing.x4),
-        child: MultipleChoiceWidget(
-          questionNo: item.questionNo,
-          options: opts,
-          selected: _answers[item.questionNo.toString()],
-          onSelect: (k) => setState(() => _answers[item.questionNo.toString()] = k),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (item.question.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.x2),
+                child: Text(item.question, style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+              ),
+            MultipleChoiceWidget(
+              questionNo: item.questionNo,
+              options: opts,
+              selected: _answers[item.questionNo.toString()],
+              onSelect: (k) => setState(() => _answers[item.questionNo.toString()] = k),
+            ),
+          ],
         ),
       );
     }).toList();

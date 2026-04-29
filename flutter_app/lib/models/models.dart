@@ -698,13 +698,15 @@ class PoslechOptionView {
 }
 
 class PoslechItemView {
-  const PoslechItemView({required this.questionNo, this.options = const []});
+  const PoslechItemView({required this.questionNo, this.question = '', this.options = const []});
   final int questionNo;
+  final String question;
   final List<PoslechOptionView> options;
 
   factory PoslechItemView.fromJson(Map<String, dynamic> json) {
     return PoslechItemView(
       questionNo: (json['question_no'] as num?)?.toInt() ?? 0,
+      question: json['question'] as String? ?? '',
       options: (json['options'] as List<dynamic>? ?? const [])
           .map((e) => PoslechOptionView.fromJson(e as Map<String, dynamic>))
           .toList(),

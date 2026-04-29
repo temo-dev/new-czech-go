@@ -169,6 +169,7 @@ type FillQuestion struct {
 // ListeningItem is one question in a multi-choice listening exercise (poslech_1/2).
 type ListeningItem struct {
 	QuestionNo  int                    `json:"question_no"`
+	Question    string                 `json:"question,omitempty"` // prompt shown to learner
 	AudioSource ListeningAudioSource   `json:"audio_source"`
 	Options     []MultipleChoiceOption `json:"options"`
 }
