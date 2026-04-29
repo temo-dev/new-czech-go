@@ -491,6 +491,23 @@ void main() {
     expect(detail.isChoiceWord, isFalse);
   });
 
+  test('ExerciseDetail fromJson does not crash for psani_1_formular with string questions', () {
+    // psani_1 detail['questions'] contains strings (form questions).
+    // poslechQuestions parser must not cast them as Maps.
+    final detail = ExerciseDetail.fromJson(<String, dynamic>{
+      'id': 'psani1-test',
+      'title': 'Formulář',
+      'exercise_type': 'psani_1_formular',
+      'detail': <String, dynamic>{
+        'questions': ['Jak jste se dozvěděl/a?', 'Proč nakupujete?', 'Co vám chybí?'],
+        'min_words': 10,
+      },
+    });
+    expect(detail.isPsani1, isTrue);
+    expect(detail.writingQuestions.length, 3);
+    expect(detail.poslechQuestions, isEmpty);
+  });
+
   test('ExerciseDetail writingMinWords defaults correctly per type', () {
     ExerciseDetail makeWriting(String type, {int? minWords}) {
       final detail = <String, dynamic>{};

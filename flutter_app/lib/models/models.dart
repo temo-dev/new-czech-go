@@ -550,6 +550,7 @@ class ExerciseDetail {
           .map((e) => PoslechOptionView.fromJson(e as Map<String, dynamic>))
           .toList(),
       poslechQuestions: (detail['questions'] as List<dynamic>? ?? const [])
+          .where((e) => e is Map)
           .map((e) => FillQuestionView.fromJson(e as Map<String, dynamic>))
           .toList(),
       cteniText: detail['text'] as String? ?? '',
@@ -560,6 +561,7 @@ class ExerciseDetail {
         return <PoslechOptionView>[];
       })(),
       cteniQuestions: (detail['questions'] as List<dynamic>? ?? const [])
+          .where((e) => e is Map)
           .map((e) => FillQuestionView.fromJson(e as Map<String, dynamic>))
           .toList(),
       // V6: quizcard_basic
