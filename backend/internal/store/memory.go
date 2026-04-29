@@ -26,8 +26,8 @@ type MemoryStore struct {
 	attempts       AttemptStore
 	mockExams      MockExamStore
 	mockTests      MockTestStore
-	exerciseAudio  map[string]contracts.ExerciseAudio  // exercise_id → audio
-	fullExams      map[string]contracts.FullExamSession // id → session
+	exerciseAudio  map[string]contracts.ExerciseAudio // exercise_id → audio
+	fullExamStore  FullExamStore                      // Postgres-backed when available
 	vocabulary     VocabularyStore
 	grammar        GrammarStore
 	generationJobs GenerationJobStore
@@ -98,9 +98,9 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 		attempts:  attempts,
 		mockExams:      newMemoryMockExamStore(exercises, attempts),
 		mockTests:      newMemoryMockTestStore(),
-		exerciseAudio:  map[string]contracts.ExerciseAudio{},
-		fullExams:      map[string]contracts.FullExamSession{},
-		vocabulary:     newMemoryVocabularyStore(),
+		exerciseAudio: map[string]contracts.ExerciseAudio{},
+		fullExamStore: newMemoryFullExamStore(),
+		vocabulary:    newMemoryVocabularyStore(),
 		grammar:        newMemoryGrammarStore(),
 		generationJobs: newMemoryGenerationJobStore(),
 	}
@@ -502,35 +502,28 @@ func (s *MemoryStore) CompleteMockExam(id string) (contracts.MockExamSession, er
 	return s.mockExams.CompleteMockExam(id)
 }
 
-// FullExamSession methods
+// FullExamSession methods — delegate to fullExamStore (memory or Postgres)
+
+func (s *MemoryStore) SetFullExamStore(store FullExamStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.fullExamStore = store
+}
 
 func (s *MemoryStore) FullExamSession(id string) (*contracts.FullExamSession, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	sess, ok := s.fullExams[id]
+	sess, ok := s.fullExamStore.GetFullExamSession(id)
 	if !ok {
 		return nil, false
 	}
-	cp := sess
-	return &cp, true
+	return &sess, true
 }
 
 func (s *MemoryStore) SetFullExamSession(session contracts.FullExamSession) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.fullExams[session.ID] = session
+	s.fullExamStore.SetFullExamSession(session)
 }
 
 func (s *MemoryStore) ListFullExamSessions(learnerID string) []contracts.FullExamSession {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	var out []contracts.FullExamSession
-	for _, sess := range s.fullExams {
-		if sess.LearnerID == learnerID {
-			out = append(out, sess)
-		}
-	}
-	return out
+	return s.fullExamStore.ListFullExamSessions(learnerID)
 }
 
 // ExerciseAudio methods
