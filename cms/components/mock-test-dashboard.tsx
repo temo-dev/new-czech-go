@@ -12,6 +12,7 @@ type Exercise = {
 
 type MockTestSection = {
   sequence_no: number;
+  skill_kind: string; // noi | nghe | doc | viet
   exercise_id: string;
   exercise_type: string;
   max_points: number;
@@ -54,6 +55,22 @@ const EXERCISE_TYPE_LABEL: Record<string, string> = {
 
 const MOCK_TEST_API = '/api/admin/mock-tests';
 const EXERCISES_API = '/api/admin/exercises';
+
+type SkillKind = 'noi' | 'nghe' | 'doc' | 'viet';
+
+const SKILL_GROUPS: { kind: SkillKind; label: string; color: string; prefix: string }[] = [
+  { kind: 'noi',  label: 'Nói (Speaking)',   color: '#FF6A14', prefix: 'uloha_' },
+  { kind: 'nghe', label: 'Nghe (Listening)', color: '#3060B8', prefix: 'poslech_' },
+  { kind: 'doc',  label: 'Đọc (Reading)',    color: '#C28012', prefix: 'cteni_' },
+  { kind: 'viet', label: 'Viết (Writing)',   color: '#1F8A4D', prefix: 'psani_' },
+];
+
+function resequence(sections: MockTestSection[]): MockTestSection[] {
+  let seq = 0;
+  return SKILL_GROUPS.flatMap(g =>
+    sections.filter(s => s.skill_kind === g.kind).map(s => ({ ...s, sequence_no: ++seq }))
+  );
+}
 
 type FormState = {
   title: string;
@@ -185,38 +202,43 @@ export function MockTestDashboard() {
     }
   }
 
-  function addSection() {
-    const seq = (form.sections.length > 0 ? Math.max(...form.sections.map(s => s.sequence_no)) : 0) + 1;
-    setForm(f => ({
-      ...f,
-      sections: [...f.sections, { sequence_no: seq, exercise_id: '', exercise_type: '', max_points: 0 }],
-    }));
+  function addExerciseToGroup(kind: SkillKind) {
+    setForm(f => {
+      const newSec: MockTestSection = { sequence_no: 0, skill_kind: kind, exercise_id: '', exercise_type: '', max_points: 0 };
+      return { ...f, sections: resequence([...f.sections, newSec]) };
+    });
   }
 
-  function removeSection(idx: number) {
-    setForm(f => ({
-      ...f,
-      sections: f.sections.filter((_, i) => i !== idx).map((s, i) => ({ ...s, sequence_no: i + 1 })),
-    }));
+  function removeExerciseFromGroup(kind: SkillKind, localIdx: number) {
+    setForm(f => {
+      const kindSections = f.sections.filter(s => s.skill_kind === kind);
+      const toRemove = kindSections[localIdx];
+      const remaining = f.sections.filter(s => s !== toRemove);
+      return { ...f, sections: resequence(remaining) };
+    });
   }
 
-  function updateSection(idx: number, exerciseId: string) {
+  function updateExerciseInGroup(kind: SkillKind, localIdx: number, exerciseId: string) {
     const ex = exercises.find(e => e.id === exerciseId);
     const exType = ex?.exercise_type ?? '';
     const maxPts = DEFAULT_MAX_POINTS[exType] ?? 0;
-    setForm(f => ({
-      ...f,
-      sections: f.sections.map((s, i) =>
-        i === idx ? { ...s, exercise_id: exerciseId, exercise_type: exType, max_points: maxPts } : s,
-      ),
-    }));
+    setForm(f => {
+      const kindSections = f.sections.filter(s => s.skill_kind === kind);
+      const target = kindSections[localIdx];
+      const updated = f.sections.map(s =>
+        s === target ? { ...s, exercise_id: exerciseId, exercise_type: exType, max_points: maxPts } : s
+      );
+      return { ...f, sections: resequence(updated) };
+    });
   }
 
-  function updateSectionPoints(idx: number, pts: number) {
-    setForm(f => ({
-      ...f,
-      sections: f.sections.map((s, i) => (i === idx ? { ...s, max_points: pts } : s)),
-    }));
+  function updateGroupExercisePoints(kind: SkillKind, localIdx: number, pts: number) {
+    setForm(f => {
+      const kindSections = f.sections.filter(s => s.skill_kind === kind);
+      const target = kindSections[localIdx];
+      const updated = f.sections.map(s => s === target ? { ...s, max_points: pts } : s);
+      return { ...f, sections: updated };
+    });
   }
 
   const statusBadge = (status: string) => {
@@ -265,12 +287,16 @@ export function MockTestDashboard() {
                 </div>
               </div>
               {t.sections && t.sections.length > 0 && (
-                <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {t.sections.map(sec => (
-                    <span key={sec.sequence_no} style={sectionPillStyle}>
-                      {sec.sequence_no}. {EXERCISE_TYPE_LABEL[sec.exercise_type] ?? sec.exercise_type} — {sec.max_points}pts
-                    </span>
-                  ))}
+                <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {SKILL_GROUPS.map(g => {
+                    const gs = t.sections.filter(s => s.skill_kind === g.kind);
+                    if (gs.length === 0) return null;
+                    return (
+                      <span key={g.kind} style={{ ...sectionPillStyle, borderColor: g.color + '80', color: g.color, fontWeight: 600 }}>
+                        {g.label.split(' ')[0]}: {gs.length} bài · {gs.reduce((sum, s) => sum + s.max_points, 0)}pts
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -342,50 +368,72 @@ export function MockTestDashboard() {
           </p>
 
           <div style={{ marginTop: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <label style={{ ...labelStyle, margin: 0, fontWeight: 600 }}>
-                Sections ({form.sections.length})
-              </label>
-              <button type="button" onClick={addSection} style={btnStyle('secondary')}>+ Add section</button>
-            </div>
-            {form.sections.length === 0 && (
-              <p style={{ color: '#9ca3af', fontSize: 13, margin: '4px 0 0' }}>No sections yet. Add at least one.</p>
-            )}
-            {form.sections.map((sec, idx) => (
-              <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 36px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                <select
-                  value={sec.exercise_id}
-                  onChange={e => updateSection(idx, e.target.value)}
-                  style={inputStyle}
-                  required
-                >
-                  <option value="">{S.pick.exercise}</option>
-                  {exercises.map(ex => (
-                    <option key={ex.id} value={ex.id}>
-                      [{EXERCISE_TYPE_LABEL[ex.exercise_type] ?? ex.exercise_type}] {ex.title}
-                    </option>
+            <label style={{ ...labelStyle, fontWeight: 600, marginBottom: 12 }}>
+              Các phần thi ({form.sections.length} bài tập)
+            </label>
+
+            {SKILL_GROUPS.map(group => {
+              const groupSections = form.sections.filter(s => s.skill_kind === group.kind);
+              const groupExercises = exercises.filter(ex => ex.exercise_type.startsWith(group.prefix));
+              return (
+                <div key={group.kind} style={{ marginBottom: 12, border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
+                  {/* Group header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: group.color + '18', borderBottom: groupSections.length > 0 ? '1px solid #e5e7eb' : 'none' }}>
+                    <span style={{ fontWeight: 600, fontSize: 13, color: group.color }}>
+                      {group.label}
+                      {groupSections.length > 0 && (
+                        <span style={{ color: '#6b7280', fontWeight: 400, marginLeft: 8 }}>
+                          ({groupSections.length} bài · {groupSections.reduce((s, x) => s + x.max_points, 0)} pts)
+                        </span>
+                      )}
+                    </span>
+                    <button type="button" onClick={() => addExerciseToGroup(group.kind as SkillKind)} style={{ ...btnStyle('secondary'), padding: '4px 10px', fontSize: 12 }}>
+                      + Thêm bài
+                    </button>
+                  </div>
+
+                  {/* Exercise rows */}
+                  {groupSections.length === 0 && (
+                    <p style={{ margin: 0, padding: '8px 12px', fontSize: 12, color: '#9ca3af' }}>Chưa có bài tập nào.</p>
+                  )}
+                  {groupSections.map((sec, localIdx) => (
+                    <div key={localIdx} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 36px', gap: 8, padding: '8px 12px', borderTop: localIdx > 0 ? '1px solid #f3f4f6' : undefined, alignItems: 'center' }}>
+                      <select
+                        value={sec.exercise_id}
+                        onChange={e => updateExerciseInGroup(group.kind as SkillKind, localIdx, e.target.value)}
+                        style={{ ...inputStyle, margin: 0 }}
+                        required
+                      >
+                        <option value="">— Chọn bài tập —</option>
+                        {groupExercises.map(ex => (
+                          <option key={ex.id} value={ex.id}>
+                            [{EXERCISE_TYPE_LABEL[ex.exercise_type] ?? ex.exercise_type}] {ex.title}
+                          </option>
+                        ))}
+                      </select>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <input
+                          type="number"
+                          min={0}
+                          max={40}
+                          value={sec.max_points}
+                          onChange={e => updateGroupExercisePoints(group.kind as SkillKind, localIdx, parseInt(e.target.value) || 0)}
+                          style={{ ...inputStyle, margin: 0 }}
+                          title="Max points"
+                        />
+                        <span style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>pts</span>
+                      </div>
+                      <button type="button" onClick={() => removeExerciseFromGroup(group.kind as SkillKind, localIdx)} style={{ ...btnStyle('danger'), padding: '6px 8px' }}>✕</button>
+                    </div>
                   ))}
-                </select>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <input
-                    type="number"
-                    min={0}
-                    max={40}
-                    value={sec.max_points}
-                    onChange={e => updateSectionPoints(idx, parseInt(e.target.value) || 0)}
-                    style={{ ...inputStyle, margin: 0, width: '100%' }}
-                    title="Max points"
-                  />
-                  <span style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>pts</span>
                 </div>
-                <button type="button" onClick={() => removeSection(idx)} style={{ ...btnStyle('danger'), padding: '6px 8px' }}>✕</button>
-              </div>
-            ))}
+              );
+            })}
+
             {form.sections.length > 0 && (
               <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0' }}>
-                Total: {form.sections.reduce((s, sec) => s + sec.max_points, 0)} pts
-                {' + 3 pts pronunciation = '}
-                {form.sections.reduce((s, sec) => s + sec.max_points, 0) + 3} pts max
+                Tổng: {form.sections.reduce((s, sec) => s + sec.max_points, 0)} pts + 3 pts phát âm ={' '}
+                <strong>{form.sections.reduce((s, sec) => s + sec.max_points, 0) + 3} pts</strong>
               </p>
             )}
           </div>

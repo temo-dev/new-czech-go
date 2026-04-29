@@ -57,6 +57,9 @@ CREATE TABLE IF NOT EXISTS mock_test_sections (
     max_points    INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (mock_test_id, sequence_no)
 );
+
+ALTER TABLE mock_test_sections
+    ADD COLUMN IF NOT EXISTS skill_kind TEXT NOT NULL DEFAULT '';
 `)
 	return err
 }
@@ -89,8 +92,8 @@ func (s *postgresMockTestStore) CreateMockTest(t contracts.MockTest) (contracts.
 
 	for _, sec := range t.Sections {
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO mock_test_sections (mock_test_id, sequence_no, exercise_id, exercise_type, max_points) VALUES ($1,$2,$3,$4,$5)`,
-			id, sec.SequenceNo, sec.ExerciseID, sec.ExerciseType, sec.MaxPoints,
+			`INSERT INTO mock_test_sections (mock_test_id, sequence_no, skill_kind, exercise_id, exercise_type, max_points) VALUES ($1,$2,$3,$4,$5,$6)`,
+			id, sec.SequenceNo, sec.SkillKind, sec.ExerciseID, sec.ExerciseType, sec.MaxPoints,
 		); err != nil {
 			return contracts.MockTest{}, fmt.Errorf("insert mock test section: %w", err)
 		}
@@ -120,7 +123,7 @@ func (s *postgresMockTestStore) MockTestByID(id string) (contracts.MockTest, boo
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT sequence_no, exercise_id, exercise_type, max_points FROM mock_test_sections WHERE mock_test_id = $1 ORDER BY sequence_no`, id,
+		`SELECT sequence_no, skill_kind, exercise_id, exercise_type, max_points FROM mock_test_sections WHERE mock_test_id = $1 ORDER BY sequence_no`, id,
 	)
 	if err != nil {
 		return contracts.MockTest{}, false
@@ -128,7 +131,7 @@ func (s *postgresMockTestStore) MockTestByID(id string) (contracts.MockTest, boo
 	defer rows.Close()
 	for rows.Next() {
 		var sec contracts.MockTestSection
-		if err := rows.Scan(&sec.SequenceNo, &sec.ExerciseID, &sec.ExerciseType, &sec.MaxPoints); err != nil {
+		if err := rows.Scan(&sec.SequenceNo, &sec.SkillKind, &sec.ExerciseID, &sec.ExerciseType, &sec.MaxPoints); err != nil {
 			return contracts.MockTest{}, false
 		}
 		t.Sections = append(t.Sections, sec)
@@ -166,7 +169,7 @@ func (s *postgresMockTestStore) ListMockTests(statusFilter string) []contracts.M
 	// Load sections for each test
 	for i, t := range tests {
 		srows, err := s.db.QueryContext(ctx,
-			`SELECT sequence_no, exercise_id, exercise_type, max_points FROM mock_test_sections WHERE mock_test_id = $1 ORDER BY sequence_no`,
+			`SELECT sequence_no, skill_kind, exercise_id, exercise_type, max_points FROM mock_test_sections WHERE mock_test_id = $1 ORDER BY sequence_no`,
 			t.ID,
 		)
 		if err != nil {
@@ -174,7 +177,7 @@ func (s *postgresMockTestStore) ListMockTests(statusFilter string) []contracts.M
 		}
 		for srows.Next() {
 			var sec contracts.MockTestSection
-			if err := srows.Scan(&sec.SequenceNo, &sec.ExerciseID, &sec.ExerciseType, &sec.MaxPoints); err != nil {
+			if err := srows.Scan(&sec.SequenceNo, &sec.SkillKind, &sec.ExerciseID, &sec.ExerciseType, &sec.MaxPoints); err != nil {
 				continue
 			}
 			tests[i].Sections = append(tests[i].Sections, sec)
@@ -216,8 +219,8 @@ func (s *postgresMockTestStore) UpdateMockTest(id string, update contracts.MockT
 	}
 	for _, sec := range update.Sections {
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO mock_test_sections (mock_test_id, sequence_no, exercise_id, exercise_type, max_points) VALUES ($1,$2,$3,$4,$5)`,
-			id, sec.SequenceNo, sec.ExerciseID, sec.ExerciseType, sec.MaxPoints,
+			`INSERT INTO mock_test_sections (mock_test_id, sequence_no, skill_kind, exercise_id, exercise_type, max_points) VALUES ($1,$2,$3,$4,$5,$6)`,
+			id, sec.SequenceNo, sec.SkillKind, sec.ExerciseID, sec.ExerciseType, sec.MaxPoints,
 		); err != nil {
 			return contracts.MockTest{}, false
 		}

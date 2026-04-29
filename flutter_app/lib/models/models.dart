@@ -130,12 +130,14 @@ class PlanDay {
 class MockTestSection {
   const MockTestSection({
     required this.sequenceNo,
+    required this.skillKind,
     required this.exerciseId,
     required this.exerciseType,
     required this.maxPoints,
   });
 
   final int sequenceNo;
+  final String skillKind; // noi | nghe | doc | viet
   final String exerciseId;
   final String exerciseType;
   final int maxPoints;
@@ -143,6 +145,7 @@ class MockTestSection {
   factory MockTestSection.fromJson(Map<String, dynamic> json) {
     return MockTestSection(
       sequenceNo: (json['sequence_no'] as num).toInt(),
+      skillKind: json['skill_kind'] as String? ?? '',
       exerciseId: json['exercise_id'] as String? ?? '',
       exerciseType: json['exercise_type'] as String? ?? '',
       maxPoints: (json['max_points'] as num?)?.toInt() ?? 0,

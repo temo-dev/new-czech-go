@@ -463,6 +463,7 @@ type MockTest struct {
 
 type MockTestSection struct {
 	SequenceNo   int    `json:"sequence_no"`
+	SkillKind    string `json:"skill_kind"` // noi | nghe | doc | viet
 	ExerciseID   string `json:"exercise_id"`
 	ExerciseType string `json:"exercise_type"`
 	MaxPoints    int    `json:"max_points"`
