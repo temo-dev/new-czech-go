@@ -582,7 +582,7 @@ class _ReviewArtifactSectionState extends State<_ReviewArtifactSection> {
             title: l.reviewSourceTitle,
             chunks: artifact.diffChunks,
             getText: (c) => c.sourceText,
-            highlightKind: 'deleted',
+            isSourceView: true,
             fallback: _sourceText(context, artifact),
           ),
           const SizedBox(height: AppSpacing.x3),
@@ -590,7 +590,7 @@ class _ReviewArtifactSectionState extends State<_ReviewArtifactSection> {
             title: l.reviewCorrectedTitle,
             chunks: artifact.diffChunks,
             getText: (c) => c.targetText,
-            highlightKind: 'added',
+            isSourceView: false,
             containerHighlight: true,
             fallback: artifact.correctedTranscriptText,
           ),
@@ -743,15 +743,17 @@ class _TextBlock extends StatelessWidget {
 
 /// Renders source or corrected text with diff-chunk highlighting.
 ///
-/// [highlightKind] = 'deleted' → red highlight on source errors.
-/// [highlightKind] = 'added'   → green highlight on corrected additions.
+/// Backend diff kinds: 'unchanged' | 'deleted' | 'inserted' | 'replaced'
+///
+/// Source view  ([isSourceView]=true):  deleted+replaced → red (errors).
+/// Corrected view ([isSourceView]=false): inserted+replaced → green (fixes).
 /// Falls back to plain [fallback] string when [chunks] is empty.
 class _DiffTextBlock extends StatelessWidget {
   const _DiffTextBlock({
     required this.title,
     required this.chunks,
     required this.getText,
-    required this.highlightKind,
+    required this.isSourceView,
     required this.fallback,
     this.containerHighlight = false,
   });
@@ -759,9 +761,15 @@ class _DiffTextBlock extends StatelessWidget {
   final String title;
   final List<DiffChunkView> chunks;
   final String Function(DiffChunkView) getText;
-  final String highlightKind; // 'deleted' | 'added'
+  final bool isSourceView;
   final String fallback;
   final bool containerHighlight;
+
+  bool _isError(String kind) =>
+      isSourceView && (kind == 'deleted' || kind == 'replaced');
+
+  bool _isFix(String kind) =>
+      !isSourceView && (kind == 'inserted' || kind == 'replaced');
 
   @override
   Widget build(BuildContext context) {
@@ -780,16 +788,21 @@ class _DiffTextBlock extends StatelessWidget {
       for (final chunk in chunks) {
         final text = getText(chunk);
         if (text.isEmpty) continue;
-        if (chunk.kind == highlightKind) {
+        if (_isError(chunk.kind)) {
           spans.add(TextSpan(
             text: text,
             style: AppTypography.bodyMedium.copyWith(
-              backgroundColor: highlightKind == 'deleted'
-                  ? AppColors.errorContainer
-                  : AppColors.successContainer,
-              color: highlightKind == 'deleted'
-                  ? AppColors.error
-                  : AppColors.success,
+              backgroundColor: AppColors.errorContainer,
+              color: AppColors.error,
+              fontWeight: FontWeight.w600,
+            ),
+          ));
+        } else if (_isFix(chunk.kind)) {
+          spans.add(TextSpan(
+            text: text,
+            style: AppTypography.bodyMedium.copyWith(
+              backgroundColor: AppColors.successContainer,
+              color: AppColors.success,
               fontWeight: FontWeight.w600,
             ),
           ));
