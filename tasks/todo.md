@@ -104,18 +104,18 @@ Chi tiết + AC đầy đủ trong `docs/plans/flexible-sprint-mocktest-plan.md`
 Design: `pass_threshold_percent` per MockTest, bỏ `session_type` constraint trong CMS,
 Flutter route mỗi section đến đúng screen theo `exercise_type` prefix.
 
-- [ ] **SP-1** Backend: `pass_threshold_percent` field trên `MockTest` + `MockExamSession`;
+- [x] **SP-1** Backend: `pass_threshold_percent` field trên `MockTest` + `MockExamSession`;
       ALTER TABLE + update INSERT/SELECT/UPDATE; `computeScoring` nhận threshold param;
-      `CompleteMockExam` đọc threshold từ session row
-- [ ] **SP-2a** CMS: bỏ `session_type` field khỏi form; thêm `pass_threshold_percent` input
-      (default=80); update payload + display danh sách
-- [ ] **SP-2b** Flutter: di chuyển `onAttemptCompleted?.call(attemptId)` trong
+      `CompleteMockExam` đọc threshold từ session row (2026-04-29)
+- [x] **SP-2a** CMS: bỏ `session_type` field khỏi form; thêm `pass_threshold_percent` input
+      (default=80); update payload + display danh sách (2026-04-29)
+- [x] **SP-2b** Flutter: di chuyển `onAttemptCompleted?.call(attemptId)` trong
       `WritingExerciseScreen._submit()` xuống SAU `await Navigator.push(AnalysisScreen)`
-      (1-line move — Listening + Reading đã OK, callbacks đã tồn tại đúng chỗ)
-- [ ] **SP-3** Flutter: `MockExamScreen._runSection()` route theo `exercise_type` prefix
+      (1-line move — Listening + Reading đã OK, callbacks đã tồn tại đúng chỗ) (2026-04-29)
+- [x] **SP-3** Flutter: `MockExamScreen._runSection()` route theo `exercise_type` prefix
       (`uloha_`→speaking, `poslech_`→listening, `cteni_`→reading, `psani_`→writing);
       non-speaking sections advance mock exam ngay; `_bulkAnalyze` chỉ cho speaking;
-      result view hiển thị pass threshold
+      result view hiển thị pass threshold (2026-04-29)
 
 **[CHECKPOINT SP]** `make verify` + manual: tạo sprint 2 sections (1 nói + 1 nghe),
   làm bài, kết quả tính 80% threshold đúng
