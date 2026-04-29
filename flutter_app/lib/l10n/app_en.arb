@@ -226,6 +226,7 @@
     "submitAnswersCta": "Submit answers",
     "submitWritingCta": "Submit",
     "scoringInProgress": "Scoring…",
+    "scoringTimeout": "Scoring timed out. Please try again.",
     "resultScreenTitle": "Result",
     "retryCta": "Try again",
 

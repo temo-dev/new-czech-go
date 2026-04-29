@@ -55,6 +55,13 @@ func ValidateWritingSubmission(exerciseType string, sub contracts.WritingSubmiss
 // The learner's written text is treated as a "transcript" so the existing feedback
 // pipeline (LLM prompt → AttemptFeedback → review artifact) can be reused directly.
 func (p *Processor) ProcessWritingAttempt(attemptID string, sub contracts.WritingSubmission) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("writing attempt %s: panic recovered: %v", attemptID, r)
+			p.repo.FailAttempt(attemptID, "scoring_failed")
+		}
+	}()
+
 	attempt, ok := p.repo.Attempt(attemptID)
 	if !ok {
 		log.Printf("writing attempt %s not found", attemptID)
@@ -64,12 +71,6 @@ func (p *Processor) ProcessWritingAttempt(attemptID string, sub contracts.Writin
 	exercise, ok := p.repo.Exercise(attempt.ExerciseID)
 	if !ok {
 		log.Printf("writing attempt %s: exercise %s not found", attemptID, attempt.ExerciseID)
-		p.repo.FailAttempt(attemptID, "scoring_failed")
-		return
-	}
-
-	if err := ValidateWritingSubmission(exercise.ExerciseType, sub); err != nil {
-		log.Printf("writing attempt %s validation failed: %v", attemptID, err)
 		p.repo.FailAttempt(attemptID, "scoring_failed")
 		return
 	}

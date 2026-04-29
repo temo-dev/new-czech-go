@@ -271,6 +271,7 @@
     "submitAnswersCta": "Nộp đáp án",
     "submitWritingCta": "Nộp bài",
     "scoringInProgress": "Đang chấm bài…",
+    "scoringTimeout": "Hết thời gian chờ kết quả. Vui lòng thử lại.",
     "resultScreenTitle": "Kết quả",
     "retryCta": "Làm lại",
 

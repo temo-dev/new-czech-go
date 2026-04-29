@@ -593,6 +593,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get scoringInProgress => 'Đang chấm bài…';
 
   @override
+  String get scoringTimeout => 'Hết thời gian chờ kết quả. Vui lòng thử lại.';
+
+  @override
   String get resultScreenTitle => 'Kết quả';
 
   @override

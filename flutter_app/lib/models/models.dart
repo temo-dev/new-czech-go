@@ -539,7 +539,8 @@ class ExerciseDetail {
       choiceOptions: choiceOptions,
       expectedReasoningAxes: expectedReasoningAxes,
       writingQuestions: writingQuestions,
-      writingMinWords: (detail['min_words'] as num?)?.toInt() ?? 10,
+      writingMinWords: (detail['min_words'] as num?)?.toInt() ??
+          (json['exercise_type'] == 'psani_2_email' ? 35 : 10),
       emailPrompt: detail['prompt'] as String? ?? '',
       emailTopics: emailTopics,
       poslechItems: (detail['items'] as List<dynamic>? ?? const [])

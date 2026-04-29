@@ -593,6 +593,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get scoringInProgress => 'Scoring…';
 
   @override
+  String get scoringTimeout => 'Scoring timed out. Please try again.';
+
+  @override
   String get resultScreenTitle => 'Result';
 
   @override

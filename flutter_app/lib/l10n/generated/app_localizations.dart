@@ -1163,6 +1163,12 @@ abstract class AppLocalizations {
   /// **'Đang chấm bài…'**
   String get scoringInProgress;
 
+  /// No description provided for @scoringTimeout.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hết thời gian chờ kết quả. Vui lòng thử lại.'**
+  String get scoringTimeout;
+
   /// No description provided for @resultScreenTitle.
   ///
   /// In vi, this message translates to:

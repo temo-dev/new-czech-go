@@ -490,4 +490,25 @@ void main() {
     expect(detail.isFillBlank, isFalse);
     expect(detail.isChoiceWord, isFalse);
   });
+
+  test('ExerciseDetail writingMinWords defaults correctly per type', () {
+    ExerciseDetail makeWriting(String type, {int? minWords}) {
+      final detail = <String, dynamic>{};
+      if (minWords != null) detail['min_words'] = minWords;
+      return ExerciseDetail.fromJson(<String, dynamic>{
+        'id': 'w1',
+        'title': 'T',
+        'exercise_type': type,
+        'detail': detail,
+      });
+    }
+
+    // explicit min_words overrides default for both types
+    expect(makeWriting('psani_1_formular', minWords: 15).writingMinWords, 15);
+    expect(makeWriting('psani_2_email', minWords: 40).writingMinWords, 40);
+
+    // no min_words: psani_1 defaults to 10, psani_2 defaults to 35
+    expect(makeWriting('psani_1_formular').writingMinWords, 10);
+    expect(makeWriting('psani_2_email').writingMinWords, 35);
+  });
 }

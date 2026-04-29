@@ -38,7 +38,7 @@ export function WritingFields({ form, setForm }: Props) {
           maxItems={3}
           minItems={3}
           rows={1}
-          hint="Mỗi câu trả lời cần ít nhất {formularMinWords} từ."
+          hint={`Mỗi câu trả lời cần ít nhất ${form.formularMinWords} từ.`}
         />
         <label style={{ display: 'grid', gap: 6 }}>
           <span style={labelStyle}>Số từ tối thiểu / câu</span>

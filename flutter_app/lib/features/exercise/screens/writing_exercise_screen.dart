@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/locale/locale_scope.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -78,9 +79,10 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
     if (!_hasEnoughWords || _submitting) return;
     setState(() { _submitting = true; _error = null; });
     try {
+      final locale = LocaleScope.of(context).code;
       final attempt = await widget.client.createAttempt(
         widget.detail.id,
-        locale: 'vi',
+        locale: locale,
       );
       final attemptId = attempt['id'] as String;
 
@@ -270,6 +272,8 @@ class _WritingResultPollerState extends State<_WritingResultPoller> {
   AttemptResult? _result;
   String? _error;
   Timer? _timer;
+  int _retries = 0;
+  static const _maxRetries = 60; // 2 minutes at 2s interval
 
   @override
   void initState() {
@@ -285,6 +289,11 @@ class _WritingResultPollerState extends State<_WritingResultPoller> {
 
   void _poll() {
     _timer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      if (++_retries > _maxRetries) {
+        _timer?.cancel();
+        if (mounted) setState(() => _error = AppLocalizations.of(context).scoringTimeout);
+        return;
+      }
       try {
         final raw = await widget.client.getAttempt(widget.attemptId);
         final attempt = AttemptResult.fromJson(raw);
