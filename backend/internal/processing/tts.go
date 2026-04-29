@@ -15,6 +15,7 @@ import (
 const (
 	ttsProviderDev         = "dev"
 	ttsProviderAmazonPolly = "amazon_polly"
+	ttsProviderElevenLabs  = "elevenlabs"
 )
 
 type TTSProvider interface {
@@ -37,6 +38,8 @@ func NewConfiguredTTSProvider() (TTSProvider, error) {
 		return DevTTSProvider{}, nil
 	case ttsProviderAmazonPolly:
 		return NewAmazonPollyTTSProviderFromEnv()
+	case ttsProviderElevenLabs:
+		return NewElevenLabsTTSProviderFromEnv()
 	default:
 		return nil, fmt.Errorf("unsupported TTS_PROVIDER %q", os.Getenv("TTS_PROVIDER"))
 	}

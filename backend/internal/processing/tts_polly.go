@@ -52,13 +52,16 @@ func NewAmazonPollyTTSProviderFromEnv() (TTSProvider, error) {
 // Returns nil when AWS_REGION is unset.
 // Uses Standard engine because Tomáš (Czech male) does not support Neural.
 func NewAmazonPollyTTSProviderWithVoice(voiceID string) TTSProvider {
-	region := strings.TrimSpace(os.Getenv("AWS_REGION"))
-	if region == "" {
-		return nil
-	}
 	override := strings.TrimSpace(os.Getenv("POLLY_VOICE_ID_2"))
 	if override != "" {
 		voiceID = override
+	}
+	if voiceID == "" {
+		return nil
+	}
+	region := strings.TrimSpace(os.Getenv("AWS_REGION"))
+	if region == "" {
+		return nil
 	}
 	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(region))
 	if err != nil {

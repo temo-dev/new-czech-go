@@ -1135,7 +1135,14 @@ export function ExerciseDashboard() {
       if (editingId) {
         resetForm();
       } else {
-        setForm((current) => ({ ...current, title: `${current.title} moi` }));
+        // Transition to edit mode so user can generate audio immediately.
+        const newId: string | undefined = (payload.data as Record<string, unknown>)?.id as string | undefined;
+        if (newId) {
+          setEditingId(newId);
+          setWizardStep('content');
+        } else {
+          resetForm();
+        }
       }
       await loadExercises();
     } catch (err) {

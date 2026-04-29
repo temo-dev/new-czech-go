@@ -60,8 +60,13 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 	var audioGen processing.ExerciseAudioGenerator = processing.DevExerciseAudioGenerator{}
 	if ttsProvider := processor.TTSProvider(); ttsProvider != nil {
 		pollyGen := processing.NewPollyExerciseAudioGenerator(ttsProvider)
-		// Wire second voice for poslech_4 dialogs (POLLY_VOICE_ID_2, default "Tomáš").
-		if ttsB := processing.NewAmazonPollyTTSProviderWithVoice("Tomáš"); ttsB != nil {
+		// Wire second voice: prefer ElevenLabs (ELEVENLABS_API_KEY + ELEVENLABS_VOICE_ID_B),
+		// fall back to Polly (POLLY_VOICE_ID_2). Skip if neither is configured.
+		var ttsB processing.TTSProvider = processing.NewElevenLabsVoiceBProvider()
+		if ttsB == nil {
+			ttsB = processing.NewAmazonPollyTTSProviderWithVoice("")
+		}
+		if ttsB != nil {
 			pollyGen = pollyGen.WithDialogVoice(ttsB)
 		}
 		audioGen = pollyGen
