@@ -1281,13 +1281,13 @@ func (s *Server) handleAdminMockTestByID(w http.ResponseWriter, r *http.Request,
 	}
 }
 
-func (s *Server) handleMockExamByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+func (s *Server) handleMockExamByID(w http.ResponseWriter, r *http.Request, user contracts.User) {
 	path := strings.TrimPrefix(r.URL.Path, "/v1/mock-exams/")
 	switch {
 	case strings.HasSuffix(path, "/advance"):
 		s.handleMockExamAdvance(w, r, strings.TrimSuffix(path, "/advance"))
 	case strings.HasSuffix(path, "/complete"):
-		s.handleMockExamComplete(w, r, strings.TrimSuffix(path, "/complete"))
+		s.handleMockExamComplete(w, r, strings.TrimSuffix(path, "/complete"), user)
 	default:
 		if r.Method != http.MethodGet {
 			writeMethodNotAllowed(w)
@@ -1332,7 +1332,7 @@ func (s *Server) handleMockExamAdvance(w http.ResponseWriter, r *http.Request, i
 	writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})
 }
 
-func (s *Server) handleMockExamComplete(w http.ResponseWriter, r *http.Request, id string) {
+func (s *Server) handleMockExamComplete(w http.ResponseWriter, r *http.Request, id string, user contracts.User) {
 	if r.Method != http.MethodPost {
 		writeMethodNotAllowed(w)
 		return
@@ -1344,6 +1344,20 @@ func (s *Server) handleMockExamComplete(w http.ResponseWriter, r *http.Request, 
 		})
 		return
 	}
+
+	// Auto-link ústní session to an open FullExamSession for this learner.
+	if user.ID != "" {
+		openSessions := s.repo.ListFullExamSessions(user.ID)
+		if target := processing.FindOpenFullExamForAutoLink(openSessions); target != nil {
+			linked, linkErr := s.fullExamScorer.CompleteSession(target.ID, session.ID)
+			if linkErr != nil {
+				log.Printf("auto-link full exam %s with ustni %s failed: %v", target.ID, session.ID, linkErr)
+			} else {
+				log.Printf("auto-linked full exam %s with ustni mock exam %s (overall_passed=%v)", linked.ID, session.ID, linked.OverallPassed)
+			}
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})
 }
 

@@ -135,3 +135,20 @@ func (s *FullExamScorer) CompleteSession(sessionID, ustniMockExamSessionID strin
 	s.repo.SetFullExamSession(*session)
 	return *session, nil
 }
+
+// findOpenFullExamForAutoLink returns the first FullExamSession that is ready
+// to receive an ústní link: status is 'pisemna_done' or 'in_progress' and
+// no ústní mock exam session has been linked yet.
+// Returns nil if no eligible session exists.
+func FindOpenFullExamForAutoLink(sessions []contracts.FullExamSession) *contracts.FullExamSession {
+	for i := range sessions {
+		s := &sessions[i]
+		if s.UstniMockExamSessionID != "" {
+			continue // already linked
+		}
+		if s.Status == "pisemna_done" || s.Status == "in_progress" {
+			return s
+		}
+	}
+	return nil
+}
