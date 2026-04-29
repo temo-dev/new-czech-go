@@ -65,7 +65,11 @@ function initState(exerciseType: PoslechType, detail: Record<string, unknown>): 
 // ── Serialization ─────────────────────────────────────────────────────────────
 
 function buildDetail(state: PoslechState, audioSource: 'text' | 'upload'): Record<string, unknown> {
-  const seg = (text: string) => text.split('\n').filter(Boolean).map(t => ({ text: t }));
+  // Parse optional [Speaker]: prefix from each line into segment.speaker.
+  const seg = (text: string) => text.split('\n').filter(Boolean).map(t => {
+    const m = t.match(/^\[([^\]]+)\]:\s*(.+)/);
+    return m ? { speaker: m[1].trim(), text: m[2].trim() } : { text: t.trim() };
+  });
 
   if (state.type === 'poslech_1' || state.type === 'poslech_2') {
     const correct: Record<string, string> = {};

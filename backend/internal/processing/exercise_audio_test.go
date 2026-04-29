@@ -107,6 +107,49 @@ func TestBuildExerciseAudioText_NonListening_Empty(t *testing.T) {
 	}
 }
 
+func TestHasMultipleSpeakers_Dialog(t *testing.T) {
+	exercise := contracts.Exercise{
+		ExerciseType: "poslech_1",
+		Detail: contracts.Poslech1Detail{
+			Items: []contracts.ListeningItem{
+				{
+					QuestionNo: 1,
+					AudioSource: contracts.ListeningAudioSource{
+						Segments: []contracts.AudioSegment{
+							{Speaker: "Muž", Text: "Dobrý den, prosím vás."},
+							{Speaker: "Žena", Text: "Dobrý den."},
+						},
+					},
+				},
+			},
+		},
+	}
+	if !HasMultipleSpeakers(exercise) {
+		t.Error("expected HasMultipleSpeakers = true for Muž/Žena dialog")
+	}
+	lines := BuildExerciseDialogLines(exercise)
+	if len(lines) != 2 {
+		t.Errorf("BuildExerciseDialogLines = %d lines, want 2", len(lines))
+	}
+}
+
+func TestHasMultipleSpeakers_SingleVoice(t *testing.T) {
+	exercise := contracts.Exercise{
+		ExerciseType: "poslech_5",
+		Detail: contracts.Poslech5Detail{
+			AudioSource: contracts.ListeningAudioSource{
+				Segments: []contracts.AudioSegment{
+					{Text: "Ahoj Lído, tady Eva."},
+					{Text: "Dostala jsem lístky na balet."},
+				},
+			},
+		},
+	}
+	if HasMultipleSpeakers(exercise) {
+		t.Error("expected HasMultipleSpeakers = false for single-speaker segments")
+	}
+}
+
 func TestDevExerciseAudioGenerator_WritesFile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LOCAL_ASSETS_DIR", dir)

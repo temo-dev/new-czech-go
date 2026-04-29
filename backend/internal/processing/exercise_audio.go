@@ -134,6 +134,60 @@ type DialogExerciseAudioGenerator interface {
 	GenerateDialogAudio(exerciseID string, dialogTexts []string) (*contracts.ExerciseAudio, error)
 }
 
+// HasMultipleSpeakers returns true when the exercise has segments with ≥2 distinct
+// speaker labels, indicating dialog (2-voice) TTS should be used.
+func HasMultipleSpeakers(exercise contracts.Exercise) bool {
+	speakers := map[string]bool{}
+	for _, seg := range allExerciseSegments(exercise) {
+		if seg.Speaker != "" {
+			speakers[seg.Speaker] = true
+			if len(speakers) >= 2 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// BuildExerciseDialogLines returns each non-empty segment's text as a separate
+// dialog turn for 2-voice TTS alternation.
+func BuildExerciseDialogLines(exercise contracts.Exercise) []string {
+	var lines []string
+	for _, seg := range allExerciseSegments(exercise) {
+		if t := strings.TrimSpace(seg.Text); t != "" {
+			lines = append(lines, t)
+		}
+	}
+	return lines
+}
+
+// allExerciseSegments collects every AudioSegment from any poslech_* exercise.
+func allExerciseSegments(exercise contracts.Exercise) []contracts.AudioSegment {
+	switch exercise.ExerciseType {
+	case "poslech_1", "poslech_2":
+		var segs []contracts.AudioSegment
+		for _, item := range toListening1Detail(exercise.Detail) {
+			segs = append(segs, item.AudioSource.Segments...)
+		}
+		return segs
+	case "poslech_3":
+		var segs []contracts.AudioSegment
+		for _, item := range toListening3Items(exercise.Detail) {
+			segs = append(segs, item.AudioSource.Segments...)
+		}
+		return segs
+	case "poslech_4":
+		var segs []contracts.AudioSegment
+		for _, item := range toListening4Items(exercise.Detail) {
+			segs = append(segs, item.AudioSource.Segments...)
+		}
+		return segs
+	case "poslech_5":
+		return toListening5Source(exercise.Detail).Segments
+	}
+	return nil
+}
+
 // DevExerciseAudioGenerator writes a stub silent WAV file for use in development.
 type DevExerciseAudioGenerator struct{}
 
@@ -153,6 +207,11 @@ func (DevExerciseAudioGenerator) GenerateAudio(exerciseID, _ string) (*contracts
 		SourceType:  "dev",
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 	}, nil
+}
+
+// GenerateDialogAudio for dev: same stub WAV regardless of dialog content.
+func (DevExerciseAudioGenerator) GenerateDialogAudio(exerciseID string, _ []string) (*contracts.ExerciseAudio, error) {
+	return (DevExerciseAudioGenerator{}).GenerateAudio(exerciseID, "")
 }
 
 // devSilentWAV returns a minimal valid 44-byte WAV file (0 audio samples).

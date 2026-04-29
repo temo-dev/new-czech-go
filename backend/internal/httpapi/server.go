@@ -979,15 +979,18 @@ func (s *Server) handleAdminGenerateAudio(w http.ResponseWriter, r *http.Request
 		writeNotFound(w)
 		return
 	}
-	// Poslech 4: use 2-voice dialog generation when generator supports it.
+	// Use 2-voice dialog generation when:
+	// - exercise is poslech_4 (per-item dialogs), OR
+	// - any poslech_* has segments with ≥2 distinct speaker labels (e.g. [Muž]/[Žena]).
 	var audio *contracts.ExerciseAudio
-	if exercise.ExerciseType == "poslech_4" {
-		if dialogGen, ok := s.audioGenerator.(processing.DialogExerciseAudioGenerator); ok {
-			dialogTexts := processing.BuildExerciseDialogTexts(exercise)
-			if len(dialogTexts) == 0 {
-				writeError(w, http.StatusBadRequest, "validation_error", "No dialog text segments found.", false)
-				return
-			}
+	if dialogGen, ok := s.audioGenerator.(processing.DialogExerciseAudioGenerator); ok {
+		var dialogTexts []string
+		if exercise.ExerciseType == "poslech_4" {
+			dialogTexts = processing.BuildExerciseDialogTexts(exercise)
+		} else if processing.HasMultipleSpeakers(exercise) {
+			dialogTexts = processing.BuildExerciseDialogLines(exercise)
+		}
+		if len(dialogTexts) > 0 {
 			var err error
 			audio, err = dialogGen.GenerateDialogAudio(exerciseID, dialogTexts)
 			if err != nil {
