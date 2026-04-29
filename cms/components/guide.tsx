@@ -15,6 +15,11 @@ export function AdminGuide() {
         </p>
       </div>
 
+      {/* Login */}
+      <div style={{ padding: '12px 16px', background: 'rgba(15,61,58,0.06)', border: '1px solid var(--accent-soft)', borderRadius: 'var(--r2)', marginBottom: 32, fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+        <b>Đăng nhập:</b> Truy cập CMS lần đầu sẽ redirect về <Code>/login</Code>. Nhập email + password (<Code>admin@example.com</Code> / <Code>demo123</Code> mặc định, cấu hình qua <Code>ADMIN_EMAIL</Code> / <Code>ADMIN_PASSWORD</Code> env). Session giữ 24h — hết hạn sẽ tự redirect về trang login.
+      </div>
+
       {/* Flow diagrams */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r3)', padding: '20px 24px', marginBottom: 40 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.8, color: 'var(--ink-3)', textTransform: 'uppercase', marginBottom: 16 }}>Luồng A — Exercise thủ công</div>
@@ -158,12 +163,29 @@ export function AdminGuide() {
           </div>
         </SubSection>
 
-        <SubSection title="Bước 3 — Nhập nội dung">
-          <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-2)' }}>
-            Form hiện đúng fields cho loại bài đã chọn. Có 3 tab: <b>Đề bài</b> (nội dung chính), <b>Bài mẫu</b> (tùy chọn), <b>Siêu dữ liệu</b>.
+        <SubSection title="Bước 3 — Nhập nội dung (Slide-over Panel)">
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-2)', marginBottom: 8 }}>
+            Form mở từ phía phải màn hình (slide-over panel, 80% chiều rộng). Scroll thoải mái — không còn cramped modal. Inputs đã được cấu trúc sẵn theo loại bài:
           </p>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {[
+              ['Nói (Úloha 1–4)', 'Structured rows: prompt list / slot rows / checkpoint list / choice option rows — không cần nhớ format --- hay | nữa'],
+              ['Viết (Psaní 1–2)', 'ItemRepeater cho danh sách câu hỏi / topic ảnh'],
+              ['Nghe (Poslech 1–5)', 'Từng đoạn có transcript + ô options A-D + dropdown đáp án. Polly TTS: radio chọn source + nút Tạo audio'],
+              ['Đọc (Čtení 1–5)', 'Passage textarea + question rows có ô options + dropdown đáp án'],
+            ].map(([type, desc]) => (
+              <div key={type} style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 12,
+                padding: '8px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', fontSize: 13, alignItems: 'start' }}>
+                <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{type}</span>
+                <span style={{ color: 'var(--ink-3)', lineHeight: 1.5 }}>{desc}</span>
+              </div>
+            ))}
+          </div>
           <Callout type="warning">
-            Tab Siêu dữ liệu — <b>Trạng thái phải là published</b>. Exercise <Code>draft</Code> không hiện trên Flutter.
+            <b>Trạng thái phải là published</b> (chọn ở phần Siêu dữ liệu). Exercise <Code>draft</Code> không hiện trên Flutter.
+          </Callout>
+          <Callout type="info">
+            Autosave 10s — thoát panel rồi quay lại sẽ thấy toast &quot;Khôi phục bản nháp&quot;. Form bị dirty (có thay đổi chưa lưu) → confirm trước khi đóng.
           </Callout>
         </SubSection>
       </Section>
@@ -204,15 +226,32 @@ export function AdminGuide() {
           </div>
         </SubSection>
 
-        <SubSection title="Bước 3 — Review và Publish">
+        <SubSection title="Quản lý bộ từ vựng">
+          <div style={{ display: 'grid', gap: 6 }}>
+            {[
+              ['Sửa', 'Chỉnh title, level, language hoặc thêm từ mới. Module không thể đổi sau khi tạo.'],
+              ['Xóa', 'Xóa bộ từ (có confirm). Exercises đã publish không bị xóa theo.'],
+              ['Draft →', 'Nếu đã Generate nhưng chưa Publish và thoát ra — nút Draft → xuất hiện trên row để quay lại chỉnh sửa.'],
+            ].map(([action, desc]) => (
+              <div key={action} style={{ display: 'grid', gridTemplateColumns: '70px 1fr', gap: 12,
+                padding: '8px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', fontSize: 13, alignItems: 'center' }}>
+                <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{action}</span>
+                <span style={{ color: 'var(--ink-3)' }}>{desc}</span>
+              </div>
+            ))}
+          </div>
+        </SubSection>
+
+        <SubSection title="Bước 3 — Chỉnh sửa nháp & Publish">
           <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-2)', marginBottom: 8 }}>
-            Sau khi AI tạo xong, màn hình hiện danh sách bài nháp. Kiểm tra từng bài:
+            Sau khi AI tạo xong, màn hình hiện danh sách bài nháp với inline editors. Kiểm tra từng bài:
           </p>
           <div style={{ display: 'grid', gap: 6 }}>
             {[
-              ['Sửa nội dung', 'Chỉnh trực tiếp — front/back/explanation/options'],
-              ['Xóa bài', 'Xóa bài không phù hợp trước khi publish'],
-              ['Lưu nháp', 'Lưu chỉnh sửa mà chưa publish'],
+              ['Sửa nội dung', 'Chỉnh trực tiếp — front/back/explanation/options/prompt ngay trong trang'],
+              ['Xóa bài', 'Nhấn × để xóa bài không phù hợp trước khi publish'],
+              ['Lưu nháp', 'Lưu chỉnh sửa mà chưa publish — nút đổi màu xanh "✓ Đã lưu nháp"'],
+              ['← Thoát', 'Thoát về danh sách nhưng draft vẫn còn — dùng nút "Draft →" để quay lại'],
               ['Publish', 'Validate tất cả → tạo exercises vào database. Không thể undo.'],
               ['Từ chối', 'Hủy job — tạo lại từ đầu nếu cần'],
             ].map(([action, desc]) => (
@@ -246,7 +285,7 @@ export function AdminGuide() {
 
         <Callout type="info">
           Grammar chỉ generate <b>fill_blank</b> và <b>choice_word</b>. Không có flashcard (flashcard dành cho từ vựng riêng lẻ, không phù hợp ngữ pháp).
-          Flow review và publish giống Từ vựng.
+          Tất cả tính năng <b>giống Từ vựng</b>: Sửa quy tắc, Xóa, Generate, Chỉnh sửa inline (FillBlank/ChoiceWord/Matching editors), Lưu nháp, Draft →, Publish, Từ chối.
         </Callout>
       </Section>
 
@@ -287,8 +326,29 @@ export function AdminGuide() {
         </SubSection>
       </Section>
 
+      {/* Analytics */}
+      <div style={{ marginTop: 40, padding: '20px 24px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r3)', marginBottom: 24 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.8, color: 'var(--ink-3)', textTransform: 'uppercase', marginBottom: 12 }}>Analytics — Học viên</div>
+        <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+          Trang <a href="/learners" style={{ color: 'var(--brand)', fontWeight: 600 }}>Học viên</a> có 3 tab:
+        </p>
+        <div style={{ display: 'grid', gap: 6 }}>
+          {[
+            ['Lượt nộp', 'Toàn bộ attempts, filter theo readiness level (ready / almost / needs_work / not_ready)'],
+            ['Học viên', 'Grouped by learner — tổng lượt, completed, phân bố readiness, bài gần nhất'],
+            ['Analytics', 'Pass rate theo loại bài (exercise_type): total / completed / passed / passRate % + bar trực quan. Màu: xanh ≥70%, vàng ≥40%, đỏ <40%.'],
+          ].map(([tab, desc]) => (
+            <div key={tab} style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 12,
+              padding: '8px 14px', background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', fontSize: 13, alignItems: 'start' }}>
+              <span style={{ fontWeight: 600 }}>{tab}</span>
+              <span style={{ color: 'var(--ink-3)', lineHeight: 1.5 }}>{desc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Verify */}
-      <div style={{ marginTop: 40, padding: '20px 24px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r3)' }}>
+      <div style={{ marginTop: 0, padding: '20px 24px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r3)' }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.8, color: 'var(--ink-3)', textTransform: 'uppercase', marginBottom: 12 }}>Kiểm tra kết quả</div>
         <ol style={{ margin: 0, padding: '0 0 0 20px', display: 'grid', gap: 8 }}>
           {[
@@ -319,11 +379,15 @@ export function AdminGuide() {
               <span>Env var</span><span>Mục đích</span><span>Default</span>
             </div>
             {[
+              ['ADMIN_EMAIL', 'Email đăng nhập CMS admin', 'admin@example.com'],
+              ['ADMIN_PASSWORD', 'Mật khẩu đăng nhập CMS admin', 'demo123'],
               ['LLM_PROVIDER', 'Bật/tắt LLM feedback (claude hoặc để trống)', 'dev (tắt)'],
               ['LLM_MODEL', 'Model feedback nói/viết (real-time, per-attempt)', 'claude-haiku-4-5-20251001'],
               ['LLM_REVIEW_MODEL', 'Model review artifact generation', '→ LLM_MODEL'],
               ['LLM_CONTENT_MODEL', 'Model generate từ vựng/ngữ pháp (batch)', 'claude-haiku-4-5-20251001'],
               ['ANTHROPIC_API_KEY', 'API key của Anthropic — bắt buộc khi dùng Claude', '—'],
+              ['POLLY_VOICE_ID', 'Giọng Polly chính (nữ)', 'Jitka'],
+              ['POLLY_VOICE_ID_2', 'Giọng Polly phụ cho Poslech 4 dialogs (nam)', 'Tomáš'],
             ].map(([k, desc, def]) => (
               <div key={k} style={{ display: 'grid', gridTemplateColumns: '200px 1fr 200px', padding: '9px 14px', borderTop: '1px solid var(--border)', alignItems: 'center' }}>
                 <Code>{k}</Code>
@@ -343,11 +407,13 @@ export function AdminGuide() {
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.8, color: 'var(--ink-3)', textTransform: 'uppercase', marginBottom: 12 }}>Xử lý sự cố thường gặp</div>
         <div style={{ display: 'grid', gap: 10 }}>
           {[
-            ['AI generate timeout', 'Gọi Claude có thể mất 60–120s cho nhiều bài. Nếu job "failed": thử tạo ít bài hơn mỗi lần (5-10 thay vì 20+).'],
+            ['Hết session, trang trắng', 'CMS tự redirect về /login khi session hết hạn (24h). Đăng nhập lại là xong. Nếu vòng lặp redirect: xóa cookie localhost:3000 trong DevTools.'],
+            ['AI generate timeout / pending mãi', 'Job stuck ở pending sau restart: chạy UPDATE content_generation_jobs SET status=\'failed\' WHERE status=\'pending\'. Nếu "failed": thử tạo ít bài hơn (5-10 thay vì 20+).'],
             ['Bài tập không hiện trên Flutter', 'Kiểm tra: status = published, pool = course (không phải exam), skill đúng loại.'],
             ['Duplicate skill', 'Mỗi module chỉ nên có 1 skill của mỗi loại. Xóa skill thừa qua trang Skills.'],
             ['Validation error khi Publish', 'Kiểm tra từng bài: choice_word cần 4 options + correct answer trong options; fill_blank cần ___; tất cả cần explanation.'],
             ['AI tạo sai ngôn ngữ', 'Đặt Ngôn ngữ giải thích = Tiếng Việt khi tạo bộ từ. Với grammar thêm ràng buộc "All explanations in Vietnamese".'],
+            ['Poslech audio 1 giọng', 'Mặc định Jitka (nữ). Đặt POLLY_VOICE_ID_2=Tomáš để Poslech 4 dùng 2 giọng (hội thoại thực tế hơn).'],
           ].map(([problem, solution]) => (
             <div key={problem} style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 12,
               padding: '10px 14px', background: 'var(--surface-alt)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', fontSize: 13, alignItems: 'start' }}>
