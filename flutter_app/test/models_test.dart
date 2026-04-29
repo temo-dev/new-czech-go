@@ -616,4 +616,84 @@ void main() {
     });
     expect(artifact.diffChunks, isEmpty);
   });
+
+  // ── V7 Sprint MockTest model tests ─────────────────────────────────────────
+
+  test('MockTest parses passThresholdPercent from JSON', () {
+    final mt = MockTest.fromJson({
+      'id': 'mt-sprint-1',
+      'title': 'Sprint Nói+Nghe',
+      'description': 'Bài luyện ngắn',
+      'estimated_duration_minutes': 10,
+      'status': 'published',
+      'pass_threshold_percent': 80,
+      'sections': [
+        {'sequence_no': 1, 'exercise_id': 'ex-1', 'exercise_type': 'uloha_1_topic_answers', 'max_points': 8},
+        {'sequence_no': 2, 'exercise_id': 'ex-2', 'exercise_type': 'poslech_2', 'max_points': 5},
+      ],
+    });
+    expect(mt.passThresholdPercent, equals(80));
+    expect(mt.totalMaxPoints, equals(13));
+  });
+
+  test('MockTest.passThresholdPercent defaults to 60 when absent', () {
+    final mt = MockTest.fromJson({
+      'id': 'mt-standard',
+      'title': 'Standard Exam',
+      'description': '',
+      'estimated_duration_minutes': 40,
+      'status': 'published',
+      'sections': [],
+    });
+    expect(mt.passThresholdPercent, equals(60));
+  });
+
+  test('MockExamSessionView parses passThresholdPercent from JSON', () {
+    final session = MockExamSessionView.fromJson({
+      'id': 'ses-1',
+      'status': 'completed',
+      'mock_test_id': 'mt-sprint-1',
+      'overall_score': 7,
+      'passed': false,
+      'pass_threshold_percent': 80,
+      'overall_readiness_level': 'needs_work',
+      'overall_summary': 'Cần luyện thêm.',
+      'sections': [],
+    });
+    expect(session.passThresholdPercent, equals(80));
+    expect(session.overallScore, equals(7));
+    expect(session.passed, isFalse);
+  });
+
+  test('MockExamSessionView.passThresholdPercent defaults to 60 when absent', () {
+    final session = MockExamSessionView.fromJson({
+      'id': 'ses-2',
+      'status': 'completed',
+      'overall_score': 24,
+      'passed': true,
+      'sections': [],
+    });
+    expect(session.passThresholdPercent, equals(60));
+  });
+
+  test('MockTest._skillKind covers all exercise type prefixes', () {
+    // Verify the model recognises sprint-specific types via passThresholdPercent field
+    final sprint = MockTest.fromJson({
+      'id': 'mt-mixed',
+      'title': 'Mixed Sprint',
+      'description': '',
+      'estimated_duration_minutes': 15,
+      'status': 'published',
+      'pass_threshold_percent': 75,
+      'sections': [
+        {'sequence_no': 1, 'exercise_id': 'ex-u1', 'exercise_type': 'uloha_1_topic_answers', 'max_points': 8},
+        {'sequence_no': 2, 'exercise_id': 'ex-p2', 'exercise_type': 'poslech_2',              'max_points': 5},
+        {'sequence_no': 3, 'exercise_id': 'ex-c1', 'exercise_type': 'cteni_1',                'max_points': 5},
+        {'sequence_no': 4, 'exercise_id': 'ex-w1', 'exercise_type': 'psani_1_formular',       'max_points': 8},
+      ],
+    });
+    expect(sprint.passThresholdPercent, equals(75));
+    expect(sprint.sections.length, equals(4));
+    expect(sprint.totalMaxPoints, equals(26));
+  });
 }
