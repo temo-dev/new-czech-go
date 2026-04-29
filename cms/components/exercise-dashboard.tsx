@@ -1456,13 +1456,20 @@ export function ExerciseDashboard() {
               audioGenerating={audioGenerating}
               audioGenMsg={audioGenMsg}
               onGenerateAudio={async () => {
-                if (!editingId) { setAudioGenMsg('Save the draft first.'); return; }
+                if (!editingId) { setAudioGenMsg('Lưu bài trước khi tạo audio.'); return; }
                 setAudioGenerating(true); setAudioGenMsg(null);
                 try {
+                  // Auto-save current form so generate-audio reads latest transcript.
+                  const saveRes = await adminFetch(`${adminApi}/${editingId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(buildUpdatePayload(form)),
+                  });
+                  if (!saveRes.ok) throw new Error('Lưu thất bại trước khi tạo audio.');
                   const res = await adminFetch(`${adminApi}/${editingId}/generate-audio`, { method: 'POST' });
                   const j = await res.json();
                   if (!res.ok) throw new Error(j.error?.message ?? 'Failed');
-                  setAudioGenMsg(`Audio generated: ${j.data?.storage_key ?? 'ok'}`);
+                  setAudioGenMsg(`Đã tạo audio.`);
                 } catch (e) {
                   setAudioGenMsg(e instanceof Error ? e.message : 'Error');
                 } finally { setAudioGenerating(false); }
