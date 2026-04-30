@@ -126,12 +126,12 @@ Flutter route mỗi section đến đúng screen theo `exercise_type` prefix.
 
 Spec: `docs/ideas/voice-selection.md`. Plan chi tiết: `tasks/plan.md` → section V8.
 
-- [ ] **VS1** Backend: `VoiceRegistry` (voice_registry.go) + wire vào `Processor` + `GET /v1/voices` endpoint; env vars `ELEVENLABS_VOICE_ID_C/D`, `VOICE_C/D_NAME`
-- [ ] **VS2** Backend: `WritingSubmission.PreferredVoiceID`; `ProcessAttempt(attemptID, locale, preferredVoiceID)`; `ProcessWritingAttempt` dùng registry; `handleUploadComplete` parse voice từ body; `GET /v1/voices/:id/preview` với local cache
-- **[CHECKPOINT VS-A]** `make backend-build && make backend-test`
-- [ ] **VS3** Flutter: `VoiceOption` model + `VoicePreferenceService` (SharedPreferences); `api_client.getVoices()` + `getVoicePreviewUrl()` + `submitText(preferredVoiceId)` + speaking upload-complete voice param
-- [ ] **VS4** Flutter: `_VoicePickerSection` StatefulWidget trong ProfileScreen — 4 voice cards, selected state, "Nghe thử" → just_audio preview; i18n keys VI/EN
-- **[CHECKPOINT VS-B]** `make verify` + manual: Profile → chọn Tomáš → bài viết → review TTS bằng giọng Tomáš
+- [x] **VS1** Backend: `VoiceRegistry` (voice_registry.go) + wire vào `Processor` + `GET /v1/voices` endpoint; env vars `ELEVENLABS_VOICE_ID_C/D`, `VOICE_C/D_NAME` (2026-04-30)
+- [x] **VS2** Backend: `WritingSubmission.PreferredVoiceID`; `ProcessAttempt(attemptID, preferredVoiceID)`; `ProcessWritingAttempt` dùng ttsFor(); `handleUploadComplete` parse voice từ body; `GET /v1/voices/:id/preview` + `/preview/audio` (2026-04-30)
+- **[CHECKPOINT VS-A]** ✅ backend build + test green (2026-04-30)
+- [x] **VS3** Flutter: `VoiceOption` model + `VoicePreferenceService` (SharedPreferences); `api_client.getVoices()` + `getVoicePreviewUrl()` + `submitText(preferredVoiceId)` + speaking upload-complete voice param (2026-04-30)
+- [x] **VS4** Flutter: `_VoicePickerSection` StatefulWidget trong ProfileScreen — voice cards, selected state, "Nghe thử" → just_audio preview; 7 i18n keys VI/EN (2026-04-30)
+- **[CHECKPOINT VS-B]** ✅ flutter analyze + flutter test green (2026-04-30). Manual test cần: Profile → chọn Tomáš → bài viết → review TTS bằng giọng Tomáš
 
 ---
 
