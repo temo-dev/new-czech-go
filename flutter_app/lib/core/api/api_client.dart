@@ -284,6 +284,14 @@ class ApiClient {
     return Uri.parse('$baseUrl/v1/exercises/$exerciseId/assets/$assetId/file');
   }
 
+  /// Constructs URL for a vocabulary/grammar media file using its storage key.
+  /// Used by QuizcardWidget to load flashcard images.
+  Uri mediaUri(String storageKey) {
+    return Uri.parse('$baseUrl/v1/media/file').replace(
+      queryParameters: {'key': storageKey},
+    );
+  }
+
   Future<Map<String, dynamic>> _authed(
     String method,
     String path, {

@@ -199,6 +199,10 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
                   back: d.flashcardBack,
                   example: d.flashcardExample.isNotEmpty ? d.flashcardExample : null,
                   exampleTranslation: d.flashcardExampleTranslation.isNotEmpty ? d.flashcardExampleTranslation : null,
+                  imageUrl: d.flashcardImageAssetId.isNotEmpty
+                      ? widget.client.mediaUri(d.flashcardImageAssetId).toString()
+                      : null,
+                  authHeaders: widget.client.authHeaders,
                   submitting: _submitting,
                   onChoice: _submitQuizcard,
                 ),

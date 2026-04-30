@@ -5,7 +5,7 @@ import { adminFetch } from '../../lib/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type VocabItem = { term: string; meaning: string; part_of_speech?: string };
+type VocabItem = { id?: string; term: string; meaning: string; part_of_speech?: string; image_asset_id?: string };
 
 type VocabSet = {
   id: string; module_id: string; title: string;
@@ -409,6 +409,16 @@ export default function VocabularyPage() {
     setGenPhase(null); setJobId('');
   }
 
+  async function handleItemImageUpload(itemId: string, file: File, itemIndex: number) {
+    const formData = new FormData();
+    formData.set('file', file);
+    const res = await adminFetch(`/api/admin/vocabulary-items/${itemId}/image`, { method: 'POST', body: formData });
+    const j = await res.json();
+    if (res.ok && j.data?.image_asset_id) {
+      setFItems(prev => prev.map((it, i) => i === itemIndex ? { ...it, image_asset_id: j.data.image_asset_id } : it));
+    }
+  }
+
   async function handleResume(setId: string, jid: string) {
     const res = await adminFetch(`/api/admin/content-generation-jobs/${jid}`);
     const j = await res.json();
@@ -544,14 +554,29 @@ export default function VocabularyPage() {
             {/* Word list */}
             <div>
               <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700 }}>Danh sách từ</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px 32px', gap: 6, fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 6 }}>
-                <span>Từ Czech</span><span>Nghĩa Vietnamese</span><span>Loại từ</span><span />
+              <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr 90px 80px 28px', gap: 6, fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 6, alignItems: 'center' }}>
+                <span>Ảnh</span><span>Từ Czech</span><span>Nghĩa Vietnamese</span><span>Loại từ</span><span />
               </div>
               {fItems.map((item, i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px 32px', gap: 6, marginBottom: 6 }}>
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr 90px 80px 28px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+                  {/* Image thumbnail */}
+                  <div style={{ width: 40, height: 40, borderRadius: 6, border: `1.5px ${item.image_asset_id ? 'solid #22c55e' : 'dashed var(--border)'}`, overflow: 'hidden', background: 'var(--surface-alt)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {item.image_asset_id
+                      ? <span style={{ fontSize: 18 }}>🖼</span>
+                      : <span style={{ fontSize: 10, color: 'var(--ink-4)' }}>img</span>}
+                  </div>
                   <input value={item.term} placeholder="chodím" onChange={e => { const n = [...fItems]; n[i] = { ...item, term: e.target.value }; setFItems(n); }} style={inputStyle} />
                   <input value={item.meaning} placeholder="đi bộ" onChange={e => { const n = [...fItems]; n[i] = { ...item, meaning: e.target.value }; setFItems(n); }} style={inputStyle} />
                   <input value={item.part_of_speech ?? ''} placeholder="verb" onChange={e => { const n = [...fItems]; n[i] = { ...item, part_of_speech: e.target.value }; setFItems(n); }} style={inputStyle} />
+                  {/* Upload button — only for saved items (have id) */}
+                  {item.id ? (
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, border: `1px ${item.image_asset_id ? 'solid #22c55e' : 'dashed var(--border)'}`, borderRadius: 6, padding: '4px 6px', cursor: 'pointer', fontSize: 10, fontWeight: 600, color: item.image_asset_id ? '#15803d' : 'var(--ink-3)', background: item.image_asset_id ? '#f0fdf4' : 'transparent', whiteSpace: 'nowrap' }}>
+                      {item.image_asset_id ? '✓ Đổi' : '+ Ảnh'}
+                      <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f && item.id) handleItemImageUpload(item.id, f, i); e.target.value = ''; }} />
+                    </label>
+                  ) : (
+                    <span style={{ fontSize: 10, color: 'var(--ink-4)', textAlign: 'center' }}>Lưu trước</span>
+                  )}
                   <button onClick={() => setFItems(fItems.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#c03a28', fontSize: 18 }}>×</button>
                 </div>
               ))}

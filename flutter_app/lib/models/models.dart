@@ -389,6 +389,7 @@ class ExerciseDetail {
     this.flashcardBack = '',
     this.flashcardExample = '',
     this.flashcardExampleTranslation = '',
+    this.flashcardImageAssetId = '',
     this.matchingPairs = const [],
     this.fillBlankSentence = '',
     this.fillBlankHint = '',
@@ -432,6 +433,7 @@ class ExerciseDetail {
   final String flashcardBack;
   final String flashcardExample;
   final String flashcardExampleTranslation;
+  final String flashcardImageAssetId;
 
   // V6: matching
   final List<MatchingPairView> matchingPairs;
@@ -589,6 +591,7 @@ class ExerciseDetail {
       flashcardExample: detail['example_sentence'] as String? ?? '',
       flashcardExampleTranslation:
           detail['example_translation'] as String? ?? '',
+      flashcardImageAssetId: detail['image_asset_id'] as String? ?? '',
       // V6: matching
       matchingPairs:
           (detail['pairs'] as List<dynamic>? ?? const [])

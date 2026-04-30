@@ -9,7 +9,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 
 /// Flashcard with flip animation.
-/// Front: Czech term. Back: Vietnamese definition + optional example.
+/// Front: optional image + Czech term. Back: Vietnamese definition + optional example.
 /// After flip: [Đã biết ✓] and [Ôn lại ↺] buttons.
 class QuizcardWidget extends StatefulWidget {
   const QuizcardWidget({
@@ -18,6 +18,8 @@ class QuizcardWidget extends StatefulWidget {
     required this.back,
     this.example,
     this.exampleTranslation,
+    this.imageUrl,
+    this.authHeaders,
     required this.submitting,
     required this.onChoice,
   });
@@ -26,6 +28,9 @@ class QuizcardWidget extends StatefulWidget {
   final String back;
   final String? example;
   final String? exampleTranslation;
+  /// Storage key URL for the flashcard image. Null = no image.
+  final String? imageUrl;
+  final Map<String, String>? authHeaders;
   final bool submitting;
   final void Function(String choice) onChoice; // "known" | "review"
 
@@ -83,7 +88,7 @@ class _QuizcardWidgetState extends State<QuizcardWidget> with SingleTickerProvid
                 transform: Matrix4.identity()
                   ..setEntry(3, 2, 0.001)
                   ..rotateY(angle),
-                child: isFront ? _FrontFace(text: widget.front, hint: l.vocabFlip) : _BackFace(
+                child: isFront ? _FrontFace(text: widget.front, hint: l.vocabFlip, imageUrl: widget.imageUrl, authHeaders: widget.authHeaders) : _BackFace(
                   back: widget.back,
                   example: widget.example,
                   exampleTranslation: widget.exampleTranslation,
@@ -135,15 +140,23 @@ class _QuizcardWidgetState extends State<QuizcardWidget> with SingleTickerProvid
 }
 
 class _FrontFace extends StatelessWidget {
-  const _FrontFace({required this.text, required this.hint});
+  const _FrontFace({
+    required this.text,
+    required this.hint,
+    this.imageUrl,
+    this.authHeaders,
+  });
   final String text;
   final String hint;
+  final String? imageUrl;
+  final Map<String, String>? authHeaders;
 
   @override
   Widget build(BuildContext context) {
+    final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
     return Container(
       width: double.infinity,
-      height: 220,
+      constraints: BoxConstraints(minHeight: hasImage ? 280 : 220),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
         borderRadius: AppRadius.lgAll,
@@ -153,9 +166,34 @@ class _FrontFace extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(text, style: AppTypography.titleLarge.copyWith(fontSize: 32, fontWeight: FontWeight.w700), textAlign: TextAlign.center),
-          const SizedBox(height: AppSpacing.x3),
-          const Icon(Icons.touch_app_outlined, size: 20, color: Color(0xFFBCB2A6)),
+          if (hasImage) ...[
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              child: Image.network(
+                imageUrl!,
+                headers: authHeaders ?? const {},
+                width: double.infinity,
+                height: 160,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                loadingBuilder: (_, child, progress) => progress == null
+                    ? child
+                    : Container(height: 160, color: Color(0xFFF5F0EA),
+                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2))),
+              ),
+            ),
+          ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x4, vertical: AppSpacing.x4),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(text, style: AppTypography.titleLarge.copyWith(fontSize: 32, fontWeight: FontWeight.w700), textAlign: TextAlign.center),
+                const SizedBox(height: AppSpacing.x3),
+                const Icon(Icons.touch_app_outlined, size: 20, color: Color(0xFFBCB2A6)),
+              ],
+            ),
+          ),
         ],
       ),
     );
