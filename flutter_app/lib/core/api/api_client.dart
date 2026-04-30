@@ -53,8 +53,14 @@ class ApiClient {
     return payload['data'] as List<dynamic>? ?? const [];
   }
 
-  Future<List<dynamic>> listSkillExercises(String skillId) async {
-    final payload = await _authed('GET', '/v1/skills/$skillId/exercises');
+  Future<List<dynamic>> listModuleExercises(
+    String moduleId, {
+    String? skillKind,
+  }) async {
+    final path = skillKind != null
+        ? '/v1/modules/$moduleId/exercises?skill_kind=$skillKind'
+        : '/v1/modules/$moduleId/exercises';
+    final payload = await _authed('GET', path);
     return payload['data'] as List<dynamic>? ?? const [];
   }
 

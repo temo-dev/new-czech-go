@@ -27,22 +27,18 @@ class Course {
   }
 }
 
-class Skill {
-  const Skill({
-    required this.id,
+// SkillSummary is computed from exercises grouped by skill_kind within a module.
+// The skills table no longer exists; this is a derived aggregate from the API.
+class SkillSummary {
+  const SkillSummary({
     required this.moduleId,
     required this.skillKind,
-    required this.title,
-    required this.sequenceNo,
-    required this.status,
+    required this.exerciseCount,
   });
 
-  final String id;
   final String moduleId;
   final String skillKind;
-  final String title;
-  final int sequenceNo;
-  final String status;
+  final int exerciseCount;
 
   bool get isImplemented =>
       skillKind == 'noi' ||
@@ -54,14 +50,11 @@ class Skill {
 
   bool get isWriting => skillKind == 'viet';
 
-  factory Skill.fromJson(Map<String, dynamic> json) {
-    return Skill(
-      id: json['id'] as String? ?? '',
-      moduleId: json['module_id'] as String? ?? '',
-      skillKind: json['skill_kind'] as String? ?? 'noi',
-      title: json['title'] as String? ?? '',
-      sequenceNo: (json['sequence_no'] as num?)?.toInt() ?? 0,
-      status: json['status'] as String? ?? 'published',
+  factory SkillSummary.fromJson(Map<String, dynamic> json, String moduleId) {
+    return SkillSummary(
+      moduleId: moduleId,
+      skillKind: json['skill_kind'] as String? ?? '',
+      exerciseCount: (json['exercise_count'] as num?)?.toInt() ?? 0,
     );
   }
 }

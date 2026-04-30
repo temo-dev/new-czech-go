@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/skill_utils.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -19,7 +20,7 @@ class ModuleDetailScreen extends StatefulWidget {
 }
 
 class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
-  List<Skill> _skills = [];
+  List<SkillSummary> _skills = [];
   bool _loading = true;
   String? _error;
 
@@ -32,8 +33,9 @@ class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
       final raw = await widget.client.listModuleSkills(widget.module.id);
       if (!mounted) return;
       setState(() {
-        _skills = raw.map((e) => Skill.fromJson(e as Map<String, dynamic>)).toList()
-          ..sort((a, b) => a.sequenceNo.compareTo(b.sequenceNo));
+        _skills = raw
+            .map((e) => SkillSummary.fromJson(e as Map<String, dynamic>, widget.module.id))
+            .toList();
         _loading = false;
       });
     } catch (err) {
@@ -41,26 +43,6 @@ class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
       setState(() { _error = err.toString(); _loading = false; });
     }
   }
-
-  String _skillLabel(String kind, AppLocalizations l) => switch (kind) {
-    'noi'      => l.skillNoi,
-    'nghe'     => l.skillNghe,
-    'doc'      => l.skillDoc,
-    'viet'     => l.skillViet,
-    'tu_vung'  => l.skillTuVung,
-    'ngu_phap' => l.skillNguPhap,
-    _          => kind,
-  };
-
-  IconData _skillIcon(String kind) => switch (kind) {
-    'noi'      => Icons.mic_rounded,
-    'nghe'     => Icons.headphones_rounded,
-    'doc'      => Icons.menu_book_rounded,
-    'viet'     => Icons.edit_rounded,
-    'tu_vung'  => Icons.translate_rounded,
-    'ngu_phap' => Icons.rule_rounded,
-    _          => Icons.school_rounded,
-  };
 
   String _skillDesc(String kind, AppLocalizations l) => switch (kind) {
     'noi'      => 'Luyện nói và phát âm tiếng Czech tự nhiên.',
@@ -134,13 +116,17 @@ class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
                                 physics: const NeverScrollableScrollPhysics(),
                                 children: _skills.map((sk) => _SkillCard(
                                   skill: sk,
-                                  label: _skillLabel(sk.skillKind, l),
+                                  label: skillLabel(l, sk.skillKind),
                                   description: _skillDesc(sk.skillKind, l),
-                                  icon: _skillIcon(sk.skillKind),
+                                  icon: skillIcon(sk.skillKind),
                                   comingSoon: l.skillComingSoon,
                                   onTap: sk.isImplemented ? () => Navigator.of(context).push(
                                     MaterialPageRoute(
-                                      builder: (_) => ExerciseListScreen(client: widget.client, skill: sk),
+                                      builder: (_) => ExerciseListScreen(
+                                        client: widget.client,
+                                        moduleId: sk.moduleId,
+                                        skillKind: sk.skillKind,
+                                      ),
                                     ),
                                   ) : null,
                                 )).toList(),
@@ -171,7 +157,7 @@ class _SkillCard extends StatelessWidget {
     this.onTap,
   });
 
-  final Skill skill;
+  final SkillSummary skill;
   final String label;
   final String description;
   final IconData icon;

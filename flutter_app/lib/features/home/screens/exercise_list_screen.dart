@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/skill_utils.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -14,9 +15,15 @@ import '../../exercise/screens/vocab_grammar_exercise_screen.dart';
 import '../../exercise/screens/writing_exercise_screen.dart';
 
 class ExerciseListScreen extends StatefulWidget {
-  const ExerciseListScreen({super.key, required this.client, required this.skill});
+  const ExerciseListScreen({
+    super.key,
+    required this.client,
+    required this.moduleId,
+    required this.skillKind,
+  });
   final ApiClient client;
-  final Skill skill;
+  final String moduleId;
+  final String skillKind;
 
   @override
   State<ExerciseListScreen> createState() => _ExerciseListScreenState();
@@ -34,7 +41,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final raw = await widget.client.listSkillExercises(widget.skill.id);
+      final raw = await widget.client.listModuleExercises(widget.moduleId, skillKind: widget.skillKind);
       if (!mounted) return;
       setState(() {
         _exercises = raw.map((e) => ExerciseSummary.fromJson(e as Map<String, dynamic>)).toList();
@@ -156,10 +163,10 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
 
   List<ExerciseSummary> get _filtered {
     final kindFiltered = _exercises
-        .where((e) => _exerciseMatchesSkillKind(e.exerciseType, widget.skill.skillKind))
+        .where((e) => _exerciseMatchesSkillKind(e.exerciseType, widget.skillKind))
         .toList();
     if (_filterTag == null) return kindFiltered;
-    if (widget.skill.skillKind == 'noi') {
+    if (widget.skillKind == 'noi') {
       return kindFiltered.where((e) => e.exerciseType.startsWith('uloha_$_filterTag')).toList();
     }
     // vocab/grammar: filter by exact exercise type
@@ -235,7 +242,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
                 ),
                 const Spacer(),
                 // Only show speaking progress link for noi skill
-                if (widget.skill.skillKind == 'noi')
+                if (widget.skillKind == 'noi')
                   Text(l.exerciseListProgressLink,
                       style: AppTypography.bodySmall.copyWith(
                           color: AppColors.primary, fontWeight: FontWeight.w600)),
@@ -247,7 +254,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (widget.skill.skillKind == 'noi')
+                  if (widget.skillKind == 'noi')
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
@@ -259,7 +266,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
                               color: AppColors.primary, fontSize: 10)),
                     ),
                   const SizedBox(height: AppSpacing.x2),
-                  Text(widget.skill.title,
+                  Text(skillLabel(l, widget.skillKind),
                       style: AppTypography.titleLarge.copyWith(
                           fontSize: 30, fontWeight: FontWeight.w700)),
                   const SizedBox(height: AppSpacing.x1),
@@ -272,7 +279,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
             const SizedBox(height: AppSpacing.x4),
 
             // ── Filter pills ─────────────────────────────────────────────────
-            if (widget.skill.skillKind == 'noi')
+            if (widget.skillKind == 'noi')
               SizedBox(
                 height: 38,
                 child: ListView(
@@ -295,7 +302,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
               ),
 
             // Vocab/grammar type filter pills
-            if (widget.skill.skillKind == 'tu_vung' || widget.skill.skillKind == 'ngu_phap')
+            if (widget.skillKind == 'tu_vung' || widget.skillKind == 'ngu_phap')
               SizedBox(
                 height: 38,
                 child: ListView(
@@ -306,7 +313,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
                         onTap: () => setState(() => _filterTag = null)),
                     const SizedBox(width: AppSpacing.x2),
                     for (final entry in [
-                      if (widget.skill.skillKind == 'tu_vung')
+                      if (widget.skillKind == 'tu_vung')
                         ('quizcard_basic', 'Flashcard'),
                       ('matching', 'Ghép đôi'),
                       ('fill_blank', 'Điền từ'),
@@ -357,7 +364,7 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
                                   exercise: ex,
                                   ulohaTag: _ulohaTag(ex.exerciseType),
                                   estimatedMin: _estimatedMin(ex),
-                                  skillKind: widget.skill.skillKind,
+                                  skillKind: widget.skillKind,
                                   onTap: () => _openExercise(context, ex),
                                 );
                               },

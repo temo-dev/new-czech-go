@@ -433,22 +433,19 @@ void main() {
     expect(detail.poslechOptions[0].text, 'je');
   });
 
-  test('Skill isImplemented includes tu_vung and ngu_phap', () {
-    final tuVung = Skill(
-      id: 'sk-1', moduleId: 'mod-1', skillKind: 'tu_vung',
-      title: 'Từ vựng', sequenceNo: 1, status: 'published',
+  test('SkillSummary isImplemented includes tu_vung and ngu_phap', () {
+    final tuVung = SkillSummary(
+      moduleId: 'mod-1', skillKind: 'tu_vung', exerciseCount: 3,
     );
     expect(tuVung.isImplemented, isTrue);
 
-    final nguPhap = Skill(
-      id: 'sk-2', moduleId: 'mod-1', skillKind: 'ngu_phap',
-      title: 'Ngữ pháp', sequenceNo: 2, status: 'published',
+    final nguPhap = SkillSummary(
+      moduleId: 'mod-1', skillKind: 'ngu_phap', exerciseCount: 2,
     );
     expect(nguPhap.isImplemented, isTrue);
 
-    final tuVung2 = Skill(
-      id: 'sk-3', moduleId: 'mod-1', skillKind: 'tu_vung',
-      title: 'Từ vựng', sequenceNo: 3, status: 'published',
+    final tuVung2 = SkillSummary(
+      moduleId: 'mod-1', skillKind: 'tu_vung', exerciseCount: 1,
     );
     expect(tuVung2.isImplemented, isTrue);
   });
