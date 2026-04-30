@@ -15,14 +15,15 @@ The current stack is:
 ```
 Course  (nhiều khóa: "Giao tiếp cơ bản", "Đi urad", "Ôn thi A2", ...)
   └── Module  (chủ đề trong khóa)
-       └── Skill  (nói | nghe | đọc | viết | từ vựng | ngữ pháp)
-            └── Exercise [pool=course, skill_id = canonical parent]
+       └── Exercise [pool=course, module_id + skill_kind = canonical link]
 
 MockTest (đề thi)
   └── MockTestSection → Exercise [pool=exam]
 ```
 
-**DB linkage:** `exercises.skill_id` là liên kết duy nhất lên Module/Course — không còn `module_id` trên exercises (migration 012). `module_id` vẫn xuất hiện trong API response nhưng được derive qua JOIN với skills.
+**DB linkage (V8 — migration 017):** `exercises.module_id` + `exercises.skill_kind` là liên kết trực tiếp lên Module. Bảng `skills` đã bị xóa. `skill_kind` được lưu trực tiếp trên exercise vì `matching`/`fill_blank`/`choice_word` dùng chung cho cả `tu_vung` lẫn `ngu_phap`.
+
+**API derived:** `GET /v1/modules/:id/skills` trả danh sách `SkillSummary` (skill_kind + exercise_count) computed từ exercises, không có bảng skills.
 
 **Implemented skills:**
 - `noi` (Speaking) — fully implemented: Úloha 1-4, AI scoring, review artifact, MockTest speaking flow
@@ -35,8 +36,8 @@ MockTest (đề thi)
 **Exercise types** come from Modelový test A2 (NPI ČR, platný od dubna 2026). See `docs/specs/content-and-attempt-model.md` for full list.
 
 **Exercise pools:**
-- `pool=course` — bài luyện trong Course → Skill
-- `pool=exam` — bài thi trong MockTest → Section (không dùng chung với course)
+- `pool=course` — bài luyện trong Course → Module (module_id bắt buộc)
+- `pool=exam` — bài thi trong MockTest → Section (module_id = '', không thuộc module)
 
 Do not expand into:
 - free-form AI tutoring
@@ -278,8 +279,18 @@ Do not mix these in one change unless the human asks:
 If you notice adjacent cleanup, note it separately instead of silently expanding scope.
 
 ## Good Next Steps
-V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ — tất cả planned slices hoàn thành (2026-04-29).
+V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ V8 ✅ — tất cả planned slices hoàn thành.
 Xem `tasks/todo.md` để theo dõi backlog chi tiết.
+
+**V8 Schema Flatten — 2026-04-30:**
+- Bảng `skills` đã xóa (migration 017–019)
+- `exercises.module_id` + `exercises.skill_kind` thay cho `exercises.skill_id → skills`
+- `vocabulary_sets.module_id`, `grammar_rules.module_id` thay cho `skill_id`
+- `GET /v1/modules/:id/skills` trả `SkillSummary[]` computed từ exercises
+- `GET /v1/modules/:id/exercises?skill_kind=X` filter server-side
+- CMS: bỏ `/skills` page, exercise form chọn module trực tiếp
+- Flutter: `SkillSummary` thay `Skill`, `ExerciseSummary.skillKind` từ API
+- Specs: `docs/specs/schema-flatten-skills.md`, idea: `docs/ideas/schema-flatten-skills.md`
 
 **V7 Flexible Sprint MockTest — 2026-04-29:**
 - `pass_threshold_percent` per MockTest (default 80 sprint / 60 full exam chuẩn)

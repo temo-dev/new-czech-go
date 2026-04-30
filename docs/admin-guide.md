@@ -9,11 +9,12 @@ CMS URL: `http://localhost:3000` (local) hoặc `https://cmscz.hadoo.eu` (produc
 ```
 1. Course
 2. Module  (thuộc Course)
-3. Skill   (thuộc Module, skill_kind = noi)
-4. Exercise (thuộc Skill, pool = course, status = published)
+3. Exercise (thuộc Module trực tiếp, pool = course, status = published)
 ```
 
 MockTest độc lập — cần exercises riêng với `pool = exam`.
+
+> **V8:** Bảng `skills` đã được xóa. Exercise link thẳng vào Module qua `module_id`. `skill_kind` (noi/nghe/doc/viet/tu_vung/ngu_phap) được lưu trực tiếp trên exercise.
 
 ---
 
@@ -45,22 +46,7 @@ Mỗi module là một tuần học hoặc chủ đề:
 
 ---
 
-## 3. Tạo Skill
-
-**Trang:** `/skills` → chọn Module → **"+ Skill"**
-
-Mỗi module nên có ít nhất 1 skill `noi`:
-
-| Field | Gợi ý |
-|---|---|
-| Skill kind | `noi` |
-| Title | `Nói — Tuần 1` |
-
-> Các skill `nghe`, `doc`, `viet`, `tu_vung`, `ngu_phap` có thể tạo nhưng chưa có bài tập.
-
----
-
-## 4. Tạo Exercise (quan trọng nhất)
+## 3. Tạo Exercise (quan trọng nhất)
 
 **Trang:** `/` → form bên trái
 
@@ -91,7 +77,7 @@ Mỗi module nên có ít nhất 1 skill `noi`:
 |---|---|
 | Pool | `Bài luyện khóa học (course)` |
 | Module | Chọn module vừa tạo |
-| Skill | Chọn skill `noi` |
+| Skill Kind | Để trống → backend tự derive từ exercise type. Chỉ cần chọn khi tạo `matching`/`fill_blank`/`choice_word` (phân biệt `tu_vung` và `ngu_phap`) |
 | Status | **`published`** ← bắt buộc để Flutter thấy |
 
 > **Lưu ý:** Exercise `status = draft` sẽ **không** hiện trên Flutter app.
@@ -121,7 +107,7 @@ Mỗi module nên có ít nhất 1 skill `noi`:
 
 Tạo ở trang `/` như trên, nhưng trong Tab "Metadata":
 - Pool: **`Bài thi mock exam (exam)`**
-- Không cần chọn module/skill
+- Không cần chọn module (pool=exam exercises không thuộc module)
 
 Số lượng exercises cần tạo phụ thuộc vào loại mock test:
 - **Thi thật 4 kỹ năng:** cần exercises cho nói (Úloha 1-4), nghe (Poslech 1-5), đọc (Čtení 1-5), viết (Psaní 1-2)
