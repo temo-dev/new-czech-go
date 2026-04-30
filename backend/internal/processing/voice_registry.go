@@ -37,8 +37,12 @@ func NewVoiceRegistry(defaultTTS TTSProvider) *VoiceRegistry {
 	// Slot 1: Jitka — always present, backed by the primary TTS provider.
 	r.register(VoiceInfo{ID: "jitka", Name: "Jitka", Gender: "female", Provider: "aws_polly"}, defaultTTS)
 
-	// Slot 2: Tomáš — ElevenLabs primary voice (ELEVENLABS_VOICE_ID).
-	if tomas := newElevenLabsForVoiceEnvVar("ELEVENLABS_VOICE_ID"); tomas != nil {
+	// Slot 2: Tomáš — prefer ELEVENLABS_VOICE_ID_B (existing dialog voice already
+	// configured when TTS_PROVIDER=amazon_polly). Fall back to ELEVENLABS_VOICE_ID
+	// (used when TTS_PROVIDER=elevenlabs is primary).
+	if tomas := newElevenLabsForVoiceEnvVar("ELEVENLABS_VOICE_ID_B"); tomas != nil {
+		r.register(VoiceInfo{ID: "tomas", Name: "Tomáš", Gender: "male", Provider: "elevenlabs"}, tomas)
+	} else if tomas := newElevenLabsForVoiceEnvVar("ELEVENLABS_VOICE_ID"); tomas != nil {
 		r.register(VoiceInfo{ID: "tomas", Name: "Tomáš", Gender: "male", Provider: "elevenlabs"}, tomas)
 	}
 
