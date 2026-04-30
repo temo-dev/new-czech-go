@@ -668,6 +668,7 @@ class _MockExamResultView extends StatelessWidget {
                       style: AppTypography.scoreDisplay.copyWith(
                         fontSize: 52,
                         fontWeight: FontWeight.w900,
+                        color: AppColors.onSurface,
                       ),
                       children: [
                         TextSpan(
