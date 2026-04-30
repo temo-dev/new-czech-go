@@ -35,11 +35,25 @@ func (s *Server) handleAdminVocabItemImage(w http.ResponseWriter, r *http.Reques
 
 	switch r.Method {
 	case http.MethodPost:
-		s.uploadItemImage(w, r, itemID, "vocabulary-images", s.repo.SetVocabularyItemImage)
+		getOld := func(id string) string {
+			if item, ok := s.repo.GetVocabularyItem(id); ok {
+				return item.ImageAssetID
+			}
+			return ""
+		}
+		s.uploadItemImage(w, r, itemID, "vocabulary-images", getOld, s.repo.SetVocabularyItemImage)
 	case http.MethodDelete:
+		item, ok := s.repo.GetVocabularyItem(itemID)
+		if !ok {
+			writeNotFound(w)
+			return
+		}
 		if !s.repo.SetVocabularyItemImage(itemID, "") {
 			writeNotFound(w)
 			return
+		}
+		if item.ImageAssetID != "" {
+			os.Remove(localExerciseAssetPath(item.ImageAssetID))
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"id": itemID, "image_asset_id": ""}, "meta": map[string]any{}})
 	default:
@@ -78,11 +92,25 @@ func (s *Server) handleAdminGrammarRuleImage(w http.ResponseWriter, r *http.Requ
 
 	switch r.Method {
 	case http.MethodPost:
-		s.uploadItemImage(w, r, ruleID, "grammar-images", s.repo.SetGrammarRuleImage)
+		getOld := func(id string) string {
+			if rule, ok := s.repo.GetGrammarRule(id); ok {
+				return rule.ImageAssetID
+			}
+			return ""
+		}
+		s.uploadItemImage(w, r, ruleID, "grammar-images", getOld, s.repo.SetGrammarRuleImage)
 	case http.MethodDelete:
+		rule, ok := s.repo.GetGrammarRule(ruleID)
+		if !ok {
+			writeNotFound(w)
+			return
+		}
 		if !s.repo.SetGrammarRuleImage(ruleID, "") {
 			writeNotFound(w)
 			return
+		}
+		if rule.ImageAssetID != "" {
+			os.Remove(localExerciseAssetPath(rule.ImageAssetID))
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"id": ruleID, "image_asset_id": ""}, "meta": map[string]any{}})
 	default:
@@ -113,8 +141,9 @@ func (s *Server) handleGrammarRuleImageFile(w http.ResponseWriter, r *http.Reque
 
 // uploadItemImage handles multipart image upload for vocab items and grammar rules.
 // storagePrefix is "vocabulary-images" or "grammar-images".
+// getOldKey returns the current storage key so the old file can be removed after success.
 // setImage is the store method to call on success.
-func (s *Server) uploadItemImage(w http.ResponseWriter, r *http.Request, entityID, storagePrefix string, setImage func(id, key string) bool) {
+func (s *Server) uploadItemImage(w http.ResponseWriter, r *http.Request, entityID, storagePrefix string, getOldKey func(id string) string, setImage func(id, key string) bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxImageBytes+1024)
 	if err := r.ParseMultipartForm(maxImageBytes); err != nil {
 		var maxErr *http.MaxBytesError
@@ -162,16 +191,19 @@ func (s *Server) uploadItemImage(w http.ResponseWriter, r *http.Request, entityI
 	}
 	defer dst.Close()
 
-	size, err := io.Copy(dst, file)
-	if err != nil {
+	if _, err := io.Copy(dst, file); err != nil {
 		writeError(w, http.StatusInternalServerError, "upload_failed", "Could not store uploaded image.", true)
 		return
 	}
-	_ = size
 
+	oldKey := getOldKey(entityID)
 	if !setImage(entityID, storageKey) {
 		writeNotFound(w)
 		return
+	}
+	// Remove old file after successful store update to avoid accumulating orphan files.
+	if oldKey != "" && oldKey != storageKey {
+		os.Remove(localExerciseAssetPath(oldKey))
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -195,8 +227,7 @@ func (s *Server) handleMediaFile(w http.ResponseWriter, r *http.Request, _ contr
 		writeNotFound(w)
 		return
 	}
-	// Prevent path traversal
-	if strings.Contains(key, "..") {
+	if !isSafeAssetKey(key) {
 		writeError(w, http.StatusBadRequest, "validation_error", "invalid key.", false)
 		return
 	}
@@ -221,6 +252,15 @@ func serveLocalAssetFile(w http.ResponseWriter, r *http.Request, storageKey stri
 	w.Header().Set("Content-Type", ct)
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	io.Copy(w, f)
+}
+
+// isSafeAssetKey returns true only when the resolved path stays within the
+// asset storage base directory, defeating path-traversal attempts including
+// URL-encoded variants (%2e%2e) that strings.Contains("..") cannot catch.
+func isSafeAssetKey(key string) bool {
+	base := filepath.Join(os.TempDir(), "czech-go-system-assets")
+	resolved := filepath.Clean(filepath.Join(base, filepath.FromSlash(key)))
+	return strings.HasPrefix(resolved, base+string(filepath.Separator))
 }
 
 // isMaxBytesError checks if err is an *http.MaxBytesError (Go 1.19+).

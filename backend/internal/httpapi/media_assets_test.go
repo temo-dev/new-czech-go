@@ -299,6 +299,80 @@ func TestMediaAssets_VocabItemImage_AppearsInListResponse(t *testing.T) {
 	}
 }
 
+// ── /v1/media/file endpoint tests ────────────────────────────────────────────
+
+func TestMediaAssets_MediaFile_MissingKey_Returns404(t *testing.T) {
+	srv, _ := mediaServer(t)
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/v1/media/file", nil)
+	req.Header.Set("Authorization", "Bearer dev-learner-token")
+	resp, _ := srv.Client().Do(req)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 for missing key, got %d", resp.StatusCode)
+	}
+}
+
+func TestMediaAssets_MediaFile_PathTraversalDotDot_Returns400(t *testing.T) {
+	srv, _ := mediaServer(t)
+
+	for _, key := range []string{"../../etc/passwd", "../secrets", "%2e%2e/etc"} {
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/v1/media/file?key="+key, nil)
+		req.Header.Set("Authorization", "Bearer dev-learner-token")
+		resp, _ := srv.Client().Do(req)
+		resp.Body.Close()
+
+		// Either 400 (rejected key) or 404 (path outside base) — never 200
+		if resp.StatusCode == http.StatusOK {
+			t.Fatalf("path traversal key %q returned 200 — security issue", key)
+		}
+	}
+}
+
+func TestMediaAssets_MediaFile_AbsentFile_Returns404(t *testing.T) {
+	srv, _ := mediaServer(t)
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/v1/media/file?key=vocabulary-images/nonexistent/img-000.jpg", nil)
+	req.Header.Set("Authorization", "Bearer dev-learner-token")
+	resp, _ := srv.Client().Do(req)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 for absent file, got %d", resp.StatusCode)
+	}
+}
+
+func TestMediaAssets_VocabItemImage_OldFileCleanup(t *testing.T) {
+	srv, repo := mediaServer(t)
+	_, itemID := createVocabItemForTest(t, srv)
+
+	// Upload first image
+	req1 := multipartImageRequest(t, srv.URL+"/v1/admin/vocabulary-items/"+itemID+"/image", adminToken, "image/jpeg", minimalJPEG)
+	resp1, _ := srv.Client().Do(req1)
+	defer resp1.Body.Close()
+	if resp1.StatusCode != http.StatusOK {
+		t.Fatalf("first upload: expected 200, got %d", resp1.StatusCode)
+	}
+	var p1 map[string]any
+	json.NewDecoder(resp1.Body).Decode(&p1)
+	firstKey := (p1["data"].(map[string]any))["image_asset_id"].(string)
+
+	// Upload second image — should overwrite
+	req2 := multipartImageRequest(t, srv.URL+"/v1/admin/vocabulary-items/"+itemID+"/image", adminToken, "image/jpeg", minimalJPEG)
+	resp2, _ := srv.Client().Do(req2)
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("second upload: expected 200, got %d", resp2.StatusCode)
+	}
+
+	item, _ := repo.GetVocabularyItem(itemID)
+	if item.ImageAssetID == firstKey {
+		t.Fatal("store should point to new key after second upload")
+	}
+	if item.ImageAssetID == "" {
+		t.Fatal("store should have a key after second upload")
+	}
+}
+
 func TestMediaAssets_MultipleChoiceOption_HasImageAssetIDField(t *testing.T) {
 	// Contract: MultipleChoiceOption JSON round-trip preserves image_asset_id
 	opt := struct {
