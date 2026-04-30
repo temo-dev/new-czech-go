@@ -453,7 +453,7 @@ class _MockExamScreenState extends State<MockExamScreen> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadius.full),
                 child: LinearProgressIndicator(
-                  value: total > 0 ? _analyzeProgress / total : 0,
+                  value: _analyzeProgress / total,
                   minHeight: 6,
                   backgroundColor: AppColors.outlineVariant,
                   valueColor:

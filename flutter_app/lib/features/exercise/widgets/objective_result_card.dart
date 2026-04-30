@@ -268,6 +268,7 @@ class _PassageSection extends StatefulWidget {
 class _PassageSectionState extends State<_PassageSection> {
   String? _passage;
   bool _loading = true;
+  bool _expanded = false;
 
   @override
   void initState() {
@@ -315,6 +316,7 @@ class _PassageSectionState extends State<_PassageSection> {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
+          onExpansionChanged: (v) => setState(() => _expanded = v),
           tilePadding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.x3,
             vertical: 0,
@@ -325,7 +327,10 @@ class _PassageSectionState extends State<_PassageSection> {
             AppSpacing.x3,
             AppSpacing.x3,
           ),
-          title: Text(l.viewPassage, style: AppTypography.labelMedium),
+          title: Text(
+            _expanded ? l.hidePassage : l.viewPassage,
+            style: AppTypography.labelMedium,
+          ),
           children: [
             SelectableText(
               text,

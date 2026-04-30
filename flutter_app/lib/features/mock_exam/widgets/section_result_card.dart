@@ -48,11 +48,7 @@ class SectionResultCard extends StatelessWidget {
   }
 
   int get _score {
-    final obj = result.feedback?.objectiveResult;
-    if (obj != null) return obj.score;
-    // Speaking/writing: use readiness-level proxy — score not directly available
-    // in AttemptResult for non-objective skills. maxPoints shown as header only.
-    return 0;
+    return result.feedback?.objectiveResult?.score ?? 0;
   }
 
   bool get _isObjective {
@@ -69,7 +65,6 @@ class SectionResultCard extends StatelessWidget {
           skillKind: _resolvedKind,
           score: _isObjective ? _score : null,
           maxPoints: maxPoints,
-          result: result,
         ),
         const SizedBox(height: AppSpacing.x4),
         _body(),
@@ -104,13 +99,11 @@ class _SectionHeader extends StatelessWidget {
     required this.skillKind,
     required this.score,
     required this.maxPoints,
-    required this.result,
   });
 
   final String skillKind;
   final int? score;   // null for speaking/writing (no objective score)
   final int maxPoints;
-  final AttemptResult result;
 
   @override
   Widget build(BuildContext context) {
