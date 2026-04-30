@@ -642,3 +642,174 @@ W1 → W2 → W3 → W4 → [CHECKPOINT W]
 ```
 
 Không nhảy cóc giữa versions. Mỗi CHECKPOINT phải green trước khi bắt đầu version tiếp theo.
+
+---
+
+## V8 — Voice Selection (Chọn giọng đọc)
+
+Spec: `docs/ideas/voice-selection.md`
+
+**Mục tiêu:** Learner chọn 1 trong 4 giọng Czech trên màn Profile. Preference lưu trong `SharedPreferences`, gửi theo request khi generate review artifact TTS (speaking review + writing review). Poslech pre-generated audio **không bị ảnh hưởng**.
+
+**4 voices:**
+| Slug | Tên hiển thị | Giới tính | Provider | Env var |
+|---|---|---|---|---|
+| `jitka` | Jitka | Nữ | AWS Polly | `POLLY_VOICE_ID` (hiện có) |
+| `tomas` | Tomáš | Nam | ElevenLabs | `ELEVENLABS_VOICE_ID` (hiện có) |
+| `el_female_2` | (env `VOICE_C_NAME`, default `"Jana"`) | Nữ | ElevenLabs | `ELEVENLABS_VOICE_ID_C` (mới) |
+| `el_male_2` | (env `VOICE_D_NAME`, default `"Marek"`) | Nam | ElevenLabs | `ELEVENLABS_VOICE_ID_D` (mới) |
+
+**Design decisions:**
+- Voice slug `""` → fallback về `p.ttsProvider` (backward compat, không break hiện tại)
+- `VoiceRegistry.For("")` và `.For("unknown")` đều trả default provider
+- Preview: `GET /v1/voices/:id/preview` tạo 1 câu mẫu, cache local/S3, trả signed URL
+- Speaking: `preferred_voice_id` gửi trong body của `POST /v1/attempts/:id/upload-complete`
+- Writing: `preferred_voice_id` thêm vào `WritingSubmission` (omitempty, backward compat)
+- Nếu EL voice C/D chưa có env → không xuất hiện trong `GET /v1/voices` list
+
+---
+
+### Slice VS1 — Backend: VoiceRegistry + GET /v1/voices
+
+**Files:**
+- Tạo `backend/internal/processing/voice_registry.go`
+- Sửa `backend/internal/processing/processor.go` — thêm field `voiceRegistry`
+- Sửa `backend/internal/httpapi/server.go` — wire registry + route `GET /v1/voices`
+
+**API:**
+```
+GET /v1/voices   (no auth required)
+→ { "data": [{ "id":"jitka","name":"Jitka","gender":"female","provider":"aws_polly" }, ...] }
+```
+
+**Env vars mới:**
+- `ELEVENLABS_VOICE_ID_C`, `ELEVENLABS_VOICE_ID_D` — voice IDs cho 2 giọng Eleven mới
+- `VOICE_C_NAME` (default `"Jana"`), `VOICE_D_NAME` (default `"Marek"`) — display names
+
+**AC:**
+- Dev mode: trả `[{id:"jitka",...}]` (ít nhất 1)
+- Prod với đủ env: trả 4 entries
+- EL voice thiếu env → bị bỏ qua, không crash
+
+**Verify:** `make backend-build && make backend-test`
+
+---
+
+### Slice VS2 — Backend: Thread voice vào TTS + preview endpoint
+
+**Files:**
+- Sửa `backend/internal/contracts/contracts.go` — `WritingSubmission.PreferredVoiceID string` (`json:"preferred_voice_id,omitempty"`)
+- Sửa `backend/internal/processing/processor.go` — `ProcessAttempt(attemptID, locale, preferredVoiceID string)`, dùng `p.voiceRegistry.For(preferredVoiceID).Generate(...)`
+- Sửa `backend/internal/processing/writing_scorer.go` — dùng `p.voiceRegistry.For(sub.PreferredVoiceID).Generate(...)`
+- Sửa `backend/internal/httpapi/server.go`:
+  - `handleUploadComplete`: parse optional `{"preferred_voice_id":"..."}` từ body, pass vào goroutine
+  - Thêm `GET /v1/voices/:id/preview` (no auth) → generate + cache 1 câu TTS, trả signed URL
+
+**Preview cache key:** `voice-preview/<slug>.mp3` (local tmp / S3)
+**Preview phrase:** `"Dobrý den, jsem připraven pomoci vám s učením češtiny."`
+
+**AC:**
+- Speaking review: `preferred_voice_id=tomas` → Tomáš voice trong artifact TTS
+- Writing review: `preferred_voice_id=jitka` → Jitka voice trong TTS
+- `preferred_voice_id=""` → default provider (không break existing calls)
+- Preview endpoint: trả audio URL; gọi lần 2 → cache hit (không gọi lại TTS API)
+- Backward compat: upload-complete không có body vẫn hoạt động
+
+**Verify:** `make backend-build && make backend-test`
+
+---
+
+**[CHECKPOINT VS-A]** `make backend-build && make backend-test`
+Manual: `curl /v1/voices` → list; `curl /v1/voices/jitka/preview` → audio URL.
+
+---
+
+### Slice VS3 — Flutter: VoicePreferenceService + api_client
+
+**Files:**
+- Tạo `flutter_app/lib/core/voice/voice_option.dart`
+- Tạo `flutter_app/lib/core/voice/voice_preference_service.dart`
+- Sửa `flutter_app/lib/core/api/api_client.dart`
+
+**VoicePreferenceService:**
+```dart
+class VoicePreferenceService {
+  static const _key = 'pref_voice_id';
+  String get current => _prefs.getString(_key) ?? '';
+  Future<void> save(String voiceId) async { ... }
+  static Future<VoicePreferenceService> create() async { ... }
+}
+```
+
+**api_client thêm:**
+- `Future<List<VoiceOption>> getVoices()` — `GET /v1/voices`
+- `Future<String?> getVoicePreviewUrl(String voiceId)` — `GET /v1/voices/:id/preview` → trả `data.url`
+- `submitText(..., {String? preferredVoiceId})` — thêm vào body nếu not null/empty
+- Speaking upload-complete: tìm call site, thêm `preferred_voice_id` vào body
+
+**AC:**
+- `submitText(id, text:'...', preferredVoiceId:'tomas')` → body chứa `"preferred_voice_id":"tomas"`
+- `submitText(id, text:'...')` → body không có `preferred_voice_id` (backward compat)
+- `flutter analyze` pass
+
+**Verify:** `make flutter-analyze`
+
+---
+
+### Slice VS4 — Flutter: Profile screen voice picker UI
+
+**Files:**
+- Sửa `flutter_app/lib/features/profile/screens/profile_screen.dart`
+- Sửa `flutter_app/lib/l10n/app_en.arb` + `flutter_app/lib/l10n/app_vi.arb`
+
+**Layout (thêm section trước _AboutCard):**
+```
+┌──────────────────────────────────────────┐
+│ Giọng đọc mẫu                            │
+│ ┌──────────────────────┐                 │
+│ │ ✓ Jitka  Nữ  Polly  [Nghe thử]       │ ← selected: orange border
+│ │   Tomáš  Nam  EL    [Nghe thử]       │
+│ │   Jana   Nữ   EL    [Nghe thử]       │ hidden nếu chưa config
+│ │   Marek  Nam  EL    [Nghe thử]       │ hidden nếu chưa config
+│ └──────────────────────┘                 │
+└──────────────────────────────────────────┘
+```
+
+**`_VoicePickerSection` (StatefulWidget):**
+- `initState`: `getVoices()` + load `VoicePreferenceService.current` → setState
+- Tap card → `save(voice.id)` + setState (optimistic)
+- "Nghe thử": `getVoicePreviewUrl(voice.id)` → `just_audio` play URL
+- Loading: `CircularProgressIndicator` nhỏ trong section
+- Error / empty list: ẩn section (not critical)
+
+**i18n keys (thêm vào cả VI + EN):**
+- `profileVoiceSection` — "Giọng đọc mẫu" / "Model answer voice"
+- `profileVoicePreview` — "Nghe thử" / "Preview"
+- `profileVoiceFemale` — "Nữ" / "Female"
+- `profileVoiceMale` — "Nam" / "Male"
+- `profileVoiceProviderPolly` — "AWS Polly"
+- `profileVoiceProviderElevenLabs` — "ElevenLabs"
+
+**AC:**
+- Tap Tomas → check xuất hiện, preference saved → app restart vẫn giữ
+- Nhấn Nghe thử → audio phát 1 câu Czech
+- Chỉ 2 voices config → 2 card, không crash
+- Gọi API lỗi → section ẩn, không crash
+- `flutter analyze` + `flutter test` pass
+
+**Verify:** `make flutter-analyze && make flutter-test`
+
+---
+
+**[CHECKPOINT VS-B]** `make verify`
+Manual: Profile → chọn Tomáš → làm bài psani_1 → xem review → TTS audio bằng giọng Tomáš.
+
+---
+
+## Thứ tự V8
+
+```
+VS1 → VS2 → [CHECKPOINT VS-A] → VS3 → VS4 → [CHECKPOINT VS-B]
+```
+
+Dependency: VS1 là foundation (registry). VS2 dùng registry. VS3 dùng VS2 endpoints. VS4 dùng VS3 service.

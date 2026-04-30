@@ -29,6 +29,7 @@ type Server struct {
 	audioGenerator   processing.ExerciseAudioGenerator
 	fullExamScorer   *processing.FullExamScorer
 	contentGenerator processing.ContentGenerator
+	voiceRegistry    *processing.VoiceRegistry
 	mux              *http.ServeMux
 }
 
@@ -71,6 +72,7 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 		}
 		audioGen = pollyGen
 	}
+	voiceRegistry := processing.NewVoiceRegistry(processor.TTSProvider())
 	s := &Server{
 		repo:             repo,
 		processor:        processor,
@@ -80,6 +82,7 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 		audioGenerator:   audioGen,
 		fullExamScorer:   processing.NewFullExamScorer(repo),
 		contentGenerator: contentGen,
+		voiceRegistry:    voiceRegistry,
 		mux:              http.NewServeMux(),
 	}
 	// Recover any jobs stuck in "running" from a previous server crash.
@@ -90,6 +93,8 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("/healthz", s.handleHealth)
+	s.mux.HandleFunc("/v1/voices", s.handleVoices)
+	s.mux.HandleFunc("/v1/voices/", s.handleVoicePreview)
 	s.mux.HandleFunc("/v1/auth/login", s.handleLogin)
 	s.mux.HandleFunc("/v1/me", s.withAuth(s.handleMe))
 	s.mux.HandleFunc("/v1/course", s.withAuth(s.handleCourse))
@@ -137,6 +142,29 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		},
 		"meta": map[string]any{},
 	})
+}
+
+// handleVoices serves GET /v1/voices — returns configured TTS voice list.
+// No auth required; learners and admins both call this from Profile screen.
+func (s *Server) handleVoices(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": s.voiceRegistry.Voices(),
+		"meta": map[string]any{},
+	})
+}
+
+// handleVoicePreview serves GET /v1/voices/:id/preview — VS2 placeholder.
+// Returns 501 until the preview cache and TTS call are wired in VS2.
+func (s *Server) handleVoicePreview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	writeError(w, http.StatusNotImplemented, "not_implemented", "Voice preview not yet available.", false)
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {

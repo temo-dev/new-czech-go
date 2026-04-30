@@ -122,6 +122,19 @@ Flutter route mỗi section đến đúng screen theo `exercise_type` prefix.
 
 ---
 
+## V8 — Voice Selection (Chọn giọng đọc)
+
+Spec: `docs/ideas/voice-selection.md`. Plan chi tiết: `tasks/plan.md` → section V8.
+
+- [ ] **VS1** Backend: `VoiceRegistry` (voice_registry.go) + wire vào `Processor` + `GET /v1/voices` endpoint; env vars `ELEVENLABS_VOICE_ID_C/D`, `VOICE_C/D_NAME`
+- [ ] **VS2** Backend: `WritingSubmission.PreferredVoiceID`; `ProcessAttempt(attemptID, locale, preferredVoiceID)`; `ProcessWritingAttempt` dùng registry; `handleUploadComplete` parse voice từ body; `GET /v1/voices/:id/preview` với local cache
+- **[CHECKPOINT VS-A]** `make backend-build && make backend-test`
+- [ ] **VS3** Flutter: `VoiceOption` model + `VoicePreferenceService` (SharedPreferences); `api_client.getVoices()` + `getVoicePreviewUrl()` + `submitText(preferredVoiceId)` + speaking upload-complete voice param
+- [ ] **VS4** Flutter: `_VoicePickerSection` StatefulWidget trong ProfileScreen — 4 voice cards, selected state, "Nghe thử" → just_audio preview; i18n keys VI/EN
+- **[CHECKPOINT VS-B]** `make verify` + manual: Profile → chọn Tomáš → bài viết → review TTS bằng giọng Tomáš
+
+---
+
 ## Backlog (sau V5)
 
 - [x] Polly 2 voices cho `poslech_4` dialogs — DialogExerciseAudioGenerator interface + alternating voice per item + MP3 concat + POLLY_VOICE_ID_2 env (2026-04-29)
