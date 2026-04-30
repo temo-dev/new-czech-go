@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../voice/voice_option.dart';
+
 const _kDefaultBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
   defaultValue: 'http://localhost:8080',
@@ -98,6 +100,7 @@ class ApiClient {
     int durationMs = 25000,
     int? sampleRateHz,
     int? channels,
+    String? preferredVoiceId,
   }) async {
     final uploadPayload = await _authed(
       'POST',
@@ -133,6 +136,9 @@ class ApiClient {
     }
     if (channels != null && channels > 0) {
       uploadCompleteBody['channels'] = channels;
+    }
+    if (preferredVoiceId != null && preferredVoiceId.isNotEmpty) {
+      uploadCompleteBody['preferred_voice_id'] = preferredVoiceId;
     }
 
     await _authed(
@@ -175,15 +181,41 @@ class ApiClient {
 
   /// Submit written text for psani_1_formular or psani_2_email.
   /// [answers] = 3 strings for psani_1, [text] = full email for psani_2.
+  /// [preferredVoiceId] is optional; empty/null → backend uses default voice.
   Future<void> submitText(
     String attemptId, {
     List<String>? answers,
     String? text,
+    String? preferredVoiceId,
   }) async {
     final body = <String, dynamic>{};
     if (answers != null) body['answers'] = answers;
     if (text != null) body['text'] = text;
+    if (preferredVoiceId != null && preferredVoiceId.isNotEmpty) {
+      body['preferred_voice_id'] = preferredVoiceId;
+    }
     await _authed('POST', '/v1/attempts/$attemptId/submit-text', body: body);
+  }
+
+  /// Returns configured TTS voice list from GET /v1/voices.
+  Future<List<VoiceOption>> getVoices() async {
+    final payload = await _authed('GET', '/v1/voices');
+    final data = payload['data'] as List<dynamic>? ?? const [];
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(VoiceOption.fromJson)
+        .toList();
+  }
+
+  /// Returns the audio preview URL for the given voice slug.
+  /// Returns null on error (e.g. voice not found or TTS unavailable).
+  Future<String?> getVoicePreviewUrl(String voiceId) async {
+    try {
+      final payload = await _authed('GET', '/v1/voices/$voiceId/preview');
+      return (payload['data'] as Map<String, dynamic>?)?['url'] as String?;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<List<dynamic>> getAttempts() async {
