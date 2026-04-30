@@ -52,6 +52,10 @@ ALTER TABLE mock_tests
 ALTER TABLE mock_tests
     ADD COLUMN IF NOT EXISTS exam_mode VARCHAR(20) NOT NULL DEFAULT '';
 
+-- V9: session_type was never persisted to this table (Go struct-only field).
+-- All existing rows get exam_mode = '' which the application treats as 'practice'.
+-- No data migration needed.
+
 CREATE TABLE IF NOT EXISTS mock_test_sections (
     mock_test_id  TEXT    NOT NULL REFERENCES mock_tests(id) ON DELETE CASCADE,
     sequence_no   INTEGER NOT NULL,

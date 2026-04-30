@@ -457,7 +457,7 @@ type MockTest struct {
 	Description              string            `json:"description"`
 	EstimatedDurationMinutes int               `json:"estimated_duration_minutes"`
 	Status                   string            `json:"status"`                 // draft, published
-	ExamMode                 string            `json:"exam_mode,omitempty"`    // "real" | "practice" | "" (default practice)
+	ExamMode                 string            `json:"exam_mode"`              // "real" | "practice" | "" (default practice)
 	PassThresholdPercent     int               `json:"pass_threshold_percent"` // 0 = use default 60
 	Sections                 []MockTestSection `json:"sections"`
 }

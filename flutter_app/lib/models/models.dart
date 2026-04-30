@@ -186,8 +186,6 @@ class MockTest {
         (s) => s.skillKind == 'noi' || s.exerciseType.startsWith('uloha_'),
       );
   int get totalScoreMax => totalMaxPoints + (hasPronunciationBonus ? 3 : 0);
-  bool get isPisemna => examMode == 'pisemna';
-  bool get isFull => examMode == 'full';
 
   factory MockTest.fromJson(Map<String, dynamic> json) {
     final raw = json['sections'] as List<dynamic>? ?? const [];
