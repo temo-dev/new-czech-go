@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS exercises (
 ALTER TABLE exercises ADD COLUMN IF NOT EXISTS pool       TEXT NOT NULL DEFAULT 'course';
 ALTER TABLE exercises ADD COLUMN IF NOT EXISTS module_id  TEXT NOT NULL DEFAULT '';
 ALTER TABLE exercises ADD COLUMN IF NOT EXISTS skill_kind TEXT NOT NULL DEFAULT '';
+ALTER TABLE exercises DROP COLUMN IF EXISTS skill_id;
 `)
 	return err
 }
@@ -382,7 +383,7 @@ func (s *postgresExerciseStore) SkillSummariesByModule(moduleID string) []contra
 	}
 	defer rows.Close()
 
-	var summaries []contracts.SkillSummary
+	summaries := make([]contracts.SkillSummary, 0)
 	for rows.Next() {
 		var s contracts.SkillSummary
 		if err := rows.Scan(&s.SkillKind, &s.ExerciseCount); err == nil {
