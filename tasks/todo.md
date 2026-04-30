@@ -159,3 +159,17 @@ Chi tiết + AC đầy đủ trong `tasks/plan.md` (section V9).
 - [x] **EX-4** Flutter: xóa `full_exam_intro_screen.dart` + `full_exam_result_screen.dart`; xóa `FullExamSession` model; xóa API calls; xóa routes; `MockTest.sessionType` → `examMode` (2026-04-30)
 
 **[CHECKPOINT EX]** ✅ Passed 2026-04-30 — backend 218 tests, flutter 34 tests, cms build clean, 0 FullExam references
+
+---
+
+## V10 — Exam Result Flow Redesign
+
+Spec: `docs/specs/exam-result-flow-implementation.md`
+Chi tiết + AC đầy đủ trong `tasks/plan.md` (section V10).
+
+- [x] **ER-1** Flutter: `ObjectiveResultCard` — upgrade `_QuestionRow` → card container per câu (green/red bg + 2-line layout cho câu sai); thêm optional params `showPassage`/`exerciseId`/`client`; thêm `_PassageSection` StatefulWidget (async fetch + `ExpansionTile`); 2 i18n keys VI+EN `viewPassage`/`hidePassage` (2026-04-30)
+- [x] **ER-2** Flutter: `section_result_card.dart` mới — `SectionResultCard` wrapper với `_SectionHeader` (skill icon + label + score + progress bar) + dispatch body (nghe/doc → `ObjectiveResultCard`, noi/viet → `ResultCard`); skillKind fallback by exerciseType prefix (2026-04-30)
+- [x] **ER-3** Flutter: plumbing — `MockExamSectionDetailScreen` thêm `skillKind`/`maxPoints` params, dùng `SectionResultCard`; `mock_exam_screen.dart` truyền `skillKind`/`maxPoints` khi navigate (2026-04-30)
+- [x] **ER-4** Flutter: `_buildAnalyzingView` upgrade — LinearProgressIndicator + step list per speaking section (✓ xong / ⏳ đang xử lý / ○ chờ) (2026-04-30)
+
+**[CHECKPOINT ER]** ✅ Passed 2026-04-30 — flutter analyze clean, 37/37 tests pass

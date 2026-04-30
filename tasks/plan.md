@@ -927,3 +927,232 @@ EX-1 (xóa FullExam stack)
 EX-1 trước: xóa references trước khi rename field để tránh compile error cascade.
 EX-2 sau EX-1: rename field an toàn khi FullExam types đã xóa.
 EX-3 và EX-4 song song sau EX-2.
+
+---
+
+## V10 — Exam Result Flow Redesign
+
+Spec: `docs/specs/exam-result-flow-implementation.md`
+UI design: `docs/specs/exam-result-flow-redesign.md`
+Idea: `docs/ideas/exam-result-flow-redesign.md`
+
+### Problem
+
+`MockExamSectionDetailScreen` luôn render `ResultCard` (speaking widget) cho mọi skill.
+Nghe/đọc → màn rỗng/sai. Fix: truyền `skillKind` + `maxPoints`, dispatch đúng widget.
+
+### Key findings từ codebase
+
+- `_QuestionRow` đã có `learnerAnswer`/`correctAnswer` — chỉ cần visual card upgrade
+- `viet` dùng `ResultCard` là đúng — `transcript` = text nộp, tab "Bài mẫu" có diff
+- `ObjectiveResultCard` cần: card bg per câu + passage collapsible (doc only)
+- `MockExamSection.skillKind` đã có — chỉ cần truyền qua detail screen
+
+### Slices
+
+#### ER-1 — ObjectiveResultCard: visual upgrade + passage
+
+**Files:** `flutter_app/lib/features/exercise/widgets/objective_result_card.dart`, `flutter_app/lib/l10n/intl_vi.arb`, `flutter_app/lib/l10n/intl_en.arb`
+
+**Changes:**
+
+1. Upgrade `_QuestionRow` → card container per câu:
+   - Đúng: green bg `AppColors.success.withValues(alpha:0.08)`, border green 0.2, icon ✓, correctAnswer riêng dòng
+   - Sai: red bg `AppColors.error.withValues(alpha:0.08)`, border red 0.2, icon ✗, learnerAnswer (đỏ) + correctAnswer (xanh) riêng 2 dòng
+
+2. Thêm params backward-compatible (all optional, default=false/''):
+   - `showPassage` — chỉ `doc` truyền `true`
+   - `exerciseId` — để fetch passage
+   - `client` — `ApiClient?` để fetch `getExercise()`
+
+3. Thêm `_PassageSection` StatefulWidget:
+   - `initState`: nếu `showPassage && exerciseId.isNotEmpty && client != null` → fetch `getExercise(exerciseId)`
+   - Loading: `LinearProgressIndicator` compact
+   - Loaded: `ExpansionTile` (`l.viewPassage` / `l.hidePassage`) + `SelectableText(passage)`
+   - Error: ẩn hoàn toàn, không block result
+
+4. 2 i18n keys VI+EN: `viewPassage` ("Xem bài đọc"), `hidePassage` ("Ẩn bài đọc")
+
+**AC:**
+- `flutter-analyze` clean
+- Câu đúng: green card, icon ✓, 1 dòng đáp án
+- Câu sai: red card, icon ✗, 2 dòng (learner đỏ + đúng xanh)
+- `showPassage=true` + valid exerciseId + client → passage fetch + collapsible
+- `showPassage=false` (default) → passage section không render
+- Existing callers (`ListeningExerciseScreen`, `ReadingExerciseScreen`) — không bị break
+
+#### ER-2 — SectionResultCard: wrapper mới (phụ thuộc ER-1)
+
+**File mới:** `flutter_app/lib/features/mock_exam/widgets/section_result_card.dart`
+
+**Structure:**
+```dart
+class SectionResultCard extends StatelessWidget {
+  // client, result, skillKind, maxPoints, onRetry
+  // _resolvedKind: skillKind → fallback by exerciseType prefix
+  // _body(): switch _resolvedKind → ObjectiveResultCard | ResultCard
+}
+
+class _SectionHeader extends StatelessWidget {
+  // skill icon + label + score "X/Y" + LinearProgressIndicator h=6dp
+  // color: ≥75% success, ≥50% info, <50% error
+}
+```
+
+**Skill icons:**
+- `noi` → `Icons.mic_outlined`
+- `nghe` → `Icons.headphones_outlined`
+- `doc` → `Icons.menu_book_outlined`
+- `viet` → `Icons.edit_outlined`
+
+**Dispatch:**
+```
+'nghe'|'doc' → ObjectiveResultCard(showPassage: kind=='doc', exerciseId, client)
+_            → ResultCard(noi + viet)
+```
+
+**AC:**
+- `noi` + `viet` → `ResultCard`
+- `nghe` → `ObjectiveResultCard(showPassage: false)`
+- `doc` → `ObjectiveResultCard(showPassage: true, exerciseId: result.exerciseId, client)`
+- Empty `skillKind` + `exerciseType='poslech_1'` → fallback nghe → `ObjectiveResultCard`
+- Header hiện score badge và progress bar đúng màu
+
+#### ER-3 — Plumbing: truyền skillKind qua screens (phụ thuộc ER-2)
+
+**Files:**
+- `flutter_app/lib/features/mock_exam/screens/mock_exam_section_detail_screen.dart`
+- `flutter_app/lib/features/mock_exam/screens/mock_exam_screen.dart`
+
+**`mock_exam_section_detail_screen.dart`:**
+- Thêm `required this.skillKind` + `required this.maxPoints` vào constructor
+- Thay `ResultCard(...)` → `SectionResultCard(result, skillKind: widget.skillKind, maxPoints: widget.maxPoints, client: widget.client, onRetry: ...)`
+
+**`mock_exam_screen.dart` — `_MockExamResultView` (~dòng 706):**
+- Thêm `skillKind: _sectionSkillKind(section)` + `maxPoints: section.maxPoints` vào `MockExamSectionDetailScreen(...)` call
+
+**AC:**
+- Tap nói → `ResultCard` với tabs Phản hồi/Bản ghi/Bài mẫu
+- Tap nghe → `ObjectiveResultCard` extended (card per câu)
+- Tap đọc → `ObjectiveResultCard` extended + passage collapsible
+- Tap viết → `ResultCard` với tabs (transcript = text nộp)
+- `flutter-analyze` clean, không có unused import
+
+#### ER-4 — Loading view upgrade (độc lập)
+
+**File:** `flutter_app/lib/features/mock_exam/screens/mock_exam_screen.dart`
+
+**`_buildAnalyzingView` upgrade:** thay `CircularProgressIndicator` đơn lẻ bằng:
+```
+- Text "Đang phân tích bài nói..."      ← bodyMedium
+- LinearProgressIndicator (_analyzeProgress / total)
+- SizedBox(h=AppSpacing.x4)
+- Column per _pendingAnalyses[i]:
+    i < _analyzeProgress    → Icon.check_circle (success) + "Section N · xong"
+    i == _analyzeProgress-1 → SizedBox(16) CircularProgressIndicator small + "Section N · đang xử lý..."
+    i >= _analyzeProgress   → Icon.radio_button_unchecked (muted) + "Section N"
+```
+
+**AC:**
+- 0/2 pending: progress 0%, 2 icons muted
+- 1/2 done: Section 1 ✓, Section 2 spinning
+- 2/2 done: tự navigate (logic `_finalize` hiện tại giữ nguyên)
+- Nếu `_pendingAnalyses` empty → màn này không xuất hiện (guard hiện tại giữ nguyên)
+
+### Dependency graph
+
+```
+ER-1 (ObjectiveResultCard upgrade)
+  └── ER-2 (SectionResultCard mới, dùng ObjectiveResultCard với params mới)
+        └── ER-3 (Plumbing: MockExamSectionDetailScreen + MockExamScreen)
+                    ↓
+              [CHECKPOINT ER]
+
+ER-4 (Loading view) — độc lập, làm sau ER-3
+```
+
+ER-1 trước: `SectionResultCard` cần `ObjectiveResultCard` đã có params mới.
+ER-3 cuối: cần cả ER-1 + ER-2 compile trước.
+
+
+---
+
+## V10 — Exam Result Flow Redesign
+
+Spec: `docs/specs/exam-result-flow-implementation.md`
+UI design: `docs/specs/exam-result-flow-redesign.md`
+Idea: `docs/ideas/exam-result-flow-redesign.md`
+
+### Problem
+
+`MockExamSectionDetailScreen` luôn render `ResultCard` (speaking widget) cho mọi skill. Nghe/đọc → màn rỗng/sai. Fix: truyền `skillKind` + `maxPoints` qua và dispatch đúng widget.
+
+### Key findings từ codebase
+
+- `_QuestionRow` đã hiện `learnerAnswer` → correctAnswer (sai) inline — chỉ cần visual upgrade card
+- `viet` dùng `ResultCard` là đúng — `transcript` = text nộp, "Bài mẫu" tab có diff
+- `ObjectiveResultCard` cần: card bg per câu + passage collapsible (doc only)
+- `MockExamSection.skillKind` đã có — chỉ cần truyền qua detail screen
+
+### Slices
+
+#### ER-1 — ObjectiveResultCard: visual upgrade + passage (standalone)
+
+**Files:** `flutter_app/lib/features/exercise/widgets/objective_result_card.dart`, `flutter_app/lib/l10n/intl_vi.arb`, `flutter_app/lib/l10n/intl_en.arb`
+
+**Changes:**
+1. Upgrade `_QuestionRow` → card container per câu:
+   - Đúng: green bg `AppColors.success.withValues(alpha:0.08)`, border green 0.2, icon ✓ + correctAnswer trên dòng riêng
+   - Sai: red bg `AppColors.error.withValues(alpha:0.08)`, border red 0.2, icon ✗ + learnerAnswer (đỏ) + correctAnswer (xanh) trên 2 dòng riêng
+2. Thêm params backward-compatible:
+   ```dart
+   class ObjectiveResultCard extends StatelessWidget {
+     const ObjectiveResultCard({
+       super.key,
+       required this.result,
+       required this.onRetry,
+       this.showPassage = false,
+       this.exerciseId = '',
+       this.client,
+     });
+     final bool showPassage;
+     final String exerciseId;
+     final ApiClient? client;
+   }
+   ```
+3. Thêm `_PassageSection` StatefulWidget (doc only):
+   - `initState`: nếu `showPassage && exerciseId.isNotEmpty && client != null` → fetch `getExercise(exerciseId)`
+   - Loading: `LinearProgressIndicator` + "Đang tải bài đọc..." text
+   - Loaded: `ExpansionTile` title `l.viewPassage` / `l.hidePassage` + `SelectableText(passage)`
+   - Error: ẩn hoàn toàn (không block result)
+4. Thêm 2 i18n keys VI+EN: `viewPassage` / `hidePassage`
+
+**AC:**
+- `flutter-analyze` clean
+- Câu đúng: green card, 1 dòng (câu số + đáp án)
+- Câu sai: red card, 2 dòng (learner đỏ + đúng xanh)
+- `showPassage=true` + valid exerciseId → fetch + collapsible passage
+- `showPassage=false` → passage section ẩn hoàn toàn
+- Existing callers `ListeningExerciseScreen`, `ReadingExerciseScreen` → không bị break
+
+#### ER-2 — SectionResultCard: wrapper mới (phụ thuộc ER-1)
+
+**File mới:** `flutter_app/lib/features/mock_exam/widgets/section_result_card.dart`
+
+**Widget:**
+```dart
+class SectionResultCard extends StatelessWidget {
+  // header + dispatch body
+  // nghe/doc → ObjectiveResultCard(showPassage: skillKind=='doc')
+  // _ → ResultCard (noi + viet)
+}
+
+class _SectionHeader extends StatelessWidget {
+  // skill icon (Icons.mic/headphones/menu_book/edit outlined)
+  // skill label (dùng _skillLabel helper)
+  // score "sectionScore/maxPoints"
+  // LinearProgressIndicator height 6dp, màu theo pct
+}
+```
+
+**Score color:** ≥75

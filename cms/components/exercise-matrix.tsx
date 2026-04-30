@@ -53,7 +53,7 @@ export function buildMatrix(
 
   // Build rows for all modules (even if count = 0)
   const rows: MatrixRow[] = modules
-    .filter((m) => m.course_id) // skip orphan modules
+    .filter((m) => m.course_id && courseMap.has(m.course_id)) // skip orphan + deleted-course modules
     .map((m) => {
       const bySkill = counts.get(m.id) ?? new Map<string, MatrixCell>();
       const cells: Record<string, MatrixCell> = {};
