@@ -311,6 +311,7 @@ type ObjectiveResult struct {
 
 type QuestionResult struct {
 	QuestionNo    int    `json:"question_no"`
+	QuestionText  string `json:"question_text,omitempty"`
 	LearnerAnswer string `json:"learner_answer"`
 	CorrectAnswer string `json:"correct_answer"`
 	IsCorrect     bool   `json:"is_correct"`

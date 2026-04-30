@@ -178,7 +178,17 @@ class _QuestionCard extends StatelessWidget {
                       color: AppColors.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  if (q.questionText.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      q.questionText,
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 4),
                   if (q.isCorrect)
                     Text(
                       q.correctAnswer.isNotEmpty

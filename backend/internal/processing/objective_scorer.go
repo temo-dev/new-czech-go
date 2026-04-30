@@ -11,7 +11,8 @@ import (
 // ScoreObjectiveAnswers compares learner answers to correct answers.
 // Fill-in answers use case-insensitive substring match.
 // Multiple-choice answers (≤4 chars) use case-insensitive exact match.
-func ScoreObjectiveAnswers(learner, correct map[string]string) contracts.ObjectiveResult {
+// questions is an optional map[question_no_str -> question_text]; pass nil to omit.
+func ScoreObjectiveAnswers(learner, correct, questions map[string]string) contracts.ObjectiveResult {
 	breakdown := make([]contracts.QuestionResult, 0, len(correct))
 	score := 0
 	for qno, correctAns := range correct {
@@ -24,6 +25,7 @@ func ScoreObjectiveAnswers(learner, correct map[string]string) contracts.Objecti
 		fmt.Sscanf(qno, "%d", &n)
 		breakdown = append(breakdown, contracts.QuestionResult{
 			QuestionNo:    n,
+			QuestionText:  questions[qno],
 			LearnerAnswer: learnerAns,
 			CorrectAnswer: correctAns,
 			IsCorrect:     isCorrect,
@@ -109,8 +111,9 @@ func (p *Processor) ProcessObjectiveAttempt(attemptID string, sub contracts.Answ
 	if err != nil {
 		return nil, fmt.Errorf("exercise %s: %w", exercise.ID, err)
 	}
+	questions := extractQuestionTexts(exercise)
 
-	result := ScoreObjectiveAnswers(sub.Answers, correct)
+	result := ScoreObjectiveAnswers(sub.Answers, correct, questions)
 	feedback := BuildObjectiveFeedback(result)
 
 	transcript := contracts.Transcript{
@@ -155,4 +158,49 @@ func formatAnswersAsText(answers map[string]string) string {
 
 func unmarshalJSON(b []byte, v any) error {
 	return json.Unmarshal(b, v)
+}
+
+// extractQuestionTexts returns a map[question_no_str -> question_text] from the
+// exercise detail. Works for all exercise types that store questions in either
+// an "items" array (ListeningItem.question) or a "questions" array
+// (ReadingQuestion.prompt / FillQuestion.prompt).
+func extractQuestionTexts(exercise contracts.Exercise) map[string]string {
+	b, err := json.Marshal(exercise.Detail)
+	if err != nil {
+		return nil
+	}
+
+	texts := make(map[string]string)
+
+	// Try "items" (poslech_1/2/3 — ListeningItem.question)
+	var withItems struct {
+		Items []struct {
+			QuestionNo int    `json:"question_no"`
+			Question   string `json:"question"`
+		} `json:"items"`
+	}
+	if json.Unmarshal(b, &withItems) == nil {
+		for _, item := range withItems.Items {
+			if item.Question != "" {
+				texts[fmt.Sprintf("%d", item.QuestionNo)] = item.Question
+			}
+		}
+	}
+
+	// Try "questions" with "prompt" (cteni_2/4/5, poslech_5 — ReadingQuestion/FillQuestion)
+	var withQuestions struct {
+		Questions []struct {
+			QuestionNo int    `json:"question_no"`
+			Prompt     string `json:"prompt"`
+		} `json:"questions"`
+	}
+	if json.Unmarshal(b, &withQuestions) == nil {
+		for _, q := range withQuestions.Questions {
+			if q.Prompt != "" {
+				texts[fmt.Sprintf("%d", q.QuestionNo)] = q.Prompt
+			}
+		}
+	}
+
+	return texts
 }

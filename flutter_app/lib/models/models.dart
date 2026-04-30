@@ -1067,11 +1067,13 @@ class CriterionCheckView {
 class QuestionResult {
   const QuestionResult({
     required this.questionNo,
+    this.questionText = '',
     required this.learnerAnswer,
     required this.correctAnswer,
     required this.isCorrect,
   });
   final int questionNo;
+  final String questionText;
   final String learnerAnswer;
   final String correctAnswer;
   final bool isCorrect;
@@ -1079,6 +1081,7 @@ class QuestionResult {
   factory QuestionResult.fromJson(Map<String, dynamic> json) {
     return QuestionResult(
       questionNo: (json['question_no'] as num?)?.toInt() ?? 0,
+      questionText: json['question_text'] as String? ?? '',
       learnerAnswer: json['learner_answer'] as String? ?? '',
       correctAnswer: json['correct_answer'] as String? ?? '',
       isCorrect: json['is_correct'] as bool? ?? false,

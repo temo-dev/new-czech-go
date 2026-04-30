@@ -55,7 +55,7 @@ func TestExtractCorrectAnswers_Cteni5_FillIn(t *testing.T) {
 		"21": "salát",         // substring → correct
 		"22": "cibuli",        // substring → correct
 	}
-	result := ScoreObjectiveAnswers(learner, correct)
+	result := ScoreObjectiveAnswers(learner, correct, nil)
 	if result.Score != 2 {
 		t.Errorf("Score = %d, want 2 (both substring matches)", result.Score)
 	}
@@ -103,7 +103,7 @@ func TestExtractCorrectAnswers_Cteni4_MultiQuestion(t *testing.T) {
 	if len(correct) != 6 {
 		t.Errorf("expected 6 correct answers, got %d", len(correct))
 	}
-	result := ScoreObjectiveAnswers(correct, correct) // all correct
+	result := ScoreObjectiveAnswers(correct, correct, nil) // all correct
 	if result.Score != 6 {
 		t.Errorf("Score = %d, want 6", result.Score)
 	}

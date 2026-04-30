@@ -16,10 +16,10 @@ Widget _wrap(Widget child) => MaterialApp(
     );
 
 AttemptResult _speakingResult({String exerciseType = 'uloha_1_topic_answers'}) =>
-    const AttemptResult(
+    AttemptResult(
       id: 'a1',
       exerciseId: 'ex-1',
-      exerciseType: 'uloha_1_topic_answers',
+      exerciseType: exerciseType,
       status: 'completed',
       startedAt: '',
       readinessLevel: 'good',
