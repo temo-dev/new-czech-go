@@ -260,6 +260,13 @@
     "@profileVersion": {
         "placeholders": { "version": { "type": "String" } }
     },
+    "profileVoiceSection": "Model answer voice",
+    "profileVoicePreview": "Preview",
+    "profileVoiceFemale": "Female",
+    "profileVoiceMale": "Male",
+    "profileVoiceProviderPolly": "AWS Polly",
+    "profileVoiceProviderElevenLabs": "ElevenLabs",
+    "profileVoicePreviewError": "Could not preview this voice",
 
     "submitAnswersCta": "Submit answers",
     "submitWritingCta": "Submit",

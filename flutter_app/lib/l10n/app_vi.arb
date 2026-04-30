@@ -305,6 +305,13 @@
     "@profileVersion": {
         "placeholders": { "version": { "type": "String" } }
     },
+    "profileVoiceSection": "Giọng đọc mẫu",
+    "profileVoicePreview": "Nghe thử",
+    "profileVoiceFemale": "Nữ",
+    "profileVoiceMale": "Nam",
+    "profileVoiceProviderPolly": "AWS Polly",
+    "profileVoiceProviderElevenLabs": "ElevenLabs",
+    "profileVoicePreviewError": "Không thể phát thử giọng này",
 
     "submitAnswersCta": "Nộp đáp án",
     "submitWritingCta": "Nộp bài",

@@ -667,6 +667,27 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String get profileVoiceSection => 'Giọng đọc mẫu';
+
+  @override
+  String get profileVoicePreview => 'Nghe thử';
+
+  @override
+  String get profileVoiceFemale => 'Nữ';
+
+  @override
+  String get profileVoiceMale => 'Nam';
+
+  @override
+  String get profileVoiceProviderPolly => 'AWS Polly';
+
+  @override
+  String get profileVoiceProviderElevenLabs => 'ElevenLabs';
+
+  @override
+  String get profileVoicePreviewError => 'Không thể phát thử giọng này';
+
+  @override
   String get submitAnswersCta => 'Nộp đáp án';
 
   @override

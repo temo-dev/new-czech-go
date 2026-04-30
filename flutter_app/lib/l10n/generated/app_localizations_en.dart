@@ -667,6 +667,27 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get profileVoiceSection => 'Model answer voice';
+
+  @override
+  String get profileVoicePreview => 'Preview';
+
+  @override
+  String get profileVoiceFemale => 'Female';
+
+  @override
+  String get profileVoiceMale => 'Male';
+
+  @override
+  String get profileVoiceProviderPolly => 'AWS Polly';
+
+  @override
+  String get profileVoiceProviderElevenLabs => 'ElevenLabs';
+
+  @override
+  String get profileVoicePreviewError => 'Could not preview this voice';
+
+  @override
   String get submitAnswersCta => 'Submit answers';
 
   @override

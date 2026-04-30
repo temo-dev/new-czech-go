@@ -1283,6 +1283,48 @@ abstract class AppLocalizations {
   /// **'Phiên bản {version}'**
   String profileVersion(String version);
 
+  /// No description provided for @profileVoiceSection.
+  ///
+  /// In vi, this message translates to:
+  /// **'Giọng đọc mẫu'**
+  String get profileVoiceSection;
+
+  /// No description provided for @profileVoicePreview.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nghe thử'**
+  String get profileVoicePreview;
+
+  /// No description provided for @profileVoiceFemale.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nữ'**
+  String get profileVoiceFemale;
+
+  /// No description provided for @profileVoiceMale.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nam'**
+  String get profileVoiceMale;
+
+  /// No description provided for @profileVoiceProviderPolly.
+  ///
+  /// In vi, this message translates to:
+  /// **'AWS Polly'**
+  String get profileVoiceProviderPolly;
+
+  /// No description provided for @profileVoiceProviderElevenLabs.
+  ///
+  /// In vi, this message translates to:
+  /// **'ElevenLabs'**
+  String get profileVoiceProviderElevenLabs;
+
+  /// No description provided for @profileVoicePreviewError.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể phát thử giọng này'**
+  String get profileVoicePreviewError;
+
   /// No description provided for @submitAnswersCta.
   ///
   /// In vi, this message translates to:

@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/api/api_client.dart';
 import 'core/locale/locale_provider.dart';
 import 'core/locale/locale_scope.dart';
+import 'core/voice/voice_preference_service.dart';
 import 'core/theme/app_theme.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'features/exercise/screens/exercise_screen.dart' as exercise_feature;
@@ -64,6 +65,7 @@ class LearnerShell extends StatefulWidget {
 
 class _LearnerShellState extends State<LearnerShell> {
   final ApiClient _client = ApiClient();
+  VoicePreferenceService? _voiceService;
   bool _loading = true;
   String? _error;
   List<AttemptResult> _recentAttempts = const [];
@@ -81,6 +83,7 @@ class _LearnerShellState extends State<LearnerShell> {
       _error = null;
     });
     try {
+      _voiceService ??= await VoicePreferenceService.create();
       await _client.login(
         email: 'learner@example.com',
         password: 'demo123',
@@ -176,7 +179,10 @@ class _LearnerShellState extends State<LearnerShell> {
     } else if (_tabIndex == 2) {
       body = MockTestListScreen(client: _client);
     } else if (_tabIndex == 3) {
-      body = const ProfileScreen();
+      body = ProfileScreen(
+        client: _client,
+        voiceService: _voiceService!,
+      );
     } else {
       body = CourseListScreen(client: _client);
     }
