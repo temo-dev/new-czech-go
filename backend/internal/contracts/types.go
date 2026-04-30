@@ -575,7 +575,8 @@ type QuizcardBasicDetail struct {
 	ExampleSentence    string            `json:"example_sentence,omitempty"`
 	ExampleTranslation string            `json:"example_translation,omitempty"`
 	Explanation        string            `json:"explanation,omitempty"`
-	CorrectAnswers     map[string]string `json:"correct_answers"` // always {"1":"known"}
+	ImageAssetID       string            `json:"image_asset_id,omitempty"` // storage key for flashcard image
+	CorrectAnswers     map[string]string `json:"correct_answers"`          // always {"1":"known"}
 }
 
 // MatchingPair is one left→right pair in a matching exercise.

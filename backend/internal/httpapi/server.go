@@ -130,6 +130,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/admin/vocabulary-items/", s.withRole("admin", s.handleAdminVocabItemImage))
 	s.mux.HandleFunc("/v1/vocabulary-items/", s.withRole("learner", s.handleVocabItemImageFile))
 	s.mux.HandleFunc("/v1/grammar-rules/", s.withRole("learner", s.handleGrammarRuleImageFile))
+	s.mux.HandleFunc("/v1/media/file", s.withRole("learner", s.handleMediaFile))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

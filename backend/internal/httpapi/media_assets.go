@@ -183,6 +183,26 @@ func (s *Server) uploadItemImage(w http.ResponseWriter, r *http.Request, entityI
 	})
 }
 
+// handleMediaFile serves any local asset by storage key (query param ?key=).
+// Requires learner auth. Used by Flutter to load vocabulary/grammar images from exercise details.
+func (s *Server) handleMediaFile(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	key := strings.TrimSpace(r.URL.Query().Get("key"))
+	if key == "" {
+		writeNotFound(w)
+		return
+	}
+	// Prevent path traversal
+	if strings.Contains(key, "..") {
+		writeError(w, http.StatusBadRequest, "validation_error", "invalid key.", false)
+		return
+	}
+	serveLocalAssetFile(w, r, key)
+}
+
 // serveLocalAssetFile streams a local asset file identified by its storage key.
 func serveLocalAssetFile(w http.ResponseWriter, r *http.Request, storageKey string) {
 	filePath := localExerciseAssetPath(storageKey)

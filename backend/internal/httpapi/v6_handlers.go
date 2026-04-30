@@ -381,6 +381,14 @@ func (s *Server) handlePublishGenJob(w http.ResponseWriter, jobID string) {
 
 	skillKind := skillKindFromSourceType(job.SourceType)
 
+	// Pre-fetch vocab items once to avoid N+1 queries when injecting images.
+	vocabItemsByTerm := map[string]contracts.VocabularyItem{}
+	if job.SourceType == "vocabulary_set" {
+		for _, item := range s.repo.ListVocabularyItems(job.SourceID) {
+			vocabItemsByTerm[item.Term] = item
+		}
+	}
+
 	// Publish all exercises
 	exerciseIDs := make([]string, 0, len(gp.Exercises))
 	for _, ex := range gp.Exercises {
@@ -394,6 +402,17 @@ func (s *Server) handlePublishGenJob(w http.ResponseWriter, jobID string) {
 		exercise.SourceType = job.SourceType
 		exercise.SourceID = job.SourceID
 		exercise.GenerationJobID = job.ID
+
+		// Inject vocabulary item image into quizcard detail when available.
+		if ex.ExerciseType == "quizcard_basic" {
+			if item, ok := vocabItemsByTerm[ex.FrontText]; ok && item.ImageAssetID != "" {
+				if detail, ok := exercise.Detail.(contracts.QuizcardBasicDetail); ok {
+					detail.ImageAssetID = item.ImageAssetID
+					exercise.Detail = detail
+				}
+			}
+		}
+
 		created := s.repo.CreateExercise(exercise)
 		exerciseIDs = append(exerciseIDs, created.ID)
 	}
