@@ -218,27 +218,24 @@ func (s *postgresMockExamStore) AdvanceMockExam(id, attemptID string) (contracts
 		return contracts.MockExamSession{}, fmt.Errorf("mock exam already completed")
 	}
 
+	// Find the pending section whose exercise_id matches the attempt's exercise_id.
+	// Using first-pending order would break mixed-skill exams where speaking sections
+	// are queued for bulk analysis while objective sections complete out of order.
 	var sequenceNo int
-	var sectionExerciseID string
-	err := s.db.QueryRowContext(ctx,
-		`SELECT sequence_no, exercise_id FROM mock_exam_sections WHERE session_id = $1 AND status = 'pending' ORDER BY sequence_no LIMIT 1`,
-		id,
-	).Scan(&sequenceNo, &sectionExerciseID)
+	err := s.db.QueryRowContext(ctx, `
+		SELECT mes.sequence_no
+		FROM mock_exam_sections mes
+		JOIN attempts a ON a.exercise_id = mes.exercise_id
+		WHERE mes.session_id = $1
+		  AND mes.status    = 'pending'
+		  AND a.id          = $2
+		LIMIT 1
+	`, id, attemptID).Scan(&sequenceNo)
 	if err == sql.ErrNoRows {
-		return contracts.MockExamSession{}, fmt.Errorf("no pending section")
+		return contracts.MockExamSession{}, fmt.Errorf("no pending section matches attempt %s", attemptID)
 	}
 	if err != nil {
 		return contracts.MockExamSession{}, fmt.Errorf("query pending section: %w", err)
-	}
-
-	var attemptExerciseID string
-	if err := s.db.QueryRowContext(ctx, `SELECT exercise_id FROM attempts WHERE id = $1`, attemptID).Scan(&attemptExerciseID); err == sql.ErrNoRows {
-		return contracts.MockExamSession{}, fmt.Errorf("attempt not found")
-	} else if err != nil {
-		return contracts.MockExamSession{}, fmt.Errorf("query attempt: %w", err)
-	}
-	if attemptExerciseID != sectionExerciseID {
-		return contracts.MockExamSession{}, fmt.Errorf("attempt exercise does not match section %d", sequenceNo)
 	}
 
 	if _, err := s.db.ExecContext(ctx,
