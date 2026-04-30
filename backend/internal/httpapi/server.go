@@ -126,6 +126,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/admin/grammar-rules/", s.withRole("admin", s.handleAdminGrammarRuleByID))
 	s.mux.HandleFunc("/v1/admin/content-generation-jobs", s.withRole("admin", s.handleAdminGenJobs))
 	s.mux.HandleFunc("/v1/admin/content-generation-jobs/", s.withRole("admin", s.handleAdminGenJobByID))
+	// V11: Media enrichment — image upload/delete for vocab items and grammar rules
+	s.mux.HandleFunc("/v1/admin/vocabulary-items/", s.withRole("admin", s.handleAdminVocabItemImage))
+	s.mux.HandleFunc("/v1/vocabulary-items/", s.withRole("learner", s.handleVocabItemImageFile))
+	s.mux.HandleFunc("/v1/grammar-rules/", s.withRole("learner", s.handleGrammarRuleImageFile))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

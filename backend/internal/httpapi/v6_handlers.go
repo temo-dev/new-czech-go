@@ -167,8 +167,16 @@ func (s *Server) handleAdminGrammarRules(w http.ResponseWriter, r *http.Request,
 	}
 }
 
-func (s *Server) handleAdminGrammarRuleByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
-	id := strings.TrimPrefix(r.URL.Path, "/v1/admin/grammar-rules/")
+func (s *Server) handleAdminGrammarRuleByID(w http.ResponseWriter, r *http.Request, u contracts.User) {
+	path := strings.TrimPrefix(r.URL.Path, "/v1/admin/grammar-rules/")
+
+	// Sub-resource: /grammar-rules/:id/image
+	if strings.HasSuffix(path, "/image") {
+		s.handleAdminGrammarRuleImage(w, r, u)
+		return
+	}
+
+	id := path
 	switch r.Method {
 	case http.MethodGet:
 		rule, ok := s.repo.GetGrammarRule(id)

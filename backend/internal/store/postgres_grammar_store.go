@@ -61,12 +61,12 @@ func (s *postgresGrammarStore) GetGrammarRule(id string) (contracts.GrammarRule,
 	var gr contracts.GrammarRule
 	var tableJSON []byte
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, module_id, title, level, explanation_vi, rule_table_json, constraints_text, status,
+		`SELECT id, module_id, title, level, explanation_vi, rule_table_json, constraints_text, status, image_asset_id,
 		        to_char(created_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
 		        to_char(updated_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"')
 		 FROM grammar_rules WHERE id = $1`, id,
 	).Scan(&gr.ID, &gr.ModuleID, &gr.Title, &gr.Level, &gr.ExplanationVI,
-		&tableJSON, &gr.ConstraintsText, &gr.Status, &gr.CreatedAt, &gr.UpdatedAt)
+		&tableJSON, &gr.ConstraintsText, &gr.Status, &gr.ImageAssetID, &gr.CreatedAt, &gr.UpdatedAt)
 	if err != nil {
 		return contracts.GrammarRule{}, false
 	}
@@ -79,7 +79,7 @@ func (s *postgresGrammarStore) GetGrammarRule(id string) (contracts.GrammarRule,
 func (s *postgresGrammarStore) ListGrammarRules(moduleID string) []contracts.GrammarRule {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	query := `SELECT id, module_id, title, level, explanation_vi, rule_table_json, constraints_text, status,
+	query := `SELECT id, module_id, title, level, explanation_vi, rule_table_json, constraints_text, status, image_asset_id,
 	                 to_char(created_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
 	                 to_char(updated_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"')
 	          FROM grammar_rules`
@@ -99,7 +99,7 @@ func (s *postgresGrammarStore) ListGrammarRules(moduleID string) []contracts.Gra
 		var gr contracts.GrammarRule
 		var tableJSON []byte
 		if err := rows.Scan(&gr.ID, &gr.ModuleID, &gr.Title, &gr.Level, &gr.ExplanationVI,
-			&tableJSON, &gr.ConstraintsText, &gr.Status, &gr.CreatedAt, &gr.UpdatedAt); err == nil {
+			&tableJSON, &gr.ConstraintsText, &gr.Status, &gr.ImageAssetID, &gr.CreatedAt, &gr.UpdatedAt); err == nil {
 			if len(tableJSON) > 0 {
 				json.Unmarshal(tableJSON, &gr.RuleTable)
 			}
@@ -107,6 +107,20 @@ func (s *postgresGrammarStore) ListGrammarRules(moduleID string) []contracts.Gra
 		}
 	}
 	return out
+}
+
+func (s *postgresGrammarStore) SetGrammarRuleImage(id, storageKey string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE grammar_rules SET image_asset_id = $2, updated_at = now() WHERE id = $1`,
+		id, storageKey,
+	)
+	if err != nil {
+		return false
+	}
+	n, _ := res.RowsAffected()
+	return n > 0
 }
 
 func (s *postgresGrammarStore) UpdateGrammarRule(id string, update contracts.GrammarRule) (contracts.GrammarRule, bool) {

@@ -14,8 +14,10 @@ type VocabularyStore interface {
 	UpdateVocabularySet(id string, update contracts.VocabularySet) (contracts.VocabularySet, bool)
 	DeleteVocabularySet(id string) bool
 	CreateVocabularyItem(item contracts.VocabularyItem) contracts.VocabularyItem
+	GetVocabularyItem(id string) (contracts.VocabularyItem, bool)
 	ListVocabularyItems(setID string) []contracts.VocabularyItem
 	DeleteVocabularyItem(id string) bool
+	SetVocabularyItemImage(id, storageKey string) bool
 }
 
 type memoryVocabularyStore struct {
@@ -118,6 +120,16 @@ func (s *memoryVocabularyStore) CreateVocabularyItem(item contracts.VocabularyIt
 	return cp
 }
 
+func (s *memoryVocabularyStore) GetVocabularyItem(id string) (contracts.VocabularyItem, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	v, ok := s.items[id]
+	if !ok {
+		return contracts.VocabularyItem{}, false
+	}
+	return *v, true
+}
+
 func (s *memoryVocabularyStore) ListVocabularyItems(setID string) []contracts.VocabularyItem {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -137,5 +149,16 @@ func (s *memoryVocabularyStore) DeleteVocabularyItem(id string) bool {
 		return false
 	}
 	delete(s.items, id)
+	return true
+}
+
+func (s *memoryVocabularyStore) SetVocabularyItemImage(id, storageKey string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item, ok := s.items[id]
+	if !ok {
+		return false
+	}
+	item.ImageAssetID = storageKey
 	return true
 }

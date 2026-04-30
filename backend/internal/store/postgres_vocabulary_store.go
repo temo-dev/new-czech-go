@@ -138,11 +138,26 @@ func (s *postgresVocabularyStore) CreateVocabularyItem(item contracts.Vocabulary
 	return item
 }
 
+func (s *postgresVocabularyStore) GetVocabularyItem(id string) (contracts.VocabularyItem, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var vi contracts.VocabularyItem
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, set_id, term, meaning, part_of_speech, example_sentence, example_translation, sequence_no, image_asset_id
+		 FROM vocabulary_items WHERE id = $1`, id,
+	).Scan(&vi.ID, &vi.SetID, &vi.Term, &vi.Meaning,
+		&vi.PartOfSpeech, &vi.ExampleSentence, &vi.ExampleTranslation, &vi.SequenceNo, &vi.ImageAssetID)
+	if err != nil {
+		return contracts.VocabularyItem{}, false
+	}
+	return vi, true
+}
+
 func (s *postgresVocabularyStore) ListVocabularyItems(setID string) []contracts.VocabularyItem {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, set_id, term, meaning, part_of_speech, example_sentence, example_translation, sequence_no
+		`SELECT id, set_id, term, meaning, part_of_speech, example_sentence, example_translation, sequence_no, image_asset_id
 		 FROM vocabulary_items WHERE set_id = $1 ORDER BY sequence_no, id`, setID)
 	if err != nil {
 		return nil
@@ -152,11 +167,25 @@ func (s *postgresVocabularyStore) ListVocabularyItems(setID string) []contracts.
 	for rows.Next() {
 		var vi contracts.VocabularyItem
 		if err := rows.Scan(&vi.ID, &vi.SetID, &vi.Term, &vi.Meaning,
-			&vi.PartOfSpeech, &vi.ExampleSentence, &vi.ExampleTranslation, &vi.SequenceNo); err == nil {
+			&vi.PartOfSpeech, &vi.ExampleSentence, &vi.ExampleTranslation, &vi.SequenceNo, &vi.ImageAssetID); err == nil {
 			out = append(out, vi)
 		}
 	}
 	return out
+}
+
+func (s *postgresVocabularyStore) SetVocabularyItemImage(id, storageKey string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE vocabulary_items SET image_asset_id = $2 WHERE id = $1`,
+		id, storageKey,
+	)
+	if err != nil {
+		return false
+	}
+	n, _ := res.RowsAffected()
+	return n > 0
 }
 
 func (s *postgresVocabularyStore) DeleteVocabularyItem(id string) bool {

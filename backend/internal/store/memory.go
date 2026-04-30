@@ -379,11 +379,17 @@ func (s *MemoryStore) DeleteVocabularySet(id string) bool {
 func (s *MemoryStore) CreateVocabularyItem(item contracts.VocabularyItem) contracts.VocabularyItem {
 	return s.vocabulary.CreateVocabularyItem(item)
 }
+func (s *MemoryStore) GetVocabularyItem(id string) (contracts.VocabularyItem, bool) {
+	return s.vocabulary.GetVocabularyItem(id)
+}
 func (s *MemoryStore) ListVocabularyItems(setID string) []contracts.VocabularyItem {
 	return s.vocabulary.ListVocabularyItems(setID)
 }
 func (s *MemoryStore) DeleteVocabularyItem(id string) bool {
 	return s.vocabulary.DeleteVocabularyItem(id)
+}
+func (s *MemoryStore) SetVocabularyItemImage(id, storageKey string) bool {
+	return s.vocabulary.SetVocabularyItemImage(id, storageKey)
 }
 
 // Grammar delegates
@@ -401,6 +407,9 @@ func (s *MemoryStore) UpdateGrammarRule(id string, update contracts.GrammarRule)
 }
 func (s *MemoryStore) DeleteGrammarRule(id string) bool {
 	return s.grammar.DeleteGrammarRule(id)
+}
+func (s *MemoryStore) SetGrammarRuleImage(id, storageKey string) bool {
+	return s.grammar.SetGrammarRuleImage(id, storageKey)
 }
 
 // GenerationJob delegates

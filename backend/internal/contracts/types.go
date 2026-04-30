@@ -133,13 +133,15 @@ type ListeningAudioSource struct {
 }
 
 type MultipleChoiceOption struct {
-	Key  string `json:"key"` // "A", "B", ...
-	Text string `json:"text"`
+	Key          string `json:"key"` // "A", "B", ...
+	Text         string `json:"text"`
+	ImageAssetID string `json:"image_asset_id,omitempty"`
 }
 
 type MatchOption struct {
-	Key   string `json:"key"`
-	Label string `json:"label"`
+	Key          string `json:"key"`
+	Label        string `json:"label"`
+	ImageAssetID string `json:"image_asset_id,omitempty"`
 }
 
 type ImageOption struct {
@@ -517,6 +519,7 @@ type VocabularyItem struct {
 	ExampleSentence    string `json:"example_sentence,omitempty"`
 	ExampleTranslation string `json:"example_translation,omitempty"`
 	SequenceNo         int    `json:"sequence_no"`
+	ImageAssetID       string `json:"image_asset_id,omitempty"`
 }
 
 type GrammarRule struct {
@@ -528,6 +531,7 @@ type GrammarRule struct {
 	RuleTable       map[string]string `json:"rule_table,omitempty"` // e.g. {"já":"jsem","ty":"jsi"}
 	ConstraintsText string            `json:"constraints_text,omitempty"`
 	Status          string            `json:"status"`
+	ImageAssetID    string            `json:"image_asset_id,omitempty"`
 	CreatedAt       string            `json:"created_at,omitempty"`
 	UpdatedAt       string            `json:"updated_at,omitempty"`
 }

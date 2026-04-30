@@ -13,6 +13,7 @@ type GrammarStore interface {
 	ListGrammarRules(skillID string) []contracts.GrammarRule
 	UpdateGrammarRule(id string, update contracts.GrammarRule) (contracts.GrammarRule, bool)
 	DeleteGrammarRule(id string) bool
+	SetGrammarRuleImage(id, storageKey string) bool
 }
 
 type memoryGrammarStore struct {
@@ -98,5 +99,16 @@ func (s *memoryGrammarStore) DeleteGrammarRule(id string) bool {
 		return false
 	}
 	delete(s.rules, id)
+	return true
+}
+
+func (s *memoryGrammarStore) SetGrammarRuleImage(id, storageKey string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rule, ok := s.rules[id]
+	if !ok {
+		return false
+	}
+	rule.ImageAssetID = storageKey
 	return true
 }
