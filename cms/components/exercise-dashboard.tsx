@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useS } from '../lib/i18n';
 import { adminFetch } from '../lib/api';
 import { ExerciseList, ExerciseListFilters } from './exercise-list';
 import { ExerciseSlideOver } from './exercise-form';
+import { ExerciseMatrix, MatrixSkillKind } from './exercise-matrix';
 import {
   CmsCourse,
   CmsModule,
@@ -16,6 +17,8 @@ import {
   metricLabelStyle,
   metricValueStyle,
 } from './exercise-utils';
+
+type ActiveCell = { moduleId: string | null; skillKind: MatrixSkillKind } | null;
 
 export function ExerciseDashboard() {
   const S = useS();
@@ -29,11 +32,14 @@ export function ExerciseDashboard() {
   const [mockTests, setMockTests] = useState<CmsMockTest[]>([]);
 
   // ── UI state ─────────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<'course' | 'exam'>('course');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [activeCell, setActiveCell] = useState<ActiveCell>(null);
   const [listFilters, setListFilters] = useState<ExerciseListFilters>({
     courseId: '', moduleId: '', skillKind: '', mockTestId: '', text: '',
   });
+  const listRef = useRef<HTMLDivElement>(null);
 
   const editingItem = editingId ? (items.find((i) => i.id === editingId) ?? null) : null;
 
@@ -88,6 +94,20 @@ export function ExerciseDashboard() {
     void loadMockTests();
   }, []);
 
+  // ── Matrix cell click ────────────────────────────────────────────────────────
+  function handleCellClick(moduleId: string | null, skillKind: MatrixSkillKind) {
+    // Toggle: clicking active cell clears filters
+    if (activeCell?.moduleId === moduleId && activeCell?.skillKind === skillKind) {
+      setActiveCell(null);
+      patchFilters({ moduleId: '', skillKind: '' });
+      return;
+    }
+    setActiveCell({ moduleId, skillKind });
+    patchFilters({ moduleId: moduleId ?? '', skillKind });
+    // Scroll to list
+    listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   // ── Form callbacks ───────────────────────────────────────────────────────────
   function openCreate() {
     setEditingId(null);
@@ -111,6 +131,24 @@ export function ExerciseDashboard() {
   async function handleDeleted(_id: string) {
     await loadExercises();
   }
+
+  // ── Tab styles ───────────────────────────────────────────────────────────────
+  function tabStyle(active: boolean): React.CSSProperties {
+    return {
+      padding: '10px 20px',
+      fontSize: 14,
+      fontWeight: active ? 700 : 500,
+      color: active ? 'var(--brand)' : 'var(--ink-3)',
+      background: 'none',
+      border: 'none',
+      borderBottom: active ? '2px solid var(--brand)' : '2px solid transparent',
+      cursor: 'pointer',
+      transition: 'color 150ms, border-color 150ms',
+    };
+  }
+
+  // ── Exam pool items ──────────────────────────────────────────────────────────
+  const examItems = items.filter((i) => i.pool === 'exam');
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -179,33 +217,111 @@ export function ExerciseDashboard() {
         onClose={handleClose}
       />
 
-      {/* Exercise list */}
-      <ExerciseList
-        items={items}
-        modules={availableModules}
-        courses={courses}
-        mockTests={mockTests}
-        loading={loading}
-        error={error}
-        filters={listFilters}
-        onFilterChange={patchFilters}
-        onEdit={startEditing}
-        onDelete={async (id) => {
-          if (!window.confirm(S.exercise.deleteConfirm)) return;
-          try {
-            const res = await adminFetch(`/api/admin/exercises/${id}`, { method: 'DELETE' });
-            if (!res.ok) {
-              const p = await res.json();
-              throw new Error(p.error?.message ?? 'Could not delete exercise.');
-            }
-            await loadExercises();
-          } catch (err) {
-            setError(err instanceof Error ? err.message : 'Unknown error');
-          }
+      {/* Tab bar */}
+      <div
+        style={{
+          display: 'flex',
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--surface)',
+          borderRadius: '16px 16px 0 0',
+          paddingTop: 4,
+          overflow: 'hidden',
+          border: '1px solid var(--border)',
         }}
-        onReload={loadExercises}
-        onOpenCreate={openCreate}
-      />
+      >
+        <button style={tabStyle(activeTab === 'course')} onClick={() => setActiveTab('course')}>
+          Khoá học
+        </button>
+        <button style={tabStyle(activeTab === 'exam')} onClick={() => setActiveTab('exam')}>
+          Exam Pool
+          {examItems.length > 0 && (
+            <span
+              style={{
+                marginLeft: 6,
+                fontSize: 11,
+                background: 'var(--surface-alt)',
+                color: 'var(--ink-3)',
+                padding: '1px 6px',
+                borderRadius: 99,
+                fontWeight: 600,
+              }}
+            >
+              {examItems.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Tab: Khoá học */}
+      {activeTab === 'course' && (
+        <>
+          <ExerciseMatrix
+            items={items}
+            modules={availableModules}
+            courses={courses}
+            activeCell={activeCell}
+            onCellClick={handleCellClick}
+          />
+          <div ref={listRef}>
+            <ExerciseList
+              items={items.filter((i) => i.pool !== 'exam')}
+              modules={availableModules}
+              courses={courses}
+              mockTests={mockTests}
+              loading={loading}
+              error={error}
+              filters={listFilters}
+              onFilterChange={patchFilters}
+              onEdit={startEditing}
+              onDelete={async (id) => {
+                if (!window.confirm(S.exercise.deleteConfirm)) return;
+                try {
+                  const res = await adminFetch(`/api/admin/exercises/${id}`, { method: 'DELETE' });
+                  if (!res.ok) {
+                    const p = await res.json();
+                    throw new Error(p.error?.message ?? 'Could not delete exercise.');
+                  }
+                  await loadExercises();
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Unknown error');
+                }
+              }}
+              onReload={loadExercises}
+              onOpenCreate={openCreate}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Tab: Exam Pool */}
+      {activeTab === 'exam' && (
+        <ExerciseList
+          items={examItems}
+          modules={availableModules}
+          courses={courses}
+          mockTests={mockTests}
+          loading={loading}
+          error={error}
+          filters={{ courseId: '', moduleId: '', skillKind: '', mockTestId: '', text: listFilters.text }}
+          onFilterChange={(patch) => patchFilters({ text: patch.text ?? listFilters.text })}
+          onEdit={startEditing}
+          onDelete={async (id) => {
+            if (!window.confirm(S.exercise.deleteConfirm)) return;
+            try {
+              const res = await adminFetch(`/api/admin/exercises/${id}`, { method: 'DELETE' });
+              if (!res.ok) {
+                const p = await res.json();
+                throw new Error(p.error?.message ?? 'Could not delete exercise.');
+              }
+              await loadExercises();
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'Unknown error');
+            }
+          }}
+          onReload={loadExercises}
+          onOpenCreate={openCreate}
+        />
+      )}
     </main>
   );
 }
