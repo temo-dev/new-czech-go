@@ -1,5 +1,5 @@
 'use client';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 
 type Course = {
   id: string;
@@ -8,6 +8,7 @@ type Course = {
   description: string;
   status: string;
   sequence_no: number;
+  banner_image_id?: string;
 };
 
 const API = '/api/admin/courses';
@@ -27,6 +28,8 @@ export function CourseDashboard() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState<string | null>(null);
+  const bannerInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -35,6 +38,23 @@ export function CourseDashboard() {
   });
 
   useEffect(() => { load(); }, []);
+
+  async function handleBannerUpload(courseId: string, file: File) {
+    setUploadingBanner(courseId);
+    try {
+      const formData = new FormData();
+      formData.set('file', file);
+      const res = await fetch(`/api/admin/courses/${courseId}/banner`, { method: 'POST', body: formData });
+      if (res.ok) await load();
+    } finally {
+      setUploadingBanner(null);
+    }
+  }
+
+  async function handleBannerDelete(courseId: string) {
+    await fetch(`/api/admin/courses/${courseId}/banner`, { method: 'DELETE' });
+    await load();
+  }
 
   async function load() {
     setLoading(true);
@@ -134,28 +154,49 @@ export function CourseDashboard() {
                 onMouseEnter={e => (e.currentTarget.style.boxShadow = 'var(--shadow-md)')}
                 onMouseLeave={e => (e.currentTarget.style.boxShadow = 'var(--shadow-sm)')}
               >
-                {/* Color header */}
+                {/* Banner header — shows uploaded image or solid color */}
                 <div style={{
                   height: 96,
-                  background: colors.header,
+                  background: c.banner_image_id ? 'transparent' : colors.header,
                   borderRadius: 'var(--r3) var(--r3) 0 0',
                   display: 'flex',
                   alignItems: 'flex-end',
                   padding: '12px 16px',
                   position: 'relative',
+                  overflow: 'hidden',
                 }}>
-                  <span style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    letterSpacing: 0.6,
-                    textTransform: 'uppercase',
-                    background: colors.badge,
-                    color: colors.text,
-                    padding: '3px 9px',
-                    borderRadius: 999,
-                  }}>
-                    #{c.sequence_no} · {c.status}
-                  </span>
+                  {c.banner_image_id && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`/api/media/file?key=${encodeURIComponent(c.banner_image_id)}`}
+                      alt="banner"
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--r3) var(--r3) 0 0' }}
+                    />
+                  )}
+                  {/* Overlay for text legibility */}
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 60%)', borderRadius: 'var(--r3) var(--r3) 0 0' }} />
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase',
+                      background: c.banner_image_id ? 'rgba(0,0,0,0.35)' : colors.badge,
+                      color: '#fff',
+                      padding: '3px 9px', borderRadius: 999,
+                    }}>
+                      #{c.sequence_no} · {c.status}
+                    </span>
+                    <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(0,0,0,0.35)', color: '#fff', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {uploadingBanner === c.id ? '⏳' : c.banner_image_id ? '🔄 Banner' : '🖼 Banner'}
+                      <input
+                        ref={el => { bannerInputRefs.current[c.id] = el; }}
+                        type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+                        disabled={uploadingBanner !== null}
+                        onChange={e => { const f = e.target.files?.[0]; if (f) void handleBannerUpload(c.id, f); e.target.value = ''; }}
+                      />
+                    </label>
+                    {c.banner_image_id && (
+                      <button type="button" onClick={() => void handleBannerDelete(c.id)} style={{ background: 'rgba(0,0,0,0.35)', color: '#fff', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>✕</button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Card body */}

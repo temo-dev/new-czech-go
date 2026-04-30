@@ -122,6 +122,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
               padding: const EdgeInsets.only(bottom: AppSpacing.x3),
               child: _CourseCard(
                 course: c,
+                client: widget.client,
                 bgColor: colors.bg,
                 textColor: colors.text,
                 badgeColor: colors.badge,
@@ -142,6 +143,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
 class _CourseCard extends StatelessWidget {
   const _CourseCard({
     required this.course,
+    required this.client,
     required this.bgColor,
     required this.textColor,
     required this.badgeColor,
@@ -150,6 +152,7 @@ class _CourseCard extends StatelessWidget {
   });
 
   final Course course;
+  final ApiClient client;
   final Color bgColor;
   final Color textColor;
   final Color badgeColor;
@@ -161,6 +164,8 @@ class _CourseCard extends StatelessWidget {
     'draft'     => 'SẮP RA MẮT',
     _           => 'KHÓA HỌC',
   };
+
+  bool get _hasBanner => course.bannerImageId.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -174,11 +179,75 @@ class _CourseCard extends StatelessWidget {
             color: bgColor,
             borderRadius: AppRadius.lgAll,
           ),
-          child: Padding(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Banner image (when available) or solid color header strip
+              if (_hasBanner)
+                ClipRRect(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+                  child: Stack(
+                    children: [
+                      Image.network(
+                        client.mediaUri(course.bannerImageId).toString(),
+                        headers: client.authHeaders,
+                        height: isFeatured ? 160 : 120,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(height: isFeatured ? 160 : 120, color: bgColor),
+                        loadingBuilder: (_, child, progress) => progress == null
+                            ? child
+                            : Container(height: isFeatured ? 160 : 120, color: bgColor),
+                      ),
+                      // Gradient overlay for text legibility
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.45)],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Badge + lock on banner
+                      Positioned(
+                        left: isFeatured ? AppSpacing.x5 : AppSpacing.x4,
+                        right: isFeatured ? AppSpacing.x5 : AppSpacing.x4,
+                        bottom: isFeatured ? AppSpacing.x3 : AppSpacing.x2,
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(AppRadius.full),
+                              ),
+                              child: Text(
+                                _statusLabel,
+                                style: AppTypography.labelUppercase.copyWith(
+                                  color: Colors.white.withAlpha(220),
+                                  fontSize: 10, letterSpacing: 0.8,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            if (isLocked)
+                              const Icon(Icons.lock_outline_rounded, color: Colors.white70, size: 16),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              Padding(
             padding: EdgeInsets.all(isFeatured ? AppSpacing.x5 : AppSpacing.x4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (!_hasBanner) ...[
                 // Top row: badge + lock icon
                 Row(
                   children: [
@@ -202,8 +271,8 @@ class _CourseCard extends StatelessWidget {
                       Icon(Icons.lock_outline_rounded, color: textColor.withAlpha(140), size: 16),
                   ],
                 ),
-
                 SizedBox(height: isFeatured ? AppSpacing.x3 : AppSpacing.x2),
+                ],
 
                 // Title
                 Text(
@@ -274,9 +343,11 @@ class _CourseCard extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-        ),
-      ),
+          ),    // close inner Padding
+          ],    // close outer Column children
+        ),      // close outer Column
+        ),      // close Container
+      ),        // close Opacity
     );
   }
 }

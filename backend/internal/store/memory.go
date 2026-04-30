@@ -219,6 +219,9 @@ func (s *MemoryStore) UpdateCourse(id string, update contracts.Course) (contract
 func (s *MemoryStore) DeleteCourse(id string) bool {
 	return s.courses.DeleteCourse(id)
 }
+func (s *MemoryStore) SetCourseBannerImage(id, storageKey string) bool {
+	return s.courses.SetCourseBannerImage(id, storageKey)
+}
 
 // Module CRUD
 func (s *MemoryStore) ListModules(kind, courseID string) []contracts.Module {

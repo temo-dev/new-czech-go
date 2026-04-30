@@ -9,12 +9,13 @@ type User struct {
 }
 
 type Course struct {
-	ID          string `json:"id"`
-	Slug        string `json:"slug"`
-	Title       string `json:"title"`
-	Description string `json:"description,omitempty"`
-	Status      string `json:"status,omitempty"` // draft, published
-	SequenceNo  int    `json:"sequence_no,omitempty"`
+	ID            string `json:"id"`
+	Slug          string `json:"slug"`
+	Title         string `json:"title"`
+	Description   string `json:"description,omitempty"`
+	Status        string `json:"status,omitempty"` // draft, published
+	SequenceNo    int    `json:"sequence_no,omitempty"`
+	BannerImageID string `json:"banner_image_id,omitempty"` // storage key for course banner
 }
 
 // SkillSummary is a computed aggregate of exercises grouped by skill_kind within a module.

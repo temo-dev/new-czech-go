@@ -6,6 +6,7 @@ class Course {
     required this.description,
     required this.status,
     required this.sequenceNo,
+    this.bannerImageId = '',
   });
 
   final String id;
@@ -14,6 +15,7 @@ class Course {
   final String description;
   final String status;
   final int sequenceNo;
+  final String bannerImageId;
 
   factory Course.fromJson(Map<String, dynamic> json) {
     return Course(
@@ -23,6 +25,7 @@ class Course {
       description: json['description'] as String? ?? '',
       status: json['status'] as String? ?? 'published',
       sequenceNo: (json['sequence_no'] as num?)?.toInt() ?? 0,
+      bannerImageId: json['banner_image_id'] as String? ?? '',
     );
   }
 }

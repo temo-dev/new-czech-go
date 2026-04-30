@@ -126,7 +126,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/admin/grammar-rules/", s.withRole("admin", s.handleAdminGrammarRuleByID))
 	s.mux.HandleFunc("/v1/admin/content-generation-jobs", s.withRole("admin", s.handleAdminGenJobs))
 	s.mux.HandleFunc("/v1/admin/content-generation-jobs/", s.withRole("admin", s.handleAdminGenJobByID))
-	// V11: Media enrichment — image upload/delete for vocab items and grammar rules
+	// V11: Media enrichment — image upload/delete for vocab items, grammar rules, and course banners
 	s.mux.HandleFunc("/v1/admin/vocabulary-items/", s.withRole("admin", s.handleAdminVocabItemImage))
 	s.mux.HandleFunc("/v1/vocabulary-items/", s.withRole("learner", s.handleVocabItemImageFile))
 	s.mux.HandleFunc("/v1/grammar-rules/", s.withRole("learner", s.handleGrammarRuleImageFile))
@@ -2162,8 +2162,15 @@ func (s *Server) handleAdminCourses(w http.ResponseWriter, r *http.Request, _ co
 	}
 }
 
-func (s *Server) handleAdminCourseByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
-	id := strings.TrimPrefix(r.URL.Path, "/v1/admin/courses/")
+func (s *Server) handleAdminCourseByID(w http.ResponseWriter, r *http.Request, u contracts.User) {
+	path := strings.TrimPrefix(r.URL.Path, "/v1/admin/courses/")
+
+	if strings.HasSuffix(path, "/banner") {
+		s.handleAdminCourseBanner(w, r, u)
+		return
+	}
+
+	id := path
 	switch r.Method {
 	case http.MethodGet:
 		c, ok := s.repo.CourseByID(id)

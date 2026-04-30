@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS courses (
 func (s *postgresCourseStore) ListCourses(status string) []contracts.Course {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	q := `SELECT id, slug, title, description, status, sequence_no FROM courses`
+	q := `SELECT id, slug, title, description, status, sequence_no, banner_image_id FROM courses`
 	args := []any{}
 	if status != "" {
 		q += ` WHERE status = $1`
@@ -57,7 +57,7 @@ func (s *postgresCourseStore) ListCourses(status string) []contracts.Course {
 	var out []contracts.Course
 	for rows.Next() {
 		var c contracts.Course
-		if err := rows.Scan(&c.ID, &c.Slug, &c.Title, &c.Description, &c.Status, &c.SequenceNo); err == nil {
+		if err := rows.Scan(&c.ID, &c.Slug, &c.Title, &c.Description, &c.Status, &c.SequenceNo, &c.BannerImageID); err == nil {
 			out = append(out, c)
 		}
 	}
@@ -73,8 +73,8 @@ func (s *postgresCourseStore) CourseByID(id string) (contracts.Course, bool) {
 	defer cancel()
 	var c contracts.Course
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, slug, title, description, status, sequence_no FROM courses WHERE id = $1`, id,
-	).Scan(&c.ID, &c.Slug, &c.Title, &c.Description, &c.Status, &c.SequenceNo)
+		`SELECT id, slug, title, description, status, sequence_no, banner_image_id FROM courses WHERE id = $1`, id,
+	).Scan(&c.ID, &c.Slug, &c.Title, &c.Description, &c.Status, &c.SequenceNo, &c.BannerImageID)
 	if err != nil {
 		return contracts.Course{}, false
 	}
@@ -130,6 +130,20 @@ func (s *postgresCourseStore) DeleteCourse(id string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	res, err := s.db.ExecContext(ctx, `DELETE FROM courses WHERE id = $1`, id)
+	if err != nil {
+		return false
+	}
+	n, _ := res.RowsAffected()
+	return n > 0
+}
+
+func (s *postgresCourseStore) SetCourseBannerImage(id, storageKey string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE courses SET banner_image_id = $2, updated_at = now() WHERE id = $1`,
+		id, storageKey,
+	)
 	if err != nil {
 		return false
 	}

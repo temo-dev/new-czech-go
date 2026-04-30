@@ -13,6 +13,7 @@ type CourseStore interface {
 	CreateCourse(c contracts.Course) (contracts.Course, error)
 	UpdateCourse(id string, update contracts.Course) (contracts.Course, bool)
 	DeleteCourse(id string) bool
+	SetCourseBannerImage(id, storageKey string) bool
 }
 
 type memoryCourseStore struct {
@@ -98,6 +99,17 @@ func (s *memoryCourseStore) DeleteCourse(id string) bool {
 		return false
 	}
 	delete(s.courses, id)
+	return true
+}
+
+func (s *memoryCourseStore) SetCourseBannerImage(id, storageKey string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c, ok := s.courses[id]
+	if !ok {
+		return false
+	}
+	c.BannerImageID = storageKey
 	return true
 }
 
