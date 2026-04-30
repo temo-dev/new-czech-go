@@ -69,17 +69,16 @@ export function buildMatrix(
       };
     });
 
-  // Sort: group by course (stable insertion order), then by sequence_no within course
+  // Pre-compute lookup maps to avoid O(M²logM) in sort comparator
   const courseOrder = new Map<string, number>();
   courses.forEach((c, i) => courseOrder.set(c.id, i));
+  const moduleSeqMap = new Map(modules.map((m) => [m.id, m.sequence_no ?? 0]));
 
   rows.sort((a, b) => {
     const ca = courseOrder.get(a.courseId) ?? 999;
     const cb = courseOrder.get(b.courseId) ?? 999;
     if (ca !== cb) return ca - cb;
-    const ma = modules.find((m) => m.id === a.moduleId)?.sequence_no ?? 0;
-    const mb = modules.find((m) => m.id === b.moduleId)?.sequence_no ?? 0;
-    return ma - mb;
+    return (moduleSeqMap.get(a.moduleId) ?? 0) - (moduleSeqMap.get(b.moduleId) ?? 0);
   });
 
   return rows;
@@ -349,7 +348,7 @@ export function ExamPoolMatrix({ items, activeType, onTypeClick }: ExamPoolMatri
     const row = byType.get(item.exercise_type)!;
     row.total++;
     if (item.status === 'published') row.published++;
-    if ((item.assets?.length ?? 0) > 0) row.hasAudio++;
+    if (item.assets?.some((a) => a.asset_kind === 'audio' || a.mime_type?.startsWith('audio/'))) row.hasAudio++;
   }
 
   const rows: ExamRow[] = [...byType.values()].sort((a, b) =>

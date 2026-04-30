@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useS } from '../lib/i18n';
 import { adminFetch } from '../lib/api';
 import { ExerciseList, ExerciseListFilters } from './exercise-list';
@@ -20,6 +20,50 @@ import {
 
 type ActiveCell = { moduleId: string | null; skillKind: MatrixSkillKind } | null;
 type FormPrefill = { moduleId?: string; skillKind?: string; pool?: string } | null;
+
+function tabStyle(active: boolean): React.CSSProperties {
+  return {
+    padding: '10px 20px',
+    fontSize: 14,
+    fontWeight: active ? 700 : 500,
+    color: active ? 'var(--brand)' : 'var(--ink-3)',
+    background: 'none',
+    border: 'none',
+    borderBottom: active ? '2px solid var(--brand)' : '2px solid transparent',
+    cursor: 'pointer',
+    transition: 'color 150ms, border-color 150ms',
+  };
+}
+
+function MatrixSkeleton() {
+  return (
+    <div
+      style={{
+        background: 'var(--surface)',
+        borderRadius: 28,
+        border: '1px solid var(--border)',
+        padding: 24,
+        display: 'grid',
+        gap: 12,
+      }}
+    >
+      {[1, 2, 3, 4].map((n) => (
+        <div
+          key={n}
+          style={{
+            height: 44,
+            borderRadius: 8,
+            background: 'linear-gradient(90deg, var(--surface-alt) 25%, var(--border) 50%, var(--surface-alt) 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.4s infinite',
+            opacity: 0.7,
+          }}
+        />
+      ))}
+      <style>{`@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
+    </div>
+  );
+}
 
 export function ExerciseDashboard() {
   const S = useS();
@@ -132,7 +176,8 @@ export function ExerciseDashboard() {
     await loadExercises();
   }
 
-  async function handleDeleted(_id: string) {
+  // Called by slide-over after form-based deletion; id ignored, just reload
+  async function handleFormDeleted(_id: string) {
     await loadExercises();
   }
 
@@ -150,54 +195,12 @@ export function ExerciseDashboard() {
     }
   }
 
-  // ── Tab styles ───────────────────────────────────────────────────────────────
-  function tabStyle(active: boolean): React.CSSProperties {
-    return {
-      padding: '10px 20px',
-      fontSize: 14,
-      fontWeight: active ? 700 : 500,
-      color: active ? 'var(--brand)' : 'var(--ink-3)',
-      background: 'none',
-      border: 'none',
-      borderBottom: active ? '2px solid var(--brand)' : '2px solid transparent',
-      cursor: 'pointer',
-      transition: 'color 150ms, border-color 150ms',
-    };
-  }
-
-  // ── Derived data ─────────────────────────────────────────────────────────────
-  const examItems = items.filter((i) => i.pool === 'exam');
-  const examFiltered = activeExamType
-    ? examItems.filter((i) => i.exercise_type === activeExamType)
-    : examItems;
-
-  // ── Skeleton ─────────────────────────────────────────────────────────────────
-  const MatrixSkeleton = () => (
-    <div
-      style={{
-        background: 'var(--surface)',
-        borderRadius: 28,
-        border: '1px solid var(--border)',
-        padding: 24,
-        display: 'grid',
-        gap: 12,
-      }}
-    >
-      {[1, 2, 3, 4].map((n) => (
-        <div
-          key={n}
-          style={{
-            height: 44,
-            borderRadius: 8,
-            background: 'linear-gradient(90deg, var(--surface-alt) 25%, var(--border) 50%, var(--surface-alt) 75%)',
-            backgroundSize: '200% 100%',
-            animation: 'shimmer 1.4s infinite',
-            opacity: 0.7,
-          }}
-        />
-      ))}
-      <style>{`@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
-    </div>
+  // ── Derived data (memoized) ───────────────────────────────────────────────────
+  const courseItems = useMemo(() => items.filter((i) => i.pool !== 'exam'), [items]);
+  const examItems = useMemo(() => items.filter((i) => i.pool === 'exam'), [items]);
+  const examFiltered = useMemo(
+    () => (activeExamType ? examItems.filter((i) => i.exercise_type === activeExamType) : examItems),
+    [examItems, activeExamType],
   );
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -275,7 +278,7 @@ export function ExerciseDashboard() {
         prefillSkillKind={formPrefill?.skillKind}
         prefillPool={formPrefill?.pool}
         onSaved={handleSaved}
-        onDeleted={handleDeleted}
+        onDeleted={handleFormDeleted}
         onClose={handleClose}
       />
 
@@ -311,7 +314,7 @@ export function ExerciseDashboard() {
             <MatrixSkeleton />
           ) : (
             <ExerciseMatrix
-              items={items}
+              items={courseItems}
               modules={availableModules}
               courses={courses}
               activeCell={activeCell}
@@ -320,7 +323,7 @@ export function ExerciseDashboard() {
           )}
           <div ref={listRef}>
             <ExerciseList
-              items={items.filter((i) => i.pool !== 'exam')}
+              items={courseItems}
               modules={availableModules}
               courses={courses}
               mockTests={mockTests}

@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useS } from '../lib/i18n';
 import {
   CmsCourse,
@@ -50,21 +51,30 @@ export function ExerciseList({
   const S = useS();
   const { courseId, moduleId, skillKind, mockTestId, text } = filters;
 
-  const mtExerciseIds = mockTestId
-    ? new Set((mockTests.find((t) => t.id === mockTestId)?.sections ?? []).map((s) => s.exercise_id))
-    : null;
+  const moduleMap = useMemo(() => new Map(modules.map((m) => [m.id, m])), [modules]);
 
-  const modulesForCourse = courseId
-    ? modules.filter((m) => m.course_id === courseId)
-    : modules;
+  const mtExerciseIds = useMemo(
+    () => mockTestId
+      ? new Set((mockTests.find((t) => t.id === mockTestId)?.sections ?? []).map((s) => s.exercise_id))
+      : null,
+    [mockTestId, mockTests],
+  );
 
-  const skillKindsInView = [...new Set(items.map((i) => i.skill_kind).filter(Boolean))] as string[];
+  const modulesForCourse = useMemo(
+    () => courseId ? modules.filter((m) => m.course_id === courseId) : modules,
+    [courseId, modules],
+  );
 
-  const filteredItems = items.filter((item) => {
+  const skillKindsInView = useMemo(
+    () => [...new Set(items.map((i) => i.skill_kind).filter(Boolean))] as string[],
+    [items],
+  );
+
+  const filteredItems = useMemo(() => items.filter((item) => {
     if (skillKind && item.skill_kind !== skillKind) return false;
     if (moduleId && item.module_id !== moduleId) return false;
     if (courseId && !moduleId) {
-      const mod = modules.find((m) => m.id === item.module_id);
+      const mod = moduleMap.get(item.module_id ?? '');
       if (mod?.course_id !== courseId) return false;
     }
     if (mtExerciseIds && !mtExerciseIds.has(item.id)) return false;
@@ -74,7 +84,7 @@ export function ExerciseList({
       !item.exercise_type.toLowerCase().includes(text.toLowerCase())
     ) return false;
     return true;
-  });
+  }), [items, skillKind, moduleId, courseId, moduleMap, mtExerciseIds, text]);
 
   function clearFilters() {
     onFilterChange({ courseId: '', moduleId: '', skillKind: '', mockTestId: '', text: '' });
