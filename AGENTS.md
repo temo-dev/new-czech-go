@@ -224,9 +224,14 @@ Use the root `Makefile` when possible:
 - `make compose-down`
 - `make compose-logs`
 - `make smoke-attempt-flow`
+- `make smoke-course-flow`
+- `make smoke-exam-flow`
+- `make smoke-all`
 - `make verify`
 
 For daily local startup, prefer [docs/dev-workflow.md](/Users/daniel.dev/Desktop/czech-go-system/docs/dev-workflow.md).
+
+For smoke test usage, troubleshooting, and API notes: [docs/smoke-test-guide.md](/Users/daniel.dev/Desktop/czech-go-system/docs/smoke-test-guide.md).
 
 Per the local repo rule in `RTK.md`, shell commands should be prefixed with `rtk`. The `Makefile` already does this.
 

@@ -83,10 +83,32 @@ def is_same_origin(upload_url, base_url):
     return (upload.scheme, upload.netloc) == (base.scheme, base.netloc)
 
 
+def discover_speaking_exercise(base_url, auth_headers):
+    """Walk courses → /modules → skills(noi) → first exercise. Returns exercise_id or raises."""
+    courses_resp = request_json("GET", f"{base_url}/v1/courses", headers=auth_headers)
+    courses = (courses_resp.get("data") or [])
+    if not courses:
+        raise RuntimeError("No courses found. Run `make seed-modelovy-test-2` first.")
+    mods_resp = request_json("GET", f"{base_url}/v1/courses/{courses[0]['id']}/modules", headers=auth_headers)
+    modules = mods_resp.get("data") or []
+    for module in modules:
+        skills_resp = request_json("GET", f"{base_url}/v1/modules/{module['id']}/skills", headers=auth_headers)
+        skills = skills_resp.get("data") or []
+        for skill in skills:
+            if skill.get("skill_kind") == "noi":
+                exs_resp = request_json("GET", f"{base_url}/v1/skills/{skill['id']}/exercises", headers=auth_headers)
+                exercises = exs_resp.get("data") or []
+                if exercises:
+                    eid = exercises[0]["id"]
+                    print(f"[exercise] auto-discovered id={eid}", file=sys.stderr, flush=True)
+                    return eid
+    raise RuntimeError("No published speaking (noi) exercise found. Run `make seed-modelovy-test-2` first.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Smoke test the production learner attempt flow.")
     parser.add_argument("--base-url", required=True, help="API base URL, for example https://apicz.hadoo.eu")
-    parser.add_argument("--exercise-id", default="exercise-uloha1-weather", help="Exercise ID to use")
+    parser.add_argument("--exercise-id", default="auto", help="Exercise ID to use, or 'auto' to discover from first published speaking exercise")
     parser.add_argument("--email", default="learner@example.com", help="Learner login email")
     parser.add_argument("--password", default="demo123", help="Learner login password")
     parser.add_argument("--audio-file", default="", help="Path to an audio file. If omitted, a tiny dummy file is created.")
@@ -122,11 +144,15 @@ def main():
         token = login["data"]["access_token"]
         auth_headers = {"Authorization": f"Bearer {token}"}
 
+        exercise_id = args.exercise_id
+        if exercise_id == "auto":
+            exercise_id = discover_speaking_exercise(base_url, auth_headers)
+
         attempt_resp = request_json(
             "POST",
             f"{base_url}/v1/attempts",
             body={
-                "exercise_id": args.exercise_id,
+                "exercise_id": exercise_id,
                 "client_platform": "smoke-test",
                 "app_version": "smoke-1",
             },

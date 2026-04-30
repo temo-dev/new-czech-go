@@ -60,6 +60,9 @@ CREATE TABLE IF NOT EXISTS mock_test_sections (
 
 ALTER TABLE mock_test_sections
     ADD COLUMN IF NOT EXISTS skill_kind TEXT NOT NULL DEFAULT '';
+
+-- V9: drop obsolete full exam sessions table (was added in V5, replaced by exam_mode model)
+DROP TABLE IF EXISTS full_exam_sessions;
 `)
 	return err
 }

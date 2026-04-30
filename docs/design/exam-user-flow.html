@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V9 Exam User Flow — ExamTemplate vs PracticeSet</title>
+<style>
+  :root {
+    --orange: #FF6A14;
+    --orange-light: #FFE8D6;
+    --teal: #0F3D3A;
+    --teal-mid: #1A5C57;
+    --teal-light: #D4EAE8;
+    --cream: #FBF3E7;
+    --cream-dark: #F0E4CC;
+    --ink: #1A1A1A;
+    --muted: #6B7280;
+    --border: #E5D9C5;
+    --deleted-bg: #FEE2E2;
+    --deleted-border: #FCA5A5;
+    --deleted-text: #991B1B;
+    --real-bg: #EFF6FF;
+    --real-border: #93C5FD;
+    --real-text: #1E40AF;
+    --practice-bg: #F0FDF4;
+    --practice-border: #86EFAC;
+    --practice-text: #166534;
+    --shadow: 0 2px 8px rgba(15,61,58,0.12);
+    --shadow-lg: 0 4px 20px rgba(15,61,58,0.16);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 32px 24px 64px;
+  }
+
+  /* ── Header ── */
+  .page-header {
+    max-width: 1100px;
+    margin: 0 auto 40px;
+  }
+  .page-header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--teal);
+    margin-bottom: 6px;
+  }
+  .page-header p {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-right: 6px;
+  }
+  .badge-real { background: var(--real-bg); color: var(--real-text); border: 1px solid var(--real-border); }
+  .badge-practice { background: var(--practice-bg); color: var(--practice-text); border: 1px solid var(--practice-border); }
+  .badge-deleted { background: var(--deleted-bg); color: var(--deleted-text); border: 1px solid var(--deleted-border); }
+  .badge-new { background: var(--orange-light); color: var(--orange); border: 1px solid #FDBA74; }
+
+  /* ── Legend ── */
+  .legend {
+    max-width: 1100px;
+    margin: 0 auto 32px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .legend-dot {
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  /* ── Flow canvas ── */
+  .flow-canvas {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* ── Shared entry point ── */
+  .shared-row {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0;
+  }
+
+  /* ── Branch row ── */
+  .branch-row {
+    display: grid;
+    grid-template-columns: 1fr 40px 1fr;
+    gap: 0;
+    align-items: start;
+  }
+
+  .branch-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  /* ── Arrow connector ── */
+  .arrow-down {
+    width: 2px;
+    background: var(--teal-mid);
+    margin: 0 auto;
+    position: relative;
+  }
+  .arrow-down::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid var(--teal-mid);
+  }
+
+  .arrow-down-deleted {
+    width: 2px;
+    background: var(--deleted-border);
+    margin: 0 auto;
+    position: relative;
+    opacity: 0.5;
+  }
+  .arrow-down-deleted::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid var(--deleted-border);
+  }
+
+  /* ── Branch lines ── */
+  .branch-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 20px;
+  }
+  .branch-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    background: var(--cream);
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    margin-bottom: 6px;
+  }
+  .branch-line-h {
+    width: 100%;
+    height: 2px;
+    background: var(--teal-mid);
+    margin-bottom: 4px;
+  }
+
+  /* ── Screen cards ── */
+  .screen-card {
+    width: 280px;
+    background: white;
+    border-radius: 16px;
+    border: 1.5px solid var(--border);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .screen-card.real {
+    border-color: var(--real-border);
+    box-shadow: 0 2px 8px rgba(37,99,235,0.12);
+  }
+
+  .screen-card.practice {
+    border-color: var(--practice-border);
+    box-shadow: 0 2px 8px rgba(22,163,74,0.1);
+  }
+
+  .screen-card.deleted {
+    border-color: var(--deleted-border);
+    box-shadow: none;
+    opacity: 0.6;
+    background: var(--deleted-bg);
+  }
+
+  .screen-card.shared {
+    border-color: var(--teal-mid);
+    box-shadow: var(--shadow-lg);
+    width: 320px;
+  }
+
+  .screen-card.routing {
+    background: var(--teal);
+    border-color: var(--teal);
+  }
+
+  /* Card header */
+  .card-header {
+    padding: 10px 14px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .screen-card.real .card-header { border-bottom-color: var(--real-border); }
+  .screen-card.practice .card-header { border-bottom-color: var(--practice-border); }
+  .screen-card.deleted .card-header { border-bottom-color: var(--deleted-border); }
+  .screen-card.routing .card-header { border-bottom-color: rgba(255,255,255,0.15); }
+  .screen-card.shared .card-header { border-bottom-color: var(--teal-light); }
+
+  .card-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--teal);
+    font-family: 'SFMono-Regular', 'Consolas', monospace;
+  }
+  .screen-card.routing .card-title { color: rgba(255,255,255,0.9); }
+  .screen-card.deleted .card-title { color: var(--deleted-text); text-decoration: line-through; }
+
+  /* Card body */
+  .card-body {
+    padding: 10px 14px 12px;
+  }
+
+  .card-desc {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-bottom: 8px;
+  }
+  .screen-card.routing .card-desc { color: rgba(255,255,255,0.65); }
+  .screen-card.deleted .card-desc { color: var(--deleted-text); opacity: 0.7; }
+
+  /* UI mockup elements */
+  .mock-title {
+    height: 10px;
+    border-radius: 4px;
+    background: var(--teal-light);
+    margin-bottom: 5px;
+  }
+  .mock-text { height: 8px; border-radius: 3px; background: var(--cream-dark); margin-bottom: 4px; }
+  .mock-btn {
+    height: 28px;
+    border-radius: 8px;
+    background: var(--orange);
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .mock-btn.secondary {
+    background: var(--teal-light);
+    color: var(--teal);
+  }
+  .mock-btn.ghost {
+    background: transparent;
+    color: var(--orange);
+    border: 1.5px solid var(--orange);
+  }
+
+  .mock-section-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 5px;
+  }
+  .mock-section-chip {
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 600;
+  }
+  .chip-speaking { background: #FEF3C7; color: #92400E; }
+  .chip-listening { background: #DBEAFE; color: #1E40AF; }
+  .chip-reading { background: #D1FAE5; color: #065F46; }
+  .chip-writing { background: #FCE7F3; color: #9D174D; }
+
+  .mock-score-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .mock-score-ring {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: 3px solid var(--orange);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--teal);
+    flex-shrink: 0;
+  }
+  .mock-score-text {
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  .mock-badge-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .mock-mode-badge {
+    padding: 2px 7px;
+    border-radius: 99px;
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .mode-real { background: var(--real-bg); color: var(--real-text); }
+  .mode-practice { background: var(--practice-bg); color: var(--practice-text); }
+
+  .mock-list-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--cream-dark);
+  }
+  .mock-list-item:last-child { border-bottom: none; }
+  .mock-list-icon {
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+  .icon-real { background: var(--real-bg); }
+  .icon-practice { background: var(--practice-bg); }
+
+  .mock-pass { color: #16a34a; font-size: 10px; font-weight: 700; }
+  .mock-fail { color: #dc2626; font-size: 10px; font-weight: 700; }
+
+  /* Routing card special */
+  .route-row {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .route-row:last-child { border-bottom: none; }
+  .route-type {
+    font-size: 9px;
+    font-family: monospace;
+    color: #FCD34D;
+    width: 75px;
+    flex-shrink: 0;
+  }
+  .route-arrow { color: rgba(255,255,255,0.4); font-size: 10px; }
+  .route-screen { font-size: 9px; color: rgba(255,255,255,0.85); }
+
+  /* Section spacers */
+  .spacer-v { flex-shrink: 0; }
+
+  /* Deleted section */
+  .deleted-section {
+    max-width: 1100px;
+    margin: 0 auto 32px;
+    border: 1.5px dashed var(--deleted-border);
+    border-radius: 16px;
+    padding: 20px 24px;
+    background: var(--deleted-bg);
+    opacity: 0.7;
+  }
+  .deleted-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--deleted-text);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .deleted-section-title::before {
+    content: '✕';
+    font-size: 11px;
+  }
+  .deleted-flow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .deleted-node {
+    padding: 6px 12px;
+    background: white;
+    border: 1px solid var(--deleted-border);
+    border-radius: 8px;
+    font-size: 10.5px;
+    font-family: monospace;
+    color: var(--deleted-text);
+    text-decoration: line-through;
+  }
+  .deleted-arrow { color: var(--deleted-border); font-size: 14px; }
+  .deleted-reason {
+    font-size: 11px;
+    color: var(--deleted-text);
+    margin-top: 8px;
+    opacity: 0.8;
+  }
+
+  /* Section title */
+  .section-title {
+    max-width: 1100px;
+    margin: 0 auto 16px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Inline arrow label */
+  .arrow-label {
+    font-size: 9.5px;
+    color: var(--muted);
+    text-align: center;
+    margin: 2px 0;
+  }
+
+  /* Column headers */
+  .col-headers {
+    max-width: 1100px;
+    margin: 0 auto 16px;
+    display: grid;
+    grid-template-columns: 1fr 40px 1fr;
+  }
+  .col-header {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 8px;
+  }
+  .col-header.real { background: var(--real-bg); color: var(--real-text); }
+  .col-header.practice { background: var(--practice-bg); color: var(--practice-text); }
+
+  /* Result comparison */
+  .result-compare {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .result-box {
+    background: white;
+    border-radius: 16px;
+    border: 1.5px solid var(--border);
+    padding: 16px;
+    box-shadow: var(--shadow);
+  }
+  .result-box.real { border-color: var(--real-border); }
+  .result-box.practice { border-color: var(--practice-border); }
+  .result-box h3 {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .result-box ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .result-box li {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  .result-box li::before { content: '→'; color: var(--orange); flex-shrink: 0; margin-top: 1px; }
+
+  /* Shared result */
+  .shared-result {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* Connector horizontal */
+  .connector-h {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+  .connector-line-h {
+    height: 2px;
+    background: var(--teal-mid);
+    flex: 1;
+  }
+  .connector-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--teal-mid);
+    flex-shrink: 0;
+  }
+
+  /* Vertical spacers */
+  .vs-12 { height: 12px; }
+  .vs-16 { height: 16px; }
+  .vs-20 { height: 20px; }
+  .vs-24 { height: 24px; }
+  .vs-32 { height: 32px; }
+  .vs-40 { height: 40px; }
+
+  /* Arrow down thin */
+  .arrow-thin {
+    width: 2px;
+    background: var(--teal-mid);
+    position: relative;
+  }
+  .arrow-thin::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 6px solid var(--teal-mid);
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Page header ── -->
+<div class="page-header">
+  <h1>V9 Exam User Flow — ExamTemplate vs PracticeSet</h1>
+  <p style="margin-bottom:10px;">Idea doc: <code>docs/ideas/exam-template-vs-practice-set.md</code> · Plan: <code>tasks/todo.md</code> (EX-1 → EX-4)</p>
+  <div>
+    <span class="badge badge-real">● exam_mode = "real"</span>
+    <span class="badge badge-practice">● exam_mode = "practice"</span>
+    <span class="badge badge-deleted">✕ deleted in V9</span>
+    <span class="badge badge-new">★ changed in V9</span>
+  </div>
+</div>
+
+<!-- ── Legend ── -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--real-bg);border:1.5px solid var(--real-border)"></div>ExamTemplate (real exam, 60% fixed)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--practice-bg);border:1.5px solid var(--practice-border)"></div>PracticeSet (flexible, custom threshold)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--deleted-bg);border:1.5px solid var(--deleted-border)"></div>Deleted: FullExamSession flow</div>
+  <div class="legend-item"><div class="legend-dot" style="background:white;border:1.5px solid var(--teal-mid)"></div>Shared screens (unchanged)</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     DELETED SECTION
+════════════════════════════════════════════════════════ -->
+<div class="deleted-section">
+  <div class="deleted-section-title">Xóa trong V9 — FullExamSession flow (dead code từ V7)</div>
+  <div class="deleted-flow">
+    <span class="deleted-node">FullExamIntroScreen</span>
+    <span class="deleted-arrow">→</span>
+    <span class="deleted-node">písemná MockExamScreen</span>
+    <span class="deleted-arrow">→</span>
+    <span class="deleted-node">POST /v1/full-exams</span>
+    <span class="deleted-arrow">→</span>
+    <span class="deleted-node">auto-link ústní</span>
+    <span class="deleted-arrow">→</span>
+    <span class="deleted-node">FullExamResultScreen</span>
+  </div>
+  <div class="deleted-reason">Lý do: V7 sprint model đã thay thế. Không có Flutter route nào trigger được flow này. 3 scoring paths → 1.</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     NEW FLOW
+════════════════════════════════════════════════════════ -->
+
+<div class="section-title">New V9 User Flow</div>
+
+<!-- ── 1. Home ── -->
+<div class="shared-row">
+  <div style="display:flex;flex-direction:column;align-items:center;">
+    <div class="screen-card shared">
+      <div class="card-header">
+        <span class="card-title">HomeScreen</span>
+        <span class="badge" style="background:var(--teal-light);color:var(--teal);font-size:10px;padding:2px 8px;border-radius:99px;border:none;">Bottom Nav</span>
+      </div>
+      <div class="card-body">
+        <div class="card-desc">Learner chọn học hoặc thi thử từ Home tab</div>
+        <div class="mock-list-item">
+          <div class="mock-list-icon" style="background:var(--orange-light);"></div>
+          <div>
+            <div class="mock-text" style="width:120px;background:var(--cream-dark);"></div>
+            <div style="font-size:9px;color:var(--muted);margin-top:2px;">Course luyện tập</div>
+          </div>
+        </div>
+        <div class="mock-list-item">
+          <div class="mock-list-icon" style="background:var(--teal-light);"></div>
+          <div>
+            <div class="mock-text" style="width:100px;background:var(--teal-light);"></div>
+            <div style="font-size:9px;color:var(--muted);margin-top:2px;">Thi thử / Luyện thi</div>
+          </div>
+        </div>
+        <div class="mock-btn" style="margin-top:8px;">Xem bài thi →</div>
+      </div>
+    </div>
+    <div class="arrow-down" style="height:20px;"></div>
+  </div>
+</div>
+
+
+<!-- ── 2. MockTestList ── -->
+<div class="shared-row">
+  <div style="display:flex;flex-direction:column;align-items:center;">
+    <div class="screen-card shared">
+      <div class="card-header">
+        <span class="card-title">MockTestListScreen</span>
+        <span class="badge badge-new">★ V9</span>
+      </div>
+      <div class="card-body">
+        <div class="card-desc">Danh sách exam templates với <code style="font-size:10px;">exam_mode</code> badge</div>
+
+        <div class="mock-list-item">
+          <div class="mock-list-icon icon-real"></div>
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
+              <div class="mock-text" style="width:90px;margin:0;"></div>
+              <span class="mock-mode-badge mode-real">Thi thật</span>
+            </div>
+            <div style="font-size:9px;color:var(--muted);">Đủ 4 kỹ năng · Ngưỡng 60%</div>
+          </div>
+        </div>
+
+        <div class="mock-list-item">
+          <div class="mock-list-icon icon-practice"></div>
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
+              <div class="mock-text" style="width:80px;margin:0;background:var(--practice-bg);"></div>
+              <span class="mock-mode-badge mode-practice">Luyện thi</span>
+            </div>
+            <div style="font-size:9px;color:var(--muted);">Chỉ nói · Ngưỡng 80%</div>
+          </div>
+        </div>
+
+        <div class="mock-list-item" style="border-bottom:none;">
+          <div class="mock-list-icon icon-practice"></div>
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
+              <div class="mock-text" style="width:70px;margin:0;background:var(--practice-bg);"></div>
+              <span class="mock-mode-badge mode-practice">Luyện thi</span>
+            </div>
+            <div style="font-size:9px;color:var(--muted);">Nghe + Đọc · Ngưỡng 70%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Branch arrows -->
+    <div style="width:320px;display:flex;justify-content:space-between;align-items:flex-start;margin-top:0;">
+      <div style="display:flex;flex-direction:column;align-items:center;width:50%;">
+        <div class="arrow-down" style="height:16px;background:var(--real-border);"></div>
+        <div style="font-size:9px;color:var(--real-text);font-weight:600;background:var(--real-bg);padding:2px 7px;border-radius:4px;border:1px solid var(--real-border);">exam_mode = "real"</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;width:50%;">
+        <div class="arrow-down" style="height:16px;background:var(--practice-border);"></div>
+        <div style="font-size:9px;color:var(--practice-text);font-weight:600;background:var(--practice-bg);padding:2px 7px;border-radius:4px;border:1px solid var(--practice-border);">exam_mode = "practice"</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="vs-24"></div>
+
+<!-- Column headers -->
+<div class="col-headers">
+  <div class="col-header real">ExamTemplate (thi thật)</div>
+  <div></div>
+  <div class="col-header practice">PracticeSet (luyện thi)</div>
+</div>
+
+<!-- ── Branch: Intro screens ── -->
+<div class="branch-row" style="max-width:1100px;margin:0 auto;">
+
+  <!-- Real intro -->
+  <div class="branch-col">
+    <div class="screen-card real">
+      <div class="card-header">
+        <span class="card-title">MockTestIntroScreen</span>
+        <span class="mock-mode-badge mode-real">Thi thật</span>
+      </div>
+      <div class="card-body">
+        <div class="card-desc">Hiển thị format thi chính thức A2</div>
+        <div class="mock-badge-row">
+          <span class="mock-section-chip chip-speaking">Nói 40đ</span>
+          <span class="mock-section-chip chip-listening">Nghe 25đ</span>
+          <span class="mock-section-chip chip-reading">Đọc 25đ</span>
+          <span class="mock-section-chip chip-writing">Viết 20đ</span>
+        </div>
+        <div style="font-size:10px;color:var(--real-text);background:var(--real-bg);padding:5px 8px;border-radius:6px;margin-bottom:6px;border:1px solid var(--real-border);">
+          Ngưỡng đạt: <strong>60%</strong> (cố định theo NPI ČR)
+        </div>
+        <div class="mock-btn">Bắt đầu thi →</div>
+      </div>
+    </div>
+    <div class="arrow-down" style="height:20px;"></div>
+  </div>
+
+  <!-- Center divider -->
+  <div class="branch-center">
+    <div style="height:2px;width:100%;background:linear-gradient(90deg,var(--real-border),var(--practice-border));"></div>
+  </div>
+
+  <!-- Practice intro -->
+  <div class="branch-col">
+    <div class="screen-card practice">
+      <div class="card-header">
+        <span class="card-title">MockTestIntroScreen</span>
+        <span class="mock-mode-badge mode-practice">Luyện thi</span>
+      </div>
+      <div class="card-body">
+        <div class="card-desc">Hiển thị sections admin đã cấu hình</div>
+        <div class="mock-badge-row" id="practice-sections">
+          <span class="mock-section-chip chip-speaking">Nói 40đ</span>
+          <span class="mock-section-chip chip-writing">Viết 20đ</span>
+        </div>
+        <div style="font-size:10px;color:var(--practice-text);background:var(--practice-bg);padding:5px 8px;border-radius:6px;margin-bottom:6px;border:1px solid var(--practice-border);">
+          Ngưỡng đạt: <strong>80%</strong> (admin tùy chỉnh)
+        </div>
+        <div class="mock-btn" style="background:var(--teal);">Bắt đầu luyện →</div>
+      </div>
+    </div>
+    <div class="arrow-down" style="height:20px;"></div>
+  </div>
+
+</div><!-- /branch-row -->
+
+<div class="vs-4"></div>
+
+<!-- ── Shared: MockExamScreen ── -->
+<div class="shared-row">
+  <div style="display:flex;flex-direction:column;align-items:center;">
+    <div class="screen-card routing" style="width:320px;">
+      <div class="card-header">
+        <span class="card-title" style="color:white;">MockExamScreen</span>
+        <span class="badge" style="background:rgba(255,255,255,0.15);color:white;border:none;font-size:10px;">Section Router</span>
+      </div>
+      <div class="card-body">
+        <div class="card-desc">Route mỗi section đến đúng screen theo exercise_type prefix</div>
+        <div class="route-row">
+          <span class="route-type">uloha_*</span>
+          <span class="route-arrow">→</span>
+          <span class="route-screen">SpeakingExerciseScreen (record + analyze)</span>
+        </div>
+        <div class="route-row">
+          <span class="route-type">poslech_*</span>
+          <span class="route-arrow">→</span>
+          <span class="route-screen">ListeningExerciseScreen (audio + MCQ)</span>
+        </div>
+        <div class="route-row">
+          <span class="route-type">cteni_*</span>
+          <span class="route-arrow">→</span>
+          <span class="route-screen">ReadingExerciseScreen (text + fill-in)</span>
+        </div>
+        <div class="route-row" style="border-bottom:none;">
+          <span class="route-type">psani_*</span>
+          <span class="route-arrow">→</span>
+          <span class="route-screen">WritingExerciseScreen (text input)</span>
+        </div>
+      </div>
+    </div>
+    <div class="arrow-down" style="height:20px;"></div>
+    <div class="arrow-label">Learner hoàn thành tất cả sections</div>
+    <div class="arrow-down" style="height:16px;"></div>
+  </div>
+</div>
+
+<div class="vs-8"></div>
+
+<!-- ── Scoring split ── -->
+<div class="section-title">Scoring Logic (EX-2)</div>
+
+<div class="branch-row" style="max-width:1100px;margin:0 auto;">
+
+  <!-- Real scoring -->
+  <div class="branch-col">
+    <div class="screen-card real">
+      <div class="card-header">
+        <span class="card-title">computeScoring()</span>
+        <span class="mock-mode-badge mode-real">exam_mode = "real"</span>
+      </div>
+      <div class="card-body">
+        <div class="card-desc" style="color:var(--real-text);">Threshold cố định 60% theo spec NPI ČR</div>
+        <div style="font-size:10px;color:var(--ink);line-height:1.6;background:var(--real-bg);padding:7px 9px;border-radius:6px;border:1px solid var(--real-border);">
+          <div><code style="font-size:9.5px;">ustni</code>: score ≥ 24/40 → passed</div>
+          <div><code style="font-size:9.5px;">pisemna</code>: score ≥ 42/70 → passed</div>
+          <div style="margin-top:4px;font-weight:600;color:var(--real-text);">threshold = 60 (hardcoded)</div>
+        </div>
+      </div>
+    </div>
+    <div class="arrow-down" style="height:20px;background:#93c5fd;"></div>
+  </div>
+
+  <div class="branch-center">
+    <div style="height:2px;width:100%;background:linear-gradient(90deg,var(--real-border),var(--practice-border));"></div>
+  </div>
+
+  <!-- Practice scoring -->
+  <div class="branch-col">
+    <div class="screen-card practice">
+      <div class="card-header">
+        <span class="card-title">computeScoring()</span>
+        <span class="mock-mode-badge mode-practice">exam_mode = "practice"</span>
+      </div>
+      <div class="card-body">
+        <div class="card-desc" style="color:var(--practice-text);">Threshold đọc từ session.PassThresholdPercent</div>
+        <div style="font-size:10px;color:var(--ink);line-height:1.6;background:var(--practice-bg);padding:7px 9px;border-radius:6px;border:1px solid var(--practice-border);">
+          <div><code style="font-size:9.5px;">pass_threshold_percent</code> từ MockTest</div>
+          <div>Default = 60 nếu bằng 0</div>
+          <div style="margin-top:4px;font-weight:600;color:var(--practice-text);">threshold = configurable (80, 70, ...)</div>
+        </div>
+      </div>
+    </div>
+    <div class="arrow-down" style="height:20px;background:var(--practice-border);"></div>
+  </div>
+
+</div>
+
+<div class="vs-8"></div>
+
+<!-- ── Result screen ── -->
+<div class="section-title">Result Screen</div>
+
+<div class="result-compare">
+  <div class="result-box real">
+    <h3><span class="mock-mode-badge mode-real" style="font-size:11px;padding:3px 9px;">Thi thật</span> MockExamResultScreen</h3>
+    <div class="mock-score-row" style="margin-bottom:8px;">
+      <div class="mock-score-ring">32/40</div>
+      <div>
+        <div class="mock-pass">ĐẠT ✓</div>
+        <div class="mock-score-text">Ngưỡng đạt: 24/40 (60%)</div>
+      </div>
+    </div>
+    <ul>
+      <li>Hiển thị score tuyệt đối (X/40 hoặc X/70)</li>
+      <li>Badge PASS/FAIL với ngưỡng 60% cố định</li>
+      <li>Breakdown per section (uloha_1: 7/8, v.v.)</li>
+      <li>Tap section → full ResultCard (transcript + feedback)</li>
+    </ul>
+  </div>
+  <div class="result-box practice">
+    <h3><span class="mock-mode-badge mode-practice" style="font-size:11px;padding:3px 9px;">Luyện thi</span> MockExamResultScreen</h3>
+    <div class="mock-score-row" style="margin-bottom:8px;">
+      <div class="mock-score-ring" style="border-color:var(--teal);">28/40</div>
+      <div>
+        <div class="mock-fail">CHƯA ĐẠT ✗</div>
+        <div class="mock-score-text">Ngưỡng đạt: 32/40 (80%)</div>
+      </div>
+    </div>
+    <ul>
+      <li>Hiển thị score + threshold% do admin cài</li>
+      <li>Badge PASS/FAIL với threshold tùy chỉnh</li>
+      <li>Breakdown per section</li>
+      <li>Tap section → full ResultCard</li>
+    </ul>
+  </div>
+</div>
+
+<div class="vs-40"></div>
+
+<!-- ═══════════════════════════════════════════════════════
+     CMS FLOW
+════════════════════════════════════════════════════════ -->
+
+<div class="section-title" style="margin-top:16px;">CMS Admin Flow (EX-3)</div>
+
+<div style="max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:16px;">
+
+  <div style="display:grid;grid-template-columns:1fr 40px 1fr;gap:0;align-items:start;">
+
+    <!-- Real admin -->
+    <div class="screen-card real" style="width:100%;">
+      <div class="card-header">
+        <span class="card-title">/mock-tests — Tạo ExamTemplate</span>
+        <span class="mock-mode-badge mode-real">real</span>
+      </div>
+      <div class="card-body">
+        <div style="font-size:10px;margin-bottom:6px;">
+          <div style="background:var(--cream-dark);border-radius:4px;padding:4px 8px;margin-bottom:4px;">
+            <span style="color:var(--muted);">Tiêu đề:</span> <span style="font-weight:500;">Modelový test A2 — tháng 5</span>
+          </div>
+          <div style="background:var(--real-bg);border-radius:4px;padding:4px 8px;border:1px solid var(--real-border);">
+            <span style="color:var(--real-text);font-weight:600;">○ Thi thật &nbsp;●</span> &nbsp;○ Luyện thi <br>
+            <span style="font-size:9px;color:var(--muted);">Ngưỡng đạt: <strong>60%</strong> (cố định, không chỉnh được)</span>
+          </div>
+        </div>
+        <div class="card-desc">Admin chọn exercise per section. Không thay đổi structure.</div>
+        <div class="mock-btn secondary">Thêm section →</div>
+      </div>
+    </div>
+
+    <div></div>
+
+    <!-- Practice admin -->
+    <div class="screen-card practice" style="width:100%;">
+      <div class="card-header">
+        <span class="card-title">/mock-tests — Tạo PracticeSet</span>
+        <span class="mock-mode-badge mode-practice">practice</span>
+      </div>
+      <div class="card-body">
+        <div style="font-size:10px;margin-bottom:6px;">
+          <div style="background:var(--cream-dark);border-radius:4px;padding:4px 8px;margin-bottom:4px;">
+            <span style="color:var(--muted);">Tiêu đề:</span> <span style="font-weight:500;">Sprint nói + viết — tuần 3</span>
+          </div>
+          <div style="background:var(--practice-bg);border-radius:4px;padding:4px 8px;border:1px solid var(--practice-border);">
+            <span style="color:var(--muted);">○ Thi thật &nbsp;</span><span style="color:var(--practice-text);font-weight:600;">● Luyện thi</span><br>
+            <span style="font-size:9px;color:var(--muted);">Ngưỡng đạt: </span>
+            <input type="number" value="80" style="width:36px;font-size:9px;border:1px solid var(--practice-border);border-radius:3px;padding:1px 3px;" readonly>
+            <span style="font-size:9px;color:var(--muted);">%</span>
+          </div>
+        </div>
+        <div class="card-desc">Admin chọn sections tự do (bất kỳ skill nào).</div>
+        <div class="mock-btn" style="background:var(--teal);">Thêm section →</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<div class="vs-40"></div>
+
+<!-- ═══════════════════════════════════════════════════════
+     TASK SUMMARY
+════════════════════════════════════════════════════════ -->
+
+<div class="section-title" style="margin-top:8px;">Task Summary</div>
+
+<div style="max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+  <div style="background:white;border-radius:12px;border:1.5px solid var(--border);padding:14px;box-shadow:var(--shadow);">
+    <div style="font-size:11px;font-weight:700;color:var(--teal);margin-bottom:8px;font-family:monospace;">EX-1</div>
+    <div style="font-size:11px;font-weight:600;margin-bottom:6px;">Xóa FullExam stack</div>
+    <div style="font-size:10px;color:var(--muted);line-height:1.5;">
+      6 files Go xóa<br>
+      3 types xóa<br>
+      4 routes xóa<br>
+      Auto-link xóa<br>
+      DROP TABLE
+    </div>
+  </div>
+  <div style="background:white;border-radius:12px;border:1.5px solid var(--border);padding:14px;box-shadow:var(--shadow);">
+    <div style="font-size:11px;font-weight:700;color:var(--teal);margin-bottom:8px;font-family:monospace;">EX-2</div>
+    <div style="font-size:11px;font-weight:600;margin-bottom:6px;">session_type → exam_mode</div>
+    <div style="font-size:10px;color:var(--muted);line-height:1.5;">
+      contracts/types.go<br>
+      postgres_mock_tests.go<br>
+      ensureSchema ALTER<br>
+      server.go handler
+    </div>
+  </div>
+  <div style="background:white;border-radius:12px;border:1.5px solid var(--border);padding:14px;box-shadow:var(--shadow);">
+    <div style="font-size:11px;font-weight:700;color:var(--teal);margin-bottom:8px;font-family:monospace;">EX-3</div>
+    <div style="font-size:11px;font-weight:600;margin-bottom:6px;">CMS radio UI</div>
+    <div style="font-size:10px;color:var(--muted);line-height:1.5;">
+      Bỏ session_type dropdown<br>
+      Thêm exam_mode radio<br>
+      real | practice<br>
+      Badge trong list
+    </div>
+  </div>
+  <div style="background:white;border-radius:12px;border:1.5px solid var(--border);padding:14px;box-shadow:var(--shadow);">
+    <div style="font-size:11px;font-weight:700;color:var(--teal);margin-bottom:8px;font-family:monospace;">EX-4</div>
+    <div style="font-size:11px;font-weight:600;margin-bottom:6px;">Flutter cleanup</div>
+    <div style="font-size:10px;color:var(--muted);line-height:1.5;">
+      2 screens xóa<br>
+      models.dart update<br>
+      api_client.dart<br>
+      main.dart routes
+    </div>
+  </div>
+</div>
+
+<div style="max-width:1100px;margin:24px auto 0;padding:12px 16px;background:var(--teal);border-radius:10px;color:white;">
+  <div style="font-size:11px;font-weight:700;margin-bottom:4px;">CHECKPOINT EX — <code style="font-size:10px;">make verify</code></div>
+  <div style="font-size:10px;opacity:0.75;">EX-1 → EX-2 → (EX-3 ‖ EX-4) → make verify → 0 FullExam references</div>
+</div>
+
+</body>
+</html>

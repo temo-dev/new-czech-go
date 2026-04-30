@@ -1,4 +1,4 @@
-# Plan: Skills Expansion V2→V5
+# Plan: Skills Expansion V2→V9
 
 Source: Modelový test A2, NPI ČR (platný od dubna 2026). OCR'd 2026-04-27.
 
@@ -11,6 +11,8 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026). OCR'd 2026-04-27.
 - ✅ pool=course / pool=exam separation
 - ✅ Design system V0 (Babbel theme)
 - ✅ Flutter i18n (VI/EN)
+- ✅ V2 Writing, V3 Listening, V4 Reading, V5 MockTest full, V6 Vocab+Grammar, V7 Flexible Sprint
+- ✅ V8 Voice Selection (4 slices VS1-VS4)
 
 ---
 
@@ -813,3 +815,115 @@ VS1 → VS2 → [CHECKPOINT VS-A] → VS3 → VS4 → [CHECKPOINT VS-B]
 ```
 
 Dependency: VS1 là foundation (registry). VS2 dùng registry. VS3 dùng VS2 endpoints. VS4 dùng VS3 service.
+
+---
+
+## V9 — Exam Model Cleanup: ExamTemplate vs PracticeSet
+
+Idea doc: `docs/ideas/exam-template-vs-practice-set.md`
+
+### Vấn đề
+
+`MockTest.session_type` (`speaking | pisemna | full | ""`) là 4-value field cố gắng phân loại cả exam thật lẫn luyện thi. `FullExamSession` là entity thứ 3 không có Flutter UI nào kết nối vào, tồn tại như dead code kể từ V7 sprint model thay thế.
+
+Kết quả: 3 scoring path (`CompleteMockExam` / `FullExamScorer` / `computeScoring`), 2 session store, 1 auto-link hack, và admin không rõ phải tạo MockTest loại gì.
+
+### Model mới
+
+```
+exam_mode: "real" | "practice"   ← thay session_type
+
+"real"     → ExamTemplate: admin chọn exercise per section, scoring 60% cố định
+"practice" → PracticeSet:  admin chọn sections tự do, pass_threshold_percent tùy chỉnh
+```
+
+`MockTest` entity và `MockExamSession` giữ nguyên — chỉ đổi field + xóa `FullExamSession` layer.
+
+### Quyết định kiến trúc
+
+| Quyết định | Lý do |
+|---|---|
+| Giữ tên DB table `mock_tests` | Không đáng rủi ro rename migration |
+| Giữ `MockExamSession` cho cả 2 modes | 1 table đủ, không over-engineer |
+| Xóa toàn bộ `FullExamSession` stack | Dead code — không có Flutter UI nào trigger |
+| `exam_mode = "real"` scoring = 60% flat | Theo spec NPI ČR (≥24/40 ustni, ≥42/70 pisemna) |
+| DROP TABLE `full_exam_sessions` inline trong main.go cleanup | Không có migration files riêng trong codebase |
+
+### Slices
+
+#### EX-1 — Backend: Xóa FullExam stack
+
+**Files xóa:**
+- `backend/internal/processing/full_exam_scorer.go`
+- `backend/internal/processing/full_exam_scorer_test.go`
+- `backend/internal/processing/full_exam_auto_link_test.go`
+- `backend/internal/store/full_exam_store.go`
+- `backend/internal/store/full_exam_store_test.go`
+- `backend/internal/store/postgres_full_exam_store.go`
+
+**Files sửa:**
+- `backend/internal/contracts/types.go` — xóa `FullExamSession`, `FullExamCreateRequest`, `FullExamCompleteRequest`
+- `backend/internal/store/memory.go` — xóa FullExamStore field + Repo methods (`FullExamSession`, `SetFullExamSession`, `ListFullExamSessions`)
+- `backend/internal/httpapi/server.go` — xóa `fullExamScorer` field, handlers `handleFullExams`/`handleFullExamByID`, routes `/v1/full-exams*`, auto-link call trong `handleMockExamComplete`
+- `backend/cmd/api/main.go` — xóa fullExamScorer wiring, thêm `DROP TABLE IF EXISTS full_exam_sessions`
+
+**AC:**
+- `make backend-build` passes
+- `make backend-test` passes
+- `curl /v1/full-exams` → 404
+
+#### EX-2 — Backend: session_type → exam_mode
+
+**Files sửa:**
+- `backend/internal/contracts/types.go` — `MockTest.SessionType` → `MockTest.ExamMode`
+- `backend/internal/store/postgres_mock_tests.go` — ensureSchema: `ADD COLUMN IF NOT EXISTS exam_mode VARCHAR(20) NOT NULL DEFAULT ''`; drop `session_type` col; update INSERT/SELECT/UPDATE queries
+- `backend/internal/store/mock_test_store.go` (nếu có memory impl) — cập nhật field
+- `backend/internal/httpapi/server.go` — handler `handleAdminMockTests` đọc/ghi `exam_mode`
+
+**AC:**
+- `make backend-build && make backend-test`
+- `GET /v1/mock-tests` trả về `exam_mode` thay `session_type`
+
+#### EX-3 — CMS: bỏ session_type, thêm exam_mode radio
+
+**Files sửa:**
+- MockTest form trong CMS — xóa `session_type` dropdown, thêm `exam_mode` radio (`real` | `practice`)
+- Hiển thị danh sách MockTest — show exam_mode badge thay session_type
+
+**AC:**
+- `make cms-lint && make cms-build`
+- Tạo MockTest mới → chọn real/practice → lưu → reload → đúng giá trị
+
+#### EX-4 — Flutter: xóa FullExam screens, update models
+
+**Files xóa:**
+- `flutter_app/lib/features/mock_exam/screens/full_exam_intro_screen.dart`
+- `flutter_app/lib/features/mock_exam/screens/full_exam_result_screen.dart`
+
+**Files sửa:**
+- `flutter_app/lib/models/models.dart` — xóa `FullExamSession` model; `MockTest.sessionType` → `examMode`
+- `flutter_app/lib/core/api/api_client.dart` — xóa FullExam API calls
+- `flutter_app/lib/main.dart` — xóa FullExam imports/routes
+- `flutter_app/lib/features/mock_exam/screens/mock_test_list_screen.dart` — xóa navigation đến FullExamIntroScreen
+- `flutter_app/lib/features/mock_exam/screens/mock_test_intro_screen.dart` — xóa FullExam branching nếu có
+
+**AC:**
+- `make flutter-analyze` passes (0 errors)
+- `make flutter-test` passes
+
+**[CHECKPOINT EX]** `make verify`
+
+### Dependency graph
+
+```
+EX-1 (xóa FullExam stack)
+  └── EX-2 (session_type → exam_mode)
+        ├── EX-3 (CMS)
+        └── EX-4 (Flutter)
+              ↓
+[CHECKPOINT EX] make verify
+```
+
+EX-1 trước: xóa references trước khi rename field để tránh compile error cascade.
+EX-2 sau EX-1: rename field an toàn khi FullExam types đã xóa.
+EX-3 và EX-4 song song sau EX-2.

@@ -10,6 +10,7 @@ IOS_DEVICE ?= iPhone 17 Pro Max
 EC2_ENV_FILE ?= .env.ec2
 SMOKE_BASE_URL ?= http://localhost:8080
 SMOKE_ATTEMPT_ARGS ?=
+SMOKE_AUDIO_FILE ?=
 
 .PHONY: help install install-cms install-flutter \
 	backend-run backend-build backend-test backend-fmt \
@@ -20,6 +21,7 @@ SMOKE_ATTEMPT_ARGS ?=
 	compose-proxy-up compose-proxy-down compose-proxy-logs compose-ec2-config \
 	compose-ec2-pull compose-ec2-up compose-ec2-down compose-ec2-logs release-images ecr-login check-ec2-env \
 	check-ec2-host check-aws-audio-pipeline package-ec2-deploy smoke-attempt-flow \
+	smoke-course-flow smoke-exam-flow smoke-all \
 	seed-modelovy-test-2 graph-status verify clean
 
 help:
@@ -65,6 +67,9 @@ help:
 	@echo "  make package-ec2-deploy - Create a tar.gz deploy bundle for EC2 without git"
 	@echo "  make smoke-attempt-flow - Run the API-level learner smoke test against SMOKE_BASE_URL"
 	@echo "                            Add --require-real-transcript in SMOKE_ATTEMPT_ARGS to fail when the backend still returns synthetic transcript data"
+	@echo "  make smoke-course-flow  - Smoke test course browsing: login → courses → modules → skills → exercises"
+	@echo "  make smoke-exam-flow    - Smoke test mock exam session: create → submit all sections → complete → verify score"
+	@echo "  make smoke-all          - Run all three smoke tests in sequence"
 	@echo "  make graph-status     - Show whether the local code-review graph database exists"
 	@echo "  make verify           - Run backend build, CMS lint/build, Flutter analyze/test"
 
@@ -209,6 +214,14 @@ package-ec2-deploy:
 
 smoke-attempt-flow:
 	$(RTK) python3 scripts/smoke_test_attempt_flow.py --base-url $(SMOKE_BASE_URL) $(SMOKE_ATTEMPT_ARGS)
+
+smoke-course-flow:
+	$(RTK) python3 scripts/smoke_course_flow.py --base-url $(SMOKE_BASE_URL)
+
+smoke-exam-flow:
+	$(RTK) python3 scripts/smoke_exam_flow.py --base-url $(SMOKE_BASE_URL) $(if $(SMOKE_AUDIO_FILE),--audio-file $(SMOKE_AUDIO_FILE),)
+
+smoke-all: smoke-attempt-flow smoke-course-flow smoke-exam-flow
 
 seed-modelovy-test-2:
 	$(RTK) python3 scripts/seed-modelovy-test-2.py

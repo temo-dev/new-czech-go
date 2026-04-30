@@ -1,6 +1,6 @@
-# Todo — Skills Expansion V2→V6
+# Todo — Skills Expansion V2→V9
 
-Cập nhật: 2026-04-29. Xem chi tiết + AC trong `tasks/plan.md`.
+Cập nhật: 2026-04-30. Xem chi tiết + AC trong `tasks/plan.md`.
 Plan Sprint MockTest: `docs/plans/flexible-sprint-mocktest-plan.md`.
 
 ---
@@ -145,3 +145,17 @@ Spec: `docs/ideas/voice-selection.md`. Plan chi tiết: `tasks/plan.md` → sect
 - [x] V5: FullExamIntroScreen capture real attempt_id (hiện dùng placeholder 'done-N')
 - [x] V5: Auto-link ústní session sau khi mock exam speaking hoàn tất — FindOpenFullExamForAutoLink + handleMockExamComplete wires user (2026-04-29)
 - [x] V5: Postgres store cho full_exam_sessions — FullExamStore interface + postgresFullExamStore + wire main.go (2026-04-29)
+
+---
+
+## V9 — Exam Model Cleanup: ExamTemplate vs PracticeSet
+
+Idea doc: `docs/ideas/exam-template-vs-practice-set.md`
+Chi tiết + AC đầy đủ trong `tasks/plan.md` (section V9).
+
+- [ ] **EX-1** Backend: xóa FullExam stack — `full_exam_scorer.go`, `full_exam_store.go`, `postgres_full_exam_store.go` + 3 test files; xóa `FullExamSession/CreateRequest/CompleteRequest` khỏi contracts; xóa `fullExamScorer` + handlers `/v1/full-exams*` + auto-link call khỏi server.go; `DROP TABLE IF EXISTS full_exam_sessions` trong main.go
+- [ ] **EX-2** Backend: `MockTest.session_type` → `exam_mode`; ensureSchema ALTER TABLE; update INSERT/SELECT/UPDATE; update server.go handler
+- [ ] **EX-3** CMS: xóa `session_type` dropdown, thêm `exam_mode` radio (`real` | `practice`)
+- [ ] **EX-4** Flutter: xóa `full_exam_intro_screen.dart` + `full_exam_result_screen.dart`; xóa `FullExamSession` model; xóa API calls; xóa routes; `MockTest.sessionType` → `examMode`
+
+**[CHECKPOINT EX]** `make verify`

@@ -1,6 +1,6 @@
-# SPEC — A2 Mluvení Sprint: Skills Expansion V2→V5
+# SPEC — A2 Mluvení Sprint: Skills Expansion V2→V9
 
-Source: `tasks/plan.md` (2026-04-27). Kỳ thi: Modelový test A2, NPI ČR (platný od dubna 2026).
+Source: `tasks/plan.md` (2026-04-30). Kỳ thi: Modelový test A2, NPI ČR (platný od dubna 2026).
 
 ---
 
@@ -120,13 +120,38 @@ QuestionResult   { QuestionNo, LearnerAnswer, CorrectAnswer, IsCorrect }
 - Multiple choice: exact match (case-insensitive key "A"/"B"/...)
 - Fill-in (`cteni_5`, `poslech_5`): **1đ/câu**, substring match (case-insensitive, trim). Partial credit — không all-or-nothing.
 
-### Full exam V5
+### Full exam V5 (superseded by V9)
 ```
 písemná (V4+V2+V3): max 70đ, pass ≥42 (60%)
 ústní   (V1):       max 40đ, pass ≥24 (60%)
 overall_passed = pisemna_passed AND ustni_passed
 ```
-DB: `full_exam_sessions` bảng mới + `session_type` trên `mock_tests`.
+~~DB: `full_exam_sessions` bảng mới + `session_type` trên `mock_tests`.~~
+→ **V9:** `FullExamSession` bị xóa. `session_type` → `exam_mode`. Xem section V9 bên dưới.
+
+### Exam model V9 — ExamTemplate vs PracticeSet
+
+Idea doc: `docs/ideas/exam-template-vs-practice-set.md`
+
+```
+exam_mode: "real" | "practice"   (thay session_type trên mock_tests)
+
+"real"     → ExamTemplate: admin chọn exercise per section, scoring 60% cố định
+"practice" → PracticeSet:  admin chọn sections tự do, pass_threshold_percent tùy chỉnh
+```
+
+**Xóa hoàn toàn:**
+- `FullExamSession`, `FullExamCreateRequest`, `FullExamCompleteRequest` khỏi contracts
+- `FullExamStore` interface + memory + postgres implementations
+- `FullExamScorer`, `FindOpenFullExamForAutoLink` khỏi processing
+- Routes `/v1/full-exams`, `/v1/full-exams/:id/complete`
+- Auto-link mechanism trong `handleMockExamComplete`
+- DB table `full_exam_sessions` (DROP TABLE IF EXISTS trong main.go cleanup)
+
+**Thay đổi:**
+- `mock_tests.session_type` → `mock_tests.exam_mode VARCHAR(20) DEFAULT ''`
+- `MockTest.SessionType` → `MockTest.ExamMode` trong Go contracts
+- Scoring: `exam_mode = "real"` → threshold 60% (≥24/40 ustni, ≥42/70 pisemna); `"practice"` → `pass_threshold_percent`
 
 ---
 
@@ -161,21 +186,20 @@ Response: attempt object (status=completed, objective_result populated)
 - Lưu audio → `exercise_audio` table
 - Returns `{storage_key, mime_type, duration_sec}`
 
-### POST /v1/full-exams (V5)
-```json
-Request: { "mock_test_id": "uuid" }
-Response: { "id": "uuid", "pisemna_session_id": "uuid", "status": "in_progress" }
-```
+### ~~POST /v1/full-exams (V5)~~ — **XÓA trong V9**
+Route này bị xóa. `FullExamSession` không còn tồn tại.
 
 ---
 
 ## 5. Data Model mới
 
-### DB migrations
-| Migration | Nội dung |
+### DB schema (inline trong Go ensureSchema — không có migration files riêng)
+| Table | Trạng thái |
 |---|---|
-| `010_exercise_audio.sql` | `exercise_audio (exercise_id, storage_key, mime_type, source_type, generated_at)` |
-| `011_full_exam.sql` | `full_exam_sessions` table + `session_type` column trên `mock_tests` |
+| `exercise_audio` | ✅ tồn tại (V3) |
+| `full_exam_sessions` | ~~V5~~ **XÓA trong V9** — `DROP TABLE IF EXISTS` trong main.go |
+| `mock_tests.session_type` | ~~V5~~ **XÓA trong V9** — thay bằng `exam_mode` |
+| `mock_tests.exam_mode` | **THÊM trong V9** — `VARCHAR(20) NOT NULL DEFAULT ''` |
 
 ### New Go structs (contracts/types.go)
 - `Psani1Detail`, `Psani2Detail`, `WritingSubmission`
@@ -183,7 +207,7 @@ Response: { "id": "uuid", "pisemna_session_id": "uuid", "status": "in_progress" 
 - `Cteni1Detail`, `Cteni2Detail`, `Cteni3Detail`, `Cteni4Detail`, `Cteni5Detail`
 - `AnswerSubmission`, `ObjectiveResult`, `QuestionResult`
 - `ListeningAudioSource`, `AudioSegment`, `MultipleChoiceOption`, `FillQuestion`
-- `FullExamSession` (V5)
+- ~~`FullExamSession` (V5)~~ **XÓA trong V9**
 
 ### AttemptFeedback extension
 Thêm field: `objective_result *ObjectiveResult` (nil cho speaking/writing).
@@ -200,13 +224,12 @@ backend/
       writing_scorer.go         -- NEW V2
       exercise_audio.go         -- NEW V3 (Polly for exercises)
       objective_scorer.go       -- NEW V3/V4 (shared)
-      full_exam_scorer.go       -- NEW V5
-    httpapi/server.go           -- thêm routes mới
+      ~~full_exam_scorer.go~~    -- XÓA trong V9
+    httpapi/server.go           -- thêm routes mới; xóa /v1/full-exams* trong V9
     store/
-      postgres_*.go             -- extend cho full_exam (V5)
-  db/migrations/
-    010_exercise_audio.sql      -- NEW V3
-    011_full_exam.sql           -- NEW V5
+      postgres_mock_tests.go    -- exam_mode column thay session_type (V9)
+      ~~full_exam_store.go~~    -- XÓA trong V9
+      ~~postgres_full_exam_store.go~~ -- XÓA trong V9
 
 cms/app/exercises/              -- extend exercise forms per type
 flutter_app/lib/
@@ -226,8 +249,8 @@ flutter_app/lib/
       writing_result_card.dart       -- NEW V2
   features/mock_exam/
     screens/
-      full_exam_intro_screen.dart    -- NEW V5
-      full_exam_result_screen.dart   -- NEW V5
+      ~~full_exam_intro_screen.dart~~  -- XÓA trong V9
+      ~~full_exam_result_screen.dart~~ -- XÓA trong V9
   models/models.dart             -- extend với tất cả types mới
   core/api/api_client.dart       -- add submitText(), submitAnswers(), getExerciseAudio()
 ```
@@ -520,3 +543,88 @@ NEVER in V6:
 - Partial publish (all-or-nothing)
 - Full-text matching answers (use option key A/B/C)
 - Goroutine left stuck on server restart (must recover on boot)
+
+---
+
+## V9 — Exam Model Cleanup (2026-04-30)
+
+Idea doc: `docs/ideas/exam-template-vs-practice-set.md`
+Full plan + task breakdown: `tasks/plan.md` (section V9), `tasks/todo.md` (EX-1 → EX-4).
+
+### Objective
+
+Untangle exam session model. Hai loại rõ ràng thay vì 1 entity với 4-value `session_type` flag:
+
+| Mode | Tên gọi | Scoring | Admin config |
+|------|---------|---------|--------------|
+| `"real"` | ExamTemplate | 60% cố định (≥24/40 ustni, ≥42/70 pisemna) | Chọn exercise per section |
+| `"practice"` | PracticeSet | `pass_threshold_percent` tùy chỉnh | Chọn sections tự do |
+
+`MockTest` entity và `MockExamSession` **giữ nguyên**. Chỉ đổi field + xóa `FullExamSession` layer.
+
+### Kiến trúc quyết định (frozen)
+
+| Quyết định | Lý do |
+|---|---|
+| Giữ tên DB table `mock_tests` | Không đáng rủi ro rename migration |
+| Giữ `MockExamSession` cho cả 2 modes | 1 table đủ, không over-engineer |
+| Xóa toàn bộ `FullExamSession` stack | Dead code — không có Flutter UI nào trigger sau V7 |
+| `exam_mode = "real"` scoring = 60% flat | Theo spec NPI ČR (≥24/40, ≥42/70) |
+| DROP TABLE inline trong main.go | Không có migration files riêng trong codebase — schema quản lý qua ensureSchema() |
+| `exam_mode = ""` (empty string) = "practice" | Backward compat — existing records không bị break |
+
+### Deleted (V9)
+
+**Backend files xóa:**
+- `backend/internal/processing/full_exam_scorer.go`
+- `backend/internal/processing/full_exam_scorer_test.go`
+- `backend/internal/processing/full_exam_auto_link_test.go`
+- `backend/internal/store/full_exam_store.go`
+- `backend/internal/store/full_exam_store_test.go`
+- `backend/internal/store/postgres_full_exam_store.go`
+
+**Backend types xóa** (từ `contracts/types.go`):
+- `FullExamSession`
+- `FullExamCreateRequest`
+- `FullExamCompleteRequest`
+
+**Backend routes xóa** (từ `server.go`):
+- `POST /v1/full-exams`
+- `GET /v1/full-exams`
+- `GET /v1/full-exams/:id`
+- `POST /v1/full-exams/:id/complete`
+
+**Flutter files xóa:**
+- `flutter_app/lib/features/mock_exam/screens/full_exam_intro_screen.dart`
+- `flutter_app/lib/features/mock_exam/screens/full_exam_result_screen.dart`
+
+### Changed (V9)
+
+- `mock_tests` DB: ADD `exam_mode VARCHAR(20) NOT NULL DEFAULT ''`, DROP `session_type`
+- `contracts.MockTest`: `SessionType string` → `ExamMode string`
+- `postgres_mock_tests.go` ensureSchema: migrate column
+- `server.go` handleAdminMockTests: đọc/ghi `exam_mode`
+- CMS MockTest form: bỏ `session_type` dropdown, thêm `exam_mode` radio (`real` | `practice`)
+- Flutter `MockTest` model: `sessionType` → `examMode`
+- Flutter `api_client.dart`: xóa FullExam API calls
+
+### V9 Boundaries
+
+NEVER:
+- Rebuild `FullExamSession` hay equivalent 2-part exam tracking — thay vào đó dùng 2 `MockExamSession` riêng biệt nếu cần
+- Thêm `session_type` lại dưới bất kỳ tên gọi nào — `exam_mode: "real" | "practice"` là source of truth
+- Enforce 4-section structure cho `exam_mode = "real"` tại validation layer — convention, không phải constraint
+
+ASK FIRST:
+- Bất kỳ thay đổi nào vào `computeScoring()` logic — ảnh hưởng cả real và practice mode
+- Thêm `exam_mode` value mới ngoài `"real"` và `"practice"`
+
+### V9 Verification
+
+| Step | Lệnh | Manual check |
+|------|------|--------------|
+| EX-1 | `make backend-build && make backend-test` | `GET /v1/full-exams` → 404 |
+| EX-2 | `make backend-build && make backend-test` | `GET /v1/mock-tests` → trả `exam_mode`, không có `session_type` |
+| EX-3 | `make cms-lint && make cms-build` | Tạo MockTest → chọn real/practice → reload → đúng |
+| EX-4 | `make flutter-analyze && make flutter-test` | 0 errors, 0 FullExam references |
+| CHECKPOINT | `make verify` | Full pass |

@@ -29,7 +29,6 @@ type MemoryStore struct {
 	mockExams          MockExamStore
 	mockTests          MockTestStore
 	exerciseAudioStore ExerciseAudioStore // Postgres-backed when available
-	fullExamStore      FullExamStore      // Postgres-backed when available
 	vocabulary         VocabularyStore
 	grammar            GrammarStore
 	generationJobs     GenerationJobStore
@@ -108,7 +107,6 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 		mockExams:          newMemoryMockExamStore(exercises, attempts),
 		mockTests:          newMemoryMockTestStore(),
 		exerciseAudioStore: newMemoryExerciseAudioStore(),
-		fullExamStore:      newMemoryFullExamStore(),
 		vocabulary:         newMemoryVocabularyStore(),
 		grammar:            newMemoryGrammarStore(),
 		generationJobs:     newMemoryGenerationJobStore(),
@@ -521,30 +519,6 @@ func (s *MemoryStore) AdvanceMockExam(id, attemptID string) (contracts.MockExamS
 
 func (s *MemoryStore) CompleteMockExam(id string) (contracts.MockExamSession, error) {
 	return s.mockExams.CompleteMockExam(id)
-}
-
-// FullExamSession methods — delegate to fullExamStore (memory or Postgres)
-
-func (s *MemoryStore) SetFullExamStore(store FullExamStore) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.fullExamStore = store
-}
-
-func (s *MemoryStore) FullExamSession(id string) (*contracts.FullExamSession, bool) {
-	sess, ok := s.fullExamStore.GetFullExamSession(id)
-	if !ok {
-		return nil, false
-	}
-	return &sess, true
-}
-
-func (s *MemoryStore) SetFullExamSession(session contracts.FullExamSession) {
-	s.fullExamStore.SetFullExamSession(session)
-}
-
-func (s *MemoryStore) ListFullExamSessions(learnerID string) []contracts.FullExamSession {
-	return s.fullExamStore.ListFullExamSessions(learnerID)
 }
 
 // ExerciseAudio methods — delegate to exerciseAudioStore (memory or Postgres)
