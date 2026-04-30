@@ -1108,18 +1108,7 @@ export function ExerciseDashboard() {
         );
       }
 
-      if (editingId) {
-        resetForm();
-      } else {
-        // Transition to edit mode so user can generate audio immediately.
-        const newId: string | undefined = (payload.data as Record<string, unknown>)?.id as string | undefined;
-        if (newId) {
-          setEditingId(newId);
-          setWizardStep('content');
-        } else {
-          resetForm();
-        }
-      }
+      resetForm();
       await loadExercises();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
