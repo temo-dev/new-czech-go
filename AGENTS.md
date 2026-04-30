@@ -192,7 +192,7 @@ The implemented V1 foundation currently includes:
 Important current limitations:
 - local strict real-transcript mode still depends on valid AWS credentials plus `transcribe:*` IAM on the active local identity
 - learner-surface feedback copy and `sample_answer_text` coverage for `Uloha 3` và `Uloha 4` lighter than `Uloha 1` / `Uloha 2`
-- Exercise form file split (exercise-dashboard.tsx ~2000 dòng) deferred — chức năng hoạt động đúng nhưng file chưa được split
+- Exercise form file split ✅ hoàn thành trong V9 CMS Dashboard Upgrade
 - `_DiffTextBlock` chỉ highlight khi LLM trả về `diff_chunks` khác nhau; nếu learner text và corrected giống nhau hoàn toàn → all `unchanged` → không có highlight (đúng behavior)
 
 ## Working Rules
@@ -262,7 +262,7 @@ Per the local repo rule in `RTK.md`, shell commands should be prefixed with `rtk
 ## Verification Expectations
 Before closing a meaningful code change, run the relevant checks:
 - backend: `make backend-build` and `make backend-test`
-- CMS: `make cms-lint` and `make cms-build`
+- CMS: `make cms-lint` and `make cms-build` and `cd cms && npm test`
 - Flutter: `make flutter-analyze` and `make flutter-test`
 - full slice: `make verify`
 
@@ -300,10 +300,20 @@ Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 - CMS: bỏ `session_type` select, thêm `pass_threshold_percent` input
 - Intro screen passScore tính động từ threshold; result hiển thị % ngưỡng đạt
 
+**V9 CMS Exercise Dashboard Upgrade — 2026-04-30:**
+- `exercise-dashboard.tsx` 2036 dòng → 5 file tách biệt: `exercise-utils.ts` (types + parse/build helpers), `exercise-list.tsx` (filter bar + table), `exercise-form/index.tsx` (slide-over wizard + autosave), `exercise-matrix.tsx` (coverage matrix + exam pool mini-matrix), `exercise-dashboard.tsx` (thin orchestrator 211 dòng)
+- Coverage Matrix: Module rows × 4 cột (Nói/Nghe/Viết/Đọc), màu theo published count vs target 20, nhóm theo Course, sort theo sequence_no
+- Cell click → set module+skill_kind filter + smooth scroll đến list; toggle cell → clear filter
+- Tab "Exam Pool": mini-matrix per exercise_type (Tổng / Published / Có ảnh) + flat list; click row → filter
+- Form prefill: mở "+ Tạo exercise" khi có active matrix cell tự điền moduleId + skillKind + advance wizard đến step 2
+- Loading skeleton (shimmer) + API error banner với retry
+- `ExerciseListFilters` state lifted để matrix cell click có thể control list filters
+- Vitest 49 unit tests: `buildMatrix`, parse/build utilities, formStateFromExercise, payload builders
+- Specs: `docs/specs/exercise-dashboard-upgrade.md`, user flow: `docs/specs/exercise-dashboard-user-flow.md`
+
 **Remaining backlog (low priority):**
-1. Exercise form file split: `exercise-dashboard.tsx` ~2000 dòng → nhiều file ≤500 dòng (deferred từ EF-E)
-2. Nhập nội dung mẫu qua CMS: ít nhất 1 exercise mỗi loại để test Flutter end-to-end
-3. Polly audio upload flow cho `exercise_audio` (hiện chỉ text→Polly, upload không persist)
+1. Nhập nội dung mẫu qua CMS: ít nhất 1 exercise mỗi loại để test Flutter end-to-end
+2. Polly audio upload flow cho `exercise_audio` (hiện chỉ text→Polly, upload không persist)
 
 **Next coaching slice (if expanding):**
 Đọc `docs/ideas/attempt-repair-and-shadowing.md` + spec/plan files trước khi bắt đầu.

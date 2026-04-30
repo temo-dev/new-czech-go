@@ -48,11 +48,34 @@ Mỗi module là một tuần học hoặc chủ đề:
 
 ## 3. Tạo Exercise (quan trọng nhất)
 
-**Trang:** `/` → form bên trái
+**Trang:** `/` → Tab **"Khoá học"**
 
-### Tab "Đề bài"
+### Coverage Matrix — xem nhanh tình trạng nội dung
 
-**Task type — chọn loại bài:**
+Trang exercise hiển thị bảng **Module × Kỹ năng** (Nói / Nghe / Viết / Đọc):
+
+| Màu ô | Ý nghĩa |
+|-------|---------|
+| 🔴 Đỏ (0–5) | Thiếu nghiêm trọng |
+| 🟡 Vàng (6–14) | Còn thiếu |
+| 🟢 Xanh nhạt (15–19) | Gần đủ |
+| 🟢 Xanh đậm (≥20) | Đủ (target = 20 published) |
+
+Số nhỏ bên dưới = số bản nháp chưa xuất bản.
+
+**Cách dùng nhanh:**
+1. Nhìn vào matrix → tìm ô đỏ/vàng
+2. Click ô đó → list bên dưới tự filter theo module + kỹ năng
+3. Click **"+ Tạo exercise"** → form tự điền sẵn Module và Skill Kind từ ô đang chọn
+
+### Wizard tạo exercise mới
+
+Khi click "+ Tạo exercise":
+
+**Bước 1 — Chọn kỹ năng** (bỏ qua nếu click từ matrix cell):
+Nói / Viết / Nghe / Đọc / Từ vựng / Ngữ pháp
+
+**Bước 2 — Chọn dạng bài:**
 
 | Loại | Mô tả |
 |---|---|
@@ -60,6 +83,12 @@ Mỗi module là một tuần học hoặc chủ đề:
 | `Úloha 2` | Hội thoại — hỏi để lấy thông tin còn thiếu |
 | `Úloha 3` | Kể chuyện theo 4 tranh |
 | `Úloha 4` | Chọn 1 trong 3 phương án và giải thích lý do |
+| `Psaní 1` | Điền form (3 câu hỏi, ≥10 từ/câu) |
+| `Psaní 2` | Viết email theo 5 ảnh gợi ý (≥35 từ) |
+| `Poslech 1–5` | Các dạng nghe khác nhau |
+| `Čtení 1–5` | Các dạng đọc khác nhau |
+
+**Bước 3 — Nhập nội dung:**
 
 Điền các fields theo loại bài:
 - **Úloha 1**: Title + 3-4 câu hỏi (mỗi câu 1 dòng)
@@ -67,20 +96,22 @@ Mỗi module là một tuần học hoặc chủ đề:
 - **Úloha 3**: Story title + Narrative checkpoints (mỗi checkpoint 1 dòng)
 - **Úloha 4**: Scenario prompt + Choice options (format: `option_key | label | description`)
 
-### Tab "Bài mẫu" (tùy chọn)
+**Mục "Bài mẫu"** (tùy chọn): Điền câu trả lời mẫu tiếng Czech.
 
-Điền câu trả lời mẫu tiếng Czech — sẽ hiện trong review sau khi học viên nộp bài.
-
-### Tab "Metadata" — **BẮT BUỘC**
+**Mục "Cài đặt xuất bản"** — **BẮT BUỘC kiểm tra:**
 
 | Field | Giá trị |
 |---|---|
 | Pool | `Bài luyện khóa học (course)` |
-| Module | Chọn module vừa tạo |
-| Skill Kind | Để trống → backend tự derive từ exercise type. Chỉ cần chọn khi tạo `matching`/`fill_blank`/`choice_word` (phân biệt `tu_vung` và `ngu_phap`) |
+| Module | Chọn module vừa tạo (tự điền nếu click từ matrix) |
+| Skill Kind | Để trống → backend tự derive. Chỉ cần chọn cho `matching`/`fill_blank`/`choice_word` (phân biệt `tu_vung` / `ngu_phap`) |
 | Status | **`published`** ← bắt buộc để Flutter thấy |
 
-> **Lưu ý:** Exercise `status = draft` sẽ **không** hiện trên Flutter app.
+> **Lưu ý:** Exercise `status = draft` sẽ **không** hiện trên Flutter app. Matrix chỉ đếm exercises `published` vào màu sắc.
+
+### Autosave
+
+Form tự lưu nháp vào localStorage mỗi 10 giây. Nếu thoát nhầm, lần sau mở form sẽ hỏi "Khôi phục bản nháp?".
 
 ---
 
