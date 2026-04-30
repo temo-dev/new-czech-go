@@ -165,7 +165,7 @@ class MockTest {
     required this.estimatedDurationMinutes,
     required this.status,
     required this.sections,
-    this.sessionType = '',
+    this.examMode = '',
     this.passThresholdPercent = 60,
   });
 
@@ -174,7 +174,7 @@ class MockTest {
   final String description;
   final int estimatedDurationMinutes;
   final String status;
-  final String sessionType;
+  final String examMode;
   final int passThresholdPercent;
   final List<MockTestSection> sections;
 
@@ -186,8 +186,8 @@ class MockTest {
         (s) => s.skillKind == 'noi' || s.exerciseType.startsWith('uloha_'),
       );
   int get totalScoreMax => totalMaxPoints + (hasPronunciationBonus ? 3 : 0);
-  bool get isPisemna => sessionType == 'pisemna';
-  bool get isFull => sessionType == 'full';
+  bool get isPisemna => examMode == 'pisemna';
+  bool get isFull => examMode == 'full';
 
   factory MockTest.fromJson(Map<String, dynamic> json) {
     final raw = json['sections'] as List<dynamic>? ?? const [];
@@ -198,44 +198,13 @@ class MockTest {
       estimatedDurationMinutes:
           (json['estimated_duration_minutes'] as num?)?.toInt() ?? 15,
       status: json['status'] as String? ?? 'draft',
-      sessionType: json['session_type'] as String? ?? '',
+      examMode: json['exam_mode'] as String? ?? '',
       passThresholdPercent:
           (json['pass_threshold_percent'] as num?)?.toInt() ?? 60,
       sections:
           raw
               .map((e) => MockTestSection.fromJson(e as Map<String, dynamic>))
               .toList(),
-    );
-  }
-}
-
-class FullExamSessionView {
-  const FullExamSessionView({
-    required this.id,
-    required this.pisemnaScore,
-    required this.ustniScore,
-    required this.pisemnaPassed,
-    required this.ustniPassed,
-    required this.overallPassed,
-    required this.status,
-  });
-  final String id;
-  final int pisemnaScore;
-  final int ustniScore;
-  final bool pisemnaPassed;
-  final bool ustniPassed;
-  final bool overallPassed;
-  final String status;
-
-  factory FullExamSessionView.fromJson(Map<String, dynamic> json) {
-    return FullExamSessionView(
-      id: json['id'] as String? ?? '',
-      pisemnaScore: (json['pisemna_score'] as num?)?.toInt() ?? 0,
-      ustniScore: (json['ustni_score'] as num?)?.toInt() ?? 0,
-      pisemnaPassed: json['pisemna_passed'] as bool? ?? false,
-      ustniPassed: json['ustni_passed'] as bool? ?? false,
-      overallPassed: json['overall_passed'] as bool? ?? false,
-      status: json['status'] as String? ?? 'in_progress',
     );
   }
 }

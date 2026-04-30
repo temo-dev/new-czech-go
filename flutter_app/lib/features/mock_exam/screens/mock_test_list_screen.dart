@@ -7,7 +7,6 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
-import 'full_exam_intro_screen.dart';
 import 'mock_test_intro_screen.dart';
 
 class MockTestListScreen extends StatefulWidget {
@@ -114,15 +113,6 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
   }
 
   void _openIntro(MockTest test) {
-    if (test.isPisemna || test.isFull) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder:
-              (_) => FullExamIntroScreen(client: widget.client, test: test),
-        ),
-      );
-      return;
-    }
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => MockTestIntroScreen(client: widget.client, test: test),
