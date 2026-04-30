@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { adminFetch } from '../../lib/api';
+import { adminApi } from '../exercise-utils';
 import { AnswerSelect } from './AnswerSelect';
 import { ItemRepeater } from './ItemRepeater';
 import { OptionRow } from './OptionRow';
@@ -9,11 +11,12 @@ import { OptionRow } from './OptionRow';
 
 type CteniType = 'cteni_1' | 'cteni_2' | 'cteni_3' | 'cteni_4' | 'cteni_5';
 
-// cteni_1: 5 images/msgs → match A-H
+// cteni_1: 5 items (each is either an uploaded image or a short text message) → match A-H
+type C1Item = { mode: 'image' | 'text'; text: string; assetId: string; answer: string };
 type C1State = {
   type: 'cteni_1';
-  items: { text: string; answer: string }[];      // 5 items (asset IDs or msg text)
-  options: { key: string; text: string }[];        // A-H options
+  items: C1Item[];
+  options: { key: string; text: string }[];
 };
 
 // cteni_2 / cteni_4: reading passage → questions → A-D
@@ -44,12 +47,18 @@ function initState(type: CteniType, detail: Record<string, unknown>): CteniState
   const ca = (detail.correct_answers ?? {}) as Record<string, string>;
 
   if (type === 'cteni_1') {
-    const rawItems = (detail.items ?? []) as Array<{ item_no?: number; text?: string }>;
+    const rawItems = (detail.items ?? []) as Array<{ item_no?: number; text?: string; asset_id?: string }>;
     const rawOpts  = (detail.options ?? []) as Array<{ key?: string; text?: string }>;
-    const items = Array.from({ length: 5 }, (_, i) => ({
-      text: rawItems[i]?.text ?? '',
-      answer: ca[String(i + 1)] ?? '',
-    }));
+    const items: C1Item[] = Array.from({ length: 5 }, (_, i) => {
+      const raw = rawItems[i];
+      const assetId = raw?.asset_id ?? '';
+      return {
+        mode: assetId ? 'image' : 'text',
+        text: raw?.text ?? '',
+        assetId,
+        answer: ca[String(i + 1)] ?? '',
+      };
+    });
     const options = OPTION_KEYS_1.map((k, i) => ({
       key: k,
       text: rawOpts.find(o => o.key === k)?.text ?? rawOpts[i]?.text ?? '',
@@ -104,7 +113,10 @@ function buildDetail(state: CteniState): Record<string, unknown> {
     const correct: Record<string, string> = {};
     state.items.forEach((item, i) => { if (item.answer) correct[String(i + 1)] = item.answer; });
     return {
-      items: state.items.map((it, i) => ({ item_no: i + 1, text: it.text })),
+      items: state.items.map((it, i) => ({
+        item_no: i + 1,
+        ...(it.mode === 'image' && it.assetId ? { asset_id: it.assetId } : { text: it.text }),
+      })),
       options: state.options.map(o => ({ key: o.key, text: o.text })),
       correct_answers: correct,
     };
@@ -151,19 +163,47 @@ type Props = {
   exerciseType: CteniType;
   initialData: Record<string, unknown>;
   onChange: (detail: Record<string, unknown>) => void;
+  exerciseId?: string | null;
 };
 
 const labelStyle: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--ink-2)' };
 const sectionStyle: React.CSSProperties = { border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', display: 'grid', gap: 10, background: 'var(--surface-alt)' };
 const txStyle: React.CSSProperties = { padding: '8px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, resize: 'vertical' as const, fontFamily: 'inherit' };
 
-export function CteniFields({ exerciseType, initialData, onChange }: Props) {
+export function CteniFields({ exerciseType, initialData, onChange, exerciseId }: Props) {
   const [state, setState] = useState<CteniState>(() => initState(exerciseType, initialData));
+  const [uploadingItem, setUploadingItem] = useState<number | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setState(initState(exerciseType, initialData)); }, [exerciseType, JSON.stringify(initialData)]);
 
   function update(next: CteniState) { setState(next); onChange(buildDetail(next)); }
+
+  async function handleC1ImageUpload(file: File, itemIndex: number) {
+    if (!exerciseId) { setUploadError('Lưu bài tập trước rồi upload ảnh.'); return; }
+    setUploadingItem(itemIndex);
+    setUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.set('file', file);
+      formData.set('asset_kind', 'image');
+      const res = await adminFetch(`${adminApi}/${exerciseId}/assets/upload`, { method: 'POST', body: formData });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error?.message ?? 'Upload failed.');
+      const assetId = payload.data?.asset?.id as string | undefined;
+      if (!assetId) throw new Error('No asset ID returned.');
+      if (state.type !== 'cteni_1') return;
+      const next = [...state.items] as C1Item[];
+      next[itemIndex] = { ...next[itemIndex], mode: 'image', assetId };
+      update({ ...state, items: next });
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Unknown error.');
+    } finally {
+      setUploadingItem(null);
+    }
+  }
 
   const c1    = state.type === 'cteni_1' ? state : null;
   const c24   = (state.type === 'cteni_2' || state.type === 'cteni_4') ? state : null;
@@ -193,27 +233,84 @@ export function CteniFields({ exerciseType, initialData, onChange }: Props) {
             ))}
           </div>
           <div style={{ display: 'grid', gap: 8 }}>
-            <span style={labelStyle}>5 ảnh / tin nhắn (asset ID hoặc text)</span>
+            <span style={labelStyle}>5 ảnh / tin nhắn</span>
+            {uploadError && <p style={{ margin: 0, fontSize: 12, color: 'var(--danger)' }}>{uploadError}</p>}
             {c1.items.map((item, i) => (
               <div key={i} style={sectionStyle}>
-                <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Item {i + 1}</span>
-                <input
-                  type="text"
-                  value={item.text}
-                  onChange={e => {
-                    const next = [...c1.items];
-                    next[i] = { ...next[i], text: e.target.value };
-                    update({ ...c1, items: next });
-                  }}
-                  placeholder="asset-id hoặc nội dung tin nhắn..."
-                  style={{ padding: '7px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }}
-                />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Item {i + 1}</span>
+                  {/* Mode toggle */}
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {(['image', 'text'] as const).map(m => (
+                      <button key={m} type="button"
+                        onClick={() => {
+                          const next = [...c1.items] as C1Item[];
+                          next[i] = { ...next[i], mode: m };
+                          update({ ...c1, items: next });
+                        }}
+                        style={{ padding: '3px 10px', borderRadius: 6, border: `1px solid ${item.mode === m ? 'var(--brand)' : 'var(--border)'}`, background: item.mode === m ? 'var(--brand)' : 'transparent', color: item.mode === m ? '#fff' : 'var(--ink-3)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        {m === 'image' ? '🖼 Ảnh' : '💬 Văn bản'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Image mode */}
+                {item.mode === 'image' && (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {item.assetId && exerciseId && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`${adminApi}/${exerciseId}/assets/${item.assetId}/file`}
+                        alt={`item ${i + 1}`}
+                        style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }}
+                      />
+                    )}
+                    {!item.assetId && (
+                      <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-4)' }}>Chưa có ảnh.</p>
+                    )}
+                    {!exerciseId ? (
+                      <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-4)' }}>Lưu bài tập trước rồi upload ảnh.</p>
+                    ) : (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px dashed var(--border)', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--ink-3)', background: 'var(--surface-alt)' }}>
+                        {uploadingItem === i ? '⏳ Đang tải...' : item.assetId ? '🔄 Đổi ảnh' : '+ Tải ảnh lên'}
+                        <input
+                          ref={el => { fileInputRefs.current[i] = el; }}
+                          type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+                          disabled={uploadingItem !== null}
+                          onChange={e => {
+                            const f = e.target.files?.[0];
+                            if (f) void handleC1ImageUpload(f, i);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                )}
+
+                {/* Text mode */}
+                {item.mode === 'text' && (
+                  <input
+                    type="text"
+                    value={item.text}
+                    onChange={e => {
+                      const next = [...c1.items] as C1Item[];
+                      next[i] = { ...next[i], text: e.target.value };
+                      update({ ...c1, items: next });
+                    }}
+                    placeholder="Nội dung tin nhắn ngắn..."
+                    style={{ padding: '7px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }}
+                  />
+                )}
+
                 <AnswerSelect
                   label="Đáp án:"
                   options={c1.options.map(o => ({ key: o.key, label: o.text }))}
                   value={item.answer}
                   onChange={v => {
-                    const next = [...c1.items];
+                    const next = [...c1.items] as C1Item[];
                     next[i] = { ...next[i], answer: v };
                     update({ ...c1, items: next });
                   }}

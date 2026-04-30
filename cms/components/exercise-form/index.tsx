@@ -689,6 +689,7 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                     exerciseType={form.exerciseType as 'cteni_1' | 'cteni_2' | 'cteni_3' | 'cteni_4' | 'cteni_5'}
                     initialData={form.typePayload ?? {}}
                     onChange={(payload) => setForm((f) => ({ ...f, typePayload: payload }))}
+                    exerciseId={editingId}
                   />
                 )}
 
