@@ -23,6 +23,13 @@ func NewPostgresGrammarStore(databaseURL string) (GrammarStore, error) {
 		db.Close()
 		return nil, fmt.Errorf("ping grammar db: %w", err)
 	}
+	// Migration 021: image_asset_id on grammar_rules (idempotent)
+	if _, err := db.ExecContext(ctx,
+		`ALTER TABLE grammar_rules ADD COLUMN IF NOT EXISTS image_asset_id TEXT NOT NULL DEFAULT ''`,
+	); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate grammar_rules image_asset_id: %w", err)
+	}
 	return &postgresGrammarStore{db: db}, nil
 }
 

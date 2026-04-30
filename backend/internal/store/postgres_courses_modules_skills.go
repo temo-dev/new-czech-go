@@ -36,6 +36,13 @@ CREATE TABLE IF NOT EXISTS courses (
 		db.Close()
 		return nil, fmt.Errorf("ensure courses schema: %w", err)
 	}
+	// Migration 022: add banner_image_id (idempotent — IF NOT EXISTS handles existing DBs)
+	if _, err := db.ExecContext(ctx,
+		`ALTER TABLE courses ADD COLUMN IF NOT EXISTS banner_image_id TEXT NOT NULL DEFAULT ''`,
+	); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate courses banner_image_id: %w", err)
+	}
 	return &postgresCourseStore{db: db}, nil
 }
 
