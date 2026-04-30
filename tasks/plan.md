@@ -1156,3 +1156,247 @@ class _SectionHeader extends StatelessWidget {
 ```
 
 **Score color:** ≥75
+---
+
+## V11 — Media Enrichment (Ảnh cho Exercise & Vocabulary)
+
+Spec: `docs/specs/media-enrichment.md`
+UI/UX: `docs/designs/media-enrichment.html`
+Idea: `docs/ideas/media-enrichment.md`
+
+### Problem
+
+Tất cả exercise types hiện chỉ dùng text cho options và vocabulary items. Bài thi A2 thực tế (послech_2) yêu cầu chọn đúng ảnh trong 4 ảnh. Flashcard từ vựng không có hình minh họa.
+
+### Hiện trạng
+
+`ImageOption`, `ChoiceOption.ImageAssetID`, `ReadingItem.AssetID` đã tồn tại (speaking/cteni_1). Asset upload endpoint `/admin/exercises/:id/assets/upload` đã có. Cần extend sang `VocabularyItem`, `GrammarRule`, `MultipleChoiceOption`, `MatchOption`.
+
+### Design decisions
+
+- `MultipleChoiceWidget` switch sang 2×2 image grid **chỉ khi tất cả** options có `image_asset_id` — không mixed layout
+- Fallback silent khi image load fail — không block interaction
+- Video excluded. Audio per vocab item deferred.
+- Exercise option images: reuse endpoint `/admin/exercises/:id/assets/upload` với `asset_kind="option_image"`, ghi `image_asset_id` vào option object trong detail JSONB — không cần migration mới
+- Vocab/grammar images: cần 2 migration nhỏ + 4 new endpoints (upload/delete per entity)
+
+---
+
+### ME-1 — Backend: contracts + vocab/grammar image endpoints
+
+**Files:**
+- `backend/internal/contracts/types.go`
+- `backend/db/migrations/020_vocabulary_item_image.sql`
+- `backend/db/migrations/021_grammar_rule_image.sql`
+- `backend/internal/httpapi/server.go` (route wiring)
+- `backend/internal/httpapi/media_assets.go` (new file — upload/delete handlers)
+- `backend/internal/store/` (update vocab + grammar stores)
+
+**Changes:**
+1. `contracts/types.go` — thêm `ImageAssetID string \`json:"image_asset_id,omitempty"\`` vào:
+   - `MultipleChoiceOption`
+   - `MatchOption`
+   - `VocabularyItem`
+   - `GrammarRule`
+2. Migration 020: `ALTER TABLE vocabulary_items ADD COLUMN image_asset_id TEXT NOT NULL DEFAULT '';`
+3. Migration 021: `ALTER TABLE grammar_rules ADD COLUMN image_asset_id TEXT NOT NULL DEFAULT '';`
+4. `media_assets.go` — 4 handlers:
+   - `handleVocabItemImageUpload` — `POST /v1/admin/vocabulary-items/:id/image`
+   - `handleVocabItemImageDelete` — `DELETE /v1/admin/vocabulary-items/:id/image`
+   - `handleGrammarRuleImageUpload` — `POST /v1/admin/grammar-rules/:id/image`
+   - `handleGrammarRuleImageDelete` — `DELETE /v1/admin/grammar-rules/:id/image`
+   - Validate: MIME ∈ {jpeg, png, webp}, size ≤ 5MB
+   - Reuse `backend_assets` volume / S3 pattern từ exercise asset handler
+5. Store: `UpdateVocabularyItemImageAssetID(id, assetID string)`, `UpdateGrammarRuleImageAssetID(id, assetID string)`
+6. `GET /v1/vocabulary-sets/:id/items` — trả `image_asset_id` trong response
+
+**AC:**
+- `make backend-build` + `make backend-test` pass
+- `POST /admin/vocabulary-items/:id/image` với jpeg hợp lệ → 200, body có `asset_id`
+- `POST /admin/vocabulary-items/:id/image` với file > 5MB → 413
+- `POST /admin/vocabulary-items/:id/image` với video/mp4 → 415
+- `DELETE /admin/vocabulary-items/:id/image` → `image_asset_id` xóa trong DB
+- `GET /v1/vocabulary-sets/:id/items` → `image_asset_id` có trong response
+- `MultipleChoiceOption`, `MatchOption` JSON serialization có `image_asset_id` (omitempty)
+
+---
+
+### ME-2 — E2E: Vocabulary flashcard với ảnh (CMS + Flutter)
+
+**Phụ thuộc:** ME-1
+
+**Files:**
+- `cms/components/vocabulary-form.tsx` (hoặc tương đương vocab edit page)
+- `flutter_app/lib/features/exercise/models/exercise_detail.dart` (hoặc vocab model)
+- `flutter_app/lib/features/exercise/widgets/quizcard_widget.dart`
+
+**CMS changes:**
+1. Mỗi vocabulary item row: thêm thumbnail 52×52 (hiện ảnh nếu `image_asset_id`, placeholder dashed nếu không)
+2. Button `+ Tải ảnh lên` / `✓ Đã có ảnh — Đổi` / `Xóa ảnh` per item
+3. Upload flow: file input → `POST /v1/admin/vocabulary-items/:id/image` → optimistic thumbnail update
+4. Error: toast nếu upload fail (size/type)
+5. Item chưa save → disable upload với tooltip "Lưu item trước"
+
+**Flutter changes:**
+1. `VocabularyItem.fromJson()` parse `image_asset_id`
+2. Build asset URL helper (reuse auth headers pattern từ audio player):
+   ```dart
+   // Dùng exercise asset endpoint với exerciseId từ context
+   // hoặc standalone: /v1/exercises/{exId}/assets/{assetId}/file
+   ```
+3. `QuizcardWidget` front side:
+   - Nếu `imageAssetId != null && imageAssetId.isNotEmpty`:
+     - `Image.network(url, headers: authHeaders)` ở top of card, aspect 16:9, `BorderRadius` 12, `BoxFit.cover`
+     - Shimmer placeholder khi loading (giống `_PassageSection` pattern)
+     - Fail → silent placeholder (grey background, không hiện broken icon)
+   - Nếu không có ảnh: card layout unchanged
+4. Back side: unchanged
+
+**AC:**
+- Admin upload ảnh cho vocab item trong CMS → thumbnail hiện ngay
+- `GET /v1/vocabulary-sets/:id/items` trả `image_asset_id` khác rỗng
+- Flutter `QuizcardWidget` hiện ảnh phía trên term khi `imageAssetId != null`
+- Khi không có ảnh: card render y hệt hiện tại
+- Image fail → card vẫn tương tác được
+- `make flutter-analyze` + `make cms-build` pass
+
+**[CHECKPOINT ME-A]** `make backend-test` + `make flutter-analyze` + `make cms-build`.
+Manual: CMS upload ảnh cho "kavárna" → Flutter flashcard hiện ảnh.
+
+---
+
+### ME-3 — Multiple choice image grid (CMS option upload + Flutter grid)
+
+**Phụ thuộc:** ME-1
+
+**Files:**
+- `cms/components/exercise-form/OptionRow.tsx`
+- `cms/components/exercise-form/PoslechFields.tsx`
+- `cms/components/exercise-form/CteniFields.tsx`
+- `cms/components/exercise-form/index.tsx` (warning indicator)
+- `flutter_app/lib/features/exercise/models/exercise_detail.dart`
+- `flutter_app/lib/features/exercise/widgets/multiple_choice_widget.dart`
+
+**CMS changes:**
+1. `OptionRow.tsx` — thêm props: `imageAssetId?: string`, `exerciseId: string`, `onImageUploaded?: (assetId: string) => void`, `onImageRemoved?: () => void`
+2. Trong `OptionRow` render: thumbnail 56×44 + upload button (reuse `/admin/exercises/:exerciseId/assets/upload` với `asset_kind: "option_image"`)
+3. `PoslechFields.tsx` + `CteniFields.tsx`: truyền `exerciseId` xuống `OptionRow`, handle `onImageUploaded` → cập nhật option state với `image_asset_id`
+4. `index.tsx`: warning banner khi `0 < countOptionsWithImage < totalOptions` — "X/Y options chưa có ảnh — Flutter dùng text list"
+5. Chỉ apply cho exercise types dùng `MultipleChoiceOption`: `послech_1`, `послech_2`, `cteni_2`, `cteni_3`, `cteni_4`
+
+**Flutter changes:**
+1. `MultipleChoiceOption.fromJson()` parse `image_asset_id`
+2. `MultipleChoiceWidget`:
+   ```dart
+   final allHaveImages = options.every((o) => o.imageAssetId?.isNotEmpty == true);
+   ```
+   - `allHaveImages = true` → `GridView.count(crossAxisCount: 2)` với image cells
+   - `allHaveImages = false` → giữ ListView layout hiện tại
+3. Image cell: `Image.network` aspect 4:3, label text phía dưới, border 2.5px:
+   - Default: `AppColors.border` (gray-200)
+   - Selected: `AppColors.primary` (#FF6A14) + check badge góc trên phải
+   - Correct: `AppColors.success` (green)
+   - Wrong: `AppColors.error` (red) + opacity 0.6
+4. Image fail trong cell → letter placeholder (A/B/C/D) centered, interaction unblocked
+
+**AC:**
+- CMS: `OptionRow` hiện thumbnail + upload button khi `exerciseId` truyền vào
+- CMS: warning hiện khi mixed images, ẩn khi 0 hoặc tất cả có ảnh
+- Flutter: tất cả options có `image_asset_id` → 2×2 grid render
+- Flutter: 1 option thiếu ảnh → text list (không mixed)
+- Selected/correct/wrong states đúng trong grid layout
+- Existing `MultipleChoiceWidget` callers không bị break
+- `make flutter-analyze` + `make cms-build` pass
+
+---
+
+### ME-4 — Matching với ảnh (Flutter MatchingWidget)
+
+**Phụ thuộc:** ME-1, ME-3 (CMS option upload pattern reusable cho matching options)
+
+**Files:**
+- `flutter_app/lib/features/exercise/models/exercise_detail.dart`
+- `flutter_app/lib/features/exercise/widgets/matching_widget.dart`
+
+**Flutter changes:**
+1. `MatchOption.fromJson()` parse `image_asset_id`
+2. `MatchingWidget` — right column rendering:
+   ```dart
+   // Nếu matchOption.imageAssetId?.isNotEmpty == true:
+   //   Render image card: Image.network (aspect 4:3) + label text nhỏ phía dưới
+   // Else:
+   //   Render text tile (unchanged)
+   ```
+3. Image card border state: unmatched → gray, matched → green border + text "✓"
+4. Image fail → fallback text-only tile, matching vẫn hoạt động
+5. Left column (Czech words) unchanged
+
+**Note:** CMS upload cho `MatchOption.image_asset_id` dùng lại `OptionRow` đã có từ ME-3, chỉ cần wire vào matching form nếu có.
+
+**AC:**
+- `MatchOption` với `image_asset_id` → image card hiện trong right column
+- `MatchOption` không có ảnh → text tile (unchanged)
+- Mixed options (có + không ảnh) trong cùng exercise → mix render (image card + text tile)
+- Correct pair highlight đúng trên cả hai loại
+- `make flutter-analyze` pass
+
+**[CHECKPOINT ME-B]** `make flutter-analyze` + `make backend-test`.
+Manual: послech_2 exercise với 4 options đều có ảnh → grid. послech_1 không ảnh → text list.
+
+---
+
+### ME-5 — Grammar rule image (backend + CMS)
+
+**Phụ thuộc:** ME-1
+
+**Files:**
+- `cms/components/grammar-form.tsx` (hoặc tương đương)
+- (Flutter đã handle image rendering từ ME-2/ME-3)
+
+**Backend:** Đã hoàn thành trong ME-1 (migration 021 + endpoints).
+
+**CMS changes:**
+1. Grammar rule form: thêm ảnh context upload (thumbnail 52×52 + `+ Tải ảnh`)
+2. Upload flow: `POST /v1/admin/grammar-rules/:id/image`
+3. Pattern y hệt vocab item từ ME-2
+
+**Flutter:** `GrammarRule.fromJson()` parse `image_asset_id`. Nếu grammar exercise dùng `QuizcardWidget` hoặc `MatchingWidget` → đã tự có image rendering từ ME-2/ME-4.
+
+**AC:**
+- CMS grammar form upload ảnh → `image_asset_id` lưu trong DB
+- `GET /v1/grammar-rules/:id` trả `image_asset_id`
+- `make cms-build` pass
+
+---
+
+### ME-6 — Exercise context image / Direction B (CMS + Flutter)
+
+**Phụ thuộc:** ME-1
+
+**Files:**
+- `cms/components/exercise-form/index.tsx` hoặc `SpeakingFields.tsx` (thêm tab/section)
+- `flutter_app/lib/features/exercise/widgets/` — exercise prompt area trong mỗi screen
+
+**Context:** `Exercise.Assets []PromptAsset` đã có + đã parse. Đang dùng cho speaking Uloha3/4. Cần enable cho tất cả exercise types.
+
+**CMS changes:**
+1. Exercise form: thêm section "Ảnh ngữ cảnh (tùy chọn)" trong tất cả exercise type forms (không chỉ speaking)
+2. Upload → `POST /admin/exercises/:id/assets/upload` với `asset_kind: "context_image"`
+3. Preview thumbnail trong form
+4. Xóa: `DELETE /admin/exercises/:id/assets/:asset_id`
+
+**Flutter changes:**
+1. Trong mỗi exercise screen (Listening/Reading/Writing/VocabGrammar): kiểm tra `exercise.assets.where((a) => a.assetKind == 'context_image')`
+2. Nếu có → render image 16:9 với `borderRadius: 12` phía trên question text/audio player
+3. Fail → ẩn hoàn toàn, không hiện placeholder, không block exercise
+4. Speaking screens đã có `uloha_prompt.dart` — verify không duplicate
+
+**AC:**
+- CMS: upload ảnh context cho exercise type bất kỳ (nghe/đọc/viết/từ vựng/ngữ pháp)
+- Flutter: context image hiện phía trên question trên tất cả exercise screens
+- Không có ảnh → layout unchanged
+- Speaking screens không bị duplicate (check `uloha_prompt.dart` không bị override)
+- `make flutter-analyze` + `make cms-build` pass
+
+**[CHECKPOINT ME-C]** `make verify` (backend-build + backend-test + cms-lint + cms-build + flutter-analyze + flutter-test).
+Manual end-to-end: (1) Upload ảnh vocab → flashcard có hình. (2) послech_2 với 4 ảnh option → grid. (3) Exercise bất kỳ với context image → hiện phía trên.

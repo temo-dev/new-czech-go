@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Media Enrichment — UI/UX Design</title>
+<style>
+  :root {
+    --orange: #FF6A14;
+    --cream: #FBF3E7;
+    --teal: #0F3D3A;
+    --teal-light: #1A5C58;
+    --teal-faint: #E8F0EF;
+    --gray-100: #F5F5F5;
+    --gray-200: #E5E5E5;
+    --gray-400: #9CA3AF;
+    --gray-600: #4B5563;
+    --gray-900: #111827;
+    --green: #22C55E;
+    --red: #EF4444;
+    --radius-card: 16px;
+    --radius-btn: 10px;
+    --radius-img: 12px;
+    --shadow-card: 0 2px 12px rgba(15,61,58,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #F0EDE8;
+    color: var(--gray-900);
+    padding: 32px 24px;
+    min-height: 100vh;
+  }
+  h1 { font-size: 28px; font-weight: 700; color: var(--teal); margin-bottom: 4px; }
+  .subtitle { color: var(--gray-600); font-size: 14px; margin-bottom: 48px; }
+
+  /* Section headers */
+  .section-label {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--teal); color: white;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 4px 12px; border-radius: 6px;
+    margin-bottom: 20px;
+  }
+  .section-label.cms { background: var(--orange); }
+
+  .section { margin-bottom: 56px; }
+
+  /* Row of screens */
+  .screen-row {
+    display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start;
+  }
+
+  /* Phone frame */
+  .phone {
+    width: 320px;
+    background: var(--cream);
+    border-radius: 32px;
+    box-shadow: 0 8px 32px rgba(15,61,58,0.18), inset 0 0 0 1.5px rgba(15,61,58,0.12);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .phone-notch {
+    background: var(--teal);
+    height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 12px;
+  }
+  .notch-pill {
+    width: 80px; height: 10px; background: rgba(255,255,255,0.15);
+    border-radius: 5px;
+  }
+  .phone-bar {
+    background: var(--teal);
+    padding: 8px 20px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .phone-bar .back {
+    color: rgba(255,255,255,0.8); font-size: 20px; cursor: pointer;
+  }
+  .phone-bar .title {
+    color: white; font-size: 15px; font-weight: 600;
+  }
+  .phone-bar .subtitle-bar {
+    color: rgba(255,255,255,0.6); font-size: 11px;
+  }
+  .phone-content {
+    padding: 16px;
+    min-height: 520px;
+  }
+
+  /* Progress bar */
+  .progress-row {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+  }
+  .progress-track {
+    flex: 1; height: 6px; background: var(--gray-200); border-radius: 3px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; background: var(--orange); border-radius: 3px;
+  }
+  .progress-text { font-size: 12px; color: var(--gray-600); font-weight: 500; }
+
+  /* === SCREEN 1: Quizcard with image === */
+  .quizcard {
+    background: white;
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+    margin-bottom: 14px;
+    border: 1.5px solid var(--gray-200);
+  }
+  .quizcard-image {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .quizcard-image .img-placeholder {
+    font-size: 40px; opacity: 0.5;
+  }
+  .quizcard-image .img-label {
+    position: absolute; bottom: 8px; right: 10px;
+    font-size: 10px; color: rgba(0,0,0,0.4); font-weight: 500;
+  }
+  .quizcard-body {
+    padding: 18px 16px 14px;
+  }
+  .quizcard-term {
+    font-size: 26px; font-weight: 700; color: var(--teal);
+    margin-bottom: 2px;
+  }
+  .quizcard-type {
+    font-size: 11px; color: var(--gray-400); margin-bottom: 10px;
+  }
+  .quizcard-hint {
+    font-size: 12px; color: var(--orange); font-weight: 500;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .flip-btn {
+    width: 100%;
+    background: var(--orange);
+    color: white;
+    border: none;
+    border-radius: var(--radius-btn);
+    padding: 13px;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .quizcard-back {
+    background: var(--teal);
+    border-radius: var(--radius-card);
+    padding: 20px 16px;
+    margin-bottom: 14px;
+    color: white;
+  }
+  .qb-label { font-size: 11px; opacity: 0.6; margin-bottom: 4px; }
+  .qb-def { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .qb-example { font-size: 13px; opacity: 0.75; font-style: italic; }
+  .audio-btn {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.15); border: none;
+    color: white; border-radius: 8px; padding: 8px 12px;
+    font-size: 12px; cursor: pointer; margin-top: 12px;
+  }
+
+  /* === SCREEN 2: Image choice grid === */
+  .choice-question {
+    font-size: 14px; color: var(--gray-600); margin-bottom: 14px; line-height: 1.4;
+  }
+  .audio-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--teal); color: white;
+    border-radius: 24px; padding: 10px 16px;
+    font-size: 13px; font-weight: 500; margin-bottom: 16px;
+    cursor: pointer;
+  }
+  .play-icon {
+    width: 28px; height: 28px; background: var(--orange);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+  }
+  .image-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .image-option {
+    border-radius: var(--radius-img);
+    overflow: hidden;
+    border: 2.5px solid var(--gray-200);
+    background: white;
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.15s;
+  }
+  .image-option.selected {
+    border-color: var(--orange);
+  }
+  .image-option.correct { border-color: var(--green); }
+  .image-option-img {
+    width: 100%;
+    aspect-ratio: 4/3;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+  }
+  .image-option-img.opt-a { background: linear-gradient(135deg, #FEF3C7, #FDE68A); }
+  .image-option-img.opt-b { background: linear-gradient(135deg, #DBEAFE, #BFDBFE); }
+  .image-option-img.opt-c { background: linear-gradient(135deg, #FCE7F3, #FBCFE8); }
+  .image-option-img.opt-d {
+    background: linear-gradient(135deg, #D1FAE5, #A7F3D0);
+    border: none;
+  }
+  .image-option-label {
+    padding: 6px 8px;
+    font-size: 11px; font-weight: 600; color: var(--gray-900);
+    text-align: center;
+  }
+  .image-option .check-badge {
+    position: absolute; top: 6px; right: 6px;
+    width: 20px; height: 20px; background: var(--orange);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 10px;
+  }
+  .check-btn {
+    width: 100%; background: var(--teal); color: white;
+    border: none; border-radius: var(--radius-btn); padding: 13px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+
+  /* === SCREEN 3: Matching with images === */
+  .match-instruction {
+    font-size: 13px; color: var(--gray-600); margin-bottom: 14px;
+  }
+  .match-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;
+  }
+  .match-col { display: flex; flex-direction: column; gap: 8px; }
+  .match-text-item {
+    background: white; border-radius: 10px; border: 2px solid var(--gray-200);
+    padding: 12px 10px; font-size: 13px; font-weight: 600; color: var(--teal);
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+    min-height: 52px;
+  }
+  .match-text-item.selected { border-color: var(--orange); background: #FFF5EE; }
+  .match-text-item .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--gray-200); flex-shrink: 0;
+  }
+  .match-text-item.selected .dot { background: var(--orange); }
+  .match-image-item {
+    border-radius: 10px; overflow: hidden;
+    border: 2px solid var(--gray-200);
+    cursor: pointer;
+  }
+  .match-image-item.matched { border-color: var(--green); }
+  .match-img-area {
+    aspect-ratio: 4/3;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+  }
+  .match-img-area.m1 { background: linear-gradient(135deg, #FEF3C7, #FDE68A); }
+  .match-img-area.m2 { background: linear-gradient(135deg, #DBEAFE, #BFDBFE); }
+  .match-img-area.m3 { background: linear-gradient(135deg, #D1FAE5, #A7F3D0); }
+  .match-img-area.m4 { background: linear-gradient(135deg, #FCE7F3, #FBCFE8); }
+  .match-img-label {
+    font-size: 10px; color: var(--gray-400);
+    padding: 4px 6px; text-align: center;
+    background: white; font-weight: 500;
+  }
+  .match-connector {
+    position: absolute;
+  }
+
+  /* === SCREEN 4: Context image in exercise === */
+  .exercise-context-img {
+    width: 100%; border-radius: var(--radius-img);
+    aspect-ratio: 16/9;
+    background: linear-gradient(135deg, #E0F2FE, #BAE6FD);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px;
+    margin-bottom: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .exercise-context-img .img-tag {
+    position: absolute; bottom: 8px; left: 10px;
+    background: rgba(15,61,58,0.7); color: white;
+    font-size: 10px; padding: 2px 8px; border-radius: 4px;
+  }
+  .fill-question {
+    font-size: 14px; color: var(--gray-900); margin-bottom: 12px; line-height: 1.5;
+  }
+  .fill-blank {
+    display: inline-block; width: 80px; height: 20px;
+    border-bottom: 2.5px solid var(--orange);
+    margin: 0 4px; vertical-align: bottom;
+  }
+  .fill-options {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
+  }
+  .fill-chip {
+    background: white; border: 1.5px solid var(--gray-200);
+    border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 500;
+    cursor: pointer; color: var(--teal);
+  }
+  .fill-chip.used { opacity: 0.4; }
+
+  /* === CMS section === */
+  .cms-frame {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    overflow: hidden;
+    width: 680px;
+    flex-shrink: 0;
+  }
+  .cms-topbar {
+    background: var(--teal);
+    padding: 12px 20px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .cms-topbar .logo {
+    font-size: 13px; font-weight: 700; color: white;
+  }
+  .cms-topbar .breadcrumb {
+    font-size: 12px; color: rgba(255,255,255,0.55);
+  }
+  .cms-body { padding: 20px; }
+  .cms-section-title {
+    font-size: 13px; font-weight: 700; color: var(--gray-600);
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px;
+  }
+
+  /* Vocab item row */
+  .vocab-item {
+    background: var(--gray-100); border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 8px;
+    border: 1.5px solid var(--gray-200);
+  }
+  .vocab-item-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  }
+  .vocab-item-thumb {
+    width: 52px; height: 52px; border-radius: 8px;
+    border: 1.5px dashed var(--gray-400);
+    display: flex; align-items: center; justify-content: center;
+    background: white; flex-shrink: 0;
+    font-size: 20px;
+  }
+  .vocab-item-thumb.has-image {
+    border-style: solid; border-color: var(--green);
+    background: linear-gradient(135deg, #D1FAE5, #A7F3D0);
+  }
+  .vocab-item-fields { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .vocab-row { display: flex; gap: 8px; }
+  .field-input {
+    flex: 1; border: 1px solid var(--gray-200); border-radius: 6px;
+    padding: 6px 10px; font-size: 12px; background: white;
+    font-family: inherit; color: var(--gray-900);
+  }
+  .field-input.czech { font-weight: 600; color: var(--teal); }
+  .vocab-actions {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .upload-btn {
+    display: flex; align-items: center; gap: 6px;
+    border: 1.5px dashed var(--orange); background: #FFF5EE;
+    color: var(--orange); border-radius: 8px;
+    padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer;
+    white-space: nowrap;
+  }
+  .upload-btn.has-img {
+    border-style: solid; border-color: var(--green);
+    background: #F0FDF4; color: #15803D;
+  }
+  .audio-gen-btn {
+    display: flex; align-items: center; gap: 5px;
+    border: 1px solid var(--gray-200); background: white;
+    color: var(--gray-600); border-radius: 8px;
+    padding: 6px 10px; font-size: 11px; cursor: pointer;
+  }
+  .del-btn {
+    width: 28px; height: 28px; border: none; background: none;
+    color: var(--gray-400); cursor: pointer; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 4px;
+  }
+
+  /* Option row in exercise form */
+  .option-row {
+    background: var(--gray-100); border-radius: 10px;
+    padding: 10px 12px; margin-bottom: 8px;
+    border: 1.5px solid var(--gray-200);
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .option-label-badge {
+    width: 28px; height: 28px; background: var(--teal); color: white;
+    border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; flex-shrink: 0; margin-top: 2px;
+  }
+  .option-content { flex: 1; }
+  .option-text-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .option-thumb {
+    width: 56px; height: 44px; border-radius: 6px;
+    border: 1.5px dashed var(--gray-400);
+    display: flex; align-items: center; justify-content: center;
+    background: white; flex-shrink: 0; font-size: 18px;
+  }
+  .option-thumb.uploaded {
+    border-style: solid; border-color: var(--orange);
+    background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+  }
+  .correct-radio {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 11px; color: var(--gray-600); margin-top: 4px;
+  }
+  .radio-dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 1.5px solid var(--gray-300);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .radio-dot.checked { border-color: var(--green); }
+  .radio-dot.checked::after {
+    content: ''; width: 7px; height: 7px;
+    background: var(--green); border-radius: 50%;
+  }
+
+  /* User flow diagram */
+  .flow-diagram {
+    background: white; border-radius: 16px;
+    padding: 28px; box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+    max-width: 900px;
+  }
+  .flow-row {
+    display: flex; align-items: flex-start; gap: 0; flex-wrap: wrap;
+  }
+  .flow-node {
+    display: flex; flex-direction: column; align-items: center;
+    width: 120px; flex-shrink: 0;
+  }
+  .flow-box {
+    width: 104px;
+    background: var(--teal-faint); border: 1.5px solid var(--teal);
+    border-radius: 10px; padding: 10px 8px;
+    font-size: 11px; font-weight: 600; color: var(--teal);
+    text-align: center; line-height: 1.35;
+  }
+  .flow-box.cms-node {
+    background: #FFF5EE; border-color: var(--orange); color: #c2440a;
+  }
+  .flow-box.highlight {
+    background: var(--teal); color: white; border-color: var(--teal);
+  }
+  .flow-box.orange-hl {
+    background: var(--orange); color: white; border-color: var(--orange);
+  }
+  .flow-arrow {
+    display: flex; align-items: center;
+    width: 40px; flex-shrink: 0;
+    margin-top: 30px;
+  }
+  .flow-arrow::after {
+    content: '→'; font-size: 18px; color: var(--gray-400); width: 40px; text-align: center;
+  }
+  .flow-sub {
+    font-size: 10px; color: var(--gray-400); margin-top: 4px; text-align: center;
+    max-width: 100px;
+  }
+  .flow-section-break {
+    width: 100%; margin: 20px 0; border-top: 1.5px dashed var(--gray-200);
+    display: flex; align-items: center; padding-top: 4px;
+  }
+  .flow-section-break span {
+    font-size: 11px; color: var(--gray-400); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+
+  /* Screen label */
+  .screen-label {
+    font-size: 12px; font-weight: 600; color: var(--teal);
+    margin-bottom: 8px; padding-left: 4px;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex; gap: 20px; flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--gray-600);
+  }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 2px;
+  }
+  .legend-dot.new { background: var(--orange); }
+  .legend-dot.existing { background: var(--teal-faint); border: 1.5px solid var(--teal); }
+  .legend-dot.cms { background: #FFF5EE; border: 1.5px solid var(--orange); }
+</style>
+</head>
+<body>
+
+<h1>Media Enrichment — UI/UX Design</h1>
+<p class="subtitle">Direction A (core: option-level images) + Direction B (extension: exercise-level context). Stack: Flutter iOS + Next.js CMS.</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot new"></div> Mới / thay đổi</div>
+  <div class="legend-item"><div class="legend-dot existing"></div> Hiện tại (giữ nguyên)</div>
+  <div class="legend-item"><div class="legend-dot cms"></div> CMS (admin)</div>
+</div>
+
+<!-- ======= SECTION 1: USER FLOW ======= -->
+<div class="section">
+  <div class="section-label">User Flow</div>
+
+  <div class="flow-diagram">
+    <!-- CMS Flow -->
+    <div class="flow-section-break"><span>Admin — CMS Upload Flow</span></div>
+    <div class="flow-row">
+      <div class="flow-node">
+        <div class="flow-box cms-node">Mở VocabularySet / Exercise</div>
+        <div class="flow-sub">CMS dashboard</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <div class="flow-box cms-node">Click "+ Ảnh" trên item / option</div>
+        <div class="flow-sub">upload button per row</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <div class="flow-box cms-node">Chọn file từ kho ảnh</div>
+        <div class="flow-sub">file picker, jpg/png/webp &lt;5MB</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <div class="flow-box cms-node">Preview thumbnail ngay lập tức</div>
+        <div class="flow-sub">optimistic UI, upload background</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <div class="flow-box orange-hl">✓ Lưu — asset_id gắn vào item/option</div>
+        <div class="flow-sub">POST /admin/…/image</div>
+      </div>
+    </div>
+
+    <!-- Learner Flow A: Vocab -->
+    <div class="flow-section-break"><span>Learner — Vocabulary Flashcard với ảnh</span></div>
+    <div class="flow-row">
+      <div class="flow-node">
+        <div class="flow-box">Module → Từ vựng</div>
+        <div class="flow-sub">filter pill</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <div class="flow-box highlight">QuizcardWidget — ảnh + từ (front)</div>
+        <div class="flow-sub">image 16:9 phía trên</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <div class="flow-box">Chạm lật → nghĩa + ví dụ (back)</div>
+        <div class="flow-sub">flip animation 300ms</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <div class="flow-box highlight">MatchingWidget — ảnh ↔ từ</div>
+        <div class="flow-sub">image column + text column</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <div class="flow-box">Kết quả + điểm</div>
+      </div>
+    </div>
+
+    <!-- Learner Flow B: Listening image options -->
+    <div class="flow-section-break"><span>Learner — Bài nghe chọn ảnh (послech_1/2)</span></div>
+    <div class="flow-row">
+      <div class="flow-node">
+        <div class="flow-box">ListeningExerciseScreen</div>
+        <div class="flow-sub">existing</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <div class="flow-box">Context image (optional) phía trên audio player</div>
+        <div class="flow-sub">Direction B</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <div class="flow-box">▶ Play audio</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <div class="flow-box highlight">2×2 image grid thay vì text list</div>
+        <div class="flow-sub">khi tất cả options có asset_id</div>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <div class="flow-box">Tap chọn → Kiểm tra → Kết quả</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= SECTION 2: FLUTTER SCREENS ======= -->
+<div class="section">
+  <div class="section-label">Flutter — Learner Screens</div>
+  <div class="screen-row">
+
+    <!-- Screen 1: Quizcard with image (front) -->
+    <div>
+      <div class="screen-label">1. QuizcardWidget — mặt trước có ảnh</div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-bar">
+          <span class="back">‹</span>
+          <div><div class="title">Từ vựng</div><div class="subtitle-bar">Module: Kavárna & Restaurace</div></div>
+          <div></div>
+        </div>
+        <div class="phone-content">
+          <div class="progress-row">
+            <div class="progress-track"><div class="progress-fill" style="width:25%"></div></div>
+            <span class="progress-text">3 / 12</span>
+          </div>
+
+          <div class="quizcard">
+            <div class="quizcard-image">
+              <span class="img-placeholder">☕</span>
+              <span class="img-label">ảnh minh họa</span>
+            </div>
+            <div class="quizcard-body">
+              <div class="quizcard-term">kavárna</div>
+              <div class="quizcard-type">podstatné jméno, ženský rod</div>
+              <div class="quizcard-hint">👆 Chạm để xem nghĩa</div>
+            </div>
+          </div>
+
+          <button class="flip-btn">🔄 Lật thẻ</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen 1b: Quizcard back side -->
+    <div>
+      <div class="screen-label">1b. QuizcardWidget — mặt sau</div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-bar">
+          <span class="back">‹</span>
+          <div><div class="title">Từ vựng</div><div class="subtitle-bar">Module: Kavárna & Restaurace</div></div>
+          <div></div>
+        </div>
+        <div class="phone-content">
+          <div class="progress-row">
+            <div class="progress-track"><div class="progress-fill" style="width:25%"></div></div>
+            <span class="progress-text">3 / 12</span>
+          </div>
+
+          <div class="quizcard-back">
+            <div class="qb-label">NGHĨA TIẾNG VIỆT</div>
+            <div class="qb-def">quán cà phê</div>
+            <div class="qb-example">"Jdu do kavárny." — Tôi đi đến quán cà phê.</div>
+            <button class="audio-btn">🔊 Phát âm Czech</button>
+          </div>
+
+          <div style="display:flex;gap:10px">
+            <button style="flex:1;padding:12px;border-radius:10px;border:2px solid #EF4444;background:white;color:#EF4444;font-weight:600;font-size:13px;cursor:pointer">✗ Chưa nhớ</button>
+            <button style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-weight:600;font-size:13px;cursor:pointer">✓ Đã nhớ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen 2: Image choice grid -->
+    <div>
+      <div class="screen-label">2. MultipleChoiceWidget — 2×2 image grid</div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-bar">
+          <span class="back">‹</span>
+          <div><div class="title">Bài nghe 1</div><div class="subtitle-bar">послech_1 — Chọn ảnh đúng</div></div>
+          <div></div>
+        </div>
+        <div class="phone-content">
+          <div class="audio-pill">
+            <div class="play-icon">▶</div>
+            <span>Nghe đoạn hội thoại</span>
+            <span style="margin-left:auto;font-size:11px;opacity:0.7">0:32</span>
+          </div>
+
+          <div class="choice-question">Kde se Marie setkala s Janem? (Họ gặp nhau ở đâu?)</div>
+
+          <div class="image-grid">
+            <div class="image-option">
+              <div class="image-option-img opt-a">☕</div>
+              <div class="image-option-label">A — Kavárna</div>
+            </div>
+            <div class="image-option">
+              <div class="image-option-img opt-b">🏥</div>
+              <div class="image-option-label">B — Nemocnice</div>
+            </div>
+            <div class="image-option selected">
+              <div class="check-badge">✓</div>
+              <div class="image-option-img opt-c" style="background:linear-gradient(135deg,#FFEDD5,#FED7AA)">🏪</div>
+              <div class="image-option-label" style="color:var(--orange)">C — Obchod</div>
+            </div>
+            <div class="image-option">
+              <div class="image-option-img opt-d">🚉</div>
+              <div class="image-option-label">D — Nádraží</div>
+            </div>
+          </div>
+
+          <button class="check-btn">Kiểm tra đáp án</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen 3: Matching with images -->
+    <div>
+      <div class="screen-label">3. MatchingWidget — nối từ với ảnh</div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-bar">
+          <span class="back">‹</span>
+          <div><div class="title">Từ vựng</div><div class="subtitle-bar">Khớp từ với ảnh</div></div>
+          <div></div>
+        </div>
+        <div class="phone-content">
+          <div class="match-instruction">Chạm từ bên trái, rồi chạm ảnh bên phải để nối.</div>
+          <div class="match-grid">
+            <div class="match-col">
+              <div class="match-text-item selected">
+                <div class="dot"></div>kavárna
+              </div>
+              <div class="match-text-item">
+                <div class="dot"></div>lékárna
+              </div>
+              <div class="match-text-item">
+                <div class="dot"></div>banka
+              </div>
+              <div class="match-text-item">
+                <div class="dot"></div>pošta
+              </div>
+            </div>
+            <div class="match-col">
+              <div class="match-image-item matched">
+                <div class="match-img-area m1">☕</div>
+                <div class="match-img-label">quán cà phê ✓</div>
+              </div>
+              <div class="match-image-item">
+                <div class="match-img-area m2">🏥</div>
+                <div class="match-img-label">nhà thuốc</div>
+              </div>
+              <div class="match-image-item">
+                <div class="match-img-area m3">🏦</div>
+                <div class="match-img-label">ngân hàng</div>
+              </div>
+              <div class="match-image-item">
+                <div class="match-img-area m4">📬</div>
+                <div class="match-img-label">bưu điện</div>
+              </div>
+            </div>
+          </div>
+          <button class="check-btn" style="background:var(--orange)">Kiểm tra</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen 4: Context image on any exercise -->
+    <div>
+      <div class="screen-label">4. Context image — bất kỳ exercise type nào (Direction B)</div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-bar">
+          <span class="back">‹</span>
+          <div><div class="title">Ngữ pháp</div><div class="subtitle-bar">Điền vào chỗ trống</div></div>
+          <div></div>
+        </div>
+        <div class="phone-content">
+          <div class="exercise-context-img">
+            🗺️
+            <div class="img-tag">ngữ cảnh</div>
+          </div>
+
+          <div class="fill-question">
+            Doplňte správnou formu:<br>
+            <span style="color:var(--gray-600)">Kde je <span class="fill-blank"></span>? — Hỏi nơi chốn.</span>
+          </div>
+
+          <div class="fill-options">
+            <div class="fill-chip">kavárna</div>
+            <div class="fill-chip">kavárně</div>
+            <div class="fill-chip used">kavárnu</div>
+            <div class="fill-chip">kavárny</div>
+          </div>
+
+          <button class="check-btn">Kiểm tra đáp án</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ======= SECTION 3: CMS SCREENS ======= -->
+<div class="section">
+  <div class="section-label cms">CMS — Admin Upload Interface</div>
+  <div class="screen-row">
+
+    <!-- CMS: Vocabulary items with image upload -->
+    <div>
+      <div class="screen-label">5. Vocabulary Set Edit — upload ảnh per item</div>
+      <div class="cms-frame">
+        <div class="cms-topbar">
+          <span class="logo">CMS Czech A2</span>
+          <span class="breadcrumb">/ Từ vựng / Kavárna & Restaurace / Chỉnh sửa</span>
+        </div>
+        <div class="cms-body">
+          <div class="cms-section-title">Danh sách từ vựng (3/20)</div>
+
+          <!-- Item 1 — has image -->
+          <div class="vocab-item">
+            <div class="vocab-item-header">
+              <div class="vocab-item-thumb has-image">☕</div>
+              <div class="vocab-item-fields">
+                <div class="vocab-row">
+                  <input class="field-input czech" value="kavárna" readonly>
+                  <input class="field-input" value="quán cà phê" readonly>
+                </div>
+                <div class="vocab-row">
+                  <input class="field-input" value="podstatné jméno, ženský rod" style="font-size:11px" readonly>
+                </div>
+              </div>
+              <button class="del-btn">×</button>
+            </div>
+            <div class="vocab-actions">
+              <button class="upload-btn has-img">✓ Đã có ảnh — Đổi ảnh</button>
+              <button class="audio-gen-btn">🔊 Tạo audio</button>
+            </div>
+          </div>
+
+          <!-- Item 2 — no image -->
+          <div class="vocab-item">
+            <div class="vocab-item-header">
+              <div class="vocab-item-thumb">
+                <span style="font-size:11px;color:var(--gray-400)">Ảnh</span>
+              </div>
+              <div class="vocab-item-fields">
+                <div class="vocab-row">
+                  <input class="field-input czech" value="lékárna" readonly>
+                  <input class="field-input" value="nhà thuốc" readonly>
+                </div>
+                <div class="vocab-row">
+                  <input class="field-input" value="podstatné jméno, ženský rod" style="font-size:11px" readonly>
+                </div>
+              </div>
+              <button class="del-btn">×</button>
+            </div>
+            <div class="vocab-actions">
+              <button class="upload-btn">+ Tải ảnh lên</button>
+              <button class="audio-gen-btn">🔊 Tạo audio</button>
+            </div>
+          </div>
+
+          <!-- Item 3 — uploading state -->
+          <div class="vocab-item" style="opacity:0.7">
+            <div class="vocab-item-header">
+              <div class="vocab-item-thumb" style="background:linear-gradient(135deg,#EEF2FF,#DBEAFE);border-color:#93C5FD;border-style:solid">
+                <span style="font-size:10px;color:#3B82F6">↑ 67%</span>
+              </div>
+              <div class="vocab-item-fields">
+                <div class="vocab-row">
+                  <input class="field-input czech" value="banka" readonly>
+                  <input class="field-input" value="ngân hàng" readonly>
+                </div>
+              </div>
+              <button class="del-btn">×</button>
+            </div>
+            <div class="vocab-actions">
+              <button class="upload-btn" style="border-color:#93C5FD;background:#EFF6FF;color:#3B82F6">⏳ Đang tải…</button>
+            </div>
+          </div>
+
+          <button style="width:100%;padding:10px;border:2px dashed var(--gray-300);border-radius:10px;background:none;color:var(--gray-500);font-size:13px;cursor:pointer;margin-top:4px">+ Thêm từ mới</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CMS: Exercise options with image upload -->
+    <div>
+      <div class="screen-label">6. Exercise Form — upload ảnh per option</div>
+      <div class="cms-frame" style="width:500px">
+        <div class="cms-topbar">
+          <span class="logo">CMS Czech A2</span>
+          <span class="breadcrumb">/ Exercise / послech_2 / Chỉnh sửa</span>
+        </div>
+        <div class="cms-body">
+          <div class="cms-section-title">Tùy chọn (Options)</div>
+          <p style="font-size:12px;color:var(--gray-400);margin-bottom:16px">Khi tất cả options có ảnh → Flutter tự động dùng layout 2×2 image grid.</p>
+
+          <!-- Option A — has image -->
+          <div class="option-row">
+            <div class="option-label-badge">A</div>
+            <div class="option-content">
+              <div class="option-text-row">
+                <div class="option-thumb uploaded">☕</div>
+                <input class="field-input" value="Kavárna" readonly style="flex:1">
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <button class="upload-btn has-img" style="font-size:10px">✓ Ảnh — Đổi</button>
+                <div class="correct-radio">
+                  <div class="radio-dot checked"></div>
+                  <span>Đáp án đúng</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Option B — no image -->
+          <div class="option-row">
+            <div class="option-label-badge" style="background:var(--gray-400)">B</div>
+            <div class="option-content">
+              <div class="option-text-row">
+                <div class="option-thumb">
+                  <span style="font-size:10px;color:var(--gray-400)">Ảnh</span>
+                </div>
+                <input class="field-input" value="Lékárna" readonly style="flex:1">
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <button class="upload-btn" style="font-size:10px">+ Tải ảnh</button>
+                <div class="correct-radio">
+                  <div class="radio-dot"></div>
+                  <span>Đáp án đúng</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Option C — no image -->
+          <div class="option-row">
+            <div class="option-label-badge" style="background:var(--gray-400)">C</div>
+            <div class="option-content">
+              <div class="option-text-row">
+                <div class="option-thumb">
+                  <span style="font-size:10px;color:var(--gray-400)">Ảnh</span>
+                </div>
+                <input class="field-input" value="Banka" readonly style="flex:1">
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <button class="upload-btn" style="font-size:10px">+ Tải ảnh</button>
+                <div class="correct-radio">
+                  <div class="radio-dot"></div>
+                  <span>Đáp án đúng</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Option D — no image -->
+          <div class="option-row">
+            <div class="option-label-badge" style="background:var(--gray-400)">D</div>
+            <div class="option-content">
+              <div class="option-text-row">
+                <div class="option-thumb">
+                  <span style="font-size:10px;color:var(--gray-400)">Ảnh</span>
+                </div>
+                <input class="field-input" value="Nádraží" readonly style="flex:1">
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <button class="upload-btn" style="font-size:10px">+ Tải ảnh</button>
+                <div class="correct-radio">
+                  <div class="radio-dot"></div>
+                  <span>Đáp án đúng</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:16px;padding:10px 12px;background:#FFFBEB;border-radius:8px;border:1px solid #FDE68A;font-size:11px;color:#92400E">
+            ⚠ 3/4 options chưa có ảnh — Flutter sẽ dùng layout text list cho đến khi đủ 4 ảnh.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ======= SECTION 4: COMPONENT STATES ======= -->
+<div class="section">
+  <div class="section-label">Image Option States — Flutter</div>
+  <div style="background:white;border-radius:16px;padding:24px;max-width:700px;box-shadow:0 2px 16px rgba(0,0,0,0.06)">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+
+      <!-- Default -->
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--gray-400);margin-bottom:8px;font-weight:600">DEFAULT</div>
+        <div class="image-option" style="border-color:var(--gray-200)">
+          <div class="image-option-img opt-a">☕</div>
+          <div class="image-option-label">A — Kavárna</div>
+        </div>
+      </div>
+
+      <!-- Pressed -->
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--orange);margin-bottom:8px;font-weight:600">SELECTED</div>
+        <div class="image-option selected">
+          <div class="check-badge">✓</div>
+          <div class="image-option-img opt-c" style="background:linear-gradient(135deg,#FFEDD5,#FED7AA)">🏪</div>
+          <div class="image-option-label" style="color:var(--orange)">C — Obchod</div>
+        </div>
+      </div>
+
+      <!-- Correct -->
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--green);margin-bottom:8px;font-weight:600">CORRECT ✓</div>
+        <div class="image-option" style="border-color:var(--green);background:#F0FDF4">
+          <div style="position:absolute;top:6px;right:6px;width:20px;height:20px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;position:relative;float:right;margin:-2px 0 -20px 0">✓</div>
+          <div class="image-option-img opt-a">☕</div>
+          <div class="image-option-label" style="color:#15803D">A — Kavárna</div>
+        </div>
+      </div>
+
+      <!-- Wrong -->
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--red);margin-bottom:8px;font-weight:600">WRONG ✗</div>
+        <div class="image-option" style="border-color:var(--red);background:#FEF2F2;opacity:0.8">
+          <div class="image-option-img opt-b">🏥</div>
+          <div class="image-option-label" style="color:var(--red)">B — Nemocnice</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="margin-top:20px;font-size:12px;color:var(--gray-600);line-height:1.6">
+      <strong>Fallback rule:</strong> Nếu ít nhất 1 option thiếu ảnh → dùng text list layout (không dùng image grid). Image grid chỉ render khi <em>tất cả</em> options có <code>asset_id</code> hợp lệ.<br>
+      <strong>Image error:</strong> Nếu load ảnh fail → hiển thị placeholder icon + text label. Không block interaction.
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

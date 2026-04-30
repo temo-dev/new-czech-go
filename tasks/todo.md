@@ -173,3 +173,19 @@ Chi tiết + AC đầy đủ trong `tasks/plan.md` (section V10).
 - [x] **ER-4** Flutter: `_buildAnalyzingView` upgrade — LinearProgressIndicator + step list per speaking section (✓ xong / ⏳ đang xử lý / ○ chờ) (2026-04-30)
 
 **[CHECKPOINT ER]** ✅ Passed 2026-04-30 — flutter analyze clean, 37/37 tests pass
+
+---
+
+## V11 — Media Enrichment (Ảnh cho Exercise & Vocabulary)
+
+Spec: `docs/specs/media-enrichment.md` · UI/UX: `docs/designs/media-enrichment.html` · Idea: `docs/ideas/media-enrichment.md`
+
+- [ ] **ME-1** Backend: thêm `image_asset_id` vào `MultipleChoiceOption`, `MatchOption`, `VocabularyItem`, `GrammarRule` trong contracts; migration 020 (vocabulary_items) + 021 (grammar_rules); `media_assets.go` — 4 upload/delete handlers cho vocab items + grammar rules với validate MIME + 5MB; wire routes; update stores
+- **[CHECKPOINT ME-A]** `make backend-test` + `make flutter-analyze` + `make cms-build`. Manual: CMS upload ảnh vocab → Flutter flashcard hiện ảnh
+- [ ] **ME-2** CMS+Flutter: vocabulary flashcard với ảnh — CMS vocab item row thêm thumbnail 52×52 + upload/xóa ảnh button (POST `/admin/vocabulary-items/:id/image`); Flutter parse `VocabularyItem.imageAssetId`; `QuizcardWidget` thêm image slot 16:9 phía trên term + shimmer + silent fallback; layout unchanged khi không có ảnh
+- [ ] **ME-3** CMS+Flutter: multiple choice image grid — `OptionRow.tsx` thêm `imageAssetId`/`exerciseId`/`onImageUploaded` props + thumbnail + upload; `PoslechFields`/`CteniFields` pass `exerciseId` + handle `onImageUploaded`; warning khi mixed images; Flutter `MultipleChoiceOption.fromJson` parse `image_asset_id`; `MultipleChoiceWidget` switch 2×2 grid khi **tất cả** options có ảnh, giữ text list khi không đủ
+- [ ] **ME-4** Flutter: matching với ảnh — `MatchOption.fromJson` parse `image_asset_id`; `MatchingWidget` right column hiện image card (aspect 4:3 + label text nhỏ) khi `imageAssetId` có, fallback text-only khi không
+- **[CHECKPOINT ME-B]** `make flutter-analyze` + `make backend-test`. Manual: послech_2 với 4 ảnh → grid; matching vocab với ảnh → image column
+- [ ] **ME-5** CMS: grammar rule image — CMS grammar form thêm thumbnail + upload/xóa (POST `/admin/grammar-rules/:id/image`); Flutter `GrammarRule.fromJson` parse `image_asset_id` (backend endpoints đã có từ ME-1)
+- [ ] **ME-6** CMS+Flutter: exercise context image (Direction B) — CMS exercise forms thêm section "Ảnh ngữ cảnh" upload với `asset_kind=context_image`; Flutter tất cả exercise screens render context_image từ `exercise.assets` phía trên question; fail → ẩn silently; speaking screens kiểm tra không duplicate với `uloha_prompt.dart`
+- **[CHECKPOINT ME-C]** `make verify`. Manual E2E: (1) vocab flashcard có ảnh; (2) послech_2 image grid; (3) exercise context image trên bất kỳ loại bài
