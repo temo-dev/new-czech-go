@@ -10,8 +10,8 @@ export function validateExercise(exerciseType: ExerciseType, payload: AnyPayload
   // Common
   const title = String(payload.title ?? '').trim();
   if (!title) errors.push('Tiêu đề không được để trống.');
-  const skillId = String(payload.skill_id ?? '').trim();
-  if (!skillId) errors.push('Phải chọn Skill.');
+  const moduleId = String(payload.module_id ?? '').trim();
+  if (!moduleId) errors.push('Phải chọn Module.');
 
   const detail = (payload.detail ?? {}) as Record<string, unknown>;
 
