@@ -153,9 +153,9 @@ Spec: `docs/ideas/voice-selection.md`. Plan chi tiết: `tasks/plan.md` → sect
 Idea doc: `docs/ideas/exam-template-vs-practice-set.md`
 Chi tiết + AC đầy đủ trong `tasks/plan.md` (section V9).
 
-- [ ] **EX-1** Backend: xóa FullExam stack — `full_exam_scorer.go`, `full_exam_store.go`, `postgres_full_exam_store.go` + 3 test files; xóa `FullExamSession/CreateRequest/CompleteRequest` khỏi contracts; xóa `fullExamScorer` + handlers `/v1/full-exams*` + auto-link call khỏi server.go; `DROP TABLE IF EXISTS full_exam_sessions` trong main.go
-- [ ] **EX-2** Backend: `MockTest.session_type` → `exam_mode`; ensureSchema ALTER TABLE; update INSERT/SELECT/UPDATE; update server.go handler
-- [ ] **EX-3** CMS: xóa `session_type` dropdown, thêm `exam_mode` radio (`real` | `practice`)
-- [ ] **EX-4** Flutter: xóa `full_exam_intro_screen.dart` + `full_exam_result_screen.dart`; xóa `FullExamSession` model; xóa API calls; xóa routes; `MockTest.sessionType` → `examMode`
+- [x] **EX-1** Backend: xóa FullExam stack — `full_exam_scorer.go`, `full_exam_store.go`, `postgres_full_exam_store.go` + 3 test files; xóa `FullExamSession/CreateRequest/CompleteRequest` khỏi contracts; xóa `fullExamScorer` + handlers `/v1/full-exams*` + auto-link call khỏi server.go; `DROP TABLE IF EXISTS full_exam_sessions` (2026-04-30)
+- [x] **EX-2** Backend: `MockTest.session_type` → `exam_mode`; ensureSchema ALTER TABLE; update INSERT/SELECT/UPDATE (2026-04-30)
+- [x] **EX-3** CMS: xóa `session_type` dropdown, thêm `exam_mode` radio (`real` | `practice`) + badge trong list (2026-04-30)
+- [x] **EX-4** Flutter: xóa `full_exam_intro_screen.dart` + `full_exam_result_screen.dart`; xóa `FullExamSession` model; xóa API calls; xóa routes; `MockTest.sessionType` → `examMode` (2026-04-30)
 
-**[CHECKPOINT EX]** `make verify`
+**[CHECKPOINT EX]** ✅ Passed 2026-04-30 — backend 218 tests, flutter 34 tests, cms build clean, 0 FullExam references
