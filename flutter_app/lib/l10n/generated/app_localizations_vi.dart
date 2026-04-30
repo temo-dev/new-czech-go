@@ -748,6 +748,18 @@ class AppLocalizationsVi extends AppLocalizations {
   String get objectiveNoAnswer => '(không trả lời)';
 
   @override
+  String get objectiveYourAnswer => 'Bạn trả lời:';
+
+  @override
+  String get objectiveCorrectAnswer => 'Đáp án đúng:';
+
+  @override
+  String get viewPassage => 'Xem bài đọc';
+
+  @override
+  String get hidePassage => 'Ẩn bài đọc';
+
+  @override
   String objectiveScoreDisplay(int score, int max) {
     return '$score/$max';
   }

@@ -343,6 +343,10 @@
     "objectivePassBadge": "ĐÚNG",
     "objectiveFailBadge": "SAI",
     "objectiveNoAnswer": "(không trả lời)",
+    "objectiveYourAnswer": "Bạn trả lời:",
+    "objectiveCorrectAnswer": "Đáp án đúng:",
+    "viewPassage": "Xem bài đọc",
+    "hidePassage": "Ẩn bài đọc",
     "objectiveScoreDisplay": "{score}/{max}",
     "@objectiveScoreDisplay": {
         "placeholders": { "score": { "type": "int" }, "max": { "type": "int" } }

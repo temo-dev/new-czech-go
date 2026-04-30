@@ -748,6 +748,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get objectiveNoAnswer => '(no answer)';
 
   @override
+  String get objectiveYourAnswer => 'Your answer:';
+
+  @override
+  String get objectiveCorrectAnswer => 'Correct answer:';
+
+  @override
+  String get viewPassage => 'View reading text';
+
+  @override
+  String get hidePassage => 'Hide reading text';
+
+  @override
   String objectiveScoreDisplay(int score, int max) {
     return '$score/$max';
   }

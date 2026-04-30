@@ -4,21 +4,26 @@ import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
-import '../../exercise/widgets/result_card.dart';
+import '../widgets/section_result_card.dart';
 
 /// Shows the full analysis for one mock exam section attempt.
-/// Loads AttemptResult via getAttempt and renders the shared ResultCard.
+/// Loads AttemptResult via getAttempt and renders SectionResultCard,
+/// which dispatches to the correct widget based on [skillKind].
 class MockExamSectionDetailScreen extends StatefulWidget {
   const MockExamSectionDetailScreen({
     super.key,
     required this.client,
     required this.attemptId,
     required this.sequenceNo,
+    required this.skillKind,
+    required this.maxPoints,
   });
 
   final ApiClient client;
   final String attemptId;
   final int sequenceNo;
+  final String skillKind;
+  final int maxPoints;
 
   @override
   State<MockExamSectionDetailScreen> createState() =>
@@ -94,9 +99,11 @@ class _MockExamSectionDetailScreenState
         vertical: AppSpacing.x5,
       ),
       children: [
-        ResultCard(
+        SectionResultCard(
           client: widget.client,
           result: result,
+          skillKind: widget.skillKind,
+          maxPoints: widget.maxPoints,
           onRetry: () => Navigator.of(context).pop(),
         ),
       ],

@@ -443,15 +443,74 @@ class _MockExamScreenState extends State<MockExamScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: AppSpacing.x4),
             Text(
-              _analyzeProgress > 0
-                  ? l.mockExamAnalyzingProgress(_analyzeProgress, total)
-                  : l.mockExamAnalyzing,
-              style: AppTypography.bodyMedium,
+              l.mockExamAnalyzing,
+              style: AppTypography.titleSmall,
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: AppSpacing.x3),
+            if (total > 0) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.full),
+                child: LinearProgressIndicator(
+                  value: total > 0 ? _analyzeProgress / total : 0,
+                  minHeight: 6,
+                  backgroundColor: AppColors.outlineVariant,
+                  valueColor:
+                      const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.x4),
+              ...List.generate(_pendingAnalyses.length, (i) {
+                // _analyzeProgress = k means section k-1 is currently processing.
+                // Sections 0..k-2 are done; section k-1 is active; k..end are pending.
+                final done = _analyzeProgress > 1 && i < _analyzeProgress - 1;
+                final active = _analyzeProgress > 0 && i == _analyzeProgress - 1;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.x1),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: done
+                            ? const Icon(
+                                Icons.check_circle_rounded,
+                                size: 20,
+                                color: AppColors.success,
+                              )
+                            : active
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.primary,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.radio_button_unchecked,
+                                    size: 20,
+                                    color: AppColors.outline,
+                                  ),
+                      ),
+                      const SizedBox(width: AppSpacing.x2),
+                      Text(
+                        l.mockExamSectionLabel(i + 1),
+                        style: AppTypography.bodySmall.copyWith(
+                          color: done
+                              ? AppColors.success
+                              : active
+                                  ? AppColors.onSurface
+                                  : AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
           ],
         ),
       ),
@@ -710,6 +769,8 @@ class _MockExamResultView extends StatelessWidget {
                                     client: _client(context),
                                     attemptId: section.attemptId,
                                     sequenceNo: section.sequenceNo,
+                                    skillKind: _sectionSkillKind(section),
+                                    maxPoints: section.maxPoints,
                                   ),
                             ),
                           )

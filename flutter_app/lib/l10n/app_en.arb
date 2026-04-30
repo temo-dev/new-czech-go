@@ -298,6 +298,10 @@
     "objectivePassBadge": "PASS",
     "objectiveFailBadge": "FAIL",
     "objectiveNoAnswer": "(no answer)",
+    "objectiveYourAnswer": "Your answer:",
+    "objectiveCorrectAnswer": "Correct answer:",
+    "viewPassage": "View reading text",
+    "hidePassage": "Hide reading text",
     "objectiveScoreDisplay": "{score}/{max}",
     "@objectiveScoreDisplay": {
         "placeholders": { "score": { "type": "int" }, "max": { "type": "int" } }

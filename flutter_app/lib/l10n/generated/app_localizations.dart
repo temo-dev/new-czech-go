@@ -1433,6 +1433,30 @@ abstract class AppLocalizations {
   /// **'(không trả lời)'**
   String get objectiveNoAnswer;
 
+  /// No description provided for @objectiveYourAnswer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn trả lời:'**
+  String get objectiveYourAnswer;
+
+  /// No description provided for @objectiveCorrectAnswer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đáp án đúng:'**
+  String get objectiveCorrectAnswer;
+
+  /// No description provided for @viewPassage.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xem bài đọc'**
+  String get viewPassage;
+
+  /// No description provided for @hidePassage.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ẩn bài đọc'**
+  String get hidePassage;
+
   /// No description provided for @objectiveScoreDisplay.
   ///
   /// In vi, this message translates to:
