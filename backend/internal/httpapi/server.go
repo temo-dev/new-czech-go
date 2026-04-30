@@ -73,6 +73,7 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 		audioGen = pollyGen
 	}
 	voiceRegistry := processing.NewVoiceRegistry(processor.TTSProvider())
+	processor.WithVoiceRegistry(voiceRegistry)
 	s := &Server{
 		repo:             repo,
 		processor:        processor,
@@ -157,14 +158,79 @@ func (s *Server) handleVoices(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleVoicePreview serves GET /v1/voices/:id/preview — VS2 placeholder.
-// Returns 501 until the preview cache and TTS call are wired in VS2.
+const voicePreviewPhrase = "Dobrý den, jsem připraven pomoci vám s učením češtiny."
+
+// handleVoicePreview dispatches /v1/voices/:id/preview routes.
+//   GET /v1/voices/:id/preview       — returns JSON with audio URL
+//   GET /v1/voices/:id/preview/audio — streams audio bytes (no auth)
 func (s *Server) handleVoicePreview(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeMethodNotAllowed(w)
 		return
 	}
-	writeError(w, http.StatusNotImplemented, "not_implemented", "Voice preview not yet available.", false)
+	tail := strings.TrimPrefix(r.URL.Path, "/v1/voices/")
+
+	if strings.HasSuffix(tail, "/preview/audio") {
+		voiceID := strings.TrimSuffix(tail, "/preview/audio")
+		s.serveVoicePreviewAudio(w, r, voiceID)
+		return
+	}
+	if strings.HasSuffix(tail, "/preview") {
+		voiceID := strings.TrimSuffix(tail, "/preview")
+		s.handleVoicePreviewURL(w, r, voiceID)
+		return
+	}
+	writeNotFound(w)
+}
+
+func (s *Server) handleVoicePreviewURL(w http.ResponseWriter, r *http.Request, voiceID string) {
+	if voiceID == "" || !s.voiceKnown(voiceID) {
+		writeError(w, http.StatusNotFound, "not_found", "Voice not found.", false)
+		return
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	audioURL := fmt.Sprintf("%s://%s/v1/voices/%s/preview/audio", scheme, r.Host, voiceID)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{"url": audioURL, "mime_type": "audio/mpeg"},
+		"meta": map[string]any{},
+	})
+}
+
+func (s *Server) serveVoicePreviewAudio(w http.ResponseWriter, r *http.Request, voiceID string) {
+	if voiceID == "" || !s.voiceKnown(voiceID) {
+		writeNotFound(w)
+		return
+	}
+	provider := s.voiceRegistry.For(voiceID)
+	audio, err := provider.Generate("voice-preview-"+voiceID, voicePreviewPhrase)
+	if err != nil {
+		log.Printf("voice preview generation failed for %s: %v", voiceID, err)
+		writeError(w, http.StatusServiceUnavailable, "tts_unavailable", "Voice preview temporarily unavailable.", false)
+		return
+	}
+	localPath := processing.ReviewAudioLocalPath(audio.StorageKey)
+	f, err := os.Open(localPath)
+	if err != nil {
+		log.Printf("voice preview file not readable at %s: %v", localPath, err)
+		writeError(w, http.StatusInternalServerError, "internal_error", "Preview audio not accessible.", true)
+		return
+	}
+	defer f.Close()
+	w.Header().Set("Content-Type", audio.MimeType)
+	w.Header().Set("Cache-Control", "max-age=86400")
+	io.Copy(w, f) //nolint:errcheck
+}
+
+func (s *Server) voiceKnown(voiceID string) bool {
+	for _, v := range s.voiceRegistry.Voices() {
+		if v.ID == voiceID {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -927,13 +993,14 @@ func (s *Server) handleUploadComplete(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	var req struct {
-		StorageKey     string `json:"storage_key"`
-		MimeType       string `json:"mime_type"`
-		DurationMs     int    `json:"duration_ms"`
-		SampleRateHz   int    `json:"sample_rate_hz"`
-		Channels       int    `json:"channels"`
-		FileSizeBytes  int    `json:"file_size_bytes"`
-		StoredFilePath string `json:"stored_file_path"`
+		StorageKey       string `json:"storage_key"`
+		MimeType         string `json:"mime_type"`
+		DurationMs       int    `json:"duration_ms"`
+		SampleRateHz     int    `json:"sample_rate_hz"`
+		Channels         int    `json:"channels"`
+		FileSizeBytes    int    `json:"file_size_bytes"`
+		StoredFilePath   string `json:"stored_file_path"`
+		PreferredVoiceID string `json:"preferred_voice_id,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "validation_error", "Upload completion payload is required.", false)
@@ -965,8 +1032,9 @@ func (s *Server) handleUploadComplete(w http.ResponseWriter, r *http.Request, us
 		writeNotFound(w)
 		return
 	}
+	preferredVoiceID := strings.TrimSpace(req.PreferredVoiceID)
 	go func() {
-		if err := s.processor.ProcessAttempt(attemptID); err != nil {
+		if err := s.processor.ProcessAttempt(attemptID, preferredVoiceID); err != nil {
 			log.Printf("attempt %s processing error: %v", attemptID, err)
 		}
 	}()

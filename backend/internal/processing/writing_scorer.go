@@ -117,7 +117,7 @@ func (p *Processor) ProcessWritingAttempt(attemptID string, sub contracts.Writin
 		// Generate Polly TTS for the model answer so learners can hear it
 		// (same pattern as speaking review artifacts in processor.go).
 		if artifact.ModelAnswerText != "" {
-			if audio, err := p.ttsProvider.Generate(attemptID, artifact.ModelAnswerText); err != nil {
+			if audio, err := p.ttsFor(sub.PreferredVoiceID).Generate(attemptID, artifact.ModelAnswerText); err != nil {
 				log.Printf("writing attempt %s: model answer TTS failed: %v", attemptID, err)
 			} else {
 				artifact.TTSAudio = audio

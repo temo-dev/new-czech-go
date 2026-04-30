@@ -293,8 +293,9 @@ type Psani2Detail struct {
 // WritingSubmission is the body of POST /v1/attempts/:id/submit-text.
 // Use Answers for psani_1_formular (3 items), Text for psani_2_email.
 type WritingSubmission struct {
-	Answers []string `json:"answers,omitempty"`
-	Text    string   `json:"text,omitempty"`
+	Answers          []string `json:"answers,omitempty"`
+	Text             string   `json:"text,omitempty"`
+	PreferredVoiceID string   `json:"preferred_voice_id,omitempty"`
 }
 
 // --- Objective scoring (V3/V4) ---

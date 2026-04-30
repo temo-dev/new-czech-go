@@ -22,6 +22,7 @@ type Processor struct {
 	repo           attemptRepository
 	transcriber    Transcriber
 	ttsProvider    TTSProvider
+	voiceRegistry  *VoiceRegistry
 	llmProvider    LLMFeedbackProvider
 	reviewProvider LLMReviewProvider
 }
@@ -42,6 +43,13 @@ func NewProcessor(repo attemptRepository, transcriber Transcriber, ttsProvider T
 	return &Processor{repo: repo, transcriber: transcriber, ttsProvider: ttsProvider, llmProvider: llmProvider, reviewProvider: reviewProvider}
 }
 
+// WithVoiceRegistry wires a VoiceRegistry for per-request voice routing.
+// Returns the processor for chaining.
+func (p *Processor) WithVoiceRegistry(r *VoiceRegistry) *Processor {
+	p.voiceRegistry = r
+	return p
+}
+
 // TTSProvider returns the configured TTS provider, or nil if it is the dev no-op.
 func (p *Processor) TTSProvider() TTSProvider {
 	if _, isDev := p.ttsProvider.(DevTTSProvider); isDev {
@@ -50,7 +58,16 @@ func (p *Processor) TTSProvider() TTSProvider {
 	return p.ttsProvider
 }
 
-func (p *Processor) ProcessAttempt(attemptID string) error {
+// ttsFor returns the TTSProvider for a given voice slug.
+// Falls back to the default ttsProvider when voiceRegistry is unset or slug unknown.
+func (p *Processor) ttsFor(voiceID string) TTSProvider {
+	if p.voiceRegistry != nil {
+		return p.voiceRegistry.For(voiceID)
+	}
+	return p.ttsProvider
+}
+
+func (p *Processor) ProcessAttempt(attemptID, preferredVoiceID string) error {
 	attempt, ok := p.repo.Attempt(attemptID)
 	if !ok {
 		return fmt.Errorf("attempt %s not found", attemptID)
@@ -104,7 +121,7 @@ func (p *Processor) ProcessAttempt(attemptID string) error {
 		artifact.GeneratedAt = time.Now().UTC().Format(time.RFC3339)
 		p.applyLLMReviewOverride(attemptID, exercise, transcript, feedback, &artifact, locale)
 		if artifact.ModelAnswerText != "" {
-			audio, err := p.ttsProvider.Generate(attemptID, artifact.ModelAnswerText)
+			audio, err := p.ttsFor(preferredVoiceID).Generate(attemptID, artifact.ModelAnswerText)
 			if err != nil {
 				log.Printf("attempt %s review artifact tts generation failed: error=%v", attemptID, err)
 			} else {
