@@ -180,12 +180,17 @@ Chi tiết + AC đầy đủ trong `tasks/plan.md` (section V10).
 
 Spec: `docs/specs/media-enrichment.md` · UI/UX: `docs/designs/media-enrichment.html` · Idea: `docs/ideas/media-enrichment.md`
 
-- [ ] **ME-1** Backend: thêm `image_asset_id` vào `MultipleChoiceOption`, `MatchOption`, `VocabularyItem`, `GrammarRule` trong contracts; migration 020 (vocabulary_items) + 021 (grammar_rules); `media_assets.go` — 4 upload/delete handlers cho vocab items + grammar rules với validate MIME + 5MB; wire routes; update stores
-- **[CHECKPOINT ME-A]** `make backend-test` + `make flutter-analyze` + `make cms-build`. Manual: CMS upload ảnh vocab → Flutter flashcard hiện ảnh
-- [ ] **ME-2** CMS+Flutter: vocabulary flashcard với ảnh — CMS vocab item row thêm thumbnail 52×52 + upload/xóa ảnh button (POST `/admin/vocabulary-items/:id/image`); Flutter parse `VocabularyItem.imageAssetId`; `QuizcardWidget` thêm image slot 16:9 phía trên term + shimmer + silent fallback; layout unchanged khi không có ảnh
-- [ ] **ME-3** CMS+Flutter: multiple choice image grid — `OptionRow.tsx` thêm `imageAssetId`/`exerciseId`/`onImageUploaded` props + thumbnail + upload; `PoslechFields`/`CteniFields` pass `exerciseId` + handle `onImageUploaded`; warning khi mixed images; Flutter `MultipleChoiceOption.fromJson` parse `image_asset_id`; `MultipleChoiceWidget` switch 2×2 grid khi **tất cả** options có ảnh, giữ text list khi không đủ
-- [ ] **ME-4** Flutter: matching với ảnh — `MatchOption.fromJson` parse `image_asset_id`; `MatchingWidget` right column hiện image card (aspect 4:3 + label text nhỏ) khi `imageAssetId` có, fallback text-only khi không
-- **[CHECKPOINT ME-B]** `make flutter-analyze` + `make backend-test`. Manual: послech_2 với 4 ảnh → grid; matching vocab với ảnh → image column
-- [ ] **ME-5** CMS: grammar rule image — CMS grammar form thêm thumbnail + upload/xóa (POST `/admin/grammar-rules/:id/image`); Flutter `GrammarRule.fromJson` parse `image_asset_id` (backend endpoints đã có từ ME-1)
-- [ ] **ME-6** CMS+Flutter: exercise context image (Direction B) — CMS exercise forms thêm section "Ảnh ngữ cảnh" upload với `asset_kind=context_image`; Flutter tất cả exercise screens render context_image từ `exercise.assets` phía trên question; fail → ẩn silently; speaking screens kiểm tra không duplicate với `uloha_prompt.dart`
-- **[CHECKPOINT ME-C]** `make verify`. Manual E2E: (1) vocab flashcard có ảnh; (2) послech_2 image grid; (3) exercise context image trên bất kỳ loại bài
+- [x] **ME-1** Backend: thêm `image_asset_id` vào `MultipleChoiceOption`, `MatchOption`, `VocabularyItem`, `GrammarRule` trong contracts; migration 020 (vocabulary_items) + 021 (grammar_rules); `media_assets.go` — 4 upload/delete handlers cho vocab items + grammar rules với validate MIME + 5MB; wire routes; update stores (2026-05-01)
+- **[CHECKPOINT ME-A]** ✅ Passed 2026-05-01
+- [x] **ME-2** CMS+Flutter: vocabulary flashcard với ảnh — CMS vocab item row thêm thumbnail 52×52 + upload/xóa ảnh button; `QuizcardWidget` image slot 16:9; `ApiClient.mediaUri(key)` → `/v1/media/file?key=`; `QuizcardBasicDetail.ImageAssetID` inject tại publish time (2026-05-01)
+- [x] **ME-3** CMS+Flutter: multiple choice image grid — `PoslechOptionView.imageAssetId`; `MultipleChoiceWidget` 2×2 grid khi **tất cả** options có ảnh (2026-05-01)
+- [x] **ME-4** Flutter: matching với ảnh — `MatchingPairView.imageAssetId`; `MatchingWidget` right column hiện image card (2026-05-01)
+- **[CHECKPOINT ME-B]** ✅ Passed 2026-05-01
+- [x] **ME-5** CMS: grammar rule image — CMS grammar form thêm thumbnail + upload/xóa; Next.js API route (2026-05-01)
+- [x] **ME-6** CMS+Flutter: exercise context image — CMS exercise forms thêm "🖼 Ảnh minh họa" section cho mọi exercise type; `ExerciseContextImage` widget trên 4 exercise screens (2026-05-01)
+- **[CHECKPOINT ME-C]** ✅ Passed 2026-05-01 — 235 backend tests, 53 Flutter tests, CMS build clean
+- [x] **ME-extra** Course banner: `Course.BannerImageID` + POST/DELETE `/admin/courses/:id/banner` + CMS course-dashboard upload UI + Flutter `_CourseCard` banner image (2026-05-01)
+- [x] **ME-extra** MockTest banner: `MockTest.BannerImageID` + POST/DELETE `/admin/mock-tests/:id/banner` + CMS mock-test-dashboard upload UI + Flutter `_MockTestCard` banner image (2026-05-01)
+- [x] **ME-extra** cteni_1 per-item image upload: `C1Item` mode image/text; CMS CteniFields upload UI; Flutter `_buildCteni1Layout` redesign (2026-05-01)
+- [x] **ME-extra** Exercise form context image: `DELETE /admin/exercises/:id/assets/:assetId`; CMS "🖼 Ảnh minh họa" section trong exercise slide-over; quizcard image priority: context_image > flashcardImageAssetId (2026-05-01)
+- [x] **ME-bugfix** Inline `ALTER TABLE ADD COLUMN IF NOT EXISTS` cho `banner_image_id` + `image_asset_id` trong `NewPostgresCourseStore`, `NewPostgresVocabularyStore`, `NewPostgresGrammarStore`, `postgresMockTestStore.ensureSchema` (2026-05-01)

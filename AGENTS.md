@@ -279,7 +279,7 @@ Do not mix these in one change unless the human asks:
 If you notice adjacent cleanup, note it separately instead of silently expanding scope.
 
 ## Good Next Steps
-V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ V8 ✅ V9 ✅ V10 ✅ — tất cả planned slices hoàn thành.
+V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ V8 ✅ V9 ✅ V10 ✅ V11 ✅ — tất cả planned slices hoàn thành.
 Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 
 **V8 Schema Flatten — 2026-04-30:**
@@ -324,9 +324,24 @@ Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 - Specs: `docs/specs/exam-result-flow-redesign.md`, `docs/specs/exam-result-flow-implementation.md`, idea: `docs/ideas/exam-result-flow-redesign.md`
 - Tests: 16 widget tests trong `flutter_app/test/section_result_card_test.dart` (53 total Flutter tests)
 
+**V11 Media Enrichment — 2026-05-01:**
+- `image_asset_id` trên `VocabularyItem`, `GrammarRule`, `MultipleChoiceOption`, `MatchOption` (contracts + migrations 020/021)
+- `QuizcardBasicDetail.ImageAssetID` inject tại publish time từ vocab item; `ApiClient.mediaUri(key)` → `GET /v1/media/file?key=`
+- `QuizcardWidget` image slot (16:9, priority: context_image asset > flashcardImageAssetId)
+- `MultipleChoiceWidget` tự switch 2×2 image grid khi tất cả options có `imageAssetId`
+- `MatchingWidget` right column hiện image card khi `imageAssetId` có
+- `ExerciseContextImage` widget trên tất cả 4 exercise screens (listening/reading/writing/vocab-grammar)
+- Exercise form: "🖼 Ảnh minh họa" collapsible section cho mọi exercise type; `DELETE /admin/exercises/:id/assets/:assetId`
+- cteni_1 per-item image upload trong CMS (CteniFields mode image/text toggle); Flutter `_buildCteni1Layout` redesign
+- `Course.BannerImageID` + `MockTest.BannerImageID`: `POST/DELETE /admin/{courses,mock-tests}/:id/banner`; CMS card header hiện banner + upload UI; Flutter CourseCard/MockTestCard banner image
+- Security fix: `isSafeAssetKey()` dùng `filepath.Clean + HasPrefix` thay `strings.Contains("..")`
+- DB fix: inline `ALTER TABLE ADD COLUMN IF NOT EXISTS` tại startup cho tất cả stores — không cần chạy goose migrations thủ công
+- Specs: `docs/specs/media-enrichment.md`, idea: `docs/ideas/media-enrichment.md`, UI/UX: `docs/designs/media-enrichment.html`
+
 **Remaining backlog (low priority):**
 1. Nhập nội dung mẫu qua CMS: ít nhất 1 exercise mỗi loại để test Flutter end-to-end
 2. Polly audio upload flow cho `exercise_audio` (hiện chỉ text→Polly, upload không persist)
+3. Vocab item audio per-item (Polly TTS deferred từ V11)
 
 **Next coaching slice (if expanding):**
 Đọc `docs/ideas/attempt-repair-and-shadowing.md` + spec/plan files trước khi bắt đầu.
