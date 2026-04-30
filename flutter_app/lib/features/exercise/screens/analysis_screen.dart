@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/voice/voice_preference_service.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
@@ -60,12 +61,14 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
   Future<void> _run() async {
     try {
+      final voiceId = await VoicePreferenceService.readCurrent();
       await widget.client.submitRecordedAudio(
         widget.attemptId,
         audioPath: widget.audioPath,
         mimeType: 'audio/m4a',
         fileSizeBytes: widget.fileSizeBytes,
         durationMs: widget.durationMs,
+        preferredVoiceId: voiceId.isNotEmpty ? voiceId : null,
       );
       if (!mounted) return;
       setState(() {

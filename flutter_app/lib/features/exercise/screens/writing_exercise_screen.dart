@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/locale/locale_scope.dart';
+import '../../../core/voice/voice_preference_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -93,15 +94,19 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
       );
       final attemptId = attempt['id'] as String;
 
+      final voiceId = await VoicePreferenceService.readCurrent();
+      final voiceArg = voiceId.isNotEmpty ? voiceId : null;
       if (widget.detail.isPsani1) {
         await widget.client.submitText(
           attemptId,
           answers: _controllers.map((c) => c.text.trim()).toList(),
+          preferredVoiceId: voiceArg,
         );
       } else {
         await widget.client.submitText(
           attemptId,
           text: _emailController.text.trim(),
+          preferredVoiceId: voiceArg,
         );
       }
 

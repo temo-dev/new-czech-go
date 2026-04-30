@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/voice/voice_preference_service.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -286,12 +287,14 @@ class _MockExamScreenState extends State<MockExamScreen> {
       if (!mounted) return;
       setState(() => _analyzeProgress = i + 1);
       try {
+        final voiceId = await VoicePreferenceService.readCurrent();
         await widget.client.submitRecordedAudio(
           pending.attemptId,
           audioPath: pending.audioPath,
           mimeType: 'audio/m4a',
           fileSizeBytes: pending.fileSizeBytes,
           durationMs: pending.durationMs,
+          preferredVoiceId: voiceId.isNotEmpty ? voiceId : null,
         );
         await _pollUntilDone(pending.attemptId);
       } catch (err) {

@@ -16,4 +16,11 @@ class VoicePreferenceService {
   String get current => _prefs.getString(_key) ?? '';
 
   Future<void> save(String voiceId) => _prefs.setString(_key, voiceId);
+
+  /// One-shot read without requiring a service instance.
+  /// Returns empty string when no preference is saved.
+  static Future<String> readCurrent() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_key) ?? '';
+  }
 }
