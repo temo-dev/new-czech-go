@@ -149,21 +149,27 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
               const SizedBox(height: AppSpacing.x4),
             ],
 
-            // Items display (cteni_1: images/messages, cteni_3: text blocks)
-            if (d.cteniItems.isNotEmpty && d.cteniText.isEmpty) ...[
-              ..._buildItems(d),
-              const SizedBox(height: AppSpacing.x4),
-            ],
+            // cteni_1: combined item+answer layout (image/text per item + A-H select)
+            if (d.exerciseType == 'cteni_1') ...[
+              ..._buildCteni1Layout(d),
+            ]
+            else ...[
+              // Items display (cteni_3: text blocks)
+              if (d.cteniItems.isNotEmpty && d.cteniText.isEmpty) ...[
+                ..._buildItems(d),
+                const SizedBox(height: AppSpacing.x4),
+              ],
 
-            // Answer UI
-            if (d.isCteni5)
-              FillInWidget(
-                questions: d.cteniQuestions,
-                answers: _answers,
-                onChanged: (k, v) => setState(() => _answers[k] = v),
-              )
-            else
-              ..._buildAnswerWidgets(d),
+              // Answer UI
+              if (d.isCteni5)
+                FillInWidget(
+                  questions: d.cteniQuestions,
+                  answers: _answers,
+                  onChanged: (k, v) => setState(() => _answers[k] = v),
+                )
+              else
+                ..._buildAnswerWidgets(d),
+            ],
 
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.x2),
@@ -203,6 +209,161 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
         ),
       ),
     );
+  }
+
+  /// cteni_1 combined layout: each item shows its content (image or text) with
+  /// an inline A-H selection directly below. Items are rendered top-to-bottom.
+  List<Widget> _buildCteni1Layout(ExerciseDetail d) {
+    final opts = d.cteniOptions.isNotEmpty ? d.cteniOptions : <PoslechOptionView>[];
+    final items = d.cteniItems;
+    if (items.isEmpty) return [];
+
+    final widgets = <Widget>[];
+
+    for (int i = 0; i < items.length; i++) {
+      final item = items[i] as Map<String, dynamic>? ?? {};
+      final assetId = item['asset_id'] as String? ?? '';
+      final text = item['text'] as String? ?? '';
+      final no = (item['item_no'] as num?)?.toInt() ?? (i + 1);
+      final currentAnswer = _answers[no.toString()];
+
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.x4),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: currentAnswer != null ? AppColors.primary : AppColors.outlineVariant,
+                width: currentAnswer != null ? 2 : 1,
+              ),
+              boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2))],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Item header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 28, height: 28,
+                        decoration: BoxDecoration(
+                          color: currentAnswer != null ? AppColors.primary : AppColors.secondary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text('$no', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      if (currentAnswer != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            currentAnswer,
+                            style: AppTypography.labelLarge.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                // Item content: image or text
+                if (assetId.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.zero),
+                    child: Image.network(
+                      widget.client.exerciseAssetUri(d.id, assetId).toString(),
+                      headers: widget.client.authHeaders,
+                      height: 160,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 80,
+                        color: const Color(0xFFF5F0EA),
+                        child: Center(child: Text('$no', style: AppTypography.titleLarge.copyWith(color: AppColors.onSurfaceVariant))),
+                      ),
+                      loadingBuilder: (_, child, progress) => progress == null
+                          ? child
+                          : Container(height: 160, color: const Color(0xFFF5F0EA)),
+                    ),
+                  ),
+                ] else if (text.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F0EA),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(text, style: AppTypography.bodyMedium.copyWith(fontStyle: FontStyle.italic)),
+                    ),
+                  ),
+                ] else ...[
+                  // No content yet
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                    child: Container(
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F0EA),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
+
+                // A-H option chips
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: opts.map((opt) {
+                      final selected = currentAnswer == opt.key;
+                      return GestureDetector(
+                        onTap: () => setState(() => _answers[no.toString()] = opt.key),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 120),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: selected ? AppColors.primary : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: selected ? AppColors.primary : AppColors.outlineVariant,
+                              width: selected ? 2 : 1,
+                            ),
+                          ),
+                          child: Text(
+                            opt.key,
+                            style: AppTypography.labelLarge.copyWith(
+                              color: selected ? Colors.white : AppColors.onSurface,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return widgets;
   }
 
   List<Widget> _buildItems(ExerciseDetail d) {
