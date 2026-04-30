@@ -26,7 +26,7 @@ const SKILL_LABELS: Record<MatrixSkillKind, string> = {
   doc: 'Đọc',
 };
 
-const COVERAGE_TARGET = 20;
+export const COVERAGE_TARGET = 20;
 
 // ─── buildMatrix ─────────────────────────────────────────────────────────────
 
