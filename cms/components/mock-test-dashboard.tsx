@@ -24,7 +24,7 @@ type MockTest = {
   description: string;
   estimated_duration_minutes: number;
   status: 'draft' | 'published';
-  session_type?: string;
+  exam_mode?: string;
   pass_threshold_percent?: number;
   sections: MockTestSection[];
 };
@@ -77,6 +77,7 @@ type FormState = {
   description: string;
   estimated_duration_minutes: number;
   status: 'draft' | 'published';
+  exam_mode: 'real' | 'practice';
   pass_threshold_percent: number;
   sections: MockTestSection[];
 };
@@ -86,6 +87,7 @@ const emptyForm = (): FormState => ({
   description: '',
   estimated_duration_minutes: 15,
   status: 'draft',
+  exam_mode: 'practice',
   pass_threshold_percent: 80,
   sections: [],
 });
@@ -142,6 +144,7 @@ export function MockTestDashboard() {
       description: t.description,
       estimated_duration_minutes: t.estimated_duration_minutes,
       status: t.status,
+      exam_mode: (t.exam_mode === 'real' ? 'real' : 'practice'),
       pass_threshold_percent: t.pass_threshold_percent ?? 80,
       sections: [...(t.sections ?? [])],
     });
@@ -165,6 +168,7 @@ export function MockTestDashboard() {
         description: form.description,
         estimated_duration_minutes: form.estimated_duration_minutes,
         status: form.status,
+        exam_mode: form.exam_mode,
         pass_threshold_percent: form.pass_threshold_percent,
         sections: form.sections,
       };
@@ -250,6 +254,15 @@ export function MockTestDashboard() {
     );
   };
 
+  const examModeBadge = (mode?: string) => {
+    const isReal = mode === 'real';
+    return (
+      <span style={{ background: isReal ? '#7c3aed' : '#0891b2', color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>
+        {isReal ? 'Thi thật' : 'Luyện thi'}
+      </span>
+    );
+  };
+
   if (loading) return <p style={{ padding: 24 }}>Loading…</p>;
 
   return (
@@ -270,6 +283,7 @@ export function MockTestDashboard() {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     {statusBadge(t.status)}
+                    {examModeBadge(t.exam_mode)}
                     <strong>{t.title}</strong>
                   </div>
                   <p style={{ margin: '4px 0', color: '#6b7280', fontSize: 14 }}>{t.description}</p>
@@ -327,6 +341,22 @@ export function MockTestDashboard() {
             rows={2}
             style={{ ...inputStyle, resize: 'vertical' }}
           />
+
+          <label style={labelStyle}>Chế độ thi</label>
+          <div style={{ display: 'flex', gap: 20, marginBottom: 4 }}>
+            {(['practice', 'real'] as const).map(mode => (
+              <label key={mode} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14 }}>
+                <input
+                  type="radio"
+                  name="exam_mode"
+                  value={mode}
+                  checked={form.exam_mode === mode}
+                  onChange={() => setForm(f => ({ ...f, exam_mode: mode }))}
+                />
+                {mode === 'real' ? 'Thi thật' : 'Luyện thi'}
+              </label>
+            ))}
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <div>
