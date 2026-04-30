@@ -617,12 +617,14 @@ class MatchingPairView {
     required this.left,
     required this.rightId,
     required this.right,
+    this.imageAssetId = '',
   });
 
   final String leftId;
   final String left; // Czech term (displayed in fixed order on left)
   final String rightId;
   final String right; // Vietnamese definition (shuffled by Flutter on right)
+  final String imageAssetId; // V11: optional image for right-column card
 
   factory MatchingPairView.fromJson(Map<String, dynamic> json) {
     return MatchingPairView(
@@ -630,6 +632,7 @@ class MatchingPairView {
       left: json['left'] as String? ?? '',
       rightId: json['right_id'] as String? ?? '',
       right: json['right'] as String? ?? '',
+      imageAssetId: json['image_asset_id'] as String? ?? '',
     );
   }
 }
@@ -713,11 +716,13 @@ class PoslechOptionView {
     this.text = '',
     this.label = '',
     this.assetId = '',
+    this.imageAssetId = '',
   });
   final String key;
   final String text;
   final String label;
-  final String assetId;
+  final String assetId;        // existing ImageOption asset (e.g. uploaded image for послech options)
+  final String imageAssetId;   // V11: MultipleChoiceOption.image_asset_id (vocabulary image)
 
   factory PoslechOptionView.fromJson(Map<String, dynamic> json) {
     return PoslechOptionView(
@@ -725,6 +730,7 @@ class PoslechOptionView {
       text: json['text'] as String? ?? '',
       label: json['label'] as String? ?? '',
       assetId: json['asset_id'] as String? ?? '',
+      imageAssetId: json['image_asset_id'] as String? ?? '',
     );
   }
 }

@@ -8,6 +8,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../widgets/exercise_context_image.dart';
 import '../widgets/fill_in_widget.dart';
 import '../widgets/multiple_choice_widget.dart';
 import '../widgets/objective_result_card.dart';
@@ -124,6 +125,8 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.x4),
           children: [
+            ExerciseContextImage(detail: d, client: widget.client),
+
             if (d.learnerInstruction.isNotEmpty) ...[
               Text(d.learnerInstruction, style: AppTypography.bodyMedium),
               const SizedBox(height: AppSpacing.x4),
@@ -278,6 +281,8 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
               options: opts,
               selected: _answers[qno.toString()],
               onSelect: (k) => setState(() => _answers[qno.toString()] = k),
+              mediaUri: widget.client.mediaUri,
+              authHeaders: widget.client.authHeaders,
             ),
           ],
         ),

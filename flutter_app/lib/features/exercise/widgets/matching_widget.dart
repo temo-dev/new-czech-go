@@ -10,22 +10,29 @@ import '../../../models/models.dart';
 /// Matching exercise widget.
 ///
 /// Left column: Czech terms in fixed order (leftId 1,2,3...).
-/// Right column: Vietnamese definitions shuffled once on first build.
+/// Right column: Vietnamese definitions (or images) shuffled once on first build.
 /// Learner taps a left chip → highlights it.
 /// Then taps a right chip → creates pair (same color).
 /// Tap a connected pair to un-pair.
 /// answers map: leftId → rightId (e.g. {"1":"A","2":"B"}).
+///
+/// Image mode: when any pair has [imageAssetId] and [mediaUri] is provided,
+/// the right column shows an image card instead of text. Falls back to text on load error.
 class MatchingWidget extends StatefulWidget {
   const MatchingWidget({
     super.key,
     required this.pairs,
     required this.answers,
     required this.onChanged,
+    this.mediaUri,
+    this.authHeaders,
   });
 
   final List<MatchingPairView> pairs;
   final Map<String, String> answers;
   final void Function(String leftId, String rightId) onChanged;
+  final Uri Function(String storageKey)? mediaUri;
+  final Map<String, String>? authHeaders;
 
   @override
   State<MatchingWidget> createState() => _MatchingWidgetState();
@@ -150,13 +157,13 @@ class _MatchingWidgetState extends State<MatchingWidget> {
                 child: Text('Vietnamese', style: AppTypography.labelUppercase.copyWith(fontSize: 10, color: AppColors.onSurfaceVariant)),
               ),
               ..._shuffledRight.map((pair) {
-                // Find if this rightId is paired with any leftId
                 final pairedLeftId = widget.answers.entries
                     .where((e) => e.value == pair.rightId && e.value.isNotEmpty)
                     .map((e) => e.key)
                     .firstOrNull;
                 final isPaired = pairedLeftId != null;
                 final idx = isPaired ? _pairIndex(pairedLeftId) : -1;
+                final hasImage = pair.imageAssetId.isNotEmpty && widget.mediaUri != null;
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.x2),
@@ -164,7 +171,6 @@ class _MatchingWidgetState extends State<MatchingWidget> {
                     onTap: () => _onRightTap(pair.rightId),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
                         color: isPaired
                             ? _pairColors[idx % _pairColors.length]
@@ -179,13 +185,23 @@ class _MatchingWidgetState extends State<MatchingWidget> {
                           width: isPaired ? 1.5 : 1,
                         ),
                       ),
-                      child: Text(
-                        pair.right,
-                        style: AppTypography.bodySmall.copyWith(
-                          fontWeight: isPaired ? FontWeight.w600 : FontWeight.w400,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+                      child: hasImage
+                          ? _MatchImageCard(
+                              imageUrl: widget.mediaUri!(pair.imageAssetId).toString(),
+                              authHeaders: widget.authHeaders ?? const {},
+                              label: pair.right,
+                              isPaired: isPaired,
+                            )
+                          : Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              child: Text(
+                                pair.right,
+                                style: AppTypography.bodySmall.copyWith(
+                                  fontWeight: isPaired ? FontWeight.w600 : FontWeight.w400,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
                     ),
                   ),
                 );
@@ -194,6 +210,59 @@ class _MatchingWidgetState extends State<MatchingWidget> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _MatchImageCard extends StatelessWidget {
+  const _MatchImageCard({
+    required this.imageUrl,
+    required this.authHeaders,
+    required this.label,
+    required this.isPaired,
+  });
+  final String imageUrl;
+  final Map<String, String> authHeaders;
+  final String label;
+  final bool isPaired;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(9),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AspectRatio(
+            aspectRatio: 4 / 3,
+            child: Image.network(
+              imageUrl,
+              headers: authHeaders,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: const Color(0xFFF5F0EA),
+                child: Center(child: Text(label, style: AppTypography.bodySmall, textAlign: TextAlign.center)),
+              ),
+              loadingBuilder: (_, child, progress) => progress == null
+                  ? child
+                  : Container(color: const Color(0xFFF5F0EA)),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: Text(
+              label,
+              style: AppTypography.bodySmall.copyWith(
+                fontSize: 10,
+                fontWeight: isPaired ? FontWeight.w600 : FontWeight.w400,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

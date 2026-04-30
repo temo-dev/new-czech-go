@@ -6,7 +6,7 @@ import { adminFetch } from '../../lib/api';
 type GrammarRule = {
   id: string; module_id: string; title: string; level: string;
   explanation_vi: string; rule_table: Record<string, string>;
-  constraints_text: string; status: string;
+  constraints_text: string; status: string; image_asset_id?: string;
 };
 type Course = { id: string; title: string };
 type Module = { id: string; title: string; course_id: string };
@@ -204,6 +204,17 @@ export default function GrammarPage() {
     const forms = Object.entries(rule.rule_table ?? {}).map(([pronoun, form]) => ({ pronoun, form }));
     setFForms(forms.length ? forms : [{ pronoun: '', form: '' }]);
     setFCourse(''); setFModule(''); setFormErr(''); setShowModal(true);
+  }
+
+  async function handleRuleImageUpload(file: File) {
+    if (!editingRule?.id) return;
+    const formData = new FormData();
+    formData.set('file', file);
+    const res = await adminFetch(`/api/admin/grammar-rules/${editingRule.id}/image`, { method: 'POST', body: formData });
+    const j = await res.json();
+    if (res.ok && j.data?.image_asset_id) {
+      setEditingRule(r => r ? { ...r, image_asset_id: j.data.image_asset_id } : r);
+    }
   }
 
   async function handleSave() {
@@ -413,6 +424,20 @@ export default function GrammarPage() {
             <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>Ràng buộc (constraints)
               <textarea rows={2} value={fConstr} onChange={e => setFConstr(e.target.value)} style={inputStyle} placeholder="VD: Chỉ dùng câu đơn giản A1..." />
             </label>
+
+            {/* Image upload — only for existing rules */}
+            {editingRule?.id && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 8, border: `1.5px ${editingRule.image_asset_id ? 'solid #22c55e' : 'dashed var(--border)'}`, overflow: 'hidden', background: 'var(--surface-alt)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {editingRule.image_asset_id ? <span style={{ fontSize: 20 }}>🖼</span> : <span style={{ fontSize: 10, color: 'var(--ink-4)' }}>img</span>}
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, border: `1px ${editingRule.image_asset_id ? 'solid #22c55e' : 'dashed var(--border)'}`, borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: editingRule.image_asset_id ? '#15803d' : 'var(--ink-3)', background: editingRule.image_asset_id ? '#f0fdf4' : 'transparent' }}>
+                  {editingRule.image_asset_id ? '✓ Đã có ảnh — Đổi' : '+ Tải ảnh ngữ cảnh'}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleRuleImageUpload(f); e.target.value = ''; }} />
+                </label>
+              </div>
+            )}
+
             {formErr && <p style={{ margin: 0, color: 'var(--error)', fontSize: 13 }}>{formErr}</p>}
             <button onClick={handleSave} disabled={saving} style={{ padding: '12px', borderRadius: 12, border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer' }}>
               {saving ? 'Đang lưu...' : editingRule ? 'Cập nhật' : 'Lưu & tiếp tục'}

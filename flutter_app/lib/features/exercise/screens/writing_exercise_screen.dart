@@ -10,6 +10,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../widgets/exercise_context_image.dart';
 import '../widgets/result_card.dart';
 
 /// Text-input exercise screen for psani_1_formular and psani_2_email.
@@ -165,6 +166,8 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.x4),
           children: [
+            ExerciseContextImage(detail: d, client: widget.client),
+
             if (d.learnerInstruction.isNotEmpty) ...[
               Text(d.learnerInstruction, style: AppTypography.bodyMedium),
               const SizedBox(height: AppSpacing.x4),

@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../widgets/exercise_context_image.dart';
 import '../widgets/matching_widget.dart';
 import '../widgets/multiple_choice_widget.dart';
 import '../widgets/objective_result_card.dart';
@@ -192,6 +193,8 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              ExerciseContextImage(detail: d, client: widget.client),
+
               // Quizcard
               if (d.isQuizcard)
                 QuizcardWidget(
@@ -215,6 +218,8 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
                   pairs: d.matchingPairs,
                   answers: _answers,
                   onChanged: (leftId, rightId) => setState(() => _answers[leftId] = rightId),
+                  mediaUri: widget.client.mediaUri,
+                  authHeaders: widget.client.authHeaders,
                 ),
                 const SizedBox(height: AppSpacing.x4),
                 _SubmitButton(canSubmit: _canSubmit, submitting: _submitting, onSubmit: _submit),
@@ -258,6 +263,8 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
                   options: d.poslechOptions,
                   selected: _answers['1'],
                   onSelect: (key) => setState(() => _answers['1'] = key),
+                  mediaUri: widget.client.mediaUri,
+                  authHeaders: widget.client.authHeaders,
                 ),
                 const SizedBox(height: AppSpacing.x4),
                 _SubmitButton(canSubmit: _canSubmit, submitting: _submitting, onSubmit: _submit),
