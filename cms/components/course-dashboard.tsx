@@ -291,6 +291,47 @@ export function CourseDashboard() {
                 </select>
               </div>
             </div>
+            {/* Banner image upload — only for saved courses */}
+            {editingId && (() => {
+              const course = courses.find(c => c.id === editingId);
+              const hasBanner = !!course?.banner_image_id;
+              return (
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                    Ảnh banner
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {hasBanner && course?.banner_image_id && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`/api/media/file?key=${encodeURIComponent(course.banner_image_id)}`}
+                        alt="banner preview"
+                        style={{ width: 80, height: 52, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }}
+                      />
+                    )}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, border: `1px ${hasBanner ? 'solid #22c55e' : 'dashed var(--border)'}`, borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: hasBanner ? '#15803d' : 'var(--ink-3)', background: hasBanner ? '#f0fdf4' : 'var(--surface-alt)' }}>
+                      {uploadingBanner === editingId ? '⏳ Đang tải...' : hasBanner ? '🔄 Đổi banner' : '🖼 Tải banner lên'}
+                      <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+                        disabled={uploadingBanner !== null}
+                        onChange={e => { const f = e.target.files?.[0]; if (f && editingId) void handleBannerUpload(editingId, f); e.target.value = ''; }} />
+                    </label>
+                    {hasBanner && editingId && (
+                      <button type="button" onClick={() => void handleBannerDelete(editingId)}
+                        style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontSize: 13, background: 'transparent', color: 'var(--danger)' }}>
+                        Xóa
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {!editingId && (
+              <p style={{ fontSize: 12, color: 'var(--ink-4)', margin: '0 0 4px' }}>
+                Tạo khóa học trước, sau đó upload banner ảnh.
+              </p>
+            )}
+
             {error && (
               <div style={{ color: 'var(--error)', fontSize: 13, marginBottom: 12 }}>{error}</div>
             )}
