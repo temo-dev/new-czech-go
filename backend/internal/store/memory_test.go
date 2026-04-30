@@ -315,9 +315,9 @@ func TestCreateExercisePreservesUloha4DetailType(t *testing.T) {
 func TestExercisesByModuleSkipsArchivedItems(t *testing.T) {
 	repo := NewMemoryStore()
 
-	// exercises link to module via skill (migration 012: exercises.skill_id is the canonical link)
 	published := repo.CreateExercise(contracts.Exercise{
-		SkillID:              "skill-noi-module-day-1",
+		ModuleID:             "module-day-1",
+		SkillKind:            "noi",
 		ExerciseType:         "uloha_1_topic_answers",
 		Title:                "Cestovani 1",
 		ShortInstruction:     "Tra loi ve chu de di lai.",
@@ -326,7 +326,8 @@ func TestExercisesByModuleSkipsArchivedItems(t *testing.T) {
 		Status:               "published",
 	})
 	repo.CreateExercise(contracts.Exercise{
-		SkillID:              "skill-noi-module-day-1",
+		ModuleID:             "module-day-1",
+		SkillKind:            "noi",
 		ExerciseType:         "uloha_1_topic_answers",
 		Title:                "Cestovani 2",
 		ShortInstruction:     "Tra loi ve chu de di lai.",

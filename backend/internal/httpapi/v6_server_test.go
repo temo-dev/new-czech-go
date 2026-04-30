@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
@@ -34,21 +33,6 @@ func getJSONWithToken(t *testing.T, server *httptest.Server, path, token string)
 func v6Server(t *testing.T) (*httptest.Server, *store.MemoryStore) {
 	t.Helper()
 	repo := store.NewMemoryStore()
-	// Seed a module + skill for vocab/grammar tests
-	repo.CreateSkill(contracts.Skill{
-		ID:        "skill-tu-vung",
-		ModuleID:  "module-1",
-		SkillKind: "tu_vung",
-		Title:     "Từ vựng",
-		Status:    "published",
-	})
-	repo.CreateSkill(contracts.Skill{
-		ID:        "skill-ngu-phap",
-		ModuleID:  "module-1",
-		SkillKind: "ngu_phap",
-		Title:     "Ngữ pháp",
-		Status:    "published",
-	})
 	srv := httptest.NewServer(NewServer(repo, nil, nil))
 	t.Cleanup(srv.Close)
 	return srv, repo
@@ -213,13 +197,6 @@ func TestV6_GetGenJob_NotFound(t *testing.T) {
 func TestV6_PublishJob_ValidExercises(t *testing.T) {
 	// Use a server with a mock content generator that returns a quizcard
 	repo := store.NewMemoryStore()
-	repo.CreateSkill(contracts.Skill{
-		ID:        "skill-tu-vung",
-		ModuleID:  "module-1",
-		SkillKind: "tu_vung",
-		Title:     "Từ vựng",
-		Status:    "published",
-	})
 
 	mockGen := &processing.MockContentGenerator{
 		Payload: &contracts.GeneratedPayload{
@@ -299,13 +276,6 @@ func TestV6_PublishJob_ValidExercises(t *testing.T) {
 
 func TestV6_PublishJob_ValidationErrors(t *testing.T) {
 	repo := store.NewMemoryStore()
-	repo.CreateSkill(contracts.Skill{
-		ID:        "skill-tu-vung",
-		ModuleID:  "module-1",
-		SkillKind: "tu_vung",
-		Title:     "Từ vựng",
-		Status:    "published",
-	})
 
 	// Mock generator returns an INVALID exercise (missing explanation)
 	mockGen := &processing.MockContentGenerator{
@@ -377,13 +347,6 @@ func TestV6_PublishJob_ValidationErrors(t *testing.T) {
 
 func TestV6_RateLimit_OneActiveJobPerModule(t *testing.T) {
 	repo := store.NewMemoryStore()
-	repo.CreateSkill(contracts.Skill{
-		ID:        "skill-tu-vung",
-		ModuleID:  "module-1",
-		SkillKind: "tu_vung",
-		Title:     "Từ vựng",
-		Status:    "published",
-	})
 
 	// Mock that never completes (slow mock)
 	slowMock := &processing.MockContentGenerator{
@@ -434,38 +397,29 @@ func TestV6_RateLimit_OneActiveJobPerModule(t *testing.T) {
 	t.Log("Rate limit test: first job created successfully")
 }
 
-// ── EnsureSkill auto-create ───────────────────────────────────────────────────
+// ── VocabularySet/GrammarRule link directly to module_id ─────────────────────
 
-func TestV6_AutoCreateSkill_VocabularySet(t *testing.T) {
+func TestV6_VocabularySet_HasModuleID(t *testing.T) {
 	srv, repo := v6Server(t)
 
-	// Create vocab set for a module that has NO tu_vung skill
-	// (module-99 has no skills seeded)
 	resp := postJSONWithToken(t, srv, "/v1/admin/vocabulary-sets", adminToken, map[string]any{
-		"title":     "Test Auto-Skill",
+		"title":     "Test Set",
 		"module_id": "module-99",
 		"items":     []map[string]any{{"term": "chodím", "meaning": "đi bộ"}},
 	})
 	data := resp["data"].(map[string]any)
-	skillID := data["skill_id"].(string)
-	if skillID == "" {
-		t.Error("expected non-empty skill_id")
-	}
+	setID := data["id"].(string)
 
-	// Verify the skill was auto-created with tu_vung kind
-	sk, ok := repo.SkillByID(skillID)
+	set, ok := repo.GetVocabularySet(setID)
 	if !ok {
-		t.Fatalf("auto-created skill not found: %s", skillID)
+		t.Fatalf("set not found: %s", setID)
 	}
-	if sk.SkillKind != "tu_vung" {
-		t.Errorf("expected tu_vung skill kind, got %s", sk.SkillKind)
-	}
-	if !strings.Contains(sk.Title, "vựng") {
-		t.Errorf("expected skill title to contain 'vựng', got %s", sk.Title)
+	if set.ModuleID != "module-99" {
+		t.Errorf("expected module_id=module-99, got %s", set.ModuleID)
 	}
 }
 
-func TestV6_AutoCreateSkill_GrammarRule(t *testing.T) {
+func TestV6_GrammarRule_HasModuleID(t *testing.T) {
 	srv, repo := v6Server(t)
 
 	resp := postJSONWithToken(t, srv, "/v1/admin/grammar-rules", adminToken, map[string]any{
@@ -473,13 +427,13 @@ func TestV6_AutoCreateSkill_GrammarRule(t *testing.T) {
 		"module_id": "module-99",
 	})
 	data := resp["data"].(map[string]any)
-	skillID := data["skill_id"].(string)
+	ruleID := data["id"].(string)
 
-	sk, ok := repo.SkillByID(skillID)
+	rule, ok := repo.GetGrammarRule(ruleID)
 	if !ok {
-		t.Fatalf("auto-created skill not found: %s", skillID)
+		t.Fatalf("rule not found: %s", ruleID)
 	}
-	if sk.SkillKind != "ngu_phap" {
-		t.Errorf("expected ngu_phap skill kind, got %s", sk.SkillKind)
+	if rule.ModuleID != "module-99" {
+		t.Errorf("expected module_id=module-99, got %s", rule.ModuleID)
 	}
 }

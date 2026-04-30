@@ -58,12 +58,12 @@ func (s *memoryVocabularyStore) GetVocabularySet(id string) (contracts.Vocabular
 	return *v, true
 }
 
-func (s *memoryVocabularyStore) ListVocabularySets(skillID string) []contracts.VocabularySet {
+func (s *memoryVocabularyStore) ListVocabularySets(moduleID string) []contracts.VocabularySet {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	out := make([]contracts.VocabularySet, 0)
 	for _, v := range s.sets {
-		if skillID == "" || v.SkillID == skillID {
+		if moduleID == "" || v.ModuleID == moduleID {
 			out = append(out, *v)
 		}
 	}

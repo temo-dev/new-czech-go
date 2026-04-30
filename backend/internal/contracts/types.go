@@ -17,13 +17,10 @@ type Course struct {
 	SequenceNo  int    `json:"sequence_no,omitempty"`
 }
 
-type Skill struct {
-	ID         string `json:"id"`
-	ModuleID   string `json:"module_id"`
-	SkillKind  string `json:"skill_kind"` // noi, nghe, doc, viet, tu_vung, ngu_phap
-	Title      string `json:"title"`
-	SequenceNo int    `json:"sequence_no"`
-	Status     string `json:"status,omitempty"`
+// SkillSummary is a computed aggregate of exercises grouped by skill_kind within a module.
+type SkillSummary struct {
+	SkillKind     string `json:"skill_kind"`
+	ExerciseCount int    `json:"exercise_count"`
 }
 
 type LearningPlan struct {
@@ -46,8 +43,8 @@ type Module struct {
 type Exercise struct {
 	ID                     string          `json:"id"`
 	ModuleID               string          `json:"module_id,omitempty"`
-	SkillID                string          `json:"skill_id,omitempty"`
-	Pool                   string          `json:"pool,omitempty"` // course | exam
+	SkillKind              string          `json:"skill_kind,omitempty"` // noi | nghe | doc | viet | tu_vung | ngu_phap
+	Pool                   string          `json:"pool,omitempty"`       // course | exam
 	ExerciseType           string          `json:"exercise_type"`
 	Title                  string          `json:"title"`
 	ShortInstruction       string          `json:"short_instruction"`
@@ -499,7 +496,7 @@ type MockExamSessionItem struct {
 
 type VocabularySet struct {
 	ID              string `json:"id"`
-	SkillID         string `json:"skill_id"`
+	ModuleID        string `json:"module_id"`
 	Title           string `json:"title"`
 	Level           string `json:"level"`            // A1 | A2 | B1
 	ExplanationLang string `json:"explanation_lang"` // vi | en | cs
@@ -521,7 +518,7 @@ type VocabularyItem struct {
 
 type GrammarRule struct {
 	ID              string            `json:"id"`
-	SkillID         string            `json:"skill_id"`
+	ModuleID        string            `json:"module_id"`
 	Title           string            `json:"title"`
 	Level           string            `json:"level"`
 	ExplanationVI   string            `json:"explanation_vi,omitempty"`
@@ -535,7 +532,6 @@ type GrammarRule struct {
 type ContentGenerationJob struct {
 	ID               string  `json:"id"`
 	ModuleID         string  `json:"module_id"`
-	SkillID          string  `json:"skill_id,omitempty"`
 	SourceType       string  `json:"source_type"` // vocabulary_set | grammar_rule
 	SourceID         string  `json:"source_id"`
 	RequestedBy      string  `json:"requested_by"`

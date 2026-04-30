@@ -40,9 +40,9 @@ func (s *postgresGrammarStore) CreateGrammarRule(rule contracts.GrammarRule) (co
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO grammar_rules (id, skill_id, title, level, explanation_vi, rule_table_json, constraints_text, status)
+		`INSERT INTO grammar_rules (id, module_id, title, level, explanation_vi, rule_table_json, constraints_text, status)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-		rule.ID, rule.SkillID, rule.Title, rule.Level,
+		rule.ID, rule.ModuleID, rule.Title, rule.Level,
 		rule.ExplanationVI, tableJSON, rule.ConstraintsText, rule.Status,
 	)
 	if err != nil {
@@ -61,11 +61,11 @@ func (s *postgresGrammarStore) GetGrammarRule(id string) (contracts.GrammarRule,
 	var gr contracts.GrammarRule
 	var tableJSON []byte
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, skill_id, title, level, explanation_vi, rule_table_json, constraints_text, status,
+		`SELECT id, module_id, title, level, explanation_vi, rule_table_json, constraints_text, status,
 		        to_char(created_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
 		        to_char(updated_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"')
 		 FROM grammar_rules WHERE id = $1`, id,
-	).Scan(&gr.ID, &gr.SkillID, &gr.Title, &gr.Level, &gr.ExplanationVI,
+	).Scan(&gr.ID, &gr.ModuleID, &gr.Title, &gr.Level, &gr.ExplanationVI,
 		&tableJSON, &gr.ConstraintsText, &gr.Status, &gr.CreatedAt, &gr.UpdatedAt)
 	if err != nil {
 		return contracts.GrammarRule{}, false
@@ -76,17 +76,17 @@ func (s *postgresGrammarStore) GetGrammarRule(id string) (contracts.GrammarRule,
 	return gr, true
 }
 
-func (s *postgresGrammarStore) ListGrammarRules(skillID string) []contracts.GrammarRule {
+func (s *postgresGrammarStore) ListGrammarRules(moduleID string) []contracts.GrammarRule {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	query := `SELECT id, skill_id, title, level, explanation_vi, rule_table_json, constraints_text, status,
+	query := `SELECT id, module_id, title, level, explanation_vi, rule_table_json, constraints_text, status,
 	                 to_char(created_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
 	                 to_char(updated_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"')
 	          FROM grammar_rules`
 	var rows *sql.Rows
 	var err error
-	if skillID != "" {
-		rows, err = s.db.QueryContext(ctx, query+` WHERE skill_id = $1 ORDER BY created_at DESC`, skillID)
+	if moduleID != "" {
+		rows, err = s.db.QueryContext(ctx, query+` WHERE module_id = $1 ORDER BY created_at DESC`, moduleID)
 	} else {
 		rows, err = s.db.QueryContext(ctx, query+` ORDER BY created_at DESC`)
 	}
@@ -98,7 +98,7 @@ func (s *postgresGrammarStore) ListGrammarRules(skillID string) []contracts.Gram
 	for rows.Next() {
 		var gr contracts.GrammarRule
 		var tableJSON []byte
-		if err := rows.Scan(&gr.ID, &gr.SkillID, &gr.Title, &gr.Level, &gr.ExplanationVI,
+		if err := rows.Scan(&gr.ID, &gr.ModuleID, &gr.Title, &gr.Level, &gr.ExplanationVI,
 			&tableJSON, &gr.ConstraintsText, &gr.Status, &gr.CreatedAt, &gr.UpdatedAt); err == nil {
 			if len(tableJSON) > 0 {
 				json.Unmarshal(tableJSON, &gr.RuleTable)

@@ -15,6 +15,8 @@ type ExerciseStore interface {
 	CreateExercise(exercise contracts.Exercise) contracts.Exercise
 	UpdateExercise(id string, update contracts.Exercise) (contracts.Exercise, bool)
 	DeleteExercise(id string) bool
+	// SkillSummariesByModule returns computed skill aggregates from published exercises.
+	SkillSummariesByModule(moduleID string) []contracts.SkillSummary
 }
 
 type memoryExerciseStore struct {
@@ -110,11 +112,28 @@ func (s *memoryExerciseStore) DeleteExercise(id string) bool {
 	return true
 }
 
+func (s *memoryExerciseStore) SkillSummariesByModule(moduleID string) []contracts.SkillSummary {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	counts := make(map[string]int)
+	for _, ex := range s.exercises {
+		if ex.ModuleID == moduleID && ex.Status == "published" && ex.SkillKind != "" {
+			counts[ex.SkillKind]++
+		}
+	}
+	summaries := make([]contracts.SkillSummary, 0, len(counts))
+	for kind, count := range counts {
+		summaries = append(summaries, contracts.SkillSummary{SkillKind: kind, ExerciseCount: count})
+	}
+	return summaries
+}
+
 func seedExercises() []contracts.Exercise {
 	return []contracts.Exercise{
 		{
 			ID:                    "exercise-uloha1-weather",
-			SkillID:               "skill-dev-noi",
+			SkillKind:             "noi",
 			ExerciseType:          "uloha_1_topic_answers",
 			Title:                 "Pocasi 1",
 			ShortInstruction:      "Tra loi ngan gon theo chu de thoi tiet.",
@@ -141,7 +160,7 @@ func seedExercises() []contracts.Exercise {
 		},
 		{
 			ID:                    "exercise-uloha3-tv",
-			SkillID:               "skill-dev-noi",
+			SkillKind:             "noi",
 			ExerciseType:          "uloha_3_story_narration",
 			Title:                 "Nakup televize",
 			ShortInstruction:      "Ke lai pribeh theo 4 tranh.",
@@ -175,7 +194,7 @@ func seedExercises() []contracts.Exercise {
 		},
 		{
 			ID:                    "exercise-uloha2-cinema",
-			SkillID:               "skill-dev-noi",
+			SkillKind:             "noi",
 			ExerciseType:          "uloha_2_dialogue_questions",
 			Title:                 "Kino vecer",
 			ShortInstruction:      "Zeptejte se na chybejici informace o navsteve kina.",
@@ -203,7 +222,7 @@ func seedExercises() []contracts.Exercise {
 		},
 		{
 			ID:                    "exercise-uloha4-flat",
-			SkillID:               "skill-dev-noi",
+			SkillKind:             "noi",
 			ExerciseType:          "uloha_4_choice_reasoning",
 			Title:                 "Bydleni v Praze",
 			ShortInstruction:      "Vyberte jednu moznost a vysvetlete proc.",
@@ -230,8 +249,8 @@ func seedExercises() []contracts.Exercise {
 		},
 		// ── Seed exercises for non-speaking skill types (used by mixed mock tests) ──
 		{
-			ID:           "exercise-seed-poslech1",
-			SkillID:      "skill-dev-noi",
+			ID:        "exercise-seed-poslech1",
+			SkillKind: "nghe",
 			ExerciseType: "poslech_1",
 			Title:        "Poslech 1 — Seed",
 			ShortInstruction:   "Nghe và chọn đáp án đúng.",
@@ -257,8 +276,8 @@ func seedExercises() []contracts.Exercise {
 			},
 		},
 		{
-			ID:           "exercise-seed-cteni1",
-			SkillID:      "skill-dev-noi",
+			ID:        "exercise-seed-cteni1",
+			SkillKind: "doc",
 			ExerciseType: "cteni_1",
 			Title:        "Čtení 1 — Seed",
 			ShortInstruction:   "Đọc và nối.",
@@ -278,8 +297,8 @@ func seedExercises() []contracts.Exercise {
 			},
 		},
 		{
-			ID:           "exercise-seed-psani2",
-			SkillID:      "skill-dev-noi",
+			ID:        "exercise-seed-psani2",
+			SkillKind: "viet",
 			ExerciseType: "psani_2_email",
 			Title:        "Psaní 2 — Email (Seed)",
 			ShortInstruction:   "Viết email theo 5 chủ đề.",
@@ -308,8 +327,11 @@ func mergeExerciseUpdate(current, update contracts.Exercise) contracts.Exercise 
 	if update.ExerciseType != "" {
 		current.ExerciseType = update.ExerciseType
 	}
-	if update.SkillID != "" {
-		current.SkillID = update.SkillID
+	if update.ModuleID != "" {
+		current.ModuleID = update.ModuleID
+	}
+	if update.SkillKind != "" {
+		current.SkillKind = update.SkillKind
 	}
 	if update.Pool != "" {
 		current.Pool = update.Pool

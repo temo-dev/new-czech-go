@@ -23,7 +23,6 @@ type MemoryStore struct {
 	plan               contracts.LearningPlan
 	courses            CourseStore
 	modules            ModuleStore
-	skills             SkillStore
 	exercises          ExerciseStore
 	attempts           AttemptStore
 	mockExams          MockExamStore
@@ -99,10 +98,9 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 			CurrentDay: 1,
 			Status:     "active",
 		},
-		courses:            newMemoryCourseStore(seedCourses()),
-		modules:            newMemoryModuleStore(seedDailyPlanModules()),
-		skills:             newMemorySkillStore(seedSkills(seedDailyPlanModules())),
-		exercises:          exercises,
+		courses:   newMemoryCourseStore(seedCourses()),
+		modules:   newMemoryModuleStore(seedDailyPlanModules()),
+		exercises: exercises,
 		attempts:           attempts,
 		mockExams:          newMemoryMockExamStore(exercises, attempts),
 		mockTests:          newMemoryMockTestStore(),
@@ -239,57 +237,12 @@ func (s *MemoryStore) DeleteModule(id string) bool {
 	return s.modules.DeleteModule(id)
 }
 
-// Skill CRUD
-func (s *MemoryStore) SkillsByModule(moduleID string) []contracts.Skill {
-	return s.skills.SkillsByModule(moduleID)
-}
-func (s *MemoryStore) AdminSkillsByModule(moduleID string) []contracts.Skill {
-	return s.skills.AdminSkillsByModule(moduleID)
-}
-func (s *MemoryStore) AllAdminSkills() []contracts.Skill {
-	return s.skills.AllAdminSkills()
-}
-func (s *MemoryStore) SkillByID(id string) (contracts.Skill, bool) {
-	return s.skills.SkillByID(id)
-}
-func (s *MemoryStore) CreateSkill(sk contracts.Skill) (contracts.Skill, error) {
-	return s.skills.CreateSkill(sk)
-}
-func (s *MemoryStore) UpdateSkill(id string, update contracts.Skill) (contracts.Skill, bool) {
-	return s.skills.UpdateSkill(id, update)
-}
-func (s *MemoryStore) DeleteSkill(id string) bool {
-	return s.skills.DeleteSkill(id)
-}
-
-// ExercisesBySkill returns published exercises for a skill (pool=course).
-func (s *MemoryStore) ExercisesBySkill(skillID string) []contracts.Exercise {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	all := s.exercises.ListExercises("course")
-	var out []contracts.Exercise
-	for _, ex := range all {
-		if ex.SkillID == skillID && ex.Status == "published" {
-			out = append(out, ex)
-		}
-	}
-	return out
-}
-
 func (s *MemoryStore) ExercisesByModule(moduleID string) []contracts.Exercise {
-	skills := s.skills.SkillsByModule(moduleID)
-	skillIDs := make(map[string]bool, len(skills))
-	for _, sk := range skills {
-		skillIDs[sk.ID] = true
-	}
-	all := s.exercises.ListExercises("")
-	out := make([]contracts.Exercise, 0)
-	for _, ex := range all {
-		if skillIDs[ex.SkillID] && ex.Status == "published" {
-			out = append(out, ex)
-		}
-	}
-	return out
+	return s.exercises.ExercisesByModule(moduleID)
+}
+
+func (s *MemoryStore) SkillSummariesByModule(moduleID string) []contracts.SkillSummary {
+	return s.exercises.SkillSummariesByModule(moduleID)
 }
 
 func (s *MemoryStore) ListExercises(pool string) []contracts.Exercise {
@@ -375,12 +328,6 @@ func (s *MemoryStore) SetModuleStore(ms ModuleStore) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.modules = ms
-}
-
-func (s *MemoryStore) SetSkillStore(ss SkillStore) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.skills = ss
 }
 
 func (s *MemoryStore) SetMockExamStore(ms MockExamStore) {

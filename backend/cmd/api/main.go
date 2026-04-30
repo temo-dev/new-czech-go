@@ -23,7 +23,6 @@ func main() {
 	var mockTestStore store.MockTestStore
 	var courseStore store.CourseStore
 	var moduleStore store.ModuleStore
-	var skillStore store.SkillStore
 	var vocabularyStore store.VocabularyStore
 	var grammarStore store.GrammarStore
 	var generationJobStore store.GenerationJobStore
@@ -53,10 +52,6 @@ func main() {
 		if err != nil {
 			log.Fatalf("could not initialize postgres module store: %v", err)
 		}
-		persistentSkillStore, err := store.NewPostgresSkillStore(databaseURL)
-		if err != nil {
-			log.Fatalf("could not initialize postgres skill store: %v", err)
-		}
 		persistentVocabularyStore, err := store.NewPostgresVocabularyStore(databaseURL)
 		if err != nil {
 			log.Fatalf("could not initialize postgres vocabulary store: %v", err)
@@ -80,11 +75,10 @@ func main() {
 		mockTestStore = persistentMockTestStore
 		courseStore = persistentCourseStore
 		moduleStore = persistentModuleStore
-		skillStore = persistentSkillStore
 		vocabularyStore = persistentVocabularyStore
 		grammarStore = persistentGrammarStore
 		generationJobStore = persistentGenerationJobStore
-		log.Printf("full Postgres persistence enabled (attempts, exercises, mock exams/tests, courses, modules, skills, vocabulary, grammar, generation_jobs, exercise_audio)")
+		log.Printf("full Postgres persistence enabled (attempts, exercises, mock exams/tests, courses, modules, vocabulary, grammar, generation_jobs, exercise_audio)")
 	}
 
 	repo := store.NewMemoryStoreWithStores(attemptStore, exerciseStore)
@@ -97,7 +91,6 @@ func main() {
 	if courseStore != nil {
 		repo.SetCourseStore(courseStore)
 		repo.SetModuleStore(moduleStore)
-		repo.SetSkillStore(skillStore)
 	}
 	if vocabularyStore != nil {
 		repo.SetVocabularyStore(vocabularyStore)

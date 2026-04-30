@@ -3,7 +3,6 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -19,17 +18,16 @@ import (
 func (s *Server) handleAdminVocabSets(w http.ResponseWriter, r *http.Request, _ contracts.User) {
 	switch r.Method {
 	case http.MethodGet:
-		skillID := r.URL.Query().Get("skill_id")
-		sets := s.repo.ListVocabularySets(skillID)
+		moduleID := r.URL.Query().Get("module_id")
+		sets := s.repo.ListVocabularySets(moduleID)
 		writeJSON(w, http.StatusOK, map[string]any{"data": sets, "meta": map[string]any{}})
 
 	case http.MethodPost:
 		var req struct {
-			SkillID         string                    `json:"skill_id"`
-			ModuleID        string                    `json:"module_id"`
-			Title           string                    `json:"title"`
-			Level           string                    `json:"level"`
-			ExplanationLang string                    `json:"explanation_lang"`
+			ModuleID        string                     `json:"module_id"`
+			Title           string                     `json:"title"`
+			Level           string                     `json:"level"`
+			ExplanationLang string                     `json:"explanation_lang"`
 			Items           []contracts.VocabularyItem `json:"items"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Title == "" || req.ModuleID == "" {
@@ -42,16 +40,8 @@ func (s *Server) handleAdminVocabSets(w http.ResponseWriter, r *http.Request, _ 
 		if req.ExplanationLang == "" {
 			req.ExplanationLang = "vi"
 		}
-		skillID, err := s.ensureSkill(req.ModuleID, "tu_vung", "Từ vựng")
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "skill_error", err.Error(), true)
-			return
-		}
-		if req.SkillID != "" {
-			skillID = req.SkillID
-		}
 		set, err := s.repo.CreateVocabularySet(contracts.VocabularySet{
-			SkillID:         skillID,
+			ModuleID:        req.ModuleID,
 			Title:           req.Title,
 			Level:           req.Level,
 			ExplanationLang: req.ExplanationLang,
@@ -137,13 +127,12 @@ func (s *Server) handleAdminVocabSetByID(w http.ResponseWriter, r *http.Request,
 func (s *Server) handleAdminGrammarRules(w http.ResponseWriter, r *http.Request, _ contracts.User) {
 	switch r.Method {
 	case http.MethodGet:
-		skillID := r.URL.Query().Get("skill_id")
-		rules := s.repo.ListGrammarRules(skillID)
+		moduleID := r.URL.Query().Get("module_id")
+		rules := s.repo.ListGrammarRules(moduleID)
 		writeJSON(w, http.StatusOK, map[string]any{"data": rules, "meta": map[string]any{}})
 
 	case http.MethodPost:
 		var req struct {
-			SkillID         string            `json:"skill_id"`
 			ModuleID        string            `json:"module_id"`
 			Title           string            `json:"title"`
 			Level           string            `json:"level"`
@@ -158,16 +147,8 @@ func (s *Server) handleAdminGrammarRules(w http.ResponseWriter, r *http.Request,
 		if req.Level == "" {
 			req.Level = "A2"
 		}
-		skillID, err := s.ensureSkill(req.ModuleID, "ngu_phap", "Ngữ pháp")
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "skill_error", err.Error(), true)
-			return
-		}
-		if req.SkillID != "" {
-			skillID = req.SkillID
-		}
 		rule, err := s.repo.CreateGrammarRule(contracts.GrammarRule{
-			SkillID:         skillID,
+			ModuleID:        req.ModuleID,
 			Title:           req.Title,
 			Level:           req.Level,
 			ExplanationVI:   req.ExplanationVI,
@@ -390,12 +371,7 @@ func (s *Server) handlePublishGenJob(w http.ResponseWriter, jobID string) {
 		return
 	}
 
-	// Get skill_id from the source
-	skillID, err := s.getSkillIDForJob(job)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "validation_error", err.Error(), false)
-		return
-	}
+	skillKind := skillKindFromSourceType(job.SourceType)
 
 	// Publish all exercises
 	exerciseIDs := make([]string, 0, len(gp.Exercises))
@@ -405,7 +381,8 @@ func (s *Server) handlePublishGenJob(w http.ResponseWriter, jobID string) {
 			writeError(w, http.StatusInternalServerError, "build_error", err.Error(), true)
 			return
 		}
-		exercise.SkillID = skillID
+		exercise.ModuleID = job.ModuleID
+		exercise.SkillKind = skillKind
 		exercise.SourceType = job.SourceType
 		exercise.SourceID = job.SourceID
 		exercise.GenerationJobID = job.ID
@@ -500,43 +477,13 @@ func (s *Server) runGenerationJob(jobID string, req contracts.GenerationJobInput
 	log.Printf("content generation job %s completed: %d exercises in %dms", jobID, len(payload.Exercises), durationMs)
 }
 
-// getSkillIDForJob resolves skill_id from the job's source.
-func (s *Server) getSkillIDForJob(job contracts.ContentGenerationJob) (string, error) {
-	switch job.SourceType {
+// skillKindFromSourceType maps content generation source types to skill kinds.
+func skillKindFromSourceType(sourceType string) string {
+	switch sourceType {
 	case "vocabulary_set":
-		set, ok := s.repo.GetVocabularySet(job.SourceID)
-		if !ok {
-			return "", fmt.Errorf("vocabulary_set %s not found", job.SourceID)
-		}
-		return set.SkillID, nil
+		return "tu_vung"
 	case "grammar_rule":
-		rule, ok := s.repo.GetGrammarRule(job.SourceID)
-		if !ok {
-			return "", fmt.Errorf("grammar_rule %s not found", job.SourceID)
-		}
-		return rule.SkillID, nil
+		return "ngu_phap"
 	}
-	return "", fmt.Errorf("unknown source_type %s", job.SourceType)
-}
-
-// ensureSkill returns the skill_id of an existing skill of the given kind in the module,
-// or auto-creates one if none exists.
-func (s *Server) ensureSkill(moduleID, skillKind, defaultTitle string) (string, error) {
-	existing := s.repo.AdminSkillsByModule(moduleID)
-	for _, sk := range existing {
-		if sk.SkillKind == skillKind {
-			return sk.ID, nil
-		}
-	}
-	sk, err := s.repo.CreateSkill(contracts.Skill{
-		ModuleID:   moduleID,
-		SkillKind:  skillKind,
-		Title:      defaultTitle,
-		SequenceNo: 99,
-		Status:     "published",
-	})
-	if err != nil {
-		return "", err
-	}
-	return sk.ID, nil
+	return ""
 }

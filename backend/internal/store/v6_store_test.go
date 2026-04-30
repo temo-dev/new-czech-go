@@ -12,7 +12,7 @@ func TestVocabularyStore_CreateAndGet(t *testing.T) {
 	s := newMemoryVocabularyStore()
 
 	set, err := s.CreateVocabularySet(contracts.VocabularySet{
-		SkillID:         "skill-tu-vung",
+		ModuleID:        "module-tu-vung",
 		Title:           "Động từ di chuyển",
 		Level:           "A2",
 		ExplanationLang: "vi",
@@ -39,16 +39,16 @@ func TestVocabularyStore_CreateAndGet(t *testing.T) {
 func TestVocabularyStore_List(t *testing.T) {
 	s := newMemoryVocabularyStore()
 
-	s.CreateVocabularySet(contracts.VocabularySet{SkillID: "skill-1", Title: "A"})
-	s.CreateVocabularySet(contracts.VocabularySet{SkillID: "skill-1", Title: "B"})
-	s.CreateVocabularySet(contracts.VocabularySet{SkillID: "skill-2", Title: "C"})
+	s.CreateVocabularySet(contracts.VocabularySet{ModuleID: "module-1", Title: "A"})
+	s.CreateVocabularySet(contracts.VocabularySet{ModuleID: "module-1", Title: "B"})
+	s.CreateVocabularySet(contracts.VocabularySet{ModuleID: "module-2", Title: "C"})
 
 	all := s.ListVocabularySets("")
 	if len(all) != 3 {
 		t.Errorf("expected 3 sets, got %d", len(all))
 	}
 
-	filtered := s.ListVocabularySets("skill-1")
+	filtered := s.ListVocabularySets("module-1")
 	if len(filtered) != 2 {
 		t.Errorf("expected 2 filtered sets, got %d", len(filtered))
 	}
@@ -56,7 +56,7 @@ func TestVocabularyStore_List(t *testing.T) {
 
 func TestVocabularyStore_Items(t *testing.T) {
 	s := newMemoryVocabularyStore()
-	set, _ := s.CreateVocabularySet(contracts.VocabularySet{SkillID: "skill-1", Title: "Test"})
+	set, _ := s.CreateVocabularySet(contracts.VocabularySet{ModuleID: "module-1", Title: "Test"})
 
 	s.CreateVocabularyItem(contracts.VocabularyItem{SetID: set.ID, Term: "chodím", Meaning: "đi bộ"})
 	s.CreateVocabularyItem(contracts.VocabularyItem{SetID: set.ID, Term: "jedu", Meaning: "đi xe"})
@@ -69,7 +69,7 @@ func TestVocabularyStore_Items(t *testing.T) {
 
 func TestVocabularyStore_Delete(t *testing.T) {
 	s := newMemoryVocabularyStore()
-	set, _ := s.CreateVocabularySet(contracts.VocabularySet{SkillID: "skill-1", Title: "Test"})
+	set, _ := s.CreateVocabularySet(contracts.VocabularySet{ModuleID: "module-1", Title: "Test"})
 	s.CreateVocabularyItem(contracts.VocabularyItem{SetID: set.ID, Term: "chodím", Meaning: "đi bộ"})
 
 	ok := s.DeleteVocabularySet(set.ID)
@@ -99,7 +99,7 @@ func TestGrammarStore_CreateAndGet(t *testing.T) {
 	s := newMemoryGrammarStore()
 
 	rule, err := s.CreateGrammarRule(contracts.GrammarRule{
-		SkillID: "skill-ngu-phap",
+		ModuleID: "module-ngu-phap",
 		Title:   "Verb být",
 		Level:   "A1",
 		RuleTable: map[string]string{
@@ -129,7 +129,7 @@ func TestGrammarStore_CreateAndGet(t *testing.T) {
 
 func TestGrammarStore_Update(t *testing.T) {
 	s := newMemoryGrammarStore()
-	rule, _ := s.CreateGrammarRule(contracts.GrammarRule{SkillID: "sk", Title: "original"})
+	rule, _ := s.CreateGrammarRule(contracts.GrammarRule{ModuleID: "module-sk", Title: "original"})
 
 	updated, ok := s.UpdateGrammarRule(rule.ID, contracts.GrammarRule{Title: "updated"})
 	if !ok {
@@ -142,7 +142,7 @@ func TestGrammarStore_Update(t *testing.T) {
 
 func TestGrammarStore_Delete(t *testing.T) {
 	s := newMemoryGrammarStore()
-	rule, _ := s.CreateGrammarRule(contracts.GrammarRule{SkillID: "sk", Title: "Test"})
+	rule, _ := s.CreateGrammarRule(contracts.GrammarRule{ModuleID: "module-sk", Title: "Test"})
 
 	if !s.DeleteGrammarRule(rule.ID) {
 		t.Fatal("DeleteGrammarRule returned false")

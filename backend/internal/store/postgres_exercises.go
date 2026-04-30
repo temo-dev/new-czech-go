@@ -38,7 +38,7 @@ func NewPostgresExerciseStore(databaseURL string) (ExerciseStore, error) {
 }
 
 func (s *postgresExerciseStore) ensureSchema(ctx context.Context) error {
-	if _, err := s.db.ExecContext(ctx, `
+	_, err := s.db.ExecContext(ctx, `
 CREATE TABLE IF NOT EXISTS exercises (
 	id TEXT PRIMARY KEY,
 	exercise_type TEXT NOT NULL,
@@ -57,20 +57,18 @@ CREATE TABLE IF NOT EXISTS exercises (
 	detail_json JSONB,
 	scoring_template_preview_json JSONB
 );
-ALTER TABLE exercises ADD COLUMN IF NOT EXISTS pool TEXT NOT NULL DEFAULT 'course';
-ALTER TABLE exercises ADD COLUMN IF NOT EXISTS skill_id TEXT NOT NULL DEFAULT '';
-ALTER TABLE exercises DROP COLUMN IF EXISTS module_id;
-`); err != nil {
-		return err
-	}
-	return nil
+ALTER TABLE exercises ADD COLUMN IF NOT EXISTS pool       TEXT NOT NULL DEFAULT 'course';
+ALTER TABLE exercises ADD COLUMN IF NOT EXISTS module_id  TEXT NOT NULL DEFAULT '';
+ALTER TABLE exercises ADD COLUMN IF NOT EXISTS skill_kind TEXT NOT NULL DEFAULT '';
+`)
+	return err
 }
 
 func (s *postgresExerciseStore) ExercisesByModule(moduleID string) []contracts.Exercise {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	rows, err := s.db.QueryContext(ctx, exerciseSelectQuery+` WHERE s.module_id = $1 AND e.status = 'published'`, moduleID)
+	rows, err := s.db.QueryContext(ctx, exerciseSelectQuery+` WHERE e.module_id = $1 AND e.status = 'published'`, moduleID)
 	if err != nil {
 		return nil
 	}
@@ -93,9 +91,9 @@ func (s *postgresExerciseStore) ListExercises(pool string) []contracts.Exercise 
 	var rows *sql.Rows
 	var err error
 	if pool != "" {
-		rows, err = s.db.QueryContext(ctx, exerciseSelectQuery+` WHERE e.pool = $1 ORDER BY s.module_id, e.sequence_no, e.title`, pool)
+		rows, err = s.db.QueryContext(ctx, exerciseSelectQuery+` WHERE e.pool = $1 ORDER BY e.module_id, e.sequence_no, e.title`, pool)
 	} else {
-		rows, err = s.db.QueryContext(ctx, exerciseSelectQuery+` ORDER BY s.module_id, e.sequence_no, e.title`)
+		rows, err = s.db.QueryContext(ctx, exerciseSelectQuery+` ORDER BY e.module_id, e.sequence_no, e.title`)
 	}
 	if err != nil {
 		return nil
@@ -181,16 +179,17 @@ func (s *postgresExerciseStore) insertExercise(ctx context.Context, exercise con
 	_, err := s.db.ExecContext(
 		ctx,
 		`INSERT INTO exercises (
-			id, skill_id, pool, exercise_type, title, short_instruction, learner_instruction,
+			id, module_id, skill_kind, pool, exercise_type, title, short_instruction, learner_instruction,
 			estimated_duration_sec, prep_time_sec, recording_time_limit_sec, sample_answer_enabled,
 			sample_answer_text, status, sequence_no, prompt_json, assets_json, detail_json, scoring_template_preview_json
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7,
-			$8, $9, $10, $11,
-			$12, $13, $14, $15, $16, $17, $18
+			$1, $2, $3, $4, $5, $6, $7, $8,
+			$9, $10, $11, $12,
+			$13, $14, $15, $16, $17, $18, $19
 		)`,
 		exercise.ID,
-		exercise.SkillID,
+		exercise.ModuleID,
+		exercise.SkillKind,
 		exercise.Pool,
 		exercise.ExerciseType,
 		exercise.Title,
@@ -218,16 +217,17 @@ func (s *postgresExerciseStore) upsertExercise(ctx context.Context, exercise con
 	_, err := s.db.ExecContext(
 		ctx,
 		`INSERT INTO exercises (
-			id, skill_id, pool, exercise_type, title, short_instruction, learner_instruction,
+			id, module_id, skill_kind, pool, exercise_type, title, short_instruction, learner_instruction,
 			estimated_duration_sec, prep_time_sec, recording_time_limit_sec, sample_answer_enabled,
 			sample_answer_text, status, sequence_no, prompt_json, assets_json, detail_json, scoring_template_preview_json
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7,
-			$8, $9, $10, $11,
-			$12, $13, $14, $15, $16, $17, $18
+			$1, $2, $3, $4, $5, $6, $7, $8,
+			$9, $10, $11, $12,
+			$13, $14, $15, $16, $17, $18, $19
 		)
 		ON CONFLICT (id) DO UPDATE SET
-			skill_id = EXCLUDED.skill_id,
+			module_id = EXCLUDED.module_id,
+			skill_kind = EXCLUDED.skill_kind,
 			pool = EXCLUDED.pool,
 			exercise_type = EXCLUDED.exercise_type,
 			title = EXCLUDED.title,
@@ -245,7 +245,8 @@ func (s *postgresExerciseStore) upsertExercise(ctx context.Context, exercise con
 			detail_json = EXCLUDED.detail_json,
 			scoring_template_preview_json = EXCLUDED.scoring_template_preview_json`,
 		exercise.ID,
-		exercise.SkillID,
+		exercise.ModuleID,
+		exercise.SkillKind,
 		exercise.Pool,
 		exercise.ExerciseType,
 		exercise.Title,
@@ -269,8 +270,8 @@ func (s *postgresExerciseStore) upsertExercise(ctx context.Context, exercise con
 const exerciseSelectQuery = `
 SELECT
 	e.id,
-	COALESCE(s.module_id, ''),
-	COALESCE(e.skill_id, ''),
+	COALESCE(e.module_id, ''),
+	COALESCE(e.skill_kind, ''),
 	COALESCE(e.pool, 'course'),
 	e.exercise_type,
 	e.title,
@@ -288,7 +289,6 @@ SELECT
 	e.detail_json,
 	e.scoring_template_preview_json
 FROM exercises e
-LEFT JOIN skills s ON e.skill_id = s.id
 `
 
 func scanExercises(rows *sql.Rows) []contracts.Exercise {
@@ -318,7 +318,7 @@ func scanExercise(scan scanFunc) (contracts.Exercise, error) {
 	err := scan(
 		&exercise.ID,
 		&exercise.ModuleID,
-		&exercise.SkillID,
+		&exercise.SkillKind,
 		&exercise.Pool,
 		&exercise.ExerciseType,
 		&exercise.Title,
@@ -364,6 +364,32 @@ func scanExercise(scan scanFunc) (contracts.Exercise, error) {
 	}
 
 	return cloneExercise(exercise), nil
+}
+
+func (s *postgresExerciseStore) SkillSummariesByModule(moduleID string) []contracts.SkillSummary {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT skill_kind, COUNT(*) AS exercise_count
+		FROM exercises
+		WHERE module_id = $1 AND status = 'published' AND skill_kind <> ''
+		GROUP BY skill_kind
+		ORDER BY skill_kind
+	`, moduleID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var summaries []contracts.SkillSummary
+	for rows.Next() {
+		var s contracts.SkillSummary
+		if err := rows.Scan(&s.SkillKind, &s.ExerciseCount); err == nil {
+			summaries = append(summaries, s)
+		}
+	}
+	return summaries
 }
 
 func decodePrompt(exerciseType string, payload []byte) any {

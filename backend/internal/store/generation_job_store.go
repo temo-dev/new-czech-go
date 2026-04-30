@@ -159,10 +159,9 @@ func (s *memoryGenerationJobStore) MarkAllRunningFailed(errMsg string) {
 // JobViewFromDB converts raw JSON fields to a JSON-serializable view for API responses.
 func JobViewFromDB(job contracts.ContentGenerationJob) map[string]any {
 	view := map[string]any{
-		"id":           job.ID,
-		"module_id":    job.ModuleID,
-		"skill_id":     job.SkillID,
-		"source_type":  job.SourceType,
+		"id":          job.ID,
+		"module_id":   job.ModuleID,
+		"source_type": job.SourceType,
 		"source_id":    job.SourceID,
 		"status":       job.Status,
 		"provider":     job.Provider,

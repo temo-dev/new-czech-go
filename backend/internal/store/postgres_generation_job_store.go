@@ -43,10 +43,10 @@ func (s *postgresGenerationJobStore) CreateJob(job contracts.ContentGenerationJo
 	defer cancel()
 	_, insertErr := s.db.ExecContext(ctx,
 		`INSERT INTO content_generation_jobs
-		    (id, module_id, skill_id, source_type, source_id, requested_by,
+		    (id, module_id, source_type, source_id, requested_by,
 		     input_payload_json, status, provider, model)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-		job.ID, job.ModuleID, job.SkillID, job.SourceType, job.SourceID,
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+		job.ID, job.ModuleID, job.SourceType, job.SourceID,
 		job.RequestedBy, job.InputPayload, job.Status, job.Provider, job.Model,
 	)
 	if insertErr != nil {
@@ -62,7 +62,6 @@ func (s *postgresGenerationJobStore) GetJob(id string) (contracts.ContentGenerat
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var j contracts.ContentGenerationJob
-	var skillID sql.NullString
 	var genPayload, editPayload []byte // sql.RawBytes not allowed on Row.Scan
 	var inputTokens, outputTokens sql.NullInt64
 	var costUSD sql.NullFloat64
@@ -70,7 +69,7 @@ func (s *postgresGenerationJobStore) GetJob(id string) (contracts.ContentGenerat
 	var errMsg sql.NullString
 	var publishedAt sql.NullString
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, module_id, COALESCE(skill_id,''), source_type, source_id, requested_by,
+		`SELECT id, module_id, source_type, source_id, requested_by,
 		        input_payload_json, COALESCE(generated_payload_json,'{}'), COALESCE(edited_payload_json,'{}'),
 		        status, provider, model,
 		        input_tokens, output_tokens, estimated_cost_usd, duration_ms, error_message,
@@ -79,7 +78,7 @@ func (s *postgresGenerationJobStore) GetJob(id string) (contracts.ContentGenerat
 		        to_char(published_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"')
 		 FROM content_generation_jobs WHERE id = $1`, id,
 	).Scan(
-		&j.ID, &j.ModuleID, &skillID, &j.SourceType, &j.SourceID, &j.RequestedBy,
+		&j.ID, &j.ModuleID, &j.SourceType, &j.SourceID, &j.RequestedBy,
 		&j.InputPayload, &genPayload, &editPayload,
 		&j.Status, &j.Provider, &j.Model,
 		&inputTokens, &outputTokens, &costUSD, &durationMs, &errMsg,
@@ -89,7 +88,6 @@ func (s *postgresGenerationJobStore) GetJob(id string) (contracts.ContentGenerat
 		log.Printf("GetJob scan error for id=%q: %v", id, err)
 		return contracts.ContentGenerationJob{}, false
 	}
-	j.SkillID = skillID.String
 	if len(genPayload) > 0 && string(genPayload) != "{}" {
 		j.GeneratedPayload = []byte(genPayload)
 	}

@@ -107,10 +107,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/mock-exams", s.withAuth(s.handleMockExams))
 	s.mux.HandleFunc("/v1/mock-exams/", s.withAuth(s.handleMockExamByID))
 	s.mux.HandleFunc("/v1/mock-tests", s.withAuth(s.handleMockTests))
-	// Course/Skill learner APIs
+	// Course learner APIs
 	s.mux.HandleFunc("/v1/courses", s.withAuth(s.handleCourses))
 	s.mux.HandleFunc("/v1/courses/", s.withAuth(s.handleCourseByID))
-	s.mux.HandleFunc("/v1/skills/", s.withAuth(s.handleSkillExercises))
 	// Admin APIs
 	s.mux.HandleFunc("/v1/admin/exercises", s.withRole("admin", s.handleAdminExercises))
 	s.mux.HandleFunc("/v1/admin/exercises/", s.withRole("admin", s.handleAdminExerciseByID))
@@ -120,8 +119,6 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/admin/courses/", s.withRole("admin", s.handleAdminCourseByID))
 	s.mux.HandleFunc("/v1/admin/modules", s.withRole("admin", s.handleAdminModules))
 	s.mux.HandleFunc("/v1/admin/modules/", s.withRole("admin", s.handleAdminModuleByID))
-	s.mux.HandleFunc("/v1/admin/skills", s.withRole("admin", s.handleAdminSkills))
-	s.mux.HandleFunc("/v1/admin/skills/", s.withRole("admin", s.handleAdminSkillByID))
 	// V6: Vocab & Grammar content authoring
 	s.mux.HandleFunc("/v1/admin/vocabulary-sets", s.withRole("admin", s.handleAdminVocabSets))
 	s.mux.HandleFunc("/v1/admin/vocabulary-sets/", s.withRole("admin", s.handleAdminVocabSetByID))
@@ -336,7 +333,8 @@ func (s *Server) handleModuleExercises(w http.ResponseWriter, r *http.Request, _
 	path := strings.TrimPrefix(r.URL.Path, "/v1/modules/")
 	if strings.HasSuffix(path, "/skills") {
 		moduleID := strings.TrimSuffix(path, "/skills")
-		s.handleModuleSkills(w, moduleID)
+		summaries := s.repo.SkillSummariesByModule(moduleID)
+		writeJSON(w, http.StatusOK, map[string]any{"data": summaries, "meta": map[string]any{}})
 		return
 	}
 	if strings.HasSuffix(path, "/exercises") {
@@ -1440,7 +1438,8 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 			SampleAnswerEnabled   bool            `json:"sample_answer_enabled"`
 			SampleAnswerText      string          `json:"sample_answer_text"`
 			Status                string          `json:"status"`
-			SkillID               string          `json:"skill_id"`
+			ModuleID              string          `json:"module_id"`
+			SkillKind             string          `json:"skill_kind"`
 			Detail                json.RawMessage `json:"detail"`
 			Questions             []string        `json:"questions"`
 		}
@@ -1448,17 +1447,8 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 			writeError(w, http.StatusBadRequest, "validation_error", "Title and exercise type are required.", false)
 			return
 		}
-		if req.SkillID != "" {
-			sk, ok := s.repo.SkillByID(req.SkillID)
-			if !ok {
-				writeError(w, http.StatusBadRequest, "validation_error", "skill_id not found.", false)
-				return
-			}
-			if expected := skillKindForExerciseType(req.ExerciseType); expected != "" && sk.SkillKind != expected {
-				writeError(w, http.StatusBadRequest, "validation_error",
-					fmt.Sprintf("Exercise type %q requires skill_kind %q, but skill has kind %q.", req.ExerciseType, expected, sk.SkillKind), false)
-				return
-			}
+		if req.SkillKind == "" {
+			req.SkillKind = skillKindForExerciseType(req.ExerciseType)
 		}
 		status := strings.TrimSpace(req.Status)
 		switch status {
@@ -1544,7 +1534,8 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 				exercise.Detail = detail
 			}
 		}
-		exercise.SkillID = req.SkillID
+		exercise.ModuleID = req.ModuleID
+		exercise.SkillKind = req.SkillKind
 		created := s.repo.CreateExercise(exercise)
 		writeJSON(w, http.StatusCreated, map[string]any{"data": created, "meta": map[string]any{}})
 	default:
@@ -1596,17 +1587,8 @@ func (s *Server) handleAdminExerciseByID(w http.ResponseWriter, r *http.Request,
 				writeError(w, http.StatusBadRequest, "validation_error", "Invalid exercise update payload.", false)
 				return
 			}
-			if req.SkillID != "" && req.ExerciseType != "" {
-				sk, ok := s.repo.SkillByID(req.SkillID)
-				if !ok {
-					writeError(w, http.StatusBadRequest, "validation_error", "skill_id not found.", false)
-					return
-				}
-				if expected := skillKindForExerciseType(req.ExerciseType); expected != "" && sk.SkillKind != expected {
-					writeError(w, http.StatusBadRequest, "validation_error",
-						fmt.Sprintf("Exercise type %q requires skill_kind %q, but skill has kind %q.", req.ExerciseType, expected, sk.SkillKind), false)
-					return
-				}
+			if req.SkillKind == "" && req.ExerciseType != "" {
+				req.SkillKind = skillKindForExerciseType(req.ExerciseType)
 			}
 			exercise, ok := s.repo.UpdateExercise(id, req)
 			if !ok {
@@ -2095,22 +2077,6 @@ func (s *Server) handleCourseByID(w http.ResponseWriter, r *http.Request, _ cont
 	writeJSON(w, http.StatusOK, map[string]any{"data": c, "meta": map[string]any{}})
 }
 
-func (s *Server) handleSkillExercises(w http.ResponseWriter, r *http.Request, _ contracts.User) {
-	// /v1/skills/:id/exercises  OR  /v1/modules/:id/skills (handled via handleModuleExercises)
-	path := strings.TrimPrefix(r.URL.Path, "/v1/skills/")
-	if !strings.HasSuffix(path, "/exercises") {
-		writeNotFound(w)
-		return
-	}
-	skillID := strings.TrimSuffix(path, "/exercises")
-	if r.Method != http.MethodGet {
-		writeMethodNotAllowed(w)
-		return
-	}
-	exercises := s.repo.ExercisesBySkill(skillID)
-	writeJSON(w, http.StatusOK, map[string]any{"data": exercises, "meta": map[string]any{}})
-}
-
 // ── Admin: Courses ────────────────────────────────────────────────────────────
 
 func (s *Server) handleAdminCourses(w http.ResponseWriter, r *http.Request, _ contracts.User) {
@@ -2227,70 +2193,3 @@ func (s *Server) handleAdminModuleByID(w http.ResponseWriter, r *http.Request, _
 
 // ── Admin: Skills ─────────────────────────────────────────────────────────────
 
-func (s *Server) handleAdminSkills(w http.ResponseWriter, r *http.Request, _ contracts.User) {
-	switch r.Method {
-	case http.MethodGet:
-		moduleID := r.URL.Query().Get("module_id")
-		var skills []contracts.Skill
-		if moduleID != "" {
-			skills = s.repo.AdminSkillsByModule(moduleID)
-		} else {
-			skills = s.repo.AllAdminSkills()
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"data": skills, "meta": map[string]any{}})
-	case http.MethodPost:
-		var sk contracts.Skill
-		if err := json.NewDecoder(r.Body).Decode(&sk); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid_body", err.Error(), false)
-			return
-		}
-		created, err := s.repo.CreateSkill(sk)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "create_failed", err.Error(), false)
-			return
-		}
-		writeJSON(w, http.StatusCreated, map[string]any{"data": created, "meta": map[string]any{}})
-	default:
-		writeMethodNotAllowed(w)
-	}
-}
-
-func (s *Server) handleAdminSkillByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
-	id := strings.TrimPrefix(r.URL.Path, "/v1/admin/skills/")
-	switch r.Method {
-	case http.MethodGet:
-		sk, ok := s.repo.SkillByID(id)
-		if !ok {
-			writeNotFound(w)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"data": sk, "meta": map[string]any{}})
-	case http.MethodPatch:
-		var update contracts.Skill
-		if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid_body", err.Error(), false)
-			return
-		}
-		updated, ok := s.repo.UpdateSkill(id, update)
-		if !ok {
-			writeNotFound(w)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"data": updated, "meta": map[string]any{}})
-	case http.MethodDelete:
-		if !s.repo.DeleteSkill(id) {
-			writeError(w, http.StatusBadRequest, "delete_failed", "skill not found", false)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{}, "meta": map[string]any{}})
-	default:
-		writeMethodNotAllowed(w)
-	}
-}
-
-// handleModulesSkills handles GET /v1/modules/:id/skills
-// Injected into handleModuleExercises path matching.
-func (s *Server) handleModuleSkills(w http.ResponseWriter, moduleID string) {
-	skills := s.repo.SkillsByModule(moduleID)
-	writeJSON(w, http.StatusOK, map[string]any{"data": skills, "meta": map[string]any{}})
-}

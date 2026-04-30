@@ -35,9 +35,9 @@ func (s *postgresVocabularyStore) CreateVocabularySet(set contracts.VocabularySe
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO vocabulary_sets (id, skill_id, title, level, explanation_lang, status)
+		`INSERT INTO vocabulary_sets (id, module_id, title, level, explanation_lang, status)
 		 VALUES ($1,$2,$3,$4,$5,$6)`,
-		set.ID, set.SkillID, set.Title, set.Level, set.ExplanationLang, set.Status,
+		set.ID, set.ModuleID, set.Title, set.Level, set.ExplanationLang, set.Status,
 	)
 	if err != nil {
 		return contracts.VocabularySet{}, fmt.Errorf("insert vocabulary_set: %w", err)
@@ -54,28 +54,28 @@ func (s *postgresVocabularyStore) GetVocabularySet(id string) (contracts.Vocabul
 	defer cancel()
 	var vs contracts.VocabularySet
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, skill_id, title, level, explanation_lang, status,
+		`SELECT id, module_id, title, level, explanation_lang, status,
 		        to_char(created_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
 		        to_char(updated_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"')
 		 FROM vocabulary_sets WHERE id = $1`, id,
-	).Scan(&vs.ID, &vs.SkillID, &vs.Title, &vs.Level, &vs.ExplanationLang, &vs.Status, &vs.CreatedAt, &vs.UpdatedAt)
+	).Scan(&vs.ID, &vs.ModuleID, &vs.Title, &vs.Level, &vs.ExplanationLang, &vs.Status, &vs.CreatedAt, &vs.UpdatedAt)
 	if err != nil {
 		return contracts.VocabularySet{}, false
 	}
 	return vs, true
 }
 
-func (s *postgresVocabularyStore) ListVocabularySets(skillID string) []contracts.VocabularySet {
+func (s *postgresVocabularyStore) ListVocabularySets(moduleID string) []contracts.VocabularySet {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	query := `SELECT id, skill_id, title, level, explanation_lang, status,
+	query := `SELECT id, module_id, title, level, explanation_lang, status,
 	                 to_char(created_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
 	                 to_char(updated_at,'YYYY-MM-DD"T"HH24:MI:SS"Z"')
 	          FROM vocabulary_sets`
 	var rows *sql.Rows
 	var err error
-	if skillID != "" {
-		rows, err = s.db.QueryContext(ctx, query+` WHERE skill_id = $1 ORDER BY created_at DESC`, skillID)
+	if moduleID != "" {
+		rows, err = s.db.QueryContext(ctx, query+` WHERE module_id = $1 ORDER BY created_at DESC`, moduleID)
 	} else {
 		rows, err = s.db.QueryContext(ctx, query+` ORDER BY created_at DESC`)
 	}
@@ -86,7 +86,7 @@ func (s *postgresVocabularyStore) ListVocabularySets(skillID string) []contracts
 	var out []contracts.VocabularySet
 	for rows.Next() {
 		var vs contracts.VocabularySet
-		if err := rows.Scan(&vs.ID, &vs.SkillID, &vs.Title, &vs.Level, &vs.ExplanationLang, &vs.Status, &vs.CreatedAt, &vs.UpdatedAt); err == nil {
+		if err := rows.Scan(&vs.ID, &vs.ModuleID, &vs.Title, &vs.Level, &vs.ExplanationLang, &vs.Status, &vs.CreatedAt, &vs.UpdatedAt); err == nil {
 			out = append(out, vs)
 		}
 	}

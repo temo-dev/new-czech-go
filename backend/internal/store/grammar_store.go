@@ -51,12 +51,12 @@ func (s *memoryGrammarStore) GetGrammarRule(id string) (contracts.GrammarRule, b
 	return *r, true
 }
 
-func (s *memoryGrammarStore) ListGrammarRules(skillID string) []contracts.GrammarRule {
+func (s *memoryGrammarStore) ListGrammarRules(moduleID string) []contracts.GrammarRule {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	out := make([]contracts.GrammarRule, 0)
 	for _, r := range s.rules {
-		if skillID == "" || r.SkillID == skillID {
+		if moduleID == "" || r.ModuleID == moduleID {
 			out = append(out, *r)
 		}
 	}
