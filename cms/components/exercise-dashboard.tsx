@@ -1336,9 +1336,15 @@ export function ExerciseDashboard() {
         <div style={{ padding: 24, display: 'grid', gap: 16, flex: 1 }}>
         {/* ── Wizard: Step 1 — pick skill (creation only) ─────────────── */}
         {!editingId && wizardStep === 'skill' && (
-          <div style={{ display: 'grid', gap: 16, padding: 24, borderRadius: 28, background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
+          <div style={{ display: 'grid', gap: 16, padding: 20, borderRadius: 28, background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
+            {/* Progress dots */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {[1,2,3].map(n => (
+                <div key={n} style={{ width: n === 1 ? 24 : 8, height: 8, borderRadius: 99, background: n === 1 ? 'var(--primary)' : 'var(--border)', transition: 'all 0.2s' }} />
+              ))}
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, color: 'var(--primary)', textTransform: 'uppercase', marginLeft: 4 }}>Bước 1 / 3</span>
+            </div>
             <div>
-              <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'var(--primary)', textTransform: 'uppercase' }}>Bước 1 / 3</p>
               <h2 style={{ margin: '0 0 4px', fontSize: 22 }}>Chọn kỹ năng</h2>
               <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 14 }}>Bài tập sẽ được gắn vào kỹ năng này.</p>
             </div>
@@ -1368,10 +1374,12 @@ export function ExerciseDashboard() {
                                 loadSkillsForModule(sk.module_id);
                                 setWizardStep('type');
                               }}
-                              style={{ textAlign: 'left', padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-muted)', cursor: 'pointer' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--primary)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--primary)'; (e.currentTarget as HTMLButtonElement).style.color = '#fff'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-muted)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = ''; }}
+                              style={{ textAlign: 'left', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-muted)', cursor: 'pointer', transition: 'background 0.15s, border-color 0.15s, color 0.15s' }}
                             >
                               <div style={{ fontWeight: 600, fontSize: 13 }}>{sk.title}</div>
-                              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>Module: {modLabel}</div>
+                              <div style={{ fontSize: 11, opacity: 0.7, marginTop: 1 }}>Module: {modLabel}</div>
                             </button>
                           );
                         })}
