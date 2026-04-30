@@ -10,7 +10,7 @@ func TestScoreObjectiveAnswers_MultipleChoice(t *testing.T) {
 	correct := map[string]string{"1": "B", "2": "A", "3": "D", "4": "C", "5": "B"}
 	learner := map[string]string{"1": "B", "2": "A", "3": "C", "4": "C", "5": "B"}
 
-	result := ScoreObjectiveAnswers(learner, correct, nil)
+	result := ScoreObjectiveAnswers(learner, correct, nil, nil)
 
 	if result.Score != 4 {
 		t.Errorf("Score = %d, want 4", result.Score)
@@ -41,7 +41,7 @@ func TestScoreObjectiveAnswers_FillIn_CaseInsensitive(t *testing.T) {
 	correct := map[string]string{"1": "bramborový salát"}
 	learner := map[string]string{"1": "salát"}
 
-	result := ScoreObjectiveAnswers(learner, correct, nil)
+	result := ScoreObjectiveAnswers(learner, correct, nil, nil)
 	if result.Score != 1 {
 		t.Errorf("Score = %d, want 1 (substring match)", result.Score)
 	}
@@ -51,7 +51,7 @@ func TestScoreObjectiveAnswers_FillIn_CaseVariant(t *testing.T) {
 	correct := map[string]string{"1": "Restaurace Klášterní"}
 	learner := map[string]string{"1": "klášterní"}
 
-	result := ScoreObjectiveAnswers(learner, correct, nil)
+	result := ScoreObjectiveAnswers(learner, correct, nil, nil)
 	if result.Score != 1 {
 		t.Errorf("Score = %d, want 1 (case-insensitive substring)", result.Score)
 	}
@@ -61,7 +61,7 @@ func TestScoreObjectiveAnswers_FillIn_Wrong(t *testing.T) {
 	correct := map[string]string{"1": "Eva"}
 	learner := map[string]string{"1": "Ivana"}
 
-	result := ScoreObjectiveAnswers(learner, correct, nil)
+	result := ScoreObjectiveAnswers(learner, correct, nil, nil)
 	if result.Score != 0 {
 		t.Errorf("Score = %d, want 0", result.Score)
 	}
@@ -69,7 +69,7 @@ func TestScoreObjectiveAnswers_FillIn_Wrong(t *testing.T) {
 
 func TestScoreObjectiveAnswers_AllCorrect(t *testing.T) {
 	correct := map[string]string{"1": "A", "2": "B", "3": "C"}
-	result := ScoreObjectiveAnswers(correct, correct, nil)
+	result := ScoreObjectiveAnswers(correct, correct, nil, nil)
 	if result.Score != 3 || result.MaxScore != 3 {
 		t.Errorf("expected 3/3 got %d/%d", result.Score, result.MaxScore)
 	}
@@ -101,7 +101,7 @@ func TestMatchObjectiveAnswer_ShortFillIn_UsesSubstring(t *testing.T) {
 	// Learner writes full name; correct answer is first name only.
 	correct := map[string]string{"1": "Eva"}
 	learner := map[string]string{"1": "Eva Nováková"}
-	result := ScoreObjectiveAnswers(learner, correct, nil)
+	result := ScoreObjectiveAnswers(learner, correct, nil, nil)
 	if result.Score != 1 {
 		t.Errorf("Score = %d, want 1 (substring: %q contains %q)", result.Score, "Eva Nováková", "Eva")
 	}
@@ -125,7 +125,7 @@ func TestMatchObjectiveAnswer_ChoiceKey_ExactOnly(t *testing.T) {
 	for _, c := range cases {
 		correct := map[string]string{"1": c.correct}
 		learner := map[string]string{"1": c.learner}
-		got := ScoreObjectiveAnswers(learner, correct, nil).Score == 1
+		got := ScoreObjectiveAnswers(learner, correct, nil, nil).Score == 1
 		if got != c.want {
 			t.Errorf("learner=%q correct=%q: got %v, want %v", c.learner, c.correct, got, c.want)
 		}

@@ -1069,13 +1069,17 @@ class QuestionResult {
     required this.questionNo,
     this.questionText = '',
     required this.learnerAnswer,
+    this.learnerAnswerText = '',
     required this.correctAnswer,
+    this.correctAnswerText = '',
     required this.isCorrect,
   });
   final int questionNo;
   final String questionText;
   final String learnerAnswer;
+  final String learnerAnswerText;
   final String correctAnswer;
+  final String correctAnswerText;
   final bool isCorrect;
 
   factory QuestionResult.fromJson(Map<String, dynamic> json) {
@@ -1083,7 +1087,9 @@ class QuestionResult {
       questionNo: (json['question_no'] as num?)?.toInt() ?? 0,
       questionText: json['question_text'] as String? ?? '',
       learnerAnswer: json['learner_answer'] as String? ?? '',
+      learnerAnswerText: json['learner_answer_text'] as String? ?? '',
       correctAnswer: json['correct_answer'] as String? ?? '',
+      correctAnswerText: json['correct_answer_text'] as String? ?? '',
       isCorrect: json['is_correct'] as bool? ?? false,
     );
   }

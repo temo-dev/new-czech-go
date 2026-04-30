@@ -11,8 +11,8 @@ import (
 // ScoreObjectiveAnswers compares learner answers to correct answers.
 // Fill-in answers use case-insensitive substring match.
 // Multiple-choice answers (≤4 chars) use case-insensitive exact match.
-// questions is an optional map[question_no_str -> question_text]; pass nil to omit.
-func ScoreObjectiveAnswers(learner, correct, questions map[string]string) contracts.ObjectiveResult {
+// questions: optional map[qno -> question_text]; optionTexts: optional map[qno -> map[key -> text]].
+func ScoreObjectiveAnswers(learner, correct, questions map[string]string, optionTexts map[string]map[string]string) contracts.ObjectiveResult {
 	breakdown := make([]contracts.QuestionResult, 0, len(correct))
 	score := 0
 	for qno, correctAns := range correct {
@@ -24,11 +24,13 @@ func ScoreObjectiveAnswers(learner, correct, questions map[string]string) contra
 		n := 0
 		fmt.Sscanf(qno, "%d", &n)
 		breakdown = append(breakdown, contracts.QuestionResult{
-			QuestionNo:    n,
-			QuestionText:  questions[qno],
-			LearnerAnswer: learnerAns,
-			CorrectAnswer: correctAns,
-			IsCorrect:     isCorrect,
+			QuestionNo:        n,
+			QuestionText:      questions[qno],
+			LearnerAnswer:     learnerAns,
+			LearnerAnswerText: lookupOptionText(optionTexts, qno, learnerAns),
+			CorrectAnswer:     correctAns,
+			CorrectAnswerText: lookupOptionText(optionTexts, qno, correctAns),
+			IsCorrect:         isCorrect,
 		})
 	}
 	sortBreakdown(breakdown)
@@ -37,6 +39,26 @@ func ScoreObjectiveAnswers(learner, correct, questions map[string]string) contra
 		MaxScore:  len(correct),
 		Breakdown: breakdown,
 	}
+}
+
+// lookupOptionText returns the display text for an option key in the given question.
+// Falls back to the global wildcard bucket "*" for matching/image exercises.
+func lookupOptionText(optionTexts map[string]map[string]string, qno, key string) string {
+	if optionTexts == nil || key == "" {
+		return ""
+	}
+	upper := strings.ToUpper(key)
+	if opts, ok := optionTexts[qno]; ok {
+		if text, ok := opts[upper]; ok {
+			return text
+		}
+	}
+	if opts, ok := optionTexts["*"]; ok {
+		if text, ok := opts[upper]; ok {
+			return text
+		}
+	}
+	return ""
 }
 
 // matchObjectiveAnswer: single-letter A-H = exact match (choice key); anything else = bidirectional substring (fill-in).
@@ -112,8 +134,9 @@ func (p *Processor) ProcessObjectiveAttempt(attemptID string, sub contracts.Answ
 		return nil, fmt.Errorf("exercise %s: %w", exercise.ID, err)
 	}
 	questions := extractQuestionTexts(exercise)
+	optionTexts := extractOptionTexts(exercise)
 
-	result := ScoreObjectiveAnswers(sub.Answers, correct, questions)
+	result := ScoreObjectiveAnswers(sub.Answers, correct, questions, optionTexts)
 	feedback := BuildObjectiveFeedback(result)
 
 	transcript := contracts.Transcript{
@@ -158,6 +181,104 @@ func formatAnswersAsText(answers map[string]string) string {
 
 func unmarshalJSON(b []byte, v any) error {
 	return json.Unmarshal(b, v)
+}
+
+// extractOptionTexts returns map[question_no_str -> map[option_key -> option_text]].
+// For per-question options (poslech_1/2/3 items, cteni_2/4 questions), each
+// question has its own key→text map.
+// For global options (poslech_3 match labels, cteni_1/3 text/person options),
+// all questions share a single map stored under the wildcard key "*".
+func extractOptionTexts(exercise contracts.Exercise) map[string]map[string]string {
+	b, err := json.Marshal(exercise.Detail)
+	if err != nil {
+		return nil
+	}
+
+	result := make(map[string]map[string]string)
+
+	// Per-question options via "items" (poslech_1/2/3)
+	var withItemsOpts struct {
+		Items []struct {
+			QuestionNo int `json:"question_no"`
+			Options    []struct {
+				Key  string `json:"key"`
+				Text string `json:"text"`
+			} `json:"options"`
+		} `json:"items"`
+	}
+	if json.Unmarshal(b, &withItemsOpts) == nil {
+		for _, item := range withItemsOpts.Items {
+			opts := make(map[string]string)
+			for _, o := range item.Options {
+				if o.Key != "" && o.Text != "" {
+					opts[strings.ToUpper(o.Key)] = o.Text
+				}
+			}
+			if len(opts) > 0 {
+				result[fmt.Sprintf("%d", item.QuestionNo)] = opts
+			}
+		}
+	}
+
+	// Per-question options via "questions" (cteni_2/4)
+	var withQuestionsOpts struct {
+		Questions []struct {
+			QuestionNo int `json:"question_no"`
+			Options    []struct {
+				Key  string `json:"key"`
+				Text string `json:"text"`
+			} `json:"options"`
+		} `json:"questions"`
+	}
+	if json.Unmarshal(b, &withQuestionsOpts) == nil {
+		for _, q := range withQuestionsOpts.Questions {
+			opts := make(map[string]string)
+			for _, o := range q.Options {
+				if o.Key != "" && o.Text != "" {
+					opts[strings.ToUpper(o.Key)] = o.Text
+				}
+			}
+			if len(opts) > 0 {
+				result[fmt.Sprintf("%d", q.QuestionNo)] = opts
+			}
+		}
+	}
+
+	// Global options shared across questions (poslech_3 MatchOption label,
+	// cteni_1 TextOption text, cteni_3 PersonOption name).
+	var withGlobal struct {
+		Options []struct {
+			Key   string `json:"key"`
+			Text  string `json:"text"`
+			Label string `json:"label"`
+		} `json:"options"`
+		Persons []struct {
+			Key  string `json:"key"`
+			Name string `json:"name"`
+		} `json:"persons"`
+	}
+	if json.Unmarshal(b, &withGlobal) == nil {
+		global := make(map[string]string)
+		for _, o := range withGlobal.Options {
+			text := o.Text
+			if text == "" {
+				text = o.Label
+			}
+			if o.Key != "" && text != "" {
+				global[strings.ToUpper(o.Key)] = text
+			}
+		}
+		for _, p := range withGlobal.Persons {
+			if p.Key != "" && p.Name != "" {
+				global[strings.ToUpper(p.Key)] = p.Name
+			}
+		}
+		if len(global) > 0 {
+			result["*"] = global
+		}
+	}
+
+	return result
 }
 
 // extractQuestionTexts returns a map[question_no_str -> question_text] from the

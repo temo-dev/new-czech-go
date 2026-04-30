@@ -310,11 +310,13 @@ type ObjectiveResult struct {
 }
 
 type QuestionResult struct {
-	QuestionNo    int    `json:"question_no"`
-	QuestionText  string `json:"question_text,omitempty"`
-	LearnerAnswer string `json:"learner_answer"`
-	CorrectAnswer string `json:"correct_answer"`
-	IsCorrect     bool   `json:"is_correct"`
+	QuestionNo        int    `json:"question_no"`
+	QuestionText      string `json:"question_text,omitempty"`
+	LearnerAnswer     string `json:"learner_answer"`
+	LearnerAnswerText string `json:"learner_answer_text,omitempty"`
+	CorrectAnswer     string `json:"correct_answer"`
+	CorrectAnswerText string `json:"correct_answer_text,omitempty"`
+	IsCorrect         bool   `json:"is_correct"`
 }
 
 type Attempt struct {

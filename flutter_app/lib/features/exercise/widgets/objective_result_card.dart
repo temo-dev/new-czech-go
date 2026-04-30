@@ -190,30 +190,31 @@ class _QuestionCard extends StatelessWidget {
                   ],
                   const SizedBox(height: 4),
                   if (q.isCorrect)
-                    Text(
-                      q.correctAnswer.isNotEmpty
-                          ? q.correctAnswer
-                          : l.objectiveNoAnswer,
-                      style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.success,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    _AnswerDisplay(
+                      answerKey: q.correctAnswer,
+                      answerText: q.correctAnswerText,
+                      fallback: l.objectiveNoAnswer,
+                      color: AppColors.success,
                     )
                   else ...[
-                    // Learner's wrong answer
                     _AnswerRow(
                       label: l.objectiveYourAnswer,
-                      value: q.learnerAnswer.isNotEmpty
-                          ? q.learnerAnswer
-                          : l.objectiveNoAnswer,
-                      valueColor: AppColors.error,
+                      child: _AnswerDisplay(
+                        answerKey: q.learnerAnswer,
+                        answerText: q.learnerAnswerText,
+                        fallback: l.objectiveNoAnswer,
+                        color: AppColors.error,
+                      ),
                     ),
                     const SizedBox(height: 2),
-                    // Correct answer
                     _AnswerRow(
                       label: l.objectiveCorrectAnswer,
-                      value: q.correctAnswer,
-                      valueColor: AppColors.success,
+                      child: _AnswerDisplay(
+                        answerKey: q.correctAnswer,
+                        answerText: q.correctAnswerText,
+                        fallback: '',
+                        color: AppColors.success,
+                      ),
                     ),
                   ],
                 ],
@@ -227,15 +228,10 @@ class _QuestionCard extends StatelessWidget {
 }
 
 class _AnswerRow extends StatelessWidget {
-  const _AnswerRow({
-    required this.label,
-    required this.value,
-    required this.valueColor,
-  });
+  const _AnswerRow({required this.label, required this.child});
 
   final String label;
-  final String value;
-  final Color valueColor;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
@@ -249,16 +245,43 @@ class _AnswerRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 4),
-        Expanded(
-          child: Text(
-            value,
-            style: AppTypography.bodySmall.copyWith(
-              color: valueColor,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
+        Expanded(child: child),
       ],
+    );
+  }
+}
+
+/// Shows answer key + full text if available, or just key/fallback.
+/// Format: "A — Nová kavárna" if text is present, else just "A".
+class _AnswerDisplay extends StatelessWidget {
+  const _AnswerDisplay({
+    required this.answerKey,
+    required this.answerText,
+    required this.fallback,
+    required this.color,
+  });
+
+  final String answerKey;
+  final String answerText;
+  final String fallback;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final String display;
+    if (answerKey.isEmpty) {
+      display = fallback;
+    } else if (answerText.isNotEmpty) {
+      display = '$answerKey — $answerText';
+    } else {
+      display = answerKey;
+    }
+    return Text(
+      display,
+      style: AppTypography.bodySmall.copyWith(
+        color: color,
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 }
