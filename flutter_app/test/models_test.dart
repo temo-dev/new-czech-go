@@ -696,4 +696,46 @@ void main() {
     expect(sprint.sections.length, equals(4));
     expect(sprint.totalMaxPoints, equals(26));
   });
+
+  // ── V9 exam_mode model tests ─────────────────────────────────────────────
+
+  test('MockTest parses exam_mode "real" from JSON', () {
+    final mt = MockTest.fromJson({
+      'id': 'mt-real-1',
+      'title': 'Modelový test A2',
+      'description': 'Thi thật',
+      'estimated_duration_minutes': 60,
+      'status': 'published',
+      'exam_mode': 'real',
+      'pass_threshold_percent': 60,
+      'sections': [],
+    });
+    expect(mt.examMode, equals('real'));
+  });
+
+  test('MockTest parses exam_mode "practice" from JSON', () {
+    final mt = MockTest.fromJson({
+      'id': 'mt-practice-1',
+      'title': 'Sprint Nói',
+      'description': '',
+      'estimated_duration_minutes': 15,
+      'status': 'published',
+      'exam_mode': 'practice',
+      'pass_threshold_percent': 80,
+      'sections': [],
+    });
+    expect(mt.examMode, equals('practice'));
+  });
+
+  test('MockTest.examMode defaults to empty string when absent', () {
+    final mt = MockTest.fromJson({
+      'id': 'mt-legacy',
+      'title': 'Legacy test',
+      'description': '',
+      'estimated_duration_minutes': 20,
+      'status': 'published',
+      'sections': [],
+    });
+    expect(mt.examMode, equals(''));
+  });
 }

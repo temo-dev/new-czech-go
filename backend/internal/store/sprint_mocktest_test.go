@@ -6,6 +6,66 @@ import (
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
 
+// ── V9 exam_mode tests ───────────────────────────────────────────────────────
+
+func TestCreateMockTestPreservesExamModeReal(t *testing.T) {
+	repo := NewMemoryStore()
+	mt, err := repo.CreateMockTest(contracts.MockTest{
+		Title:    "Full A2",
+		Status:   "published",
+		ExamMode: "real",
+	})
+	if err != nil {
+		t.Fatalf("CreateMockTest: %v", err)
+	}
+	got, ok := repo.MockTestByID(mt.ID)
+	if !ok {
+		t.Fatal("MockTestByID should find created test")
+	}
+	if got.ExamMode != "real" {
+		t.Errorf("ExamMode = %q, want %q", got.ExamMode, "real")
+	}
+}
+
+func TestCreateMockTestExamModeDefaultsToEmpty(t *testing.T) {
+	repo := NewMemoryStore()
+	mt, err := repo.CreateMockTest(contracts.MockTest{
+		Title:  "Sprint practice",
+		Status: "published",
+	})
+	if err != nil {
+		t.Fatalf("CreateMockTest: %v", err)
+	}
+	got, ok := repo.MockTestByID(mt.ID)
+	if !ok {
+		t.Fatal("MockTestByID should find created test")
+	}
+	if got.ExamMode != "" {
+		t.Errorf("ExamMode = %q, want empty string (practice default)", got.ExamMode)
+	}
+}
+
+func TestUpdateMockTestPreservesExamMode(t *testing.T) {
+	repo := NewMemoryStore()
+	mt, _ := repo.CreateMockTest(contracts.MockTest{
+		Title:    "Initial",
+		Status:   "draft",
+		ExamMode: "practice",
+	})
+	updated, ok := repo.UpdateMockTest(mt.ID, contracts.MockTest{
+		Title:                "Updated",
+		Status:               "published",
+		ExamMode:             "real",
+		PassThresholdPercent: 60,
+	})
+	if !ok {
+		t.Fatal("UpdateMockTest should succeed")
+	}
+	if updated.ExamMode != "real" {
+		t.Errorf("ExamMode after update = %q, want %q", updated.ExamMode, "real")
+	}
+}
+
 // ── computeScoring tests ─────────────────────────────────────────────────────
 
 func scoringInputsFromLevels(levels []string, maxPoints []int) []mockExamScoringInput {
