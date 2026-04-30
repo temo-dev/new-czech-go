@@ -1576,6 +1576,14 @@ func (s *Server) handleAdminExerciseByID(w http.ResponseWriter, r *http.Request,
 			return
 		}
 		s.handleAdminAssetFile(w, r, exerciseID, assetID)
+	case strings.Contains(path, "/assets/") && r.Method == http.MethodDelete:
+		// DELETE /admin/exercises/:exerciseId/assets/:assetId
+		parts := strings.SplitN(path, "/assets/", 2)
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			writeNotFound(w)
+			return
+		}
+		s.handleAdminAssetDelete(w, r, parts[0], parts[1])
 	case strings.HasSuffix(path, "/generate-audio"):
 		s.handleAdminGenerateAudio(w, r, strings.TrimSuffix(path, "/generate-audio"))
 	case strings.HasSuffix(path, "/scoring-template"):
@@ -1955,6 +1963,48 @@ func splitExerciseAssetPath(path, action string) (exerciseID, assetID string, ok
 		return "", "", false
 	}
 	return parts[0], parts[2], true
+}
+
+func (s *Server) handleAdminAssetDelete(w http.ResponseWriter, r *http.Request, exerciseID, assetID string) {
+	if r.Method != http.MethodDelete {
+		writeMethodNotAllowed(w)
+		return
+	}
+	exercise, ok := s.repo.Exercise(exerciseID)
+	if !ok {
+		writeNotFound(w)
+		return
+	}
+
+	var deleted *contracts.PromptAsset
+	remaining := make([]contracts.PromptAsset, 0, len(exercise.Assets))
+	for _, asset := range exercise.Assets {
+		if asset.ID == assetID {
+			cp := asset
+			deleted = &cp
+		} else {
+			remaining = append(remaining, asset)
+		}
+	}
+	if deleted == nil {
+		writeNotFound(w)
+		return
+	}
+
+	if _, ok := s.repo.UpdateExercise(exerciseID, contracts.Exercise{Assets: remaining}); !ok {
+		writeError(w, http.StatusInternalServerError, "update_failed", "Could not remove asset.", true)
+		return
+	}
+
+	// Remove file from local storage (best-effort; ignore error on S3 mode).
+	if deleted.StorageKey != "" {
+		os.Remove(localExerciseAssetPath(deleted.StorageKey))
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{"deleted": true, "asset_id": assetID},
+		"meta": map[string]any{},
+	})
 }
 
 func localExerciseAssetPath(storageKey string) string {

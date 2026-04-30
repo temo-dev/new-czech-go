@@ -213,7 +213,7 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
     setForm((f) => ({ ...f, moduleId, skillKind: '' }));
   }
 
-  async function handleAssetUpload(file: File) {
+  async function handleAssetUpload(file: File, assetKind = 'image') {
     if (!editingId) {
       setAssetError('Save the exercise first before uploading images.');
       return;
@@ -223,7 +223,7 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
     try {
       const formData = new FormData();
       formData.set('file', file);
-      formData.set('asset_kind', 'image');
+      formData.set('asset_kind', assetKind);
       formData.set('sequence_no', String(currentAssets.length + 1));
       const response = await adminFetch(`${adminApi}/${editingId}/assets/upload`, {
         method: 'POST',
@@ -244,6 +244,24 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
     } finally {
       setAssetUploading(false);
     }
+  }
+
+  async function handleContextImageUpload(file: File) {
+    if (!editingId) { setAssetError('Save the exercise first.'); return; }
+    // Delete existing context_image first to avoid accumulation
+    const existing = currentAssets.find((a: PromptAsset) => a.asset_kind === 'context_image');
+    if (existing) {
+      await adminFetch(`/api/admin/exercises/${editingId}/assets/${existing.id}`, { method: 'DELETE' });
+    }
+    await handleAssetUpload(file, 'context_image');
+  }
+
+  async function handleContextImageDelete() {
+    if (!editingId) return;
+    const existing = currentAssets.find((a: PromptAsset) => a.asset_kind === 'context_image');
+    if (!existing) return;
+    await adminFetch(`/api/admin/exercises/${editingId}/assets/${existing.id}`, { method: 'DELETE' });
+    onSaved();
   }
 
   async function handleCopyAssetId(assetId: string) {
@@ -876,6 +894,88 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                   <span style={fieldHintStyle}>
                     Override LLM/rule-based model answer trong review artifact của học viên.
                   </span>
+                </div>
+              </details>
+
+              {/* Context image — for ALL exercise types */}
+              <details style={{ borderRadius: 12, border: '1px solid var(--border)' }}>
+                <summary
+                  style={{
+                    padding: '10px 14px',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: 'var(--ink-2)',
+                    userSelect: 'none',
+                    listStyle: 'none',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <span>
+                    🖼 Ảnh minh họa{' '}
+                    <span style={{ fontWeight: 400, color: 'var(--ink-4)' }}>(tùy chọn)</span>
+                    {currentAssets.some((a: PromptAsset) => a.asset_kind === 'context_image') && (
+                      <span style={{ marginLeft: 8, background: '#22c55e', color: '#fff', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>
+                        ✓ Đã có ảnh
+                      </span>
+                    )}
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>▼</span>
+                </summary>
+                <div style={{ padding: '0 14px 14px', display: 'grid', gap: 12 }}>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-3)' }}>
+                    Ảnh hiển thị phía trên câu hỏi trên Flutter app. Với quizcard: ảnh hiển thị trong thẻ.
+                  </p>
+                  {(() => {
+                    const ctxAsset = currentAssets.find((a: PromptAsset) => a.asset_kind === 'context_image');
+                    return (
+                      <>
+                        {ctxAsset && (
+                          <div style={{ display: 'grid', gap: 8 }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={assetPreviewSrc(editingId ?? '', ctxAsset)}
+                              alt="context image"
+                              style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)' }}
+                            />
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: '1px dashed var(--border)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--ink-3)' }}>
+                                Đổi ảnh
+                                <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+                                  onChange={e => { const f = e.target.files?.[0]; if (f) void handleContextImageUpload(f); e.target.value = ''; }} />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => void handleContextImageDelete()}
+                                style={{ flex: 1, border: '1px solid var(--danger)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--danger)', background: 'transparent' }}
+                              >
+                                Xóa ảnh
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {!ctxAsset && (
+                          !editingId ? (
+                            <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-4)' }}>Lưu bài tập trước rồi upload ảnh.</p>
+                          ) : (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px dashed var(--border)', borderRadius: 10, padding: '12px 16px', cursor: 'pointer', background: 'var(--surface-alt)' }}>
+                              <span style={{ fontSize: 20 }}>🖼</span>
+                              <div>
+                                <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>+ Tải ảnh lên</p>
+                                <p style={{ margin: 0, fontSize: 11, color: 'var(--ink-4)' }}>JPEG / PNG / WebP, tối đa 5 MB</p>
+                              </div>
+                              <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+                                onChange={e => { const f = e.target.files?.[0]; if (f) void handleContextImageUpload(f); e.target.value = ''; }} />
+                            </label>
+                          )
+                        )}
+                        {assetUploading && <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-4)' }}>Đang tải ảnh...</p>}
+                        {assetError && <p style={{ margin: 0, fontSize: 12, color: 'var(--danger)' }}>{assetError}</p>}
+                      </>
+                    );
+                  })()}
                 </div>
               </details>
 

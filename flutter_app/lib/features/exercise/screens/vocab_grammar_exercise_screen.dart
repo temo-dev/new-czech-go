@@ -78,6 +78,22 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
     }
   }
 
+  /// Returns image URL for QuizcardWidget.
+  /// Admin-uploaded context_image (from exercise assets) takes priority over
+  /// vocab-injected flashcardImageAssetId (set at generation publish time).
+  String? _quizcardImageUrl(ExerciseDetail d) {
+    final contextAsset = d.assets
+        .where((a) => a.assetKind == 'context_image' && a.isImage)
+        .firstOrNull;
+    if (contextAsset != null) {
+      return widget.client.exerciseAssetUri(d.id, contextAsset.id).toString();
+    }
+    if (d.flashcardImageAssetId.isNotEmpty) {
+      return widget.client.mediaUri(d.flashcardImageAssetId).toString();
+    }
+    return null;
+  }
+
   bool get _canSubmit {
     final d = widget.detail;
     if (d.isMatching) {
@@ -193,7 +209,8 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ExerciseContextImage(detail: d, client: widget.client),
+              // Context image only shown for non-quizcard types — quizcard renders it inside the card
+              if (!d.isQuizcard) ExerciseContextImage(detail: d, client: widget.client),
 
               // Quizcard
               if (d.isQuizcard)
@@ -202,9 +219,8 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
                   back: d.flashcardBack,
                   example: d.flashcardExample.isNotEmpty ? d.flashcardExample : null,
                   exampleTranslation: d.flashcardExampleTranslation.isNotEmpty ? d.flashcardExampleTranslation : null,
-                  imageUrl: d.flashcardImageAssetId.isNotEmpty
-                      ? widget.client.mediaUri(d.flashcardImageAssetId).toString()
-                      : null,
+                  // Priority: admin-uploaded context_image > vocab-injected flashcardImageAssetId
+                  imageUrl: _quizcardImageUrl(d),
                   authHeaders: widget.client.authHeaders,
                   submitting: _submitting,
                   onChoice: _submitQuizcard,
