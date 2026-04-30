@@ -167,7 +167,8 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
       };
       setForm(initial);
       initialFormSnap.current = JSON.stringify(initial);
-      setWizardStep('skill');
+      // Advance wizard to type-selection step when skill is pre-filled
+      setWizardStep(prefillSkillKind ? 'type' : 'skill');
     }
     setError(null);
     setAssetError(null);
@@ -175,8 +176,10 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
     if (!editingItem && localStorage.getItem('ef-draft-v2')) {
       setDraftToast(true);
     }
+  // Use editingItem?.id (not editingItem object) so asset reloads don't reset
+  // unsaved form edits — object identity changes on every loadExercises() call
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editingItem, prefillModuleId, prefillSkillKind, prefillPool]);
+  }, [open, editingItem?.id, prefillModuleId, prefillSkillKind, prefillPool]);
 
   // Autosave every 10s while panel is open
   useEffect(() => {
@@ -269,9 +272,8 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
             (editingId ? 'Could not update exercise.' : 'Could not create exercise.'),
         );
       }
-      localStorage.removeItem('ef-draft-v2');
       onSaved();
-      doClose();
+      doClose(); // doClose() handles localStorage cleanup
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {

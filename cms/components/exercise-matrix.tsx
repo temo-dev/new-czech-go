@@ -329,7 +329,7 @@ type ExamRow = {
   exerciseType: string;
   total: number;
   published: number;
-  hasAudio: number;
+  hasAssets: number; // exercises with uploaded prompt assets (images)
 };
 
 type ExamPoolMatrixProps = {
@@ -343,12 +343,12 @@ export function ExamPoolMatrix({ items, activeType, onTypeClick }: ExamPoolMatri
   const byType = new Map<string, ExamRow>();
   for (const item of items) {
     if (!byType.has(item.exercise_type)) {
-      byType.set(item.exercise_type, { exerciseType: item.exercise_type, total: 0, published: 0, hasAudio: 0 });
+      byType.set(item.exercise_type, { exerciseType: item.exercise_type, total: 0, published: 0, hasAssets: 0 });
     }
     const row = byType.get(item.exercise_type)!;
     row.total++;
     if (item.status === 'published') row.published++;
-    if (item.assets?.some((a) => a.asset_kind === 'audio' || a.mime_type?.startsWith('audio/'))) row.hasAudio++;
+    if ((item.assets?.length ?? 0) > 0) row.hasAssets++;
   }
 
   const rows: ExamRow[] = [...byType.values()].sort((a, b) =>
@@ -392,7 +392,7 @@ export function ExamPoolMatrix({ items, activeType, onTypeClick }: ExamPoolMatri
           gap: 8,
         }}
       >
-        {['Exercise type', 'Tổng', 'Published', 'Có audio'].map((h) => (
+        {['Exercise type', 'Tổng', 'Published', 'Có ảnh'].map((h) => (
           <span
             key={h}
             style={{
@@ -445,7 +445,7 @@ export function ExamPoolMatrix({ items, activeType, onTypeClick }: ExamPoolMatri
               {row.published}
             </span>
             <span style={{ textAlign: 'center', fontSize: 13, color: 'var(--ink-2)' }}>
-              {row.hasAudio > 0 ? `${row.hasAudio} (${Math.round((row.hasAudio / row.total) * 100)}%)` : '—'}
+              {row.hasAssets > 0 ? `${row.hasAssets} (${Math.round((row.hasAssets / row.total) * 100)}%)` : '—'}
             </span>
           </button>
         );
