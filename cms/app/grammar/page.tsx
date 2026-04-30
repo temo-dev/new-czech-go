@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { adminFetch } from '../../lib/api';
 
 type GrammarRule = {
-  id: string; skill_id: string; title: string; level: string;
+  id: string; module_id: string; title: string; level: string;
   explanation_vi: string; rule_table: Record<string, string>;
   constraints_text: string; status: string;
 };

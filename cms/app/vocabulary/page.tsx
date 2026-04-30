@@ -8,7 +8,7 @@ import { adminFetch } from '../../lib/api';
 type VocabItem = { term: string; meaning: string; part_of_speech?: string };
 
 type VocabSet = {
-  id: string; skill_id: string; title: string;
+  id: string; module_id: string; title: string;
   level: string; explanation_lang: string; status: string;
 };
 

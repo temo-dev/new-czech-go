@@ -19,13 +19,12 @@ type PromptAsset = {
 
 type CmsCourse = { id: string; title: string };
 type CmsModule = { id: string; title: string; course_id: string };
-type CmsSkill = { id: string; module_id: string; skill_kind: string; title: string };
 type CmsMockTest = { id: string; title: string; sections: Array<{ exercise_id: string }> };
 
 type Exercise = {
   id: string;
   module_id?: string;
-  skill_id?: string;
+  skill_kind?: string;
   pool?: string;
   title: string;
   exercise_type: string;
@@ -75,7 +74,7 @@ type ExerciseFormState = {
   shortInstruction: string;
   learnerInstruction: string;
   moduleId: string;
-  skillId: string;
+  skillKind: string;
   questions: string;
   scenarioTitle: string;
   scenarioPrompt: string;
@@ -192,7 +191,7 @@ function createInitialFormState(): ExerciseFormState {
     shortInstruction: 'Tra loi ngan gon va ro y.',
     learnerInstruction: 'Ban hay tra loi ngan gon theo chu de thoi tiet.',
     moduleId: 'module-day-1',
-    skillId: '',
+    skillKind: '',
     questions:
       'Jake pocasi mate dnes?\nCo delate, kdyz je venku hezky?\nMate rad/a zimu?\nJake pocasi bude zitra?',
     scenarioTitle: 'Navsteva kina',
@@ -295,7 +294,7 @@ function formStateFromExercise(item: Exercise): ExerciseFormState {
     shortInstruction: item.short_instruction ?? '',
     learnerInstruction: item.learner_instruction ?? '',
     moduleId: item.module_id ?? 'module-day-1',
-    skillId: item.skill_id ?? '',
+    skillKind: item.skill_kind ?? '',
     questions: (prompt.question_prompts ?? []).join('\n'),
     scenarioTitle: String(detail.scenario_title ?? ''),
     scenarioPrompt: String(detail.scenario_prompt ?? ''),
@@ -430,7 +429,7 @@ function buildPoslechPayload(form: ExerciseFormState) {
   const correct = parsePoslechCorrectAnswers(form.poslechCorrectAnswers);
   const base = {
     module_id: form.moduleId,
-    skill_id: form.skillId,
+    skill_kind: form.skillKind,
     exercise_type: form.exerciseType,
     title: form.title,
     short_instruction: form.shortInstruction,
@@ -476,7 +475,7 @@ function parseCteniCorrectAnswers(input: string): Record<string, string> {
 function buildCteniPayload(form: ExerciseFormState) {
   const correct = parseCteniCorrectAnswers(form.cteniCorrectAnswers);
   const base = {
-    module_id: form.moduleId, skill_id: form.skillId,
+    module_id: form.moduleId, skill_kind: form.skillKind,
     exercise_type: form.exerciseType, title: form.title,
     short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
     estimated_duration_sec: 2400, sample_answer_enabled: false,
@@ -512,7 +511,7 @@ function buildCteniPayload(form: ExerciseFormState) {
 
 function buildPoslechBase(form: ExerciseFormState) {
   return {
-    module_id: form.moduleId, skill_id: form.skillId,
+    module_id: form.moduleId, skill_kind: form.skillKind,
     exercise_type: form.exerciseType, title: form.title,
     short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
     estimated_duration_sec: 1800, sample_answer_enabled: false,
@@ -522,7 +521,7 @@ function buildPoslechBase(form: ExerciseFormState) {
 
 function buildCteniBase(form: ExerciseFormState) {
   return {
-    module_id: form.moduleId, skill_id: form.skillId,
+    module_id: form.moduleId, skill_kind: form.skillKind,
     exercise_type: form.exerciseType, title: form.title,
     short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
     estimated_duration_sec: 2400, sample_answer_enabled: false,
@@ -544,7 +543,7 @@ function buildCreatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'uloha_1_topic_answers') {
     return {
       module_id: form.moduleId,
-      skill_id: form.skillId,
+      skill_kind: form.skillKind,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -563,7 +562,7 @@ function buildCreatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'uloha_2_dialogue_questions') {
     return {
       module_id: form.moduleId,
-      skill_id: form.skillId,
+      skill_kind: form.skillKind,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -587,7 +586,7 @@ function buildCreatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'uloha_3_story_narration') {
     return {
       module_id: form.moduleId,
-      skill_id: form.skillId,
+      skill_kind: form.skillKind,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -611,7 +610,7 @@ function buildCreatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'psani_1_formular') {
     return {
       module_id: form.moduleId,
-      skill_id: form.skillId,
+      skill_kind: form.skillKind,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -631,7 +630,7 @@ function buildCreatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'psani_2_email') {
     return {
       module_id: form.moduleId,
-      skill_id: form.skillId,
+      skill_kind: form.skillKind,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -684,7 +683,7 @@ function buildUpdatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'uloha_1_topic_answers') {
     return {
       module_id: form.moduleId,
-      skill_id: form.skillId,
+      skill_kind: form.skillKind,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -706,7 +705,7 @@ function buildUpdatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'uloha_2_dialogue_questions') {
     return {
       module_id: form.moduleId,
-      skill_id: form.skillId,
+      skill_kind: form.skillKind,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -730,7 +729,7 @@ function buildUpdatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'uloha_3_story_narration') {
     return {
       module_id: form.moduleId,
-      skill_id: form.skillId,
+      skill_kind: form.skillKind,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -754,7 +753,7 @@ function buildUpdatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'psani_1_formular') {
     return {
       module_id: form.moduleId,
-      skill_id: form.skillId,
+      skill_kind: form.skillKind,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -774,7 +773,7 @@ function buildUpdatePayload(form: ExerciseFormState) {
   if (form.exerciseType === 'psani_2_email') {
     return {
       module_id: form.moduleId,
-      skill_id: form.skillId,
+      skill_kind: form.skillKind,
       exercise_type: form.exerciseType,
       title: form.title,
       short_instruction: form.shortInstruction,
@@ -827,15 +826,13 @@ function filterSelectStyle(active: boolean): React.CSSProperties {
   };
 }
 
-function WizardTypeStep({ form, allSkills, onSelectType, onBack }: {
+function WizardTypeStep({ form, onSelectType, onBack }: {
   form: ExerciseFormState;
-  allSkills: CmsSkill[];
   onSelectType: (type: ExerciseType) => void;
   onBack: () => void;
 }) {
-  const skill = allSkills.find(s => s.id === form.skillId);
-  const kind = skill?.skill_kind ?? '';
-  const meta = SKILL_KIND_META[kind];
+  const kind = form.skillKind;
+  const meta = SKILL_KIND_META[kind as keyof typeof SKILL_KIND_META];
   const typeOptions = (SKILL_KIND_EXERCISE_TYPES[kind] ?? [])
     .map(v => exerciseTypeOptions.find(o => o.value === v))
     .filter((o): o is NonNullable<typeof o> => o != null);
@@ -846,7 +843,7 @@ function WizardTypeStep({ form, allSkills, onSelectType, onBack }: {
         <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'var(--primary)', textTransform: 'uppercase' }}>Bước 2 / 3</p>
         <h2 style={{ margin: '0 0 4px', fontSize: 22 }}>Chọn dạng bài</h2>
         <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 14 }}>
-          Kỹ năng: <strong style={{ color: meta?.color }}>{meta?.icon} {skill?.title}</strong>
+          Kỹ năng: <strong style={{ color: meta?.color }}>{meta?.icon} {meta?.label}</strong>
         </p>
       </div>
       <div style={{ display: 'grid', gap: 8 }}>
@@ -880,18 +877,16 @@ export function ExerciseDashboard() {
   const [assetError, setAssetError] = useState<string | null>(null);
   const [form, setForm] = useState<ExerciseFormState>(createInitialFormState);
   const [availableModules, setAvailableModules] = useState<CmsModule[]>([]);
-  const [availableSkills, setAvailableSkills] = useState<CmsSkill[]>([]);
   const [formTab, setFormTab] = useState(0);
   const [audioGenerating, setAudioGenerating] = useState(false);
   const [audioGenMsg, setAudioGenMsg] = useState<string | null>(null);
   const [wizardStep, setWizardStep] = useState<'skill' | 'type' | 'content'>('skill');
-  const [allSkills, setAllSkills] = useState<CmsSkill[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [courses, setCourses] = useState<CmsCourse[]>([]);
   const [mockTests, setMockTests] = useState<CmsMockTest[]>([]);
   const [filterCourseId, setFilterCourseId] = useState('');
   const [filterModuleId, setFilterModuleId] = useState('');
-  const [filterSkillId, setFilterSkillId] = useState('');
+  const [filterSkillKind, setFilterSkillId] = useState('');
   const [filterMockTestId, setFilterMockTestId] = useState('');
   const [filterText, setFilterText] = useState('');
   const [showConfirmClose, setShowConfirmClose] = useState(false);
@@ -997,37 +992,18 @@ export function ExerciseDashboard() {
 
   async function loadAllSkills() {
     try {
-      const [skillsRes, modulesRes] = await Promise.all([
-        fetch('/api/admin/skills'),
-        fetch('/api/admin/modules'),
-      ]);
-      const [skillsJ, modulesJ] = await Promise.all([skillsRes.json(), modulesRes.json()]);
-      setAllSkills(skillsJ.data ?? []);
+      const res = await fetch('/api/admin/modules');
+      const j = await res.json();
       setAvailableModules(prev => {
         const merged = new Map(prev.map((m: CmsModule) => [m.id, m]));
-        for (const m of (modulesJ.data ?? [])) merged.set(m.id, m);
+        for (const m of (j.data ?? [])) merged.set(m.id, m);
         return Array.from(merged.values());
       });
     } catch { /* non-fatal */ }
   }
 
-  async function loadSkillsForModule(moduleId: string) {
-    if (!moduleId) { setAvailableSkills([]); return; }
-    try {
-      const res = await adminFetch(`/api/admin/skills?module_id=${moduleId}`);
-      const j = await res.json();
-      setAvailableSkills(j.data ?? []);
-    } catch { setAvailableSkills([]); }
-  }
-
   function handleModuleChange(moduleId: string) {
-    setForm(f => ({ ...f, moduleId, skillId: '' }));
-    loadSkillsForModule(moduleId);
-  }
-
-  function handleSkillChange(skillId: string) {
-    const skill = availableSkills.find(s => s.id === skillId);
-    setForm(f => ({ ...f, skillId, moduleId: skill?.module_id ?? f.moduleId }));
+    setForm(f => ({ ...f, moduleId, skillKind: '' }));
   }
 
   function startEditing(item: Exercise) {
@@ -1173,24 +1149,14 @@ export function ExerciseDashboard() {
     ? availableModules.filter((m: CmsModule) => m.course_id === filterCourseId)
     : availableModules;
 
-  // Derived: skills for the selected module (used in filter bar skill select)
-  const skillsForModule = filterModuleId
-    ? allSkills.filter(s => s.module_id === filterModuleId)
-    : filterCourseId
-      ? allSkills.filter(s => {
-          const mod = availableModules.find((m: CmsModule) => m.id === s.module_id);
-          return mod?.course_id === filterCourseId;
-        })
-      : allSkills;
+  // skill_kind filter values derived from exercises directly
+  const skillKindsInView = [...new Set(items.map(i => i.skill_kind).filter(Boolean))] as string[];
 
   const filteredItems = items.filter(item => {
-    if (filterSkillId && item.skill_id !== filterSkillId) return false;
-    if (filterModuleId) {
-      const skill = allSkills.find(s => s.id === item.skill_id);
-      if (skill?.module_id !== filterModuleId) return false;
-    } else if (filterCourseId) {
-      const skill = allSkills.find(s => s.id === item.skill_id);
-      const mod = availableModules.find((m: CmsModule) => m.id === skill?.module_id);
+    if (filterSkillKind && item.skill_kind !== filterSkillKind) return false;
+    if (filterModuleId && item.module_id !== filterModuleId) return false;
+    if (filterCourseId && !filterModuleId) {
+      const mod = availableModules.find((m: CmsModule) => m.id === item.module_id);
       if (mod?.course_id !== filterCourseId) return false;
     }
     if (mtExerciseIds && !mtExerciseIds.has(item.id)) return false;
@@ -1348,54 +1314,33 @@ export function ExerciseDashboard() {
               <h2 style={{ margin: '0 0 4px', fontSize: 22 }}>Chọn kỹ năng</h2>
               <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 14 }}>Bài tập sẽ được gắn vào kỹ năng này.</p>
             </div>
-            {allSkills.length === 0 ? (
-              <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Chưa có kỹ năng nào. Tạo skill trong Module trước.</p>
-            ) : (
-              <div style={{ display: 'grid', gap: 12 }}>
-                {(['noi', 'viet', 'nghe', 'doc'] as const).map(kind => {
-                  const kindSkills = allSkills.filter(s => s.skill_kind === kind);
-                  if (kindSkills.length === 0) return null;
-                  const meta = SKILL_KIND_META[kind];
-                  return (
-                    <div key={kind}>
-                      <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, color: meta.color, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-                        {meta.icon} {meta.label}
-                      </p>
-                      <div style={{ display: 'grid', gap: 4 }}>
-                        {kindSkills.map(sk => {
-                          const mod = availableModules.find((m: CmsModule) => m.id === sk.module_id);
-                          const modLabel = mod?.title ?? `…${sk.module_id.slice(-8)}`;
-                          return (
-                            <button
-                              key={sk.id}
-                              type="button"
-                              onClick={() => {
-                                setForm(f => ({ ...f, skillId: sk.id, moduleId: sk.module_id, exerciseType: SKILL_KIND_EXERCISE_TYPES[kind]?.[0] ?? f.exerciseType }));
-                                loadSkillsForModule(sk.module_id);
-                                setWizardStep('type');
-                              }}
-                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--primary)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--primary)'; (e.currentTarget as HTMLButtonElement).style.color = '#fff'; }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-muted)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = ''; }}
-                              style={{ textAlign: 'left', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-muted)', cursor: 'pointer', transition: 'background 0.15s, border-color 0.15s, color 0.15s' }}
-                            >
-                              <div style={{ fontWeight: 600, fontSize: 13 }}>{sk.title}</div>
-                              <div style={{ fontSize: 11, opacity: 0.7, marginTop: 1 }}>Module: {modLabel}</div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <div style={{ display: 'grid', gap: 12 }}>
+              {(['noi', 'viet', 'nghe', 'doc', 'tu_vung', 'ngu_phap'] as const).map(kind => {
+                const meta = SKILL_KIND_META[kind as keyof typeof SKILL_KIND_META];
+                if (!meta) return null;
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => {
+                      setForm(f => ({ ...f, skillKind: kind, exerciseType: SKILL_KIND_EXERCISE_TYPES[kind]?.[0] ?? f.exerciseType }));
+                      setWizardStep('type');
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--primary)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--primary)'; (e.currentTarget as HTMLButtonElement).style.color = '#fff'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-muted)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLButtonElement).style.color = ''; }}
+                    style={{ textAlign: 'left', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-muted)', cursor: 'pointer', transition: 'background 0.15s, border-color 0.15s, color 0.15s' }}
+                  >
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{meta.icon} {meta.label}</div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
         {/* ── Wizard: Step 2 — pick exercise type (creation only) ──────── */}
         {!editingId && wizardStep === 'type' && <WizardTypeStep
           form={form}
-          allSkills={allSkills}
           onSelectType={type => { setForm(f => ({ ...f, exerciseType: type })); setWizardStep('content'); }}
           onBack={() => setWizardStep('skill')}
         />}
@@ -1701,12 +1646,18 @@ export function ExerciseDashboard() {
                     </select>
                   </label>
                   <label style={{ display: 'grid', gap: 6 }}>
-                    <span style={fieldLabelStyle}>{S.exercise.fieldSkill}</span>
-                    <select value={form.skillId} onChange={e => handleSkillChange(e.target.value)} style={fieldStyle} disabled={availableSkills.length === 0}>
-                      <option value="">{S.pick.skill}</option>
-                      {availableSkills.map(s => <option key={s.id} value={s.id}>{s.title} ({s.skill_kind})</option>)}
+                    <span style={fieldLabelStyle}>Skill Kind</span>
+                    <select
+                      value={form.skillKind}
+                      onChange={e => setForm(f => ({ ...f, skillKind: e.target.value }))}
+                      style={fieldStyle}
+                    >
+                      <option value="">Auto (derived from exercise type)</option>
+                      {['noi','nghe','doc','viet','tu_vung','ngu_phap'].map(k => (
+                        <option key={k} value={k}>{k}</option>
+                      ))}
                     </select>
-                    <span style={fieldHintStyle}>Chọn module trước để load skills.</span>
+                    <span style={fieldHintStyle}>Để trống → backend tự derive từ exercise type.</span>
                   </label>
                 </>
               )}
@@ -1866,14 +1817,14 @@ export function ExerciseDashboard() {
 
           <span style={{ color: 'var(--ink-4)', fontSize: 14, flexShrink: 0 }}>›</span>
 
-          {/* Skill — cascade from module (or course) */}
-          <select value={filterSkillId} onChange={e => {
+          {/* Skill kind — derived from exercises */}
+          <select value={filterSkillKind} onChange={e => {
             setFilterSkillId(e.target.value);
             setFilterMockTestId('');
-          }} style={filterSelectStyle(!!filterSkillId)} disabled={skillsForModule.length === 0 && (!!filterModuleId || !!filterCourseId)}>
+          }} style={filterSelectStyle(!!filterSkillKind)}>
             <option value="">Kỹ năng</option>
-            {skillsForModule.map(sk => (
-              <option key={sk.id} value={sk.id}>{SKILL_KIND_META[sk.skill_kind]?.icon} {sk.title}</option>
+            {skillKindsInView.map(kind => (
+              <option key={kind} value={kind}>{SKILL_KIND_META[kind as keyof typeof SKILL_KIND_META]?.icon} {kind}</option>
             ))}
           </select>
 
@@ -1890,7 +1841,7 @@ export function ExerciseDashboard() {
             {mockTests.map(mt => <option key={mt.id} value={mt.id}>{mt.title}</option>)}
           </select>
 
-          {(filterCourseId || filterModuleId || filterSkillId || filterMockTestId || filterText) && (
+          {(filterCourseId || filterModuleId || filterSkillKind || filterMockTestId || filterText) && (
             <button type="button" onClick={() => {
               setFilterCourseId('');
               setFilterModuleId('');
@@ -1924,10 +1875,9 @@ export function ExerciseDashboard() {
         )}
         <div>
           {filteredItems.map((item, idx) => {
-            const skill = allSkills.find(s => s.id === item.skill_id);
-            const kind = skill?.skill_kind ?? '';
-            const meta = SKILL_KIND_META[kind];
-            const modForRow = skill ? availableModules.find((m: CmsModule) => m.id === skill.module_id) : null;
+            const kind = item.skill_kind ?? '';
+            const meta = SKILL_KIND_META[kind as keyof typeof SKILL_KIND_META];
+            const modForRow = availableModules.find((m: CmsModule) => m.id === item.module_id) ?? null;
             const typeColor: Record<string, string> = { noi: '#FF6A14', viet: '#0F3D3A', nghe: '#7C3AED', doc: '#0369A1' };
             const typeBg: Record<string, string> = { noi: '#fff5ef', viet: '#d9e5e3', nghe: '#f3e8ff', doc: '#e0f2fe' };
             const color = typeColor[kind] ?? 'var(--ink-3)';
@@ -1953,7 +1903,7 @@ export function ExerciseDashboard() {
                 {/* Skill + module */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {skill ? `${meta?.icon ?? ''} ${skill.title}` : <em style={{ color: 'var(--ink-4)' }}>—</em>}
+                    {kind ? `${meta?.icon ?? ''} ${kind}` : <em style={{ color: 'var(--ink-4)' }}>—</em>}
                   </span>
                   {modForRow && (
                     <span style={{ fontSize: 11, color: 'var(--ink-4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
