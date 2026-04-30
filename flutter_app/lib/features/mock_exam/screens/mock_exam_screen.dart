@@ -28,14 +28,74 @@ class _PendingAnalysis {
   final int durationMs;
 }
 
-/// Sequential mock oral exam: record all sections first, then analyse together.
+String _skillKindForExerciseType(String exerciseType) {
+  if (exerciseType.startsWith('uloha_')) return 'noi';
+  if (exerciseType.startsWith('poslech_')) return 'nghe';
+  if (exerciseType.startsWith('cteni_')) return 'doc';
+  if (exerciseType.startsWith('psani_')) return 'viet';
+  return 'noi';
+}
+
+String _sectionSkillKind(MockExamSection section) {
+  return section.skillKind.isNotEmpty
+      ? section.skillKind
+      : _skillKindForExerciseType(section.exerciseType);
+}
+
+String _skillLabel(AppLocalizations l, String skillKind) => switch (skillKind) {
+  'noi' => l.skillNoi,
+  'nghe' => l.skillNghe,
+  'doc' => l.skillDoc,
+  'viet' => l.skillViet,
+  _ => skillKind.toUpperCase(),
+};
+
+int? _exerciseTypeNumber(String exerciseType) {
+  final match = RegExp(r'_(\d+)').firstMatch(exerciseType);
+  if (match == null) return null;
+  return int.tryParse(match.group(1)!);
+}
+
+String _exerciseTypeLabel(AppLocalizations l, String exerciseType) {
+  final n = _exerciseTypeNumber(exerciseType);
+  if (exerciseType.startsWith('uloha_') && n != null) {
+    return l.mockExamTaskTypeUloha(n);
+  }
+  if (exerciseType.startsWith('poslech_') && n != null) {
+    return l.mockExamTaskTypeListening(n);
+  }
+  if (exerciseType.startsWith('cteni_') && n != null) {
+    return l.mockExamTaskTypeReading(n);
+  }
+  if (exerciseType == 'psani_1_formular') {
+    return l.mockExamTaskTypeWritingForm;
+  }
+  if (exerciseType == 'psani_2_email') {
+    return l.mockExamTaskTypeWritingEmail;
+  }
+  if (exerciseType.startsWith('psani_') && n != null) {
+    return l.mockExamTaskTypeWriting(n);
+  }
+  return exerciseType.replaceAll('_', ' ');
+}
+
+/// Sequential sprint mock exam. Speaking sections are recorded first and then
+/// analysed together; objective/text sections score inside their own screens.
 class MockExamScreen extends StatefulWidget {
-  const MockExamScreen({super.key, required this.client, this.initialSession});
+  const MockExamScreen({
+    super.key,
+    required this.client,
+    this.initialSession,
+    this.mockTest,
+  });
 
   final ApiClient client;
 
   /// Pre-created session from the intro screen. If null, a new session is created.
   final MockExamSessionView? initialSession;
+
+  /// Template selected by the learner. Used for title/copy while a session is in progress.
+  final MockTest? mockTest;
 
   @override
   State<MockExamScreen> createState() => _MockExamScreenState();
@@ -76,7 +136,13 @@ class _MockExamScreenState extends State<MockExamScreen> {
       _analyzeProgress = 0;
     });
     try {
-      final payload = await widget.client.createMockExam();
+      final mockTestId = widget.mockTest?.id.trim() ?? '';
+      if (widget.mockTest != null && mockTestId.isEmpty) {
+        throw Exception(AppLocalizations.of(context).mockTestMissingTemplateId);
+      }
+      final payload = await widget.client.createMockExam(
+        mockTestId: mockTestId.isEmpty ? null : mockTestId,
+      );
       final session = MockExamSessionView.fromJson(payload);
       if (!mounted) return;
       setState(() {
@@ -92,17 +158,12 @@ class _MockExamScreenState extends State<MockExamScreen> {
     }
   }
 
-  static String _skillKind(String exerciseType) {
-    if (exerciseType.startsWith('uloha_')) return 'noi';
-    if (exerciseType.startsWith('poslech_')) return 'nghe';
-    if (exerciseType.startsWith('cteni_')) return 'doc';
-    if (exerciseType.startsWith('psani_')) return 'viet';
-    return 'noi';
-  }
-
   Future<void> _advanceSection(String attemptId) async {
     try {
-      final payload = await widget.client.advanceMockExam(_session!.id, attemptId: attemptId);
+      final payload = await widget.client.advanceMockExam(
+        _session!.id,
+        attemptId: attemptId,
+      );
       if (!mounted) return;
       setState(() {
         _session = MockExamSessionView.fromJson(payload);
@@ -122,25 +183,31 @@ class _MockExamScreenState extends State<MockExamScreen> {
       );
       if (!mounted) return;
 
-      final kind = _skillKind(section.exerciseType);
+      final kind = _sectionSkillKind(section);
 
       if (kind == 'noi') {
         // Speaking: collect recording, bulk-analyze after all sections done.
         _PendingAnalysis? recorded;
         await navigator.push(
           MaterialPageRoute(
-            builder: (_) => exercise_feature.ExerciseScreen(
-              client: widget.client,
-              detail: detail,
-              onRecordingReady: (attemptId, audioPath, fileSizeBytes, durationMs) {
-                recorded = _PendingAnalysis(
-                  attemptId: attemptId,
-                  audioPath: audioPath,
-                  fileSizeBytes: fileSizeBytes,
-                  durationMs: durationMs,
-                );
-              },
-            ),
+            builder:
+                (_) => exercise_feature.ExerciseScreen(
+                  client: widget.client,
+                  detail: detail,
+                  onRecordingReady: (
+                    attemptId,
+                    audioPath,
+                    fileSizeBytes,
+                    durationMs,
+                  ) {
+                    recorded = _PendingAnalysis(
+                      attemptId: attemptId,
+                      audioPath: audioPath,
+                      fileSizeBytes: fileSizeBytes,
+                      durationMs: durationMs,
+                    );
+                  },
+                ),
           ),
         );
         if (!mounted) return;
@@ -160,27 +227,40 @@ class _MockExamScreenState extends State<MockExamScreen> {
         });
       } else {
         // Non-speaking: route to correct screen; callback advances session in background.
-        await navigator.push(MaterialPageRoute(builder: (_) {
-          if (kind == 'nghe') {
-            return ListeningExerciseScreen(
-              client: widget.client,
-              detail: detail,
-              onAttemptCompleted: (id) async { await _advanceSection(id); },
-            );
-          } else if (kind == 'doc') {
-            return ReadingExerciseScreen(
-              client: widget.client,
-              detail: detail,
-              onAttemptCompleted: (id) async { await _advanceSection(id); },
-            );
-          } else {
-            return WritingExerciseScreen(
-              client: widget.client,
-              detail: detail,
-              onAttemptCompleted: (id) async { await _advanceSection(id); },
-            );
-          }
-        }));
+        await navigator.push(
+          MaterialPageRoute(
+            builder: (_) {
+              if (kind == 'nghe') {
+                return ListeningExerciseScreen(
+                  client: widget.client,
+                  detail: detail,
+                  showResultOnCompletion: false,
+                  onAttemptCompleted: (id) async {
+                    await _advanceSection(id);
+                  },
+                );
+              } else if (kind == 'doc') {
+                return ReadingExerciseScreen(
+                  client: widget.client,
+                  detail: detail,
+                  showResultOnCompletion: false,
+                  onAttemptCompleted: (id) async {
+                    await _advanceSection(id);
+                  },
+                );
+              } else {
+                return WritingExerciseScreen(
+                  client: widget.client,
+                  detail: detail,
+                  showResultOnCompletion: false,
+                  onAttemptCompleted: (id) async {
+                    await _advanceSection(id);
+                  },
+                );
+              }
+            },
+          ),
+        );
         if (!mounted) return;
         // If user backed out without completing, _session remains unchanged (nextPending != null).
       }
@@ -244,10 +324,11 @@ class _MockExamScreenState extends State<MockExamScreen> {
       final payload = await widget.client.completeMockExam(_session!.id);
       if (!mounted) return;
       final completed = MockExamSessionView.fromJson(payload);
-      final attemptIds = completed.sections
-          .map((s) => s.attemptId)
-          .where((id) => id.isNotEmpty)
-          .toSet();
+      final attemptIds =
+          completed.sections
+              .map((s) => s.attemptId)
+              .where((id) => id.isNotEmpty)
+              .toSet();
       final Map<String, String> readiness = {};
       if (attemptIds.isNotEmpty) {
         final all = await widget.client.getAttempts();
@@ -276,8 +357,11 @@ class _MockExamScreenState extends State<MockExamScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final mockTitle = widget.mockTest?.title.trim() ?? '';
     return Scaffold(
-      appBar: AppBar(title: Text(l.mockExamTitle)),
+      appBar: AppBar(
+        title: Text(mockTitle.isNotEmpty ? mockTitle : l.mockExamTitle),
+      ),
       body: SafeArea(child: _buildBody(l)),
     );
   }
@@ -306,6 +390,9 @@ class _MockExamScreenState extends State<MockExamScreen> {
       return _buildAnalyzingView(l);
     }
     final session = _session!;
+    final hasSpeaking = session.sections.any(
+      (s) => _sectionSkillKind(s) == 'noi',
+    );
     if (session.isCompleted) {
       return _MockExamResultView(
         client: widget.client,
@@ -319,20 +406,22 @@ class _MockExamScreenState extends State<MockExamScreen> {
         vertical: AppSpacing.x5,
       ),
       children: [
-        Text(l.mockExamIntroTitle, style: AppTypography.titleLarge),
+        Text(
+          l.mockExamProgressIntroTitle(session.sections.length),
+          style: AppTypography.titleLarge,
+        ),
         const SizedBox(height: AppSpacing.x2),
         Text(
-          l.mockExamIntroBody,
+          hasSpeaking
+              ? l.mockExamProgressIntroBodyWithSpeaking
+              : l.mockExamProgressIntroBodyNoSpeaking,
           style: AppTypography.bodyMedium.copyWith(
             color: AppColors.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: AppSpacing.x5),
         for (final section in session.sections) ...[
-          _SectionTile(
-            section: section,
-            onStart: () => _runSection(section),
-          ),
+          _SectionTile(section: section, onStart: () => _runSection(section)),
           const SizedBox(height: AppSpacing.x3),
         ],
         if (err != null) ...[
@@ -376,12 +465,16 @@ class _SectionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final tone = section.isCompleted
-        ? PillTone.info
-        : (section.isPending ? PillTone.primary : PillTone.neutral);
-    final label = section.isCompleted
-        ? l.mockExamStatusRecorded
-        : l.mockExamStatusPending;
+    final skill = _skillLabel(l, _sectionSkillKind(section));
+    final exercise = _exerciseTypeLabel(l, section.exerciseType);
+    final tone =
+        section.isCompleted
+            ? PillTone.info
+            : (section.isPending ? PillTone.primary : PillTone.neutral);
+    final label =
+        section.isCompleted
+            ? l.mockExamStatusRecorded
+            : l.mockExamStatusPending;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.x4),
       decoration: BoxDecoration(
@@ -403,7 +496,13 @@ class _SectionTile extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.x1),
                 Text(
-                  section.exerciseType.toUpperCase(),
+                  section.maxPoints > 0
+                      ? l.mockExamSectionMeta(
+                        skill,
+                        exercise,
+                        section.maxPoints,
+                      )
+                      : '$skill · $exercise',
                   style: AppTypography.bodySmall.copyWith(
                     color: AppColors.onSurfaceVariant,
                   ),
@@ -446,8 +545,8 @@ class _MockExamResultView extends StatelessWidget {
     String t when t.startsWith('uloha_3') => Icons.people_outline_rounded,
     String t when t.startsWith('uloha_4') => Icons.mic_none_rounded,
     String t when t.startsWith('poslech_') => Icons.headphones_outlined,
-    String t when t.startsWith('cteni_')   => Icons.menu_book_outlined,
-    String t when t.startsWith('psani_')   => Icons.edit_outlined,
+    String t when t.startsWith('cteni_') => Icons.menu_book_outlined,
+    String t when t.startsWith('psani_') => Icons.edit_outlined,
     _ => Icons.school_outlined,
   };
 
@@ -457,18 +556,19 @@ class _MockExamResultView extends StatelessWidget {
     String t when t.startsWith('uloha_3') => AppColors.warningContainer,
     String t when t.startsWith('uloha_4') => AppColors.successContainer,
     String t when t.startsWith('poslech_') => AppColors.infoContainer,
-    String t when t.startsWith('cteni_')   => AppColors.tertiaryContainer,
-    String t when t.startsWith('psani_')   => AppColors.secondaryContainer,
+    String t when t.startsWith('cteni_') => AppColors.tertiaryContainer,
+    String t when t.startsWith('psani_') => AppColors.secondaryContainer,
     _ => AppColors.surfaceContainerHigh,
   };
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final totalMax = session.totalMaxPoints > 0 ? session.totalMaxPoints + 3 : 40;
+    final totalMax = session.totalScoreMax > 0 ? session.totalScoreMax : 40;
     final hasScore = session.overallScore > 0 || session.passed;
     final passColor = session.passed ? AppColors.success : AppColors.error;
-    final passContainerColor = session.passed ? AppColors.successContainer : AppColors.errorContainer;
+    final passContainerColor =
+        session.passed ? AppColors.successContainer : AppColors.errorContainer;
 
     return ListView(
       padding: EdgeInsets.symmetric(
@@ -480,32 +580,46 @@ class _MockExamResultView extends StatelessWidget {
         if (hasScore) ...[
           Center(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x6, vertical: AppSpacing.x5),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.x6,
+                vertical: AppSpacing.x5,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainerLowest,
                 borderRadius: AppRadius.lgAll,
                 border: Border.all(color: AppColors.outlineVariant),
               ),
-              child: Column(children: [
-                Text('CELKOVÉ SKÓRE',
+              child: Column(
+                children: [
+                  Text(
+                    'CELKOVÉ SKÓRE',
                     style: AppTypography.labelUppercase.copyWith(
-                        fontSize: 10, color: AppColors.onSurfaceVariant, letterSpacing: 1.2)),
-                const SizedBox(height: AppSpacing.x2),
-                RichText(
-                  text: TextSpan(
-                    text: '${session.overallScore}',
-                    style: AppTypography.scoreDisplay.copyWith(
-                        fontSize: 52, fontWeight: FontWeight.w900),
-                    children: [
-                      TextSpan(
-                        text: ' / $totalMax',
-                        style: AppTypography.titleMedium.copyWith(
-                            color: AppColors.onSurfaceVariant, fontWeight: FontWeight.w400),
-                      ),
-                    ],
+                      fontSize: 10,
+                      color: AppColors.onSurfaceVariant,
+                      letterSpacing: 1.2,
+                    ),
                   ),
-                ),
-              ]),
+                  const SizedBox(height: AppSpacing.x2),
+                  RichText(
+                    text: TextSpan(
+                      text: '${session.overallScore}',
+                      style: AppTypography.scoreDisplay.copyWith(
+                        fontSize: 52,
+                        fontWeight: FontWeight.w900,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: ' / $totalMax',
+                          style: AppTypography.titleMedium.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.x3),
@@ -518,31 +632,49 @@ class _MockExamResultView extends StatelessWidget {
                 color: passContainerColor,
                 borderRadius: BorderRadius.circular(40),
               ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(session.passed ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                    color: passColor, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  session.passed ? l.mockExamPassLabel : l.mockExamFailLabel,
-                  style: AppTypography.labelUppercase.copyWith(
-                      color: passColor, fontSize: 13, letterSpacing: 1.2, fontWeight: FontWeight.w700),
-                ),
-              ]),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    session.passed
+                        ? Icons.check_circle_rounded
+                        : Icons.cancel_rounded,
+                    color: passColor,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    session.passed ? l.mockExamPassLabel : l.mockExamFailLabel,
+                    style: AppTypography.labelUppercase.copyWith(
+                      color: passColor,
+                      fontSize: 13,
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.x2),
           Center(
             child: Text(
               l.mockExamResultPassThreshold(session.passThresholdPercent),
-              style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.x3),
           if (session.overallSummary.isNotEmpty)
             Center(
-              child: Text(session.overallSummary,
-                  textAlign: TextAlign.center,
-                  style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant)),
+              child: Text(
+                session.overallSummary,
+                textAlign: TextAlign.center,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                ),
+              ),
             ),
           const SizedBox(height: AppSpacing.x5),
         ],
@@ -558,22 +690,27 @@ class _MockExamResultView extends StatelessWidget {
                 final score = section.sectionScore;
                 final maxPts = section.maxPoints;
                 final pct = hasMax && maxPts > 0 ? score / maxPts : 0.0;
-                final barColor = pct >= 0.75
-                    ? AppColors.success
-                    : pct >= 0.5
+                final barColor =
+                    pct >= 0.75
+                        ? AppColors.success
+                        : pct >= 0.5
                         ? AppColors.warning
                         : AppColors.error;
 
                 return GestureDetector(
-                  onTap: canTap
-                      ? () => Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) => MockExamSectionDetailScreen(
-                              client: _client(context),
-                              attemptId: section.attemptId,
-                              sequenceNo: section.sequenceNo,
+                  onTap:
+                      canTap
+                          ? () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => MockExamSectionDetailScreen(
+                                    client: _client(context),
+                                    attemptId: section.attemptId,
+                                    sequenceNo: section.sequenceNo,
+                                  ),
                             ),
-                          ))
-                      : null,
+                          )
+                          : null,
                   child: Container(
                     padding: const EdgeInsets.all(AppSpacing.x4),
                     decoration: BoxDecoration(
@@ -584,46 +721,73 @@ class _MockExamResultView extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(children: [
-                          Text(
-                            l.mockExamSectionLabel(section.sequenceNo),
-                            style: AppTypography.labelUppercase.copyWith(
-                                fontSize: 10, color: AppColors.onSurfaceVariant, letterSpacing: 1.2),
-                          ),
-                          const Spacer(),
-                          if (canTap)
-                            const Icon(Icons.chevron_right, size: 16, color: AppColors.onSurfaceVariant),
-                        ]),
-                        const SizedBox(height: AppSpacing.x2),
-                        Row(children: [
-                          Container(
-                            width: 36, height: 36,
-                            decoration: BoxDecoration(
-                              color: _sectionIconBg(section.exerciseType),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(_sectionIcon(section.exerciseType), size: 20, color: AppColors.primary),
-                          ),
-                          const SizedBox(width: AppSpacing.x3),
-                          if (hasMax) ...[
-                            Text('$score/$maxPts',
-                                style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700)),
-                            const SizedBox(width: AppSpacing.x3),
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: LinearProgressIndicator(
-                                  value: pct.clamp(0.0, 1.0),
-                                  minHeight: 6,
-                                  backgroundColor: AppColors.surfaceContainerHigh,
-                                  valueColor: AlwaysStoppedAnimation(barColor),
-                                ),
+                        Row(
+                          children: [
+                            Text(
+                              l.mockExamSectionLabel(section.sequenceNo),
+                              style: AppTypography.labelUppercase.copyWith(
+                                fontSize: 10,
+                                color: AppColors.onSurfaceVariant,
+                                letterSpacing: 1.2,
                               ),
                             ),
-                          ] else
-                            Text(section.exerciseType.toUpperCase(),
-                                style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant)),
-                        ]),
+                            const Spacer(),
+                            if (canTap)
+                              const Icon(
+                                Icons.chevron_right,
+                                size: 16,
+                                color: AppColors.onSurfaceVariant,
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.x2),
+                        Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: _sectionIconBg(section.exerciseType),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                _sectionIcon(section.exerciseType),
+                                size: 20,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.x3),
+                            if (hasMax) ...[
+                              Text(
+                                '$score/$maxPts',
+                                style: AppTypography.titleSmall.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.x3),
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: pct.clamp(0.0, 1.0),
+                                    minHeight: 6,
+                                    backgroundColor:
+                                        AppColors.surfaceContainerHigh,
+                                    valueColor: AlwaysStoppedAnimation(
+                                      barColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ] else
+                              Text(
+                                _exerciseTypeLabel(l, section.exerciseType),
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -645,16 +809,30 @@ class _MockExamResultView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: [
-                  const Icon(Icons.analytics_outlined, color: AppColors.primaryFixed, size: 20),
-                  const SizedBox(width: AppSpacing.x2),
-                  Text('Analýza připravenosti',
-                      style: AppTypography.titleSmall.copyWith(color: AppColors.primaryFixed)),
-                ]),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.analytics_outlined,
+                      color: AppColors.primaryFixed,
+                      size: 20,
+                    ),
+                    const SizedBox(width: AppSpacing.x2),
+                    Text(
+                      'Analýza připravenosti',
+                      style: AppTypography.titleSmall.copyWith(
+                        color: AppColors.primaryFixed,
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: AppSpacing.x3),
-                Text(session.overallSummary,
-                    style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.inverseOnSurfaceLight.withAlpha(200), height: 1.6)),
+                Text(
+                  session.overallSummary,
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.inverseOnSurfaceLight.withAlpha(200),
+                    height: 1.6,
+                  ),
+                ),
               ],
             ),
           ),
@@ -663,7 +841,8 @@ class _MockExamResultView extends StatelessWidget {
 
         // ── CTA ───────────────────────────────────────────────────────────────
         FilledButton.icon(
-          onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+          onPressed:
+              () => Navigator.of(context).popUntil((route) => route.isFirst),
           icon: const Icon(Icons.home_outlined, size: 18),
           label: Text(l.mockExamBackHome),
           style: FilledButton.styleFrom(

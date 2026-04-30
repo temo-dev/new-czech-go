@@ -66,6 +66,17 @@ class AppLocalizationsVi extends AppLocalizations {
   String get mockExamIntroBody => 'Ghi âm lần lượt từng Uloha. Sau khi xong cả 4 phần, hệ thống sẽ phân tích và cho kết quả tổng.';
 
   @override
+  String mockExamProgressIntroTitle(int count) {
+    return '$count phần, mỗi phần 1 lần';
+  }
+
+  @override
+  String get mockExamProgressIntroBodyWithSpeaking => 'Làm từng phần theo thứ tự. Điểm bài thi chỉ được tính sau phần cuối; phần nói sẽ được phân tích cùng nhau ở cuối.';
+
+  @override
+  String get mockExamProgressIntroBodyNoSpeaking => 'Làm từng phần theo thứ tự. Kết quả sẽ được tính sau phần cuối cùng.';
+
+  @override
   String mockExamSectionLabel(int index) {
     return 'Phần $index';
   }
@@ -92,6 +103,37 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get mockExamActionDone => 'Xong';
+
+  @override
+  String mockExamSectionMeta(String skill, String exercise, int points) {
+    return '$skill · $exercise · $points điểm';
+  }
+
+  @override
+  String mockExamTaskTypeUloha(int n) {
+    return 'Úloha $n';
+  }
+
+  @override
+  String mockExamTaskTypeListening(int n) {
+    return 'Nghe $n';
+  }
+
+  @override
+  String mockExamTaskTypeReading(int n) {
+    return 'Đọc $n';
+  }
+
+  @override
+  String mockExamTaskTypeWriting(int n) {
+    return 'Viết $n';
+  }
+
+  @override
+  String get mockExamTaskTypeWritingForm => 'Viết 1 - form';
+
+  @override
+  String get mockExamTaskTypeWritingEmail => 'Viết 2 - email';
 
   @override
   String get mockExamResultTitle => 'Kết quả mock exam';
@@ -168,6 +210,9 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get mockTestIntroStartCta => 'Bắt đầu thi';
+
+  @override
+  String get mockTestMissingTemplateId => 'Đề thi này đang thiếu ID mẫu. Hãy tải lại danh sách đề và thử lại.';
 
   @override
   String mockTestIntroPoints(int pts) {
@@ -329,6 +374,39 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get recordStatusStopped => 'ĐÃ DỪNG';
+
+  @override
+  String get recordHintTapToStart => 'NHẤN ĐỂ BẮT ĐẦU';
+
+  @override
+  String get recordHintTapToStop => 'NHẤN ĐỂ DỪNG';
+
+  @override
+  String get historyBadgeReady => 'SẴN SÀNG';
+
+  @override
+  String get historyBadgeAlmost => 'GẦN ĐẠT';
+
+  @override
+  String get historyBadgeNeedsWork => 'CẦN LUYỆN';
+
+  @override
+  String get historyBadgeNotReady => 'CHƯA SẴN SÀNG';
+
+  @override
+  String get historyBadgeFailed => 'LỖI';
+
+  @override
+  String get historyBadgeCreated => 'MỚI TẠO';
+
+  @override
+  String get historyCtaTitle => 'Tiếp tục luyện tập!';
+
+  @override
+  String get historyCtaSubtitle => 'Ôn thêm một chủ đề nữa để tăng độ lưu loát tiếng Séc.';
+
+  @override
+  String get historyCtaButton => 'Bắt đầu luyện';
 
   @override
   String get recordHintStopped => 'Nghe lại bản ghi. Ấn \"Phân tích\" khi ưng ý.';

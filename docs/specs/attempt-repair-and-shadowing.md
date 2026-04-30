@@ -283,11 +283,13 @@ Current implementation note:
 ### Audio Replay
 Implemented endpoint:
 - `GET /v1/attempts/:attempt_id/review/audio/file`
+- `GET /v1/attempts/:attempt_id/review/audio/url`
 
 Current implementation note:
 - local-backed review audio now reuses the completed-attempt playback pattern
 - the current slice reads the model-answer audio from backend temp storage using the persisted `tts_audio.storage_key`
-- cloud/provider-aware replay is still a follow-up improvement, not part of this first backend API slice
+- review-audio URL replay uses a short-lived HMAC-signed backend stream URL
+- submitted attempt audio is provider-aware separately through `GET /v1/attempts/:attempt_id/audio/url`, which returns S3 presigned GET URLs when attempts are uploaded to S3
 
 ## Flutter UX Proposal
 

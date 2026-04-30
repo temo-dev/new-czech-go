@@ -9,6 +9,10 @@ import 'core/locale/locale_scope.dart';
 import 'core/theme/app_theme.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'features/exercise/screens/exercise_screen.dart' as exercise_feature;
+import 'features/exercise/screens/listening_exercise_screen.dart';
+import 'features/exercise/screens/reading_exercise_screen.dart';
+import 'features/exercise/screens/vocab_grammar_exercise_screen.dart';
+import 'features/exercise/screens/writing_exercise_screen.dart';
 import 'features/history/screens/history_screen.dart';
 import 'features/home/screens/course_list_screen.dart';
 import 'features/mock_exam/screens/mock_test_list_screen.dart';
@@ -116,14 +120,27 @@ class _LearnerShellState extends State<LearnerShell> {
     final detail =
         ExerciseDetail.fromJson(await _client.getExercise(attempt.exerciseId));
     if (!mounted) return;
-    await navigator.push(
-      MaterialPageRoute(
-        builder: (_) => exercise_feature.ExerciseScreen(
-          client: _client,
-          detail: detail,
-        ),
-      ),
-    );
+    if (detail.isCteni) {
+      await navigator.push(MaterialPageRoute(
+        builder: (_) => ReadingExerciseScreen(client: _client, detail: detail),
+      ));
+    } else if (detail.isPoslech) {
+      await navigator.push(MaterialPageRoute(
+        builder: (_) => ListeningExerciseScreen(client: _client, detail: detail),
+      ));
+    } else if (detail.isPsani1 || detail.isPsani2) {
+      await navigator.push(MaterialPageRoute(
+        builder: (_) => WritingExerciseScreen(client: _client, detail: detail),
+      ));
+    } else if (detail.isVocabGrammar) {
+      await navigator.push(MaterialPageRoute(
+        builder: (_) => VocabGrammarExerciseScreen(client: _client, detail: detail),
+      ));
+    } else {
+      await navigator.push(MaterialPageRoute(
+        builder: (_) => exercise_feature.ExerciseScreen(client: _client, detail: detail),
+      ));
+    }
     await _loadRecentAttempts();
   }
 

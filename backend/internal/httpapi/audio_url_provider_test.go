@@ -2,11 +2,15 @@ package httpapi
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 func TestLocalSignedAudioURLRoundTripVerifies(t *testing.T) {
@@ -78,4 +82,63 @@ func TestLocalSignedAudioURLRejectsTamperedAttempt(t *testing.T) {
 	if err := verifyAudioToken(secret, "attempt-other", ScopeAttemptAudio, expiry, sig); err != errAudioURLInvalidSig {
 		t.Fatalf("expected errAudioURLInvalidSig, got %v", err)
 	}
+}
+
+func TestConfiguredAudioURLProviderDefaultsToS3WhenUploadsUseS3(t *testing.T) {
+	t.Setenv("ATTEMPT_AUDIO_URL_PROVIDER", "")
+	t.Setenv("ATTEMPT_UPLOAD_PROVIDER", "s3")
+
+	if got := configuredAudioURLProviderKind(); got != "s3" {
+		t.Fatalf("provider kind = %q, want s3", got)
+	}
+}
+
+func TestConfiguredAudioURLProviderExplicitLocalOverridesS3Uploads(t *testing.T) {
+	t.Setenv("ATTEMPT_AUDIO_URL_PROVIDER", "local")
+	t.Setenv("ATTEMPT_UPLOAD_PROVIDER", "s3")
+
+	if got := configuredAudioURLProviderKind(); got != "local" {
+		t.Fatalf("provider kind = %q, want local", got)
+	}
+}
+
+func TestS3AudioURLProviderFallsBackForReviewAudio(t *testing.T) {
+	provider := &s3PresignedAudioURLProvider{
+		bucket:        "bucket",
+		presignClient: fakeGetObjectPresigner{url: "https://s3.example.invalid/presigned-get"},
+		fallback:      NewLocalSignedAudioURLProvider([]byte("review-secret")),
+	}
+
+	signed, err := provider.SignedAudioURL(context.Background(), AudioURLInput{
+		AttemptID:  "attempt-42",
+		Scope:      ScopeReviewAudio,
+		StorageKey: "attempt-review/attempt-42/model-answer.mp3",
+		MimeType:   "audio/mpeg",
+		BaseURL:    "http://api.example.com",
+		ExpiresIn:  5 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("SignedAudioURL returned error: %v", err)
+	}
+	if strings.HasPrefix(signed.URL, "https://s3.example.invalid/") {
+		t.Fatalf("review audio should use local fallback, got %q", signed.URL)
+	}
+	if !strings.HasPrefix(signed.URL, "http://api.example.com/v1/attempt-audio/stream?") {
+		t.Fatalf("unexpected fallback URL: %q", signed.URL)
+	}
+	if !strings.Contains(signed.URL, "scope=review_audio") {
+		t.Fatalf("expected review scope in fallback URL, got %q", signed.URL)
+	}
+}
+
+type fakeGetObjectPresigner struct {
+	url string
+}
+
+func (f fakeGetObjectPresigner) PresignGetObject(context.Context, *s3.GetObjectInput, ...func(*s3.PresignOptions)) (*v4.PresignedHTTPRequest, error) {
+	return &v4.PresignedHTTPRequest{
+		URL:          f.url,
+		Method:       http.MethodGet,
+		SignedHeader: http.Header{},
+	}, nil
 }

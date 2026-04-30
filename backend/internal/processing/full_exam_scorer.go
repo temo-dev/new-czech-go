@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"math"
+	"strings"
 	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
@@ -50,15 +52,43 @@ func ScoreFromAttemptFeedback(feedback *contracts.AttemptFeedback, maxPoints int
 		return 0
 	}
 	if feedback.ObjectiveResult != nil {
-		return feedback.ObjectiveResult.Score
+		if feedback.ObjectiveResult.MaxScore <= 0 {
+			return 0
+		}
+		fraction := clampScoreFraction(float64(feedback.ObjectiveResult.Score) / float64(feedback.ObjectiveResult.MaxScore))
+		return int(math.Round(fraction * float64(maxPoints)))
 	}
 	// Writing: map readiness → fraction × maxPoints
-	fraction := map[string]float64{
-		"strong": 1.0,
-		"ok":     0.5,
-		"weak":   0.0,
-	}[feedback.ReadinessLevel]
-	return int(fraction * float64(maxPoints))
+	fraction := readinessFraction(feedback.ReadinessLevel)
+	return int(math.Round(fraction * float64(maxPoints)))
+}
+
+func readinessFraction(level string) float64 {
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "ready", "ready_for_mock", "exam_ready", "strong":
+		return 1.0
+	case "almost", "almost_ready":
+		return 0.75
+	case "needs_work", "ok":
+		return 0.5
+	case "not_ready":
+		return 0.25
+	case "weak":
+		return 0
+	default:
+		return 0
+	}
+}
+
+func clampScoreFraction(v float64) float64 {
+	switch {
+	case v < 0:
+		return 0
+	case v > 1:
+		return 1
+	default:
+		return v
+	}
 }
 
 // fullExamRepository is the minimal store interface needed by the full exam scorer.
@@ -92,6 +122,12 @@ func (s *FullExamScorer) CreateSession(learnerID, mockTestID string, pisemnaAtte
 		if !ok {
 			return contracts.FullExamSession{}, fmt.Errorf("attempt %s not found", attemptID)
 		}
+		if attempt.UserID != learnerID {
+			return contracts.FullExamSession{}, fmt.Errorf("attempt %s does not belong to learner", attemptID)
+		}
+		if attempt.Status != "completed" || attempt.Feedback == nil {
+			return contracts.FullExamSession{}, fmt.Errorf("attempt %s is not completed", attemptID)
+		}
 		score := ScoreFromAttemptFeedback(attempt.Feedback, pisemnaSectionMaxPoints[i])
 		scores = append(scores, score)
 	}
@@ -122,6 +158,12 @@ func (s *FullExamScorer) CompleteSession(sessionID, ustniMockExamSessionID strin
 	mockExam, ok := s.repo.MockExamByID(ustniMockExamSessionID)
 	if !ok {
 		return contracts.FullExamSession{}, fmt.Errorf("ustni mock exam session %s not found", ustniMockExamSessionID)
+	}
+	if mockExam.LearnerID != "" && mockExam.LearnerID != session.LearnerID {
+		return contracts.FullExamSession{}, fmt.Errorf("ustni mock exam session does not belong to learner")
+	}
+	if mockExam.Status != "completed" {
+		return contracts.FullExamSession{}, fmt.Errorf("ustni mock exam session is not completed")
 	}
 
 	ustniScore := mockExam.OverallScore

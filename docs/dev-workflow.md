@@ -130,6 +130,8 @@ If you want local or compose-based testing to use real transcript data instead o
 4. set `REQUIRE_REAL_TRANSCRIPT=true`
 5. decide whether review-artifact model audio should stay on `TTS_PROVIDER=dev` or move to `TTS_PROVIDER=amazon_polly`
 
+Attempt-audio playback follows the upload provider by default. If `ATTEMPT_AUDIO_URL_PROVIDER` is unset and `ATTEMPT_UPLOAD_PROVIDER=s3`, the backend returns S3 presigned playback URLs from `GET /v1/attempts/:attempt_id/audio/url`. Set `ATTEMPT_AUDIO_URL_PROVIDER=local` only when you intentionally want backend-local stream URLs.
+
 For local `docker compose`, also make sure the backend container can see AWS credentials:
 
 1. set `AWS_PROFILE=<your-profile>` in `.env`
@@ -158,7 +160,9 @@ make smoke-attempt-flow \
 Current known local-compose behavior:
 - `upload-url` and `upload-complete` can now succeed in `s3` mode on a local Mac if the backend container can read valid AWS credentials from `${HOME}/.aws` or direct env vars
 - if the backend log shows `AccessDeniedException` on `transcribe:StartTranscriptionJob`, the `S3` upload path is already working and the remaining blocker is IAM for the local AWS identity
-- in local `s3` mode, `GET /v1/attempts/:attempt_id/audio/file` may still return `404` because the current playback route is strongest for backend-stored local files, not for audio that only lives in `S3`
+- in local `s3` mode, use `GET /v1/attempts/:attempt_id/audio/url` for replay; it should return a presigned S3 `GET` URL
+- `GET /v1/attempts/:attempt_id/audio/file` is a compatibility path and may still return `404` for cloud-only attempts with no backend `stored_file_path`
+- if the app shows "Could not open the audio: The requested URL was not found on this server" after a real S3 attempt, rebuild/restart the backend and check that `ATTEMPT_AUDIO_URL_PROVIDER` is unset or set to `s3`, not forced to `local`
 
 ## Recommended Daily Flow
 1. `make dev-backend`

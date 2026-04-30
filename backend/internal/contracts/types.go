@@ -13,7 +13,7 @@ type Course struct {
 	Slug        string `json:"slug"`
 	Title       string `json:"title"`
 	Description string `json:"description,omitempty"`
-	Status      string `json:"status,omitempty"`   // draft, published
+	Status      string `json:"status,omitempty"` // draft, published
 	SequenceNo  int    `json:"sequence_no,omitempty"`
 }
 
@@ -65,7 +65,7 @@ type Exercise struct {
 	Detail                 any             `json:"detail,omitempty"`
 	ScoringTemplatePreview *ScoringPreview `json:"scoring_template_preview,omitempty"`
 	// V6: LLM generation provenance (nullable — omitted for manually created exercises)
-	SourceType      string `json:"source_type,omitempty"`       // vocabulary_set | grammar_rule | custom
+	SourceType      string `json:"source_type,omitempty"` // vocabulary_set | grammar_rule | custom
 	SourceID        string `json:"source_id,omitempty"`
 	GenerationJobID string `json:"generation_job_id,omitempty"`
 }
@@ -136,7 +136,7 @@ type ListeningAudioSource struct {
 }
 
 type MultipleChoiceOption struct {
-	Key  string `json:"key"`  // "A", "B", ...
+	Key  string `json:"key"` // "A", "B", ...
 	Text string `json:"text"`
 }
 
@@ -265,7 +265,7 @@ type Cteni3Detail struct {
 // Cteni4Detail — choose A-D (6 questions, 6 pts).
 type Cteni4Detail struct {
 	Context        string            `json:"context,omitempty"` // optional reading passage
-	Questions      []ReadingQuestion `json:"questions"`          // 6
+	Questions      []ReadingQuestion `json:"questions"`         // 6
 	CorrectAnswers map[string]string `json:"correct_answers"`
 }
 
@@ -284,10 +284,10 @@ type Psani1Detail struct {
 }
 
 type Psani2Detail struct {
-	Prompt        string   `json:"prompt"`           // "Jste na dovolené..."
-	ImageAssetIDs []string `json:"image_asset_ids"`  // 5 ảnh
-	Topics        []string `json:"topics"`           // ["KDE JSTE?", ...]
-	MinWords      int      `json:"min_words"`         // default 35
+	Prompt        string   `json:"prompt"`          // "Jste na dovolené..."
+	ImageAssetIDs []string `json:"image_asset_ids"` // 5 ảnh
+	Topics        []string `json:"topics"`          // ["KDE JSTE?", ...]
+	MinWords      int      `json:"min_words"`       // default 35
 }
 
 // WritingSubmission is the body of POST /v1/attempts/:id/submit-text.
@@ -455,7 +455,7 @@ type MockTest struct {
 	Title                    string            `json:"title"`
 	Description              string            `json:"description"`
 	EstimatedDurationMinutes int               `json:"estimated_duration_minutes"`
-	Status                   string            `json:"status"`                // draft, published
+	Status                   string            `json:"status"`                 // draft, published
 	SessionType              string            `json:"session_type,omitempty"` // speaking | pisemna | full | "" (sprint)
 	PassThresholdPercent     int               `json:"pass_threshold_percent"` // 0 = use default 60
 	Sections                 []MockTestSection `json:"sections"`
@@ -471,6 +471,7 @@ type MockTestSection struct {
 
 type MockExamSession struct {
 	ID                    string                `json:"id"`
+	LearnerID             string                `json:"learner_id,omitempty"`
 	Status                string                `json:"status"`
 	MockTestID            string                `json:"mock_test_id,omitempty"`
 	OverallScore          int                   `json:"overall_score,omitempty"`
@@ -501,8 +502,8 @@ type FullExamSession struct {
 // FullExamCreateRequest is the body of POST /v1/full-exams.
 type FullExamCreateRequest struct {
 	MockTestID              string   `json:"mock_test_id"`
-	PisemnaAttemptIDs       []string `json:"pisemna_attempt_ids"`         // scored attempts for cteni+psani+poslech
-	PisemnaSectionMaxPoints []int    `json:"pisemna_section_max_points"`  // max pts per section, default 25 each
+	PisemnaAttemptIDs       []string `json:"pisemna_attempt_ids"`        // scored attempts for cteni+psani+poslech
+	PisemnaSectionMaxPoints []int    `json:"pisemna_section_max_points"` // max pts per section, default 25 each
 }
 
 // FullExamCompleteRequest is the body of POST /v1/full-exams/:id/complete.
@@ -512,6 +513,7 @@ type FullExamCompleteRequest struct {
 
 type MockExamSessionItem struct {
 	SequenceNo   int    `json:"sequence_no"`
+	SkillKind    string `json:"skill_kind"`
 	ExerciseID   string `json:"exercise_id"`
 	ExerciseType string `json:"exercise_type"`
 	MaxPoints    int    `json:"max_points,omitempty"`
@@ -526,7 +528,7 @@ type VocabularySet struct {
 	ID              string `json:"id"`
 	SkillID         string `json:"skill_id"`
 	Title           string `json:"title"`
-	Level           string `json:"level"`           // A1 | A2 | B1
+	Level           string `json:"level"`            // A1 | A2 | B1
 	ExplanationLang string `json:"explanation_lang"` // vi | en | cs
 	Status          string `json:"status"`           // draft | published | archived
 	CreatedAt       string `json:"created_at,omitempty"`
@@ -558,34 +560,34 @@ type GrammarRule struct {
 }
 
 type ContentGenerationJob struct {
-	ID                   string  `json:"id"`
-	ModuleID             string  `json:"module_id"`
-	SkillID              string  `json:"skill_id,omitempty"`
-	SourceType           string  `json:"source_type"` // vocabulary_set | grammar_rule
-	SourceID             string  `json:"source_id"`
-	RequestedBy          string  `json:"requested_by"`
-	InputPayload         []byte  `json:"-"` // raw JSON stored/retrieved from DB
-	GeneratedPayload     []byte  `json:"-"`
-	EditedPayload        []byte  `json:"-"`
-	Status               string  `json:"status"`
-	Provider             string  `json:"provider"`
-	Model                string  `json:"model"`
-	InputTokens          int     `json:"input_tokens,omitempty"`
-	OutputTokens         int     `json:"output_tokens,omitempty"`
-	EstimatedCostUSD     float64 `json:"estimated_cost_usd,omitempty"`
-	DurationMs           int     `json:"duration_ms,omitempty"`
-	ErrorMessage         string  `json:"error_message,omitempty"`
-	CreatedAt            string  `json:"created_at,omitempty"`
-	UpdatedAt            string  `json:"updated_at,omitempty"`
-	PublishedAt          string  `json:"published_at,omitempty"`
+	ID               string  `json:"id"`
+	ModuleID         string  `json:"module_id"`
+	SkillID          string  `json:"skill_id,omitempty"`
+	SourceType       string  `json:"source_type"` // vocabulary_set | grammar_rule
+	SourceID         string  `json:"source_id"`
+	RequestedBy      string  `json:"requested_by"`
+	InputPayload     []byte  `json:"-"` // raw JSON stored/retrieved from DB
+	GeneratedPayload []byte  `json:"-"`
+	EditedPayload    []byte  `json:"-"`
+	Status           string  `json:"status"`
+	Provider         string  `json:"provider"`
+	Model            string  `json:"model"`
+	InputTokens      int     `json:"input_tokens,omitempty"`
+	OutputTokens     int     `json:"output_tokens,omitempty"`
+	EstimatedCostUSD float64 `json:"estimated_cost_usd,omitempty"`
+	DurationMs       int     `json:"duration_ms,omitempty"`
+	ErrorMessage     string  `json:"error_message,omitempty"`
+	CreatedAt        string  `json:"created_at,omitempty"`
+	UpdatedAt        string  `json:"updated_at,omitempty"`
+	PublishedAt      string  `json:"published_at,omitempty"`
 }
 
 // GenerationJobInput is the body of POST /admin/content-generation-jobs.
 type GenerationJobInput struct {
-	SourceType    string         `json:"source_type"`    // vocabulary_set | grammar_rule
+	SourceType    string         `json:"source_type"` // vocabulary_set | grammar_rule
 	SourceID      string         `json:"source_id"`
 	ModuleID      string         `json:"module_id"`
-	ExerciseTypes []string       `json:"exercise_types"`  // subset of quizcard_basic/matching/fill_blank/choice_word
+	ExerciseTypes []string       `json:"exercise_types"` // subset of quizcard_basic/matching/fill_blank/choice_word
 	NumPerType    map[string]int `json:"num_per_type"`
 }
 
@@ -618,7 +620,7 @@ type MatchingDetail struct {
 }
 
 type FillBlankDetail struct {
-	Sentence       string            `json:"sentence"`        // must contain "___"
+	Sentence       string            `json:"sentence"` // must contain "___"
 	Hint           string            `json:"hint,omitempty"`
 	Explanation    string            `json:"explanation,omitempty"`
 	CorrectAnswers map[string]string `json:"correct_answers"` // {"1":"chodím"}
@@ -626,7 +628,7 @@ type FillBlankDetail struct {
 
 type ChoiceWordDetail struct {
 	Stem           string                 `json:"stem"`
-	Options        []MultipleChoiceOption `json:"options"`        // reuse existing type, key A/B/C/D
+	Options        []MultipleChoiceOption `json:"options"` // reuse existing type, key A/B/C/D
 	GrammarNote    string                 `json:"grammar_note,omitempty"`
 	Explanation    string                 `json:"explanation,omitempty"`
 	CorrectAnswers map[string]string      `json:"correct_answers"` // {"1":"B"}
@@ -634,21 +636,21 @@ type ChoiceWordDetail struct {
 
 // GeneratedExercise is one exercise in an LLM-generated draft payload.
 type GeneratedExercise struct {
-	ExerciseType  string        `json:"exercise_type"`
+	ExerciseType string `json:"exercise_type"`
 	// quizcard fields
-	FrontText     string        `json:"front_text,omitempty"`
-	BackText      string        `json:"back_text,omitempty"`
-	ExampleSentence    string   `json:"example_sentence,omitempty"`
-	ExampleTranslation string   `json:"example_translation,omitempty"`
+	FrontText          string `json:"front_text,omitempty"`
+	BackText           string `json:"back_text,omitempty"`
+	ExampleSentence    string `json:"example_sentence,omitempty"`
+	ExampleTranslation string `json:"example_translation,omitempty"`
 	// fill_blank / choice_word fields
-	Prompt        string        `json:"prompt,omitempty"`
-	Options       []string      `json:"options,omitempty"`
-	CorrectAnswer string        `json:"correct_answer,omitempty"`
-	GrammarNote   string        `json:"grammar_note,omitempty"`
+	Prompt        string   `json:"prompt,omitempty"`
+	Options       []string `json:"options,omitempty"`
+	CorrectAnswer string   `json:"correct_answer,omitempty"`
+	GrammarNote   string   `json:"grammar_note,omitempty"`
 	// matching fields
-	Pairs         []MatchingPair `json:"pairs,omitempty"`
+	Pairs []MatchingPair `json:"pairs,omitempty"`
 	// common
-	Explanation   string        `json:"explanation,omitempty"`
+	Explanation string `json:"explanation,omitempty"`
 }
 
 // GeneratedPayload is the full LLM output stored in a generation job.

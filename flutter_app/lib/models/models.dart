@@ -44,9 +44,13 @@ class Skill {
   final int sequenceNo;
   final String status;
 
-  bool get isImplemented => skillKind == 'noi' || skillKind == 'viet' ||
-      skillKind == 'nghe' || skillKind == 'doc' ||
-      skillKind == 'tu_vung' || skillKind == 'ngu_phap';
+  bool get isImplemented =>
+      skillKind == 'noi' ||
+      skillKind == 'viet' ||
+      skillKind == 'nghe' ||
+      skillKind == 'doc' ||
+      skillKind == 'tu_vung' ||
+      skillKind == 'ngu_phap';
 
   bool get isWriting => skillKind == 'viet';
 
@@ -175,6 +179,13 @@ class MockTest {
   final List<MockTestSection> sections;
 
   int get totalMaxPoints => sections.fold(0, (s, sec) => s + sec.maxPoints);
+  bool get hasPronunciationBonus =>
+      sections.length == 4 &&
+      totalMaxPoints == 37 &&
+      sections.every(
+        (s) => s.skillKind == 'noi' || s.exerciseType.startsWith('uloha_'),
+      );
+  int get totalScoreMax => totalMaxPoints + (hasPronunciationBonus ? 3 : 0);
   bool get isPisemna => sessionType == 'pisemna';
   bool get isFull => sessionType == 'full';
 
@@ -184,11 +195,16 @@ class MockTest {
       id: json['id'] as String? ?? '',
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
-      estimatedDurationMinutes: (json['estimated_duration_minutes'] as num?)?.toInt() ?? 15,
+      estimatedDurationMinutes:
+          (json['estimated_duration_minutes'] as num?)?.toInt() ?? 15,
       status: json['status'] as String? ?? 'draft',
       sessionType: json['session_type'] as String? ?? '',
-      passThresholdPercent: (json['pass_threshold_percent'] as num?)?.toInt() ?? 60,
-      sections: raw.map((e) => MockTestSection.fromJson(e as Map<String, dynamic>)).toList(),
+      passThresholdPercent:
+          (json['pass_threshold_percent'] as num?)?.toInt() ?? 60,
+      sections:
+          raw
+              .map((e) => MockTestSection.fromJson(e as Map<String, dynamic>))
+              .toList(),
     );
   }
 }
@@ -227,6 +243,7 @@ class FullExamSessionView {
 class MockExamSection {
   const MockExamSection({
     required this.sequenceNo,
+    required this.skillKind,
     required this.exerciseId,
     required this.exerciseType,
     required this.maxPoints,
@@ -236,6 +253,7 @@ class MockExamSection {
   });
 
   final int sequenceNo;
+  final String skillKind;
   final String exerciseId;
   final String exerciseType;
   final int maxPoints;
@@ -249,6 +267,7 @@ class MockExamSection {
   factory MockExamSection.fromJson(Map<String, dynamic> json) {
     return MockExamSection(
       sequenceNo: (json['sequence_no'] as num).toInt(),
+      skillKind: json['skill_kind'] as String? ?? '',
       exerciseId: json['exercise_id'] as String? ?? '',
       exerciseType: json['exercise_type'] as String? ?? '',
       maxPoints: (json['max_points'] as num?)?.toInt() ?? 0,
@@ -285,6 +304,13 @@ class MockExamSessionView {
   bool get isCompleted => status == 'completed';
 
   int get totalMaxPoints => sections.fold(0, (s, sec) => s + sec.maxPoints);
+  bool get hasPronunciationBonus =>
+      sections.length == 4 &&
+      totalMaxPoints == 37 &&
+      sections.every(
+        (s) => s.skillKind == 'noi' || s.exerciseType.startsWith('uloha_'),
+      );
+  int get totalScoreMax => totalMaxPoints + (hasPronunciationBonus ? 3 : 0);
 
   MockExamSection? get nextPending {
     for (final s in sections) {
@@ -301,10 +327,14 @@ class MockExamSessionView {
       mockTestId: json['mock_test_id'] as String? ?? '',
       overallScore: (json['overall_score'] as num?)?.toInt() ?? 0,
       passed: json['passed'] as bool? ?? false,
-      passThresholdPercent: (json['pass_threshold_percent'] as num?)?.toInt() ?? 60,
+      passThresholdPercent:
+          (json['pass_threshold_percent'] as num?)?.toInt() ?? 60,
       overallReadinessLevel: json['overall_readiness_level'] as String? ?? '',
       overallSummary: json['overall_summary'] as String? ?? '',
-      sections: raw.map((e) => MockExamSection.fromJson(e as Map<String, dynamic>)).toList(),
+      sections:
+          raw
+              .map((e) => MockExamSection.fromJson(e as Map<String, dynamic>))
+              .toList(),
     );
   }
 }
@@ -430,7 +460,7 @@ class ExerciseDetail {
   final List<PoslechOptionView> poslechOptions;
   final List<FillQuestionView> poslechQuestions;
   final String cteniText;
-  final List<dynamic> cteniItems;     // ReadingItem or TextItem (raw maps)
+  final List<dynamic> cteniItems; // ReadingItem or TextItem (raw maps)
   final List<PoslechOptionView> cteniOptions;
   final List<FillQuestionView> cteniQuestions;
 
@@ -461,11 +491,12 @@ class ExerciseDetail {
   bool get isCteni5 => exerciseType == 'cteni_5';
 
   // V6: Vocab & Grammar exercise types
-  bool get isQuizcard   => exerciseType == 'quizcard_basic';
-  bool get isMatching   => exerciseType == 'matching';
-  bool get isFillBlank  => exerciseType == 'fill_blank';
+  bool get isQuizcard => exerciseType == 'quizcard_basic';
+  bool get isMatching => exerciseType == 'matching';
+  bool get isFillBlank => exerciseType == 'fill_blank';
   bool get isChoiceWord => exerciseType == 'choice_word';
-  bool get isVocabGrammar => isQuizcard || isMatching || isFillBlank || isChoiceWord;
+  bool get isVocabGrammar =>
+      isQuizcard || isMatching || isFillBlank || isChoiceWord;
 
   PromptAssetView? assetById(String assetId) {
     for (final asset in assets) {
@@ -548,40 +579,58 @@ class ExerciseDetail {
       choiceOptions: choiceOptions,
       expectedReasoningAxes: expectedReasoningAxes,
       writingQuestions: writingQuestions,
-      writingMinWords: (detail['min_words'] as num?)?.toInt() ??
+      writingMinWords:
+          (detail['min_words'] as num?)?.toInt() ??
           (json['exercise_type'] == 'psani_2_email' ? 35 : 10),
       emailPrompt: detail['prompt'] as String? ?? '',
       emailTopics: emailTopics,
-      poslechItems: (detail['items'] as List<dynamic>? ?? const [])
-          .map((e) => PoslechItemView.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      poslechOptions: (detail['options'] as List<dynamic>? ?? const [])
-          .map((e) => PoslechOptionView.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      poslechQuestions: (detail['questions'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(FillQuestionView.fromJson)
-          .toList(),
+      poslechItems:
+          (detail['items'] as List<dynamic>? ?? const [])
+              .map((e) => PoslechItemView.fromJson(e as Map<String, dynamic>))
+              .toList(),
+      poslechOptions:
+          (detail['options'] as List<dynamic>? ?? const [])
+              .map((e) => PoslechOptionView.fromJson(e as Map<String, dynamic>))
+              .toList(),
+      poslechQuestions:
+          (detail['questions'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(FillQuestionView.fromJson)
+              .toList(),
       cteniText: detail['text'] as String? ?? '',
-      cteniItems: detail['items'] as List<dynamic>? ?? detail['texts'] as List<dynamic>? ?? const [],
-      cteniOptions: (() {
-        final opts = detail['options'] ?? detail['persons'];
-        if (opts is List<dynamic>) return opts.map((e) => PoslechOptionView.fromJson(e as Map<String, dynamic>)).toList();
-        return <PoslechOptionView>[];
-      })(),
-      cteniQuestions: (detail['questions'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(FillQuestionView.fromJson)
-          .toList(),
+      cteniItems:
+          detail['items'] as List<dynamic>? ??
+          detail['texts'] as List<dynamic>? ??
+          const [],
+      cteniOptions:
+          (() {
+            final opts = detail['options'] ?? detail['persons'];
+            if (opts is List<dynamic>) {
+              return opts
+                  .map(
+                    (e) =>
+                        PoslechOptionView.fromJson(e as Map<String, dynamic>),
+                  )
+                  .toList();
+            }
+            return <PoslechOptionView>[];
+          })(),
+      cteniQuestions:
+          (detail['questions'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(FillQuestionView.fromJson)
+              .toList(),
       // V6: quizcard_basic
       flashcardFront: detail['front_text'] as String? ?? '',
       flashcardBack: detail['back_text'] as String? ?? '',
       flashcardExample: detail['example_sentence'] as String? ?? '',
-      flashcardExampleTranslation: detail['example_translation'] as String? ?? '',
+      flashcardExampleTranslation:
+          detail['example_translation'] as String? ?? '',
       // V6: matching
-      matchingPairs: (detail['pairs'] as List<dynamic>? ?? const [])
-          .map((e) => MatchingPairView.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      matchingPairs:
+          (detail['pairs'] as List<dynamic>? ?? const [])
+              .map((e) => MatchingPairView.fromJson(e as Map<String, dynamic>))
+              .toList(),
       // V6: fill_blank
       fillBlankSentence: detail['sentence'] as String? ?? '',
       fillBlankHint: detail['hint'] as String? ?? '',
@@ -605,16 +654,16 @@ class MatchingPairView {
   });
 
   final String leftId;
-  final String left;   // Czech term (displayed in fixed order on left)
+  final String left; // Czech term (displayed in fixed order on left)
   final String rightId;
-  final String right;  // Vietnamese definition (shuffled by Flutter on right)
+  final String right; // Vietnamese definition (shuffled by Flutter on right)
 
   factory MatchingPairView.fromJson(Map<String, dynamic> json) {
     return MatchingPairView(
-      leftId:  json['left_id']  as String? ?? '',
-      left:    json['left']     as String? ?? '',
+      leftId: json['left_id'] as String? ?? '',
+      left: json['left'] as String? ?? '',
       rightId: json['right_id'] as String? ?? '',
-      right:   json['right']    as String? ?? '',
+      right: json['right'] as String? ?? '',
     );
   }
 }
@@ -693,7 +742,12 @@ class ChoiceOptionView {
 // --- Listening (V3) model views ---
 
 class PoslechOptionView {
-  const PoslechOptionView({required this.key, this.text = '', this.label = '', this.assetId = ''});
+  const PoslechOptionView({
+    required this.key,
+    this.text = '',
+    this.label = '',
+    this.assetId = '',
+  });
   final String key;
   final String text;
   final String label;
@@ -710,7 +764,11 @@ class PoslechOptionView {
 }
 
 class PoslechItemView {
-  const PoslechItemView({required this.questionNo, this.question = '', this.options = const []});
+  const PoslechItemView({
+    required this.questionNo,
+    this.question = '',
+    this.options = const [],
+  });
   final int questionNo;
   final String question;
   final List<PoslechOptionView> options;
@@ -719,9 +777,10 @@ class PoslechItemView {
     return PoslechItemView(
       questionNo: (json['question_no'] as num?)?.toInt() ?? 0,
       question: json['question'] as String? ?? '',
-      options: (json['options'] as List<dynamic>? ?? const [])
-          .map((e) => PoslechOptionView.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      options:
+          (json['options'] as List<dynamic>? ?? const [])
+              .map((e) => PoslechOptionView.fromJson(e as Map<String, dynamic>))
+              .toList(),
     );
   }
 }
@@ -743,6 +802,7 @@ class AttemptResult {
   const AttemptResult({
     required this.id,
     required this.exerciseId,
+    required this.exerciseType,
     required this.status,
     required this.startedAt,
     required this.readinessLevel,
@@ -757,6 +817,7 @@ class AttemptResult {
 
   final String id;
   final String exerciseId;
+  final String exerciseType;
   final String status;
   final String startedAt;
   final String readinessLevel;
@@ -789,6 +850,7 @@ class AttemptResult {
     return AttemptResult(
       id: json['id'] as String,
       exerciseId: json['exercise_id'] as String? ?? '',
+      exerciseType: json['exercise_type'] as String? ?? '',
       status: json['status'] as String,
       startedAt: json['started_at'] as String? ?? '',
       readinessLevel:
@@ -1062,7 +1124,11 @@ class QuestionResult {
 }
 
 class ObjectiveResult {
-  const ObjectiveResult({required this.score, required this.maxScore, required this.breakdown});
+  const ObjectiveResult({
+    required this.score,
+    required this.maxScore,
+    required this.breakdown,
+  });
   final int score;
   final int maxScore;
   final List<QuestionResult> breakdown;
@@ -1071,9 +1137,10 @@ class ObjectiveResult {
     return ObjectiveResult(
       score: (json['score'] as num?)?.toInt() ?? 0,
       maxScore: (json['max_score'] as num?)?.toInt() ?? 0,
-      breakdown: (json['breakdown'] as List<dynamic>? ?? const [])
-          .map((e) => QuestionResult.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      breakdown:
+          (json['breakdown'] as List<dynamic>? ?? const [])
+              .map((e) => QuestionResult.fromJson(e as Map<String, dynamic>))
+              .toList(),
     );
   }
 }
@@ -1110,9 +1177,10 @@ class AttemptFeedbackView {
         json['task_completion'] as Map<String, dynamic>? ?? {};
     final rawCriteria =
         taskCompletion['criteria_results'] as List<dynamic>? ?? [];
-    final criteria = rawCriteria
-        .map((e) => CriterionCheckView.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final criteria =
+        rawCriteria
+            .map((e) => CriterionCheckView.fromJson(e as Map<String, dynamic>))
+            .toList();
 
     final objRaw = json['objective_result'] as Map<String, dynamic>?;
 

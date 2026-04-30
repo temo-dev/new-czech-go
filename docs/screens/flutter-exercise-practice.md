@@ -81,15 +81,14 @@ This screen renders one exercise and drives the first speaking attempt flow.
 
 ## Current Limitations
 - recording is captured to a real local audio file
-- binary upload currently goes to the backend dev host rather than durable object storage
-- transcript is mocked
+- binary upload can target either the backend dev host or S3 depending on `ATTEMPT_UPLOAD_PROVIDER`
+- transcript is synthetic only when `TRANSCRIBER_PROVIDER=dev`; real transcript mode uses S3 plus Amazon Transcribe
 - result polling assumes a simple success path
 - the timer still depends on the UI ticker rather than measured recorder duration
-- remote attempt playback now downloads the completed-attempt audio into app temp storage before playback, because direct authenticated URL playback was not reliable on iOS
-- cloud-backed remote attempt playback may still need a provider-aware implementation once audio no longer resolves through backend-local storage
+- remote attempt playback now streams a signed URL from `GET /v1/attempts/:attempt_id/audio/url`; local attempts use an HMAC backend stream and S3 attempts use a presigned S3 GET URL
 - recent-attempt history currently opens the exercise again rather than a dedicated attempt-detail screen
-- the new review block is currently strongest for `Uloha 1`; `Uloha 2` is planned next and `Uloha 3/4` are still out of this first coaching slice
-- review-audio playback now uses the same temp-file caching pattern as completed-attempt audio, so provider-aware cloud replay for review audio is still a later refinement
+- the review block exists across oral task types, but sample-answer content remains lighter for `Uloha 3/4`
+- review-audio playback uses `GET /v1/attempts/:attempt_id/review/audio/url` and currently streams backend-generated local TTS audio
 
 ## Next Step
 Keep the retry loop on the same screen, then add a compare view in history so a new attempt can be read against the previous review artifact later.

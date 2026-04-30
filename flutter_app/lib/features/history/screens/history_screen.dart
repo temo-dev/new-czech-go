@@ -37,7 +37,7 @@ String? _exerciseTypeForAttempt(
       if (e.id == attempt.exerciseId) return e.exerciseType;
     }
   }
-  return null;
+  return attempt.exerciseType.isNotEmpty ? attempt.exerciseType : null;
 }
 
 /// History tab: stats + skill filter pills + activity list + CTA card.
@@ -208,11 +208,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
             borderRadius: AppRadius.lgAll,
           ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Pokračujte v tempu!',
+            Text(l.historyCtaTitle,
                 style: AppTypography.titleMedium.copyWith(
                     color: AppColors.inverseOnSurfaceLight, fontWeight: FontWeight.w700)),
             const SizedBox(height: AppSpacing.x2),
-            Text('Procvičte si další téma a zvyšte svou plynulost v češtině.',
+            Text(l.historyCtaSubtitle,
                 style: AppTypography.bodySmall.copyWith(
                     color: AppColors.inverseOnSurfaceLight.withAlpha(200))),
             const SizedBox(height: AppSpacing.x4),
@@ -225,7 +225,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   side: BorderSide(color: AppColors.inverseOnSurfaceLight.withAlpha(80)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                child: const Text('Začít trénink'),
+                child: Text(l.historyCtaButton),
               ),
             ),
           ]),
@@ -281,7 +281,8 @@ class _AttemptRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (badgeLabel, badgeColor, badgeBg) = _badge(attempt);
+    final l = AppLocalizations.of(context);
+    final (badgeLabel, badgeColor, badgeBg) = _badge(attempt, l);
 
     return GestureDetector(
       onTap: onOpen,
@@ -330,16 +331,19 @@ class _AttemptRow extends StatelessWidget {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-(String, Color, Color) _badge(AttemptResult a) {
+(String, Color, Color) _badge(AttemptResult a, AppLocalizations l) {
   if (a.status == 'failed' || a.failureCode.isNotEmpty) {
-    return ('FAILED', AppColors.error, AppColors.errorContainer);
+    return (l.historyBadgeFailed, AppColors.error, AppColors.errorContainer);
   }
   return switch (a.readinessLevel) {
-    'ready_for_mock' || 'exam_ready' => ('READY', AppColors.success, AppColors.successContainer),
-    'almost_ready'                   => ('ALMOST', AppColors.info, AppColors.infoContainer),
-    'needs_work'                     => ('NEEDS WORK', AppColors.warning, AppColors.warningContainer),
-    'not_ready'                      => ('NOT READY', AppColors.error, AppColors.errorContainer),
-    _                                => (a.status.toUpperCase(), AppColors.onSurfaceVariant, AppColors.surfaceContainerHigh),
+    'ready_for_mock' || 'exam_ready' => (l.historyBadgeReady, AppColors.success, AppColors.successContainer),
+    'almost_ready'                   => (l.historyBadgeAlmost, AppColors.info, AppColors.infoContainer),
+    'needs_work'                     => (l.historyBadgeNeedsWork, AppColors.warning, AppColors.warningContainer),
+    'not_ready'                      => (l.historyBadgeNotReady, AppColors.error, AppColors.errorContainer),
+    _                                => switch (a.status) {
+        'created' => (l.historyBadgeCreated, AppColors.onSurfaceVariant, AppColors.surfaceContainerHigh),
+        _         => (a.status.toUpperCase(), AppColors.onSurfaceVariant, AppColors.surfaceContainerHigh),
+      },
   };
 }
 
@@ -379,7 +383,33 @@ String _exerciseTitleForAttempt(
       if (e.id == attempt.exerciseId) return e.title;
     }
   }
-  return attempt.exerciseId;
+  return _friendlyExerciseType(attempt.exerciseType);
+}
+
+String _friendlyExerciseType(String exerciseType) {
+  return switch (exerciseType) {
+    'uloha_1_topic_answers'       => 'Nói · Trả lời chủ đề',
+    'uloha_2_dialogue_questions'  => 'Nói · Hội thoại',
+    'uloha_3_story_narration'     => 'Nói · Kể chuyện',
+    'uloha_4_choice_reasoning'    => 'Nói · Lý luận lựa chọn',
+    'psani_1_formular'            => 'Viết · Điền form',
+    'psani_2_email'               => 'Viết · Email',
+    'poslech_1'                   => 'Nghe · Loại 1',
+    'poslech_2'                   => 'Nghe · Loại 2',
+    'poslech_3'                   => 'Nghe · Loại 3',
+    'poslech_4'                   => 'Nghe · Loại 4',
+    'poslech_5'                   => 'Nghe · Loại 5',
+    'cteni_1'                     => 'Đọc · Loại 1',
+    'cteni_2'                     => 'Đọc · Loại 2',
+    'cteni_3'                     => 'Đọc · Loại 3',
+    'cteni_4'                     => 'Đọc · Loại 4',
+    'cteni_5'                     => 'Đọc · Loại 5',
+    'quizcard_basic'              => 'Từ vựng · Thẻ học',
+    'matching'                    => 'Từ vựng · Nối từ',
+    'fill_blank'                  => 'Từ vựng · Điền chỗ trống',
+    'choice_word'                 => 'Từ vựng · Chọn từ',
+    _                             => exerciseType.isNotEmpty ? exerciseType : '—',
+  };
 }
 
 String _formatTimestamp(String startedAt) {

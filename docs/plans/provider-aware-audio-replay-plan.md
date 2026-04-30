@@ -1,6 +1,6 @@
 # Plan: Provider-Aware Audio Replay
 
-> **Status (2026-04-25):** Shipped. Backend exposes `GET /v1/attempts/:id/audio/url` and `.../review/audio/url` returning signed playable URLs (presigned S3 for cloud, HMAC-signed backend stream for local). Flutter playback cards stream via `just_audio.setUrl` and refresh the URL on playback errors. Legacy download helpers removed. AGENTS.md updated.
+> **Status (2026-04-30):** Shipped. Backend exposes `GET /v1/attempts/:id/audio/url` and `.../review/audio/url` returning signed playable URLs. Attempt audio uses presigned S3 URLs when `ATTEMPT_UPLOAD_PROVIDER=s3` unless explicitly overridden; local attempt and review audio use HMAC-signed backend stream URLs. Flutter playback cards stream via `just_audio.setUrl` and refresh the URL on playback errors. Legacy download helpers removed. AGENTS.md updated.
 
 ## Goal
 Ship streaming playback for attempt + review audio across both storage modes (local file and S3) without forwarding bearer tokens to cloud storage.
@@ -31,25 +31,25 @@ type AudioURLProvider interface {
 ```
 
 Two implementations:
-- `localSignedProvider` — HMAC-signs `(attempt_id | expiry_unix | scope)`, returns `{baseURL}/v1/attempts/:id/audio/file?t=<b64>&exp=<unix>` (or `/review/audio/file`).
-- `s3PresignedProvider` — reuses existing S3 client; returns 10-min GET URL.
+- `localSignedProvider` — HMAC-signs `(attempt_id | expiry_unix | scope)`, returns `{baseURL}/v1/attempt-audio/stream?...`.
+- `s3PresignedProvider` — reuses existing S3 client; returns 10-min GET URL for submitted attempt audio and falls back to the local signer for backend-generated review audio.
 
 **Acceptance:**
-- [ ] HMAC signs and verifies round-trip with shared secret.
-- [ ] Expired token returns `ErrAudioURLExpired`.
-- [ ] Wrong-scope token returns `ErrAudioURLWrongScope`.
+- [x] HMAC signs and verifies round-trip with shared secret.
+- [x] Expired token returns `ErrAudioURLExpired`.
+- [x] Wrong-scope token returns `ErrAudioURLWrongScope`.
 
-### Task 1.2 — Token verification in `/audio/file` + `/review/audio/file`
+### Task 1.2 — Token verification in `/v1/attempt-audio/stream`
 **Files:**
 - `backend/internal/httpapi/server.go`
 
-Add `verifyAudioQueryToken(r, attemptID, scope)` helper. If `t` present and valid, skip bearer check. Else keep bearer path unchanged.
+Add `verifyAudioToken(...)` on the dedicated stream endpoint. The stream URL carries `aid`, `scope`, `exp`, and `sig`.
 
 **Acceptance:**
-- [ ] GET `/audio/file?t=<valid>&exp=<future>` returns the audio bytes without `Authorization`.
-- [ ] Invalid token → 401 `audio_url_invalid`.
-- [ ] Expired token → 401 `audio_url_expired`.
-- [ ] Bearer path keeps working with no query token.
+- [x] GET `/v1/attempt-audio/stream?...` returns the audio bytes without `Authorization`.
+- [x] Invalid token returns `401 audio_url_invalid`.
+- [x] Expired token returns `401 audio_url_expired`.
+- [x] Bearer-protected compatibility file routes keep working separately.
 
 ### Task 1.3 — Two new URL endpoints
 **Files:**
@@ -63,20 +63,20 @@ Routes:
 Response shape per spec.
 
 **Acceptance:**
-- [ ] Cloud storage key → response URL is the presigned cloud URL.
-- [ ] Local storage key → response URL is `{baseURL}/v1/attempts/:id/(review/)?audio/file?t=...&exp=...`.
-- [ ] 404 when no stored audio / no review TTS audio.
-- [ ] 403 for non-owner non-admin.
+- [x] Cloud attempt storage key returns a presigned cloud URL.
+- [x] Local attempt/review storage key returns `{baseURL}/v1/attempt-audio/stream?...`.
+- [x] 404 when no stored audio / no review TTS audio.
+- [x] 403 for non-owner non-admin.
 
 ### Task 1.4 — Wire provider into `main.go`
 **Files:**
 - `backend/cmd/api/main.go`
 
-Read `AUDIO_SIGN_SECRET`; if empty, generate random at boot and log a dev-only warning. Pick `s3PresignedProvider` when `S3_BUCKET` is set, otherwise `localSignedProvider`.
+Read `AUDIO_SIGN_SECRET`; backend startup requires it. Pick `s3PresignedProvider` when `ATTEMPT_AUDIO_URL_PROVIDER=s3`, or when `ATTEMPT_AUDIO_URL_PROVIDER` is unset and `ATTEMPT_UPLOAD_PROVIDER=s3`; otherwise use `localSignedProvider`.
 
 **Acceptance:**
-- [ ] Dev mode (no secret, no bucket) works and signs locally.
-- [ ] Cloud mode returns presigned URLs.
+- [x] Dev/local mode signs locally when `AUDIO_SIGN_SECRET` is set.
+- [x] Cloud mode returns presigned URLs.
 
 ### Phase 1 Verification
 - `/usr/local/go/bin/go test ./...`
@@ -111,9 +111,9 @@ final dur = await _player.setUrl(info.url.toString());
 Drop `getTemporaryDirectory` import + `downloadAttempt*Audio` usage. Keep error-path messages and loading spinner.
 
 **Acceptance:**
-- [ ] Playback on iOS starts within ~1s against S3-backed attempt.
-- [ ] Playback works against local backend (dev).
-- [ ] Replay during same session does not refetch URL unless expiry within 60s.
+- [x] Playback on iOS starts within ~1s against S3-backed attempt.
+- [x] Playback works against local backend (dev).
+- [x] Replay during same session does not refetch URL unless expiry within 60s.
 
 ### Task 2.3 — URL refresh on playback error
 **Files:**
@@ -178,4 +178,4 @@ Flip to `Status: Shipped 2026-..-..`.
 ## Definition Of Ready
 - [x] Spec accepted.
 - [x] TTL + token scheme acknowledged.
-- [ ] Production env can set `AUDIO_SIGN_SECRET`.
+- [x] Production env can set `AUDIO_SIGN_SECRET`.

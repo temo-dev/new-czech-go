@@ -1067,7 +1067,7 @@ func (s *Server) handleFullExams(w http.ResponseWriter, r *http.Request, user co
 
 // GET  /v1/full-exams/:id — get session.
 // POST /v1/full-exams/:id/complete — link ústní session and compute overall_passed.
-func (s *Server) handleFullExamByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+func (s *Server) handleFullExamByID(w http.ResponseWriter, r *http.Request, user contracts.User) {
 	path := strings.TrimPrefix(r.URL.Path, "/v1/full-exams/")
 	if strings.HasSuffix(path, "/complete") {
 		id := strings.TrimSuffix(path, "/complete")
@@ -1078,6 +1078,28 @@ func (s *Server) handleFullExamByID(w http.ResponseWriter, r *http.Request, _ co
 		var req contracts.FullExamCompleteRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "validation_error", "Invalid request body.", false)
+			return
+		}
+		existing, ok := s.repo.FullExamSession(id)
+		if !ok {
+			writeNotFound(w)
+			return
+		}
+		if existing.LearnerID != user.ID {
+			writeError(w, http.StatusForbidden, "forbidden", "You do not have access to this full exam.", false)
+			return
+		}
+		mockExam, ok := s.repo.MockExamByID(req.UstniMockExamSessionID)
+		if !ok {
+			writeNotFound(w)
+			return
+		}
+		if mockExam.LearnerID != "" && mockExam.LearnerID != user.ID {
+			writeError(w, http.StatusForbidden, "forbidden", "You do not have access to this mock exam.", false)
+			return
+		}
+		if mockExam.Status != "completed" {
+			writeError(w, http.StatusBadRequest, "validation_error", "Speaking mock exam is not completed.", false)
 			return
 		}
 		session, err := s.fullExamScorer.CompleteSession(id, req.UstniMockExamSessionID)
@@ -1095,6 +1117,10 @@ func (s *Server) handleFullExamByID(w http.ResponseWriter, r *http.Request, _ co
 	session, ok := s.repo.FullExamSession(path)
 	if !ok {
 		writeNotFound(w)
+		return
+	}
+	if session.LearnerID != user.ID {
+		writeError(w, http.StatusForbidden, "forbidden", "You do not have access to this full exam.", false)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})
@@ -1189,13 +1215,11 @@ func (s *Server) handleMockExams(w http.ResponseWriter, r *http.Request, user co
 	var body struct {
 		MockTestID string `json:"mock_test_id"`
 	}
-	if r.ContentLength > 0 {
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{
-				"error": map[string]any{"code": "invalid_body", "message": err.Error()},
-			})
-			return
-		}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": map[string]any{"code": "invalid_body", "message": err.Error()},
+		})
+		return
 	}
 	session, err := s.repo.CreateMockExam(user.ID, body.MockTestID)
 	if err != nil {
@@ -1295,7 +1319,7 @@ func (s *Server) handleMockExamByID(w http.ResponseWriter, r *http.Request, user
 	path := strings.TrimPrefix(r.URL.Path, "/v1/mock-exams/")
 	switch {
 	case strings.HasSuffix(path, "/advance"):
-		s.handleMockExamAdvance(w, r, strings.TrimSuffix(path, "/advance"))
+		s.handleMockExamAdvance(w, r, strings.TrimSuffix(path, "/advance"), user)
 	case strings.HasSuffix(path, "/complete"):
 		s.handleMockExamComplete(w, r, strings.TrimSuffix(path, "/complete"), user)
 	default:
@@ -1308,11 +1332,15 @@ func (s *Server) handleMockExamByID(w http.ResponseWriter, r *http.Request, user
 			writeNotFound(w)
 			return
 		}
+		if session.LearnerID != "" && session.LearnerID != user.ID {
+			writeError(w, http.StatusForbidden, "forbidden", "You do not have access to this mock exam.", false)
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})
 	}
 }
 
-func (s *Server) handleMockExamAdvance(w http.ResponseWriter, r *http.Request, id string) {
+func (s *Server) handleMockExamAdvance(w http.ResponseWriter, r *http.Request, id string, user contracts.User) {
 	if r.Method != http.MethodPost {
 		writeMethodNotAllowed(w)
 		return
@@ -1326,10 +1354,24 @@ func (s *Server) handleMockExamAdvance(w http.ResponseWriter, r *http.Request, i
 		})
 		return
 	}
-	if _, ok := s.repo.Attempt(req.AttemptID); !ok {
+	attempt, ok := s.repo.Attempt(req.AttemptID)
+	if !ok {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
 			"error": map[string]any{"code": "attempt_not_found", "message": "attempt not found"},
 		})
+		return
+	}
+	if attempt.UserID != user.ID {
+		writeError(w, http.StatusForbidden, "forbidden", "You do not have access to this attempt.", false)
+		return
+	}
+	existing, ok := s.repo.MockExamByID(id)
+	if !ok {
+		writeNotFound(w)
+		return
+	}
+	if existing.LearnerID != "" && existing.LearnerID != user.ID {
+		writeError(w, http.StatusForbidden, "forbidden", "You do not have access to this mock exam.", false)
 		return
 	}
 	session, err := s.repo.AdvanceMockExam(id, req.AttemptID)
@@ -1345,6 +1387,15 @@ func (s *Server) handleMockExamAdvance(w http.ResponseWriter, r *http.Request, i
 func (s *Server) handleMockExamComplete(w http.ResponseWriter, r *http.Request, id string, user contracts.User) {
 	if r.Method != http.MethodPost {
 		writeMethodNotAllowed(w)
+		return
+	}
+	existing, ok := s.repo.MockExamByID(id)
+	if !ok {
+		writeNotFound(w)
+		return
+	}
+	if existing.LearnerID != "" && existing.LearnerID != user.ID {
+		writeError(w, http.StatusForbidden, "forbidden", "You do not have access to this mock exam.", false)
 		return
 	}
 	session, err := s.repo.CompleteMockExam(id)

@@ -39,7 +39,10 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
       final raw = await widget.client.listMockTests();
       if (!mounted) return;
       setState(() {
-        _tests = raw.map((e) => MockTest.fromJson(e as Map<String, dynamic>)).toList();
+        _tests =
+            raw
+                .map((e) => MockTest.fromJson(e as Map<String, dynamic>))
+                .toList();
         _loading = false;
       });
     } catch (err) {
@@ -83,8 +86,13 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.x5),
-          child: Text(l.mockTestListEmpty, textAlign: TextAlign.center,
-              style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant)),
+          child: Text(
+            l.mockTestListEmpty,
+            textAlign: TextAlign.center,
+            style: AppTypography.bodyMedium.copyWith(
+              color: AppColors.onSurfaceVariant,
+            ),
+          ),
         ),
       );
     }
@@ -94,11 +102,14 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
         horizontal: AppSpacing.pagePaddingH(context),
         vertical: AppSpacing.x5,
       ),
-      children: List.generate(_tests.length, (i) => _MockTestCard(
-        test: _tests[i],
-        index: i,
-        onTap: () => _openIntro(_tests[i]),
-      )),
+      children: List.generate(
+        _tests.length,
+        (i) => _MockTestCard(
+          test: _tests[i],
+          index: i,
+          onTap: () => _openIntro(_tests[i]),
+        ),
+      ),
     );
   }
 
@@ -106,7 +117,8 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
     if (test.isPisemna || test.isFull) {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => FullExamIntroScreen(client: widget.client, test: test),
+          builder:
+              (_) => FullExamIntroScreen(client: widget.client, test: test),
         ),
       );
       return;
@@ -120,7 +132,11 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
 }
 
 class _MockTestCard extends StatelessWidget {
-  const _MockTestCard({required this.test, required this.onTap, required this.index});
+  const _MockTestCard({
+    required this.test,
+    required this.onTap,
+    required this.index,
+  });
 
   final MockTest test;
   final VoidCallback onTap;
@@ -129,8 +145,8 @@ class _MockTestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final passScore = (test.totalMaxPoints * 0.6).round(); // 60% pass threshold
-    final totalPts = test.totalMaxPoints + 3; // +3 pronunciation bonus
+    final totalPts = test.totalScoreMax;
+    final passScore = ((totalPts * test.passThresholdPercent) + 99) ~/ 100;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.x3),
@@ -153,7 +169,10 @@ class _MockTestCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primaryContainer,
                       borderRadius: BorderRadius.circular(AppRadius.full),
@@ -169,8 +188,11 @@ class _MockTestCard extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  const Icon(Icons.chevron_right,
-                      size: 18, color: AppColors.onSurfaceVariant),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: AppColors.onSurfaceVariant,
+                  ),
                 ],
               ),
               const SizedBox(height: AppSpacing.x3),
@@ -191,7 +213,8 @@ class _MockTestCard extends StatelessWidget {
                 Text(
                   test.description,
                   style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.onSurfaceVariant),
+                    color: AppColors.onSurfaceVariant,
+                  ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -201,31 +224,46 @@ class _MockTestCard extends StatelessWidget {
               // Row 4: metadata icons
               Row(
                 children: [
-                  const Icon(Icons.timer_outlined,
-                      size: 13, color: AppColors.onSurfaceVariant),
+                  const Icon(
+                    Icons.timer_outlined,
+                    size: 13,
+                    color: AppColors.onSurfaceVariant,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     l.mockTestCardMinutes(test.estimatedDurationMinutes),
                     style: AppTypography.bodySmall.copyWith(
-                        fontSize: 12, color: AppColors.onSurfaceVariant),
+                      fontSize: 12,
+                      color: AppColors.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(width: AppSpacing.x3),
-                  const Icon(Icons.view_list_rounded,
-                      size: 13, color: AppColors.onSurfaceVariant),
+                  const Icon(
+                    Icons.view_list_rounded,
+                    size: 13,
+                    color: AppColors.onSurfaceVariant,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     l.mockTestCardSections(test.sections.length),
                     style: AppTypography.bodySmall.copyWith(
-                        fontSize: 12, color: AppColors.onSurfaceVariant),
+                      fontSize: 12,
+                      color: AppColors.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(width: AppSpacing.x3),
-                  const Icon(Icons.flag_outlined,
-                      size: 13, color: AppColors.success),
+                  const Icon(
+                    Icons.flag_outlined,
+                    size: 13,
+                    color: AppColors.success,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     'Đạt $passScore/$totalPts',
                     style: AppTypography.bodySmall.copyWith(
-                        fontSize: 12, color: AppColors.success),
+                      fontSize: 12,
+                      color: AppColors.success,
+                    ),
                   ),
                 ],
               ),

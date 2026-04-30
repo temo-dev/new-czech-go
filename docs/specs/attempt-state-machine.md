@@ -317,7 +317,7 @@ Session exists but no section attempt has started yet.
 At least one section has started, and the session is not terminal.
 
 #### `completed`
-All required section attempts for the session have completed successfully, and the aggregated summary exists.
+All required section attempts for the session have completed successfully, scoring has been aggregated, and the final summary exists.
 
 #### `failed`
 The session cannot continue as a coherent mock exam. V1 should use this sparingly.
@@ -334,13 +334,16 @@ The session cannot continue as a coherent mock exam. V1 should use this sparingl
 ## Mock Exam Session Item Rules
 - each session item points to one exercise
 - each session item may link to one attempt in V1
-- once an item has a completed attempt, it should not be replaced inside the same session
+- `MockExamSessionItem.status=completed` means the section has been linked to an attempt and the learner can move on
+- for speaking sections, the linked attempt may still be awaiting upload/transcription/scoring until the bulk-analysis step finishes
+- once an item has a linked attempt, it should not be replaced inside the same session
 - if a learner retries a section, V1 should create a new mock exam session instead of mutating the old one
 
 ## Aggregation Rules for Mock Exam Completion
 Before `in_progress -> completed`:
 - all required section items must have linked attempts
 - all linked attempts must be `completed`
+- all linked attempts must have feedback or objective result data
 - an overall readiness label must be generated
 - an overall summary must be generated
 

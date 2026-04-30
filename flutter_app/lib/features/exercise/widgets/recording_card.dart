@@ -114,7 +114,7 @@ class RecordingCard extends StatelessWidget {
             onTap: onStart,
           ),
           const SizedBox(height: AppSpacing.x2),
-          Text('KLEPNUTÍM ZAHÁJÍTE',
+          Text(l.recordHintTapToStart,
               style: AppTypography.labelUppercase.copyWith(
                   color: AppColors.onSurfaceVariant, fontSize: 10, letterSpacing: 1.2)),
         ] else if (_isRecording) ...[
@@ -125,7 +125,7 @@ class RecordingCard extends StatelessWidget {
             onTap: onStop,
           ),
           const SizedBox(height: AppSpacing.x2),
-          Text('KLEPNUTÍM ZASTAVÍTE',
+          Text(l.recordHintTapToStop,
               style: AppTypography.labelUppercase.copyWith(
                   color: AppColors.onSurfaceVariant, fontSize: 10, letterSpacing: 1.2)),
         ],

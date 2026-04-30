@@ -10,7 +10,11 @@ import '../../../models/models.dart';
 import 'mock_exam_screen.dart';
 
 class MockTestIntroScreen extends StatefulWidget {
-  const MockTestIntroScreen({super.key, required this.client, required this.test});
+  const MockTestIntroScreen({
+    super.key,
+    required this.client,
+    required this.test,
+  });
 
   final ApiClient client;
   final MockTest test;
@@ -24,20 +28,32 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
   String? _error;
 
   Future<void> _startExam() async {
+    final mockTestId = widget.test.id.trim();
+    if (mockTestId.isEmpty) {
+      setState(() {
+        _error = AppLocalizations.of(context).mockTestMissingTemplateId;
+      });
+      return;
+    }
+
     setState(() {
       _starting = true;
       _error = null;
     });
     try {
-      final payload = await widget.client.createMockExam(mockTestId: widget.test.id);
+      final payload = await widget.client.createMockExam(
+        mockTestId: mockTestId,
+      );
       final session = MockExamSessionView.fromJson(payload);
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => MockExamScreen(
-            client: widget.client,
-            initialSession: session,
-          ),
+          builder:
+              (_) => MockExamScreen(
+                client: widget.client,
+                initialSession: session,
+                mockTest: widget.test,
+              ),
         ),
       );
     } catch (err) {
@@ -53,7 +69,7 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final test = widget.test;
-    final totalPts = test.totalMaxPoints + 3;
+    final totalPts = test.totalScoreMax;
     final h = AppSpacing.pagePaddingH(context);
 
     return Scaffold(
@@ -87,7 +103,8 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
               Text(
                 test.description,
                 style: AppTypography.bodyMedium.copyWith(
-                    color: AppColors.onSurfaceVariant),
+                  color: AppColors.onSurfaceVariant,
+                ),
               ),
             ],
             const SizedBox(height: AppSpacing.x5),
@@ -95,26 +112,32 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
             // 3-stat grid
             Row(
               children: [
-                Expanded(child: _StatBox(
-                  icon: Icons.timer_outlined,
-                  value: '${test.estimatedDurationMinutes} phút',
-                  label: 'Thời gian',
-                  valueColor: AppColors.primary,
-                )),
+                Expanded(
+                  child: _StatBox(
+                    icon: Icons.timer_outlined,
+                    value: '${test.estimatedDurationMinutes} phút',
+                    label: 'Thời gian',
+                    valueColor: AppColors.primary,
+                  ),
+                ),
                 const SizedBox(width: AppSpacing.x2),
-                Expanded(child: _StatBox(
-                  icon: Icons.star_outline,
-                  value: '$totalPts điểm',
-                  label: 'Điểm tối đa',
-                  valueColor: AppColors.onSurface,
-                )),
+                Expanded(
+                  child: _StatBox(
+                    icon: Icons.star_outline,
+                    value: '$totalPts điểm',
+                    label: 'Điểm tối đa',
+                    valueColor: AppColors.onSurface,
+                  ),
+                ),
                 const SizedBox(width: AppSpacing.x2),
-                Expanded(child: _StatBox(
-                  icon: Icons.flag_outlined,
-                  value: '≥${test.passThresholdPercent}%',
-                  label: 'Điểm đỗ',
-                  valueColor: AppColors.success,
-                )),
+                Expanded(
+                  child: _StatBox(
+                    icon: Icons.flag_outlined,
+                    value: '≥${test.passThresholdPercent}%',
+                    label: 'Điểm đỗ',
+                    valueColor: AppColors.success,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: AppSpacing.x5),
@@ -124,8 +147,10 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
 
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.x3),
-              Text(_error!,
-                  style: AppTypography.bodySmall.copyWith(color: AppColors.error)),
+              Text(
+                _error!,
+                style: AppTypography.bodySmall.copyWith(color: AppColors.error),
+              ),
             ],
 
             const SizedBox(height: AppSpacing.x5),
@@ -134,13 +159,17 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: _starting ? null : _startExam,
-                icon: _starting
-                    ? const SizedBox(
-                        height: 18, width: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.mic_rounded, size: 20),
+                icon:
+                    _starting
+                        ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                        : const Icon(Icons.mic_rounded, size: 20),
                 label: Text(l.mockTestIntroStartCta),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -152,7 +181,9 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
               'Hãy đeo tai nghe và ngồi ở nơi yên tĩnh.',
               textAlign: TextAlign.center,
               style: AppTypography.bodySmall.copyWith(
-                  color: AppColors.onSurfaceVariant, fontSize: 11),
+                color: AppColors.onSurfaceVariant,
+                fontSize: 11,
+              ),
             ),
           ],
         ),
@@ -163,27 +194,27 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
   static const _skillKindOrder = ['noi', 'nghe', 'doc', 'viet'];
 
   static String _skillGroupLabel(String kind) => switch (kind) {
-    'noi'  => 'Nói (Speaking)',
+    'noi' => 'Nói (Speaking)',
     'nghe' => 'Nghe (Listening)',
-    'doc'  => 'Đọc (Reading)',
+    'doc' => 'Đọc (Reading)',
     'viet' => 'Viết (Writing)',
-    _      => kind.toUpperCase(),
+    _ => kind.toUpperCase(),
   };
 
   static Color _skillGroupColor(String kind) => switch (kind) {
-    'noi'  => AppColors.primary,
+    'noi' => AppColors.primary,
     'nghe' => AppColors.info,
-    'doc'  => AppColors.warning,
+    'doc' => AppColors.warning,
     'viet' => AppColors.success,
-    _      => AppColors.onSurfaceVariant,
+    _ => AppColors.onSurfaceVariant,
   };
 
   static IconData _skillGroupIcon(String kind) => switch (kind) {
-    'noi'  => Icons.mic_none_rounded,
+    'noi' => Icons.mic_none_rounded,
     'nghe' => Icons.headphones_outlined,
-    'doc'  => Icons.menu_book_outlined,
+    'doc' => Icons.menu_book_outlined,
     'viet' => Icons.edit_outlined,
-    _      => Icons.school_outlined,
+    _ => Icons.school_outlined,
   };
 
   List<Widget> _buildSkillGroups(MockTest test, AppLocalizations l) {
@@ -202,69 +233,98 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
 
     if (grouped.isEmpty) {
       return [
-        Text('${test.sections.length} PHẦN THI',
-            style: AppTypography.labelUppercase.copyWith(
-                fontSize: 11, color: AppColors.onSurfaceVariant, letterSpacing: 0.8)),
+        Text(
+          '${test.sections.length} PHẦN THI',
+          style: AppTypography.labelUppercase.copyWith(
+            fontSize: 11,
+            color: AppColors.onSurfaceVariant,
+            letterSpacing: 0.8,
+          ),
+        ),
         const SizedBox(height: AppSpacing.x3),
       ];
     }
 
     final widgets = <Widget>[
-      Text('${grouped.length} PHẦN THI',
-          style: AppTypography.labelUppercase.copyWith(
-              fontSize: 11, color: AppColors.onSurfaceVariant, letterSpacing: 0.8)),
+      Text(
+        '${grouped.length} PHẦN THI',
+        style: AppTypography.labelUppercase.copyWith(
+          fontSize: 11,
+          color: AppColors.onSurfaceVariant,
+          letterSpacing: 0.8,
+        ),
+      ),
       const SizedBox(height: AppSpacing.x3),
     ];
 
-    for (final kind in [..._skillKindOrder, ...grouped.keys.where((k) => !_skillKindOrder.contains(k))]) {
+    for (final kind in [
+      ..._skillKindOrder,
+      ...grouped.keys.where((k) => !_skillKindOrder.contains(k)),
+    ]) {
       final secs = grouped[kind];
       if (secs == null) continue;
       final totalPts = secs.fold(0, (s, x) => s + x.maxPoints);
       final color = _skillGroupColor(kind);
-      widgets.add(Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.x2),
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.x3, vertical: AppSpacing.x3),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLowest,
-            borderRadius: AppRadius.mdAll,
-            border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.x2),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.x3,
+              vertical: AppSpacing.x3,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLowest,
+              borderRadius: AppRadius.mdAll,
+              border: Border.all(
+                color: AppColors.outlineVariant.withValues(alpha: 0.6),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(_skillGroupIcon(kind), size: 16, color: color),
+                ),
+                const SizedBox(width: AppSpacing.x3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _skillGroupLabel(kind),
+                        style: AppTypography.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '${secs.length} bài luyện',
+                        style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '$totalPts đ',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
           ),
-          child: Row(children: [
-            Container(
-              width: 32, height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(_skillGroupIcon(kind), size: 16, color: color),
-            ),
-            const SizedBox(width: AppSpacing.x3),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(
-                  _skillGroupLabel(kind),
-                  style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  '${secs.length} bài luyện',
-                  style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
-                ),
-              ]),
-            ),
-            Text(
-              '$totalPts đ',
-              style: AppTypography.bodySmall.copyWith(
-                color: AppColors.onSurfaceVariant,
-                fontFamily: 'monospace',
-                fontSize: 12,
-              ),
-            ),
-          ]),
         ),
-      ));
+      );
     }
     return widgets;
   }
@@ -291,7 +351,8 @@ class _StatBox extends StatelessWidget {
         color: AppColors.surfaceContainerLowest,
         borderRadius: AppRadius.lgAll,
         border: Border.all(
-            color: AppColors.outlineVariant.withValues(alpha: 0.6)),
+          color: AppColors.outlineVariant.withValues(alpha: 0.6),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

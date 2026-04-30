@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
@@ -25,28 +26,88 @@ var defaultMaxPoints = map[string]int{
 	"uloha_4_choice_reasoning":   7,
 }
 
+type mockExamScoringInput struct {
+	SectionScore      int
+	MaxPoints         int
+	ReadinessFraction float64
+}
+
 // readinessToFraction converts a readiness label to a 0–1 score fraction.
 func readinessToFraction(level string) float64 {
-	switch level {
-	case "ready":
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "ready", "ready_for_mock", "exam_ready", "strong":
 		return 1.0
-	case "almost":
+	case "almost", "almost_ready":
 		return 0.75
-	case "needs_work":
+	case "needs_work", "ok":
 		return 0.5
 	case "not_ready":
 		return 0.25
+	case "weak":
+		return 0.0
 	default:
 		return 0.0
 	}
 }
 
+func mockExamScoringInputFromFeedback(feedback *contracts.AttemptFeedback, maxPoints int) mockExamScoringInput {
+	if maxPoints < 0 {
+		maxPoints = 0
+	}
+	if feedback == nil {
+		return mockExamScoringInput{MaxPoints: maxPoints}
+	}
+	if feedback.ObjectiveResult != nil && feedback.ObjectiveResult.MaxScore > 0 {
+		fraction := clampFraction(float64(feedback.ObjectiveResult.Score) / float64(feedback.ObjectiveResult.MaxScore))
+		return mockExamScoringInput{
+			SectionScore:      int(math.Round(fraction * float64(maxPoints))),
+			MaxPoints:         maxPoints,
+			ReadinessFraction: fraction,
+		}
+	}
+	fraction := readinessToFraction(feedback.ReadinessLevel)
+	return mockExamScoringInput{
+		SectionScore:      int(math.Round(fraction * float64(maxPoints))),
+		MaxPoints:         maxPoints,
+		ReadinessFraction: fraction,
+	}
+}
+
+func clampFraction(v float64) float64 {
+	switch {
+	case v < 0:
+		return 0
+	case v > 1:
+		return 1
+	default:
+		return v
+	}
+}
+
+func shouldApplyPronunciationBonus(sections []contracts.MockExamSessionItem) bool {
+	if len(sections) != 4 {
+		return false
+	}
+	totalMax := 0
+	for _, sec := range sections {
+		if skillKindForExerciseType(sec.ExerciseType) != "noi" {
+			return false
+		}
+		maxPoints := sec.MaxPoints
+		if maxPoints == 0 {
+			maxPoints = defaultMaxPoints[sec.ExerciseType]
+		}
+		totalMax += maxPoints
+	}
+	return totalMax == 37
+}
+
 // computeScoring calculates overall_score and passed for a completed session.
-// levels and maxPoints must be the same length and same order as sections.
-// thresholdPercent: pass if overallScore >= sum(maxPoints)*thresholdPercent/100.
+// thresholdPercent: pass if overallScore >= scoringMax*thresholdPercent/100.
+// scoringMax is sum(maxPoints), plus the 3-point speaking bonus when enabled.
 // Returns (sectionScores, pronunciationBonus, overallScore, passed).
-func computeScoring(levels []string, maxPoints []int, thresholdPercent int) ([]int, int, int, bool) {
-	n := len(levels)
+func computeScoring(inputs []mockExamScoringInput, thresholdPercent int, includePronunciationBonus bool) ([]int, int, int, bool) {
+	n := len(inputs)
 	if n == 0 {
 		return nil, 0, 0, false
 	}
@@ -57,29 +118,39 @@ func computeScoring(levels []string, maxPoints []int, thresholdPercent int) ([]i
 	totalFrac := 0.0
 	total := 0
 	totalMax := 0
-	for i, lv := range levels {
-		f := readinessToFraction(lv)
-		totalFrac += f
-		pts := int(math.Round(f * float64(maxPoints[i])))
-		sectionScores[i] = pts
-		total += pts
-		totalMax += maxPoints[i]
+	for i, input := range inputs {
+		score := input.SectionScore
+		if score < 0 {
+			score = 0
+		}
+		if input.MaxPoints > 0 && score > input.MaxPoints {
+			score = input.MaxPoints
+		}
+		sectionScores[i] = score
+		total += score
+		totalMax += input.MaxPoints
+		totalFrac += clampFraction(input.ReadinessFraction)
 	}
 	avgFrac := totalFrac / float64(n)
-	pronunciationBonus := int(math.Round(avgFrac * 3.0))
+	pronunciationBonus := 0
+	passMax := totalMax
+	if includePronunciationBonus {
+		pronunciationBonus = int(math.Round(avgFrac * 3.0))
+		passMax += 3
+	}
 	overallScore := total + pronunciationBonus
 	var passed bool
-	if totalMax > 0 {
-		passed = overallScore*100 >= totalMax*thresholdPercent
+	if passMax > 0 {
+		passed = overallScore*100 >= passMax*thresholdPercent
 	}
 	return sectionScores, pronunciationBonus, overallScore, passed
 }
 
 // memoryMockTestStore is the default in-memory implementation.
 type memoryMockTestStore struct {
-	mu       sync.RWMutex
-	tests    map[string]*contracts.MockTest
-	nextID   int
+	mu     sync.RWMutex
+	tests  map[string]*contracts.MockTest
+	nextID int
 }
 
 func newMemoryMockTestStore() MockTestStore {

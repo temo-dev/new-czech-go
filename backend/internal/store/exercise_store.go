@@ -228,6 +228,70 @@ func seedExercises() []contracts.Exercise {
 				FeedbackStyle: "supportive_direct_vi",
 			},
 		},
+		// ── Seed exercises for non-speaking skill types (used by mixed mock tests) ──
+		{
+			ID:           "exercise-seed-poslech1",
+			SkillID:      "skill-dev-noi",
+			ExerciseType: "poslech_1",
+			Title:        "Poslech 1 — Seed",
+			ShortInstruction:   "Nghe và chọn đáp án đúng.",
+			LearnerInstruction: "Nghe đoạn hội thoại và chọn A, B hoặc C.",
+			Status:             "published",
+			SequenceNo:         1,
+			Detail: contracts.Poslech1Detail{
+				Items: []contracts.ListeningItem{
+					{
+						QuestionNo: 1,
+						Question:   "Kde je pani Novakova?",
+						AudioSource: contracts.ListeningAudioSource{
+							Segments: []contracts.AudioSegment{{Text: "Pani Novakova je doma."}},
+						},
+						Options: []contracts.MultipleChoiceOption{
+							{Key: "A", Text: "V praci"},
+							{Key: "B", Text: "Doma"},
+							{Key: "C", Text: "V obchode"},
+						},
+					},
+				},
+				CorrectAnswers: map[string]string{"1": "B"},
+			},
+		},
+		{
+			ID:           "exercise-seed-cteni1",
+			SkillID:      "skill-dev-noi",
+			ExerciseType: "cteni_1",
+			Title:        "Čtení 1 — Seed",
+			ShortInstruction:   "Đọc và nối.",
+			LearnerInstruction: "Nối mỗi tin nhắn với đáp án phù hợp.",
+			Status:             "published",
+			SequenceNo:         1,
+			Detail: contracts.Cteni1Detail{
+				Items: []contracts.ReadingItem{
+					{ItemNo: 1, Text: "Ahoj, kdy prijdes domu?"},
+				},
+				Options: []contracts.TextOption{
+					{Key: "A", Text: "Prijdu v sest hodin."},
+					{Key: "B", Text: "Dnes nemohu."},
+					{Key: "C", Text: "Nevim jeste."},
+				},
+				CorrectAnswers: map[string]string{"1": "A"},
+			},
+		},
+		{
+			ID:           "exercise-seed-psani2",
+			SkillID:      "skill-dev-noi",
+			ExerciseType: "psani_2_email",
+			Title:        "Psaní 2 — Email (Seed)",
+			ShortInstruction:   "Viết email theo 5 chủ đề.",
+			LearnerInstruction: "Viết email cho bạn về kỳ nghỉ. Đề cập đến tất cả 5 chủ đề. Ít nhất 35 từ.",
+			Status:             "published",
+			SequenceNo:         1,
+			Detail: contracts.Psani2Detail{
+				Prompt:   "Jste na dovolene a chcete napsat sve kamaradce. Napiste ji pozdrav a dalsi informace.",
+				Topics:   []string{"KDE JSTE?", "JAK DLOUHO TAM JSTE?", "KDE BYDLITE?", "CO DELATE DOPOLEDNE?", "CO DELATE ODPOLEDNE?"},
+				MinWords: 35,
+			},
+		},
 	}
 }
 

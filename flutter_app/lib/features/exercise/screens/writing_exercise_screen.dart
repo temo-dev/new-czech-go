@@ -21,12 +21,15 @@ class WritingExerciseScreen extends StatefulWidget {
     required this.client,
     required this.detail,
     this.onAttemptCompleted,
+    this.showResultOnCompletion = true,
   });
 
   final ApiClient client;
   final ExerciseDetail detail;
+
   /// Called with the attempt_id after the attempt is submitted successfully.
-  final void Function(String attemptId)? onAttemptCompleted;
+  final FutureOr<void> Function(String attemptId)? onAttemptCompleted;
+  final bool showResultOnCompletion;
 
   @override
   State<WritingExerciseScreen> createState() => _WritingExerciseScreenState();
@@ -64,7 +67,8 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
     super.dispose();
   }
 
-  int _wordCount(String text) => text.trim().isEmpty ? 0 : text.trim().split(RegExp(r'\s+')).length;
+  int _wordCount(String text) =>
+      text.trim().isEmpty ? 0 : text.trim().split(RegExp(r'\s+')).length;
 
   bool get _hasEnoughWords {
     final d = widget.detail;
@@ -77,7 +81,10 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
 
   Future<void> _submit() async {
     if (!_hasEnoughWords || _submitting) return;
-    setState(() { _submitting = true; _error = null; });
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
     try {
       final locale = LocaleScope.of(context).code;
       final attempt = await widget.client.createAttempt(
@@ -99,21 +106,38 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
       }
 
       if (!mounted) return;
-      await Navigator.of(context).push(
+      final completed = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
-          builder: (_) => _WritingResultPoller(
-            client: widget.client,
-            attemptId: attemptId,
-          ),
+          builder:
+              (_) => _WritingResultPoller(
+                client: widget.client,
+                attemptId: attemptId,
+                showResultOnCompletion: widget.showResultOnCompletion,
+              ),
         ),
       );
       // Fire after AnalysisScreen pops — writing attempt is completed by then.
-      if (mounted) widget.onAttemptCompleted?.call(attemptId);
+      if (mounted && (completed ?? widget.showResultOnCompletion)) {
+        await widget.onAttemptCompleted?.call(attemptId);
+      }
+      if (mounted && !widget.showResultOnCompletion && (completed ?? false)) {
+        Navigator.of(context).pop();
+      } else if (mounted &&
+          !widget.showResultOnCompletion &&
+          completed == false) {
+        setState(() => _error = AppLocalizations.of(context).statusCopyFailed);
+      }
     } catch (e) {
       if (!mounted) return;
-      setState(() { _error = e.toString(); });
+      setState(() {
+        _error = e.toString();
+      });
     } finally {
-      if (mounted) setState(() { _submitting = false; });
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+        });
+      }
     }
   }
 
@@ -126,7 +150,9 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         title: Text(
-          d.isPsani1 ? 'Psaní 1 — Formulář' : 'Psaní 2 — E-mail', // Czech exercise names, not translated
+          d.isPsani1
+              ? 'Psaní 1 — Formulář'
+              : 'Psaní 2 — E-mail', // Czech exercise names, not translated
           style: AppTypography.titleMedium,
         ),
       ),
@@ -142,7 +168,10 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
             if (d.isPsani2) ..._buildPsani2Fields(d),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.x2),
-              Text(_error!, style: AppTypography.bodySmall.copyWith(color: Colors.red)),
+              Text(
+                _error!,
+                style: AppTypography.bodySmall.copyWith(color: Colors.red),
+              ),
             ],
             const SizedBox(height: AppSpacing.x6),
             FilledButton(
@@ -150,11 +179,26 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
-              child: _submitting
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text(AppLocalizations.of(context).submitWritingCta, style: AppTypography.labelLarge.copyWith(color: Colors.white)),
+              child:
+                  _submitting
+                      ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                      : Text(
+                        AppLocalizations.of(context).submitWritingCta,
+                        style: AppTypography.labelLarge.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
             ),
           ],
         ),
@@ -163,9 +207,14 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
   }
 
   List<Widget> _buildPsani1Fields(ExerciseDetail d) {
-    final questions = d.writingQuestions.isEmpty
-        ? List.generate(3, (i) => AppLocalizations.of(context).writingQuestionFallback(i + 1))
-        : d.writingQuestions;
+    final questions =
+        d.writingQuestions.isEmpty
+            ? List.generate(
+              3,
+              (i) =>
+                  AppLocalizations.of(context).writingQuestionFallback(i + 1),
+            )
+            : d.writingQuestions;
     return List.generate(questions.length, (i) {
       final words = _wordCount(_controllers[i].text);
       final enough = words >= d.writingMinWords;
@@ -178,22 +227,25 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
             const SizedBox(height: 6),
             ListenableBuilder(
               listenable: _controllers[i],
-              builder: (_, __) => TextField(
-                controller: _controllers[i],
-                maxLines: 4,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                  suffixText: '$words/${d.writingMinWords} từ',
-                  suffixStyle: TextStyle(
-                    color: enough ? AppColors.secondary : Colors.red,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
+              builder:
+                  (_, __) => TextField(
+                    controller: _controllers[i],
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      suffixText: '$words/${d.writingMinWords} từ',
+                      suffixStyle: TextStyle(
+                        color: enough ? AppColors.secondary : Colors.red,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                    onChanged: (_) => setState(() {}),
                   ),
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
             ),
           ],
         ),
@@ -202,9 +254,16 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
   }
 
   List<Widget> _buildPsani2Fields(ExerciseDetail d) {
-    final topics = d.emailTopics.isEmpty
-        ? const ['KDE JSTE?', 'JAK DLOUHO TAM JSTE?', 'KDE BYDLÍTE?', 'CO DĚLÁTE DOPOLEDNE?', 'CO DĚLÁTE ODPOLEDNE?']
-        : d.emailTopics;
+    final topics =
+        d.emailTopics.isEmpty
+            ? const [
+              'KDE JSTE?',
+              'JAK DLOUHO TAM JSTE?',
+              'KDE BYDLÍTE?',
+              'CO DĚLÁTE DOPOLEDNE?',
+              'CO DĚLÁTE ODPOLEDNE?',
+            ]
+            : d.emailTopics;
     final words = _wordCount(_emailController.text);
     final enough = words >= d.writingMinWords;
     return [
@@ -220,40 +279,68 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
         ),
         const SizedBox(height: AppSpacing.x4),
       ],
-      Text(AppLocalizations.of(context).writingTopicsLabel, style: AppTypography.labelMedium),
+      Text(
+        AppLocalizations.of(context).writingTopicsLabel,
+        style: AppTypography.labelMedium,
+      ),
       const SizedBox(height: 8),
-      ...topics.asMap().entries.map((e) => Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: Row(children: [
-          Container(
-            width: 22, height: 22,
-            decoration: BoxDecoration(color: AppColors.secondary, shape: BoxShape.circle),
-            child: Center(child: Text('${e.key + 1}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+      ...topics.asMap().entries.map(
+        (e) => Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Row(
+            children: [
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: AppColors.secondary,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    '${e.key + 1}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                e.value,
+                style: AppTypography.bodySmall.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Text(e.value, style: AppTypography.bodySmall.copyWith(fontWeight: FontWeight.w600)),
-        ]),
-      )),
+        ),
+      ),
       const SizedBox(height: AppSpacing.x4),
       ListenableBuilder(
         listenable: _emailController,
-        builder: (_, __) => TextField(
-          controller: _emailController,
-          maxLines: 10,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            hintText: AppLocalizations.of(context).writingEmailHint,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-            suffixText: '$words/${d.writingMinWords} từ',
-            suffixStyle: TextStyle(
-              color: enough ? AppColors.secondary : Colors.red,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
+        builder:
+            (_, __) => TextField(
+              controller: _emailController,
+              maxLines: 10,
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.white,
+                hintText: AppLocalizations.of(context).writingEmailHint,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                suffixText: '$words/${d.writingMinWords} từ',
+                suffixStyle: TextStyle(
+                  color: enough ? AppColors.secondary : Colors.red,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+              onChanged: (_) => setState(() {}),
             ),
-          ),
-          onChanged: (_) => setState(() {}),
-        ),
       ),
     ];
   }
@@ -261,9 +348,14 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
 
 /// Polls backend until writing attempt is completed, then shows ResultCard.
 class _WritingResultPoller extends StatefulWidget {
-  const _WritingResultPoller({required this.client, required this.attemptId});
+  const _WritingResultPoller({
+    required this.client,
+    required this.attemptId,
+    required this.showResultOnCompletion,
+  });
   final ApiClient client;
   final String attemptId;
+  final bool showResultOnCompletion;
 
   @override
   State<_WritingResultPoller> createState() => _WritingResultPollerState();
@@ -292,7 +384,9 @@ class _WritingResultPollerState extends State<_WritingResultPoller> {
     _timer = Timer.periodic(const Duration(seconds: 2), (_) async {
       if (++_retries > _maxRetries) {
         _timer?.cancel();
-        if (mounted) setState(() => _error = AppLocalizations.of(context).scoringTimeout);
+        if (mounted) {
+          setState(() => _error = AppLocalizations.of(context).scoringTimeout);
+        }
         return;
       }
       try {
@@ -301,6 +395,10 @@ class _WritingResultPollerState extends State<_WritingResultPoller> {
         if (!mounted) return;
         if (attempt.status == 'completed' || attempt.status == 'failed') {
           _timer?.cancel();
+          if (!widget.showResultOnCompletion) {
+            Navigator.of(context).pop(attempt.status == 'completed');
+            return;
+          }
           setState(() => _result = attempt);
         }
       } catch (e) {
@@ -315,7 +413,12 @@ class _WritingResultPollerState extends State<_WritingResultPoller> {
     if (_error != null) {
       return Scaffold(
         backgroundColor: AppColors.surface,
-        body: Center(child: Text(_error!, style: AppTypography.bodyMedium.copyWith(color: AppColors.error))),
+        body: Center(
+          child: Text(
+            _error!,
+            style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
+          ),
+        ),
       );
     }
     if (_result != null && _result!.status == 'completed') {
@@ -341,7 +444,10 @@ class _WritingResultPollerState extends State<_WritingResultPoller> {
           children: [
             const CircularProgressIndicator(color: AppColors.primary),
             const SizedBox(height: AppSpacing.x4),
-            Text(AppLocalizations.of(context).scoringInProgress, style: AppTypography.bodyMedium),
+            Text(
+              AppLocalizations.of(context).scoringInProgress,
+              style: AppTypography.bodyMedium,
+            ),
           ],
         ),
       ),

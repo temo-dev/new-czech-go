@@ -30,8 +30,8 @@ func TestBuildWritingReviewArtifact_ModelAnswerTextPopulated(t *testing.T) {
 	}
 }
 
-// TestBuildWritingReviewArtifact_EmptyLearnerText verifies failure path.
-func TestBuildWritingReviewArtifact_EmptyLearnerText(t *testing.T) {
+// TestBuildWritingReviewArtifact_EmptyLearnerTextStatusOnly verifies failure path.
+func TestBuildWritingReviewArtifact_EmptyLearnerTextStatusOnly(t *testing.T) {
 	artifact := buildWritingReviewArtifact("", contracts.AttemptFeedback{})
 	if artifact.Status != "failed" {
 		t.Errorf("expected status=failed for empty text, got %s", artifact.Status)

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -96,6 +97,7 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 		for _, mts := range mt.Sections {
 			sections = append(sections, contracts.MockExamSessionItem{
 				SequenceNo:   mts.SequenceNo,
+				SkillKind:    mts.SkillKind,
 				ExerciseID:   mts.ExerciseID,
 				ExerciseType: mts.ExerciseType,
 				MaxPoints:    mts.MaxPoints,
@@ -118,6 +120,7 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 			}
 			sections = append(sections, contracts.MockExamSessionItem{
 				SequenceNo:   i + 1,
+				SkillKind:    skillKindForExerciseType(exType),
 				ExerciseID:   exID,
 				ExerciseType: exType,
 				MaxPoints:    defaultMaxPoints[kind],
@@ -155,6 +158,7 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 
 	return contracts.MockExamSession{
 		ID:                   id,
+		LearnerID:            learnerID,
 		Status:               "in_progress",
 		MockTestID:           mockTestID,
 		PassThresholdPercent: threshold,
@@ -168,9 +172,9 @@ func (s *postgresMockExamStore) MockExamByID(id string) (contracts.MockExamSessi
 
 	var session contracts.MockExamSession
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, status, mock_test_id, overall_score, passed, pass_threshold_percent, overall_readiness_level, overall_summary FROM mock_exam_sessions WHERE id = $1`,
+		`SELECT id, learner_id, status, mock_test_id, overall_score, passed, pass_threshold_percent, overall_readiness_level, overall_summary FROM mock_exam_sessions WHERE id = $1`,
 		id,
-	).Scan(&session.ID, &session.Status, &session.MockTestID, &session.OverallScore, &session.Passed, &session.PassThresholdPercent, &session.OverallReadinessLevel, &session.OverallSummary)
+	).Scan(&session.ID, &session.LearnerID, &session.Status, &session.MockTestID, &session.OverallScore, &session.Passed, &session.PassThresholdPercent, &session.OverallReadinessLevel, &session.OverallSummary)
 	if err == sql.ErrNoRows {
 		return contracts.MockExamSession{}, false
 	}
@@ -192,6 +196,7 @@ func (s *postgresMockExamStore) MockExamByID(id string) (contracts.MockExamSessi
 		if err := rows.Scan(&sec.SequenceNo, &sec.ExerciseID, &sec.ExerciseType, &sec.MaxPoints, &sec.AttemptID, &sec.SectionScore, &sec.Status); err != nil {
 			return contracts.MockExamSession{}, false
 		}
+		sec.SkillKind = skillKindForExerciseType(sec.ExerciseType)
 		session.Sections = append(session.Sections, sec)
 	}
 	return session, true
@@ -213,19 +218,34 @@ func (s *postgresMockExamStore) AdvanceMockExam(id, attemptID string) (contracts
 		return contracts.MockExamSession{}, fmt.Errorf("mock exam already completed")
 	}
 
-	res, err := s.db.ExecContext(ctx, `
-UPDATE mock_exam_sections SET attempt_id = $1, status = 'completed'
-WHERE (session_id, sequence_no) = (
-    SELECT session_id, sequence_no FROM mock_exam_sections
-    WHERE session_id = $2 AND status = 'pending'
-    ORDER BY sequence_no LIMIT 1
-)`, attemptID, id)
-	if err != nil {
-		return contracts.MockExamSession{}, fmt.Errorf("advance mock exam: %w", err)
-	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
+	var sequenceNo int
+	var sectionExerciseID string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT sequence_no, exercise_id FROM mock_exam_sections WHERE session_id = $1 AND status = 'pending' ORDER BY sequence_no LIMIT 1`,
+		id,
+	).Scan(&sequenceNo, &sectionExerciseID)
+	if err == sql.ErrNoRows {
 		return contracts.MockExamSession{}, fmt.Errorf("no pending section")
+	}
+	if err != nil {
+		return contracts.MockExamSession{}, fmt.Errorf("query pending section: %w", err)
+	}
+
+	var attemptExerciseID string
+	if err := s.db.QueryRowContext(ctx, `SELECT exercise_id FROM attempts WHERE id = $1`, attemptID).Scan(&attemptExerciseID); err == sql.ErrNoRows {
+		return contracts.MockExamSession{}, fmt.Errorf("attempt not found")
+	} else if err != nil {
+		return contracts.MockExamSession{}, fmt.Errorf("query attempt: %w", err)
+	}
+	if attemptExerciseID != sectionExerciseID {
+		return contracts.MockExamSession{}, fmt.Errorf("attempt exercise does not match section %d", sequenceNo)
+	}
+
+	if _, err := s.db.ExecContext(ctx,
+		`UPDATE mock_exam_sections SET attempt_id = $1, status = 'completed' WHERE session_id = $2 AND sequence_no = $3`,
+		attemptID, id, sequenceNo,
+	); err != nil {
+		return contracts.MockExamSession{}, fmt.Errorf("advance mock exam: %w", err)
 	}
 
 	session, ok := s.MockExamByID(id)
@@ -249,43 +269,87 @@ func (s *postgresMockExamStore) CompleteMockExam(id string) (contracts.MockExamS
 		return contracts.MockExamSession{}, fmt.Errorf("%d section(s) not yet completed", pendingCount)
 	}
 
-	// Load sections with attempt IDs and max_points
+	// Load sections with attempt IDs, max_points, and feedback payloads.
 	srows, err := s.db.QueryContext(ctx,
-		`SELECT sequence_no, attempt_id, exercise_type, max_points FROM mock_exam_sections WHERE session_id = $1 AND attempt_id != '' ORDER BY sequence_no`, id,
+		`SELECT
+			ms.sequence_no,
+			ms.attempt_id,
+			ms.exercise_type,
+			ms.max_points,
+			a.status,
+			a.readiness_level,
+			af.payload::text
+		FROM mock_exam_sections ms
+		LEFT JOIN attempts a ON a.id = ms.attempt_id
+		LEFT JOIN attempt_feedback af ON af.attempt_id = ms.attempt_id
+		WHERE ms.session_id = $1 AND ms.attempt_id != ''
+		ORDER BY ms.sequence_no`, id,
 	)
 	if err != nil {
 		return contracts.MockExamSession{}, fmt.Errorf("query sections: %w", err)
 	}
 	type sectionMeta struct {
-		seqNo        int
-		attemptID    string
-		exerciseType string
-		maxPoints    int
+		seqNo         int
+		attemptID     string
+		exerciseType  string
+		maxPoints     int
+		attemptStatus string
+		readiness     string
+		feedback      *contracts.AttemptFeedback
 	}
 	var sectionMetas []sectionMeta
 	for srows.Next() {
 		var m sectionMeta
-		if err := srows.Scan(&m.seqNo, &m.attemptID, &m.exerciseType, &m.maxPoints); err != nil {
+		var readiness sql.NullString
+		var attemptStatus sql.NullString
+		var feedbackPayload sql.NullString
+		if err := srows.Scan(&m.seqNo, &m.attemptID, &m.exerciseType, &m.maxPoints, &attemptStatus, &readiness, &feedbackPayload); err != nil {
 			srows.Close()
 			return contracts.MockExamSession{}, fmt.Errorf("scan section: %w", err)
 		}
 		if m.maxPoints == 0 {
 			m.maxPoints = defaultMaxPoints[m.exerciseType]
 		}
+		if readiness.Valid {
+			m.readiness = readiness.String
+		}
+		if attemptStatus.Valid {
+			m.attemptStatus = attemptStatus.String
+		}
+		if feedbackPayload.Valid && feedbackPayload.String != "" {
+			var feedback contracts.AttemptFeedback
+			if err := json.Unmarshal([]byte(feedbackPayload.String), &feedback); err == nil {
+				m.feedback = &feedback
+			}
+		}
+		if m.feedback == nil && m.readiness != "" {
+			m.feedback = &contracts.AttemptFeedback{ReadinessLevel: m.readiness}
+		}
+		if m.attemptStatus != "completed" || m.feedback == nil {
+			srows.Close()
+			return contracts.MockExamSession{}, fmt.Errorf("attempt %s is not completed", m.attemptID)
+		}
 		sectionMetas = append(sectionMetas, m)
 	}
 	srows.Close()
 
-	// Fetch readiness levels in order
 	levels := make([]string, len(sectionMetas))
-	maxPoints := make([]int, len(sectionMetas))
+	inputs := make([]mockExamScoringInput, len(sectionMetas))
+	bonusSections := make([]contracts.MockExamSessionItem, len(sectionMetas))
 	for i, m := range sectionMetas {
-		maxPoints[i] = m.maxPoints
-		var lv sql.NullString
-		if err := s.db.QueryRowContext(ctx,
-			`SELECT readiness_level FROM attempts WHERE id = $1`, m.attemptID,
-		).Scan(&lv); err == nil && lv.Valid {
-			levels[i] = lv.String
+		if m.feedback != nil {
+			levels[i] = m.feedback.ReadinessLevel
+		} else {
+			levels[i] = m.readiness
+		}
+		inputs[i] = mockExamScoringInputFromFeedback(m.feedback, m.maxPoints)
+		bonusSections[i] = contracts.MockExamSessionItem{
+			SequenceNo:   m.seqNo,
+			ExerciseID:   "",
+			ExerciseType: m.exerciseType,
+			MaxPoints:    m.maxPoints,
+			AttemptID:    m.attemptID,
+			Status:       "completed",
 		}
 	}
 
@@ -297,7 +361,7 @@ func (s *postgresMockExamStore) CompleteMockExam(id string) (contracts.MockExamS
 	}
 
 	level, summary := rollupReadiness(levels)
-	sectionScores, _, overallScore, passed := computeScoring(levels, maxPoints, threshold)
+	sectionScores, _, overallScore, passed := computeScoring(inputs, threshold, shouldApplyPronunciationBonus(bonusSections))
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

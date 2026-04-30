@@ -197,6 +197,24 @@ abstract class AppLocalizations {
   /// **'Ghi âm lần lượt từng Uloha. Sau khi xong cả 4 phần, hệ thống sẽ phân tích và cho kết quả tổng.'**
   String get mockExamIntroBody;
 
+  /// No description provided for @mockExamProgressIntroTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'{count} phần, mỗi phần 1 lần'**
+  String mockExamProgressIntroTitle(int count);
+
+  /// No description provided for @mockExamProgressIntroBodyWithSpeaking.
+  ///
+  /// In vi, this message translates to:
+  /// **'Làm từng phần theo thứ tự. Điểm bài thi chỉ được tính sau phần cuối; phần nói sẽ được phân tích cùng nhau ở cuối.'**
+  String get mockExamProgressIntroBodyWithSpeaking;
+
+  /// No description provided for @mockExamProgressIntroBodyNoSpeaking.
+  ///
+  /// In vi, this message translates to:
+  /// **'Làm từng phần theo thứ tự. Kết quả sẽ được tính sau phần cuối cùng.'**
+  String get mockExamProgressIntroBodyNoSpeaking;
+
   /// No description provided for @mockExamSectionLabel.
   ///
   /// In vi, this message translates to:
@@ -244,6 +262,48 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Xong'**
   String get mockExamActionDone;
+
+  /// No description provided for @mockExamSectionMeta.
+  ///
+  /// In vi, this message translates to:
+  /// **'{skill} · {exercise} · {points} điểm'**
+  String mockExamSectionMeta(String skill, String exercise, int points);
+
+  /// No description provided for @mockExamTaskTypeUloha.
+  ///
+  /// In vi, this message translates to:
+  /// **'Úloha {n}'**
+  String mockExamTaskTypeUloha(int n);
+
+  /// No description provided for @mockExamTaskTypeListening.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nghe {n}'**
+  String mockExamTaskTypeListening(int n);
+
+  /// No description provided for @mockExamTaskTypeReading.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đọc {n}'**
+  String mockExamTaskTypeReading(int n);
+
+  /// No description provided for @mockExamTaskTypeWriting.
+  ///
+  /// In vi, this message translates to:
+  /// **'Viết {n}'**
+  String mockExamTaskTypeWriting(int n);
+
+  /// No description provided for @mockExamTaskTypeWritingForm.
+  ///
+  /// In vi, this message translates to:
+  /// **'Viết 1 - form'**
+  String get mockExamTaskTypeWritingForm;
+
+  /// No description provided for @mockExamTaskTypeWritingEmail.
+  ///
+  /// In vi, this message translates to:
+  /// **'Viết 2 - email'**
+  String get mockExamTaskTypeWritingEmail;
 
   /// No description provided for @mockExamResultTitle.
   ///
@@ -388,6 +448,12 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Bắt đầu thi'**
   String get mockTestIntroStartCta;
+
+  /// No description provided for @mockTestMissingTemplateId.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đề thi này đang thiếu ID mẫu. Hãy tải lại danh sách đề và thử lại.'**
+  String get mockTestMissingTemplateId;
 
   /// No description provided for @mockTestIntroPoints.
   ///
@@ -682,6 +748,72 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'ĐÃ DỪNG'**
   String get recordStatusStopped;
+
+  /// No description provided for @recordHintTapToStart.
+  ///
+  /// In vi, this message translates to:
+  /// **'NHẤN ĐỂ BẮT ĐẦU'**
+  String get recordHintTapToStart;
+
+  /// No description provided for @recordHintTapToStop.
+  ///
+  /// In vi, this message translates to:
+  /// **'NHẤN ĐỂ DỪNG'**
+  String get recordHintTapToStop;
+
+  /// No description provided for @historyBadgeReady.
+  ///
+  /// In vi, this message translates to:
+  /// **'SẴN SÀNG'**
+  String get historyBadgeReady;
+
+  /// No description provided for @historyBadgeAlmost.
+  ///
+  /// In vi, this message translates to:
+  /// **'GẦN ĐẠT'**
+  String get historyBadgeAlmost;
+
+  /// No description provided for @historyBadgeNeedsWork.
+  ///
+  /// In vi, this message translates to:
+  /// **'CẦN LUYỆN'**
+  String get historyBadgeNeedsWork;
+
+  /// No description provided for @historyBadgeNotReady.
+  ///
+  /// In vi, this message translates to:
+  /// **'CHƯA SẴN SÀNG'**
+  String get historyBadgeNotReady;
+
+  /// No description provided for @historyBadgeFailed.
+  ///
+  /// In vi, this message translates to:
+  /// **'LỖI'**
+  String get historyBadgeFailed;
+
+  /// No description provided for @historyBadgeCreated.
+  ///
+  /// In vi, this message translates to:
+  /// **'MỚI TẠO'**
+  String get historyBadgeCreated;
+
+  /// No description provided for @historyCtaTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tiếp tục luyện tập!'**
+  String get historyCtaTitle;
+
+  /// No description provided for @historyCtaSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ôn thêm một chủ đề nữa để tăng độ lưu loát tiếng Séc.'**
+  String get historyCtaSubtitle;
+
+  /// No description provided for @historyCtaButton.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bắt đầu luyện'**
+  String get historyCtaButton;
 
   /// No description provided for @recordHintStopped.
   ///

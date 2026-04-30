@@ -140,6 +140,12 @@ func (p *s3PresignedAudioURLProvider) SignedAudioURL(ctx context.Context, input 
 			ExpiresAt: time.Now().UTC().Add(input.ExpiresIn).Truncate(time.Second),
 		}, nil
 	}
+	if input.Scope != ScopeAttemptAudio {
+		if p.fallback != nil {
+			return p.fallback.SignedAudioURL(ctx, input)
+		}
+		return SignedAudioURL{}, fmt.Errorf("local fallback required for %s", input.Scope)
+	}
 	// If the storage key doesn't look like an S3 object path, fall back to local signing.
 	if strings.ContainsAny(key, " \t") || !strings.Contains(key, "/") {
 		if p.fallback != nil {
@@ -173,7 +179,7 @@ func (p *s3PresignedAudioURLProvider) SignedAudioURL(ctx context.Context, input 
 // Otherwise the local HMAC signer is returned.
 func NewConfiguredAudioURLProvider(ctx context.Context, secret []byte) (AudioURLProvider, error) {
 	local := NewLocalSignedAudioURLProvider(secret)
-	kind := strings.ToLower(strings.TrimSpace(os.Getenv("ATTEMPT_AUDIO_URL_PROVIDER")))
+	kind := configuredAudioURLProviderKind()
 	switch kind {
 	case "", "local":
 		return local, nil
@@ -186,6 +192,17 @@ func NewConfiguredAudioURLProvider(ctx context.Context, secret []byte) (AudioURL
 	default:
 		return nil, fmt.Errorf("unsupported ATTEMPT_AUDIO_URL_PROVIDER %q", kind)
 	}
+}
+
+func configuredAudioURLProviderKind() string {
+	kind := strings.ToLower(strings.TrimSpace(os.Getenv("ATTEMPT_AUDIO_URL_PROVIDER")))
+	if kind != "" {
+		return kind
+	}
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("ATTEMPT_UPLOAD_PROVIDER")), "s3") {
+		return "s3"
+	}
+	return "local"
 }
 
 // signAudioToken returns a base64url(no-pad) HMAC-SHA256 of the canonical payload.

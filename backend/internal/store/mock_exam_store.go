@@ -61,6 +61,7 @@ func (s *memoryMockExamStore) CreateMockExam(learnerID, mockTestID string, mockT
 		for _, mts := range mt.Sections {
 			sections = append(sections, contracts.MockExamSessionItem{
 				SequenceNo:   mts.SequenceNo,
+				SkillKind:    mts.SkillKind,
 				ExerciseID:   mts.ExerciseID,
 				ExerciseType: mts.ExerciseType,
 				MaxPoints:    mts.MaxPoints,
@@ -77,6 +78,7 @@ func (s *memoryMockExamStore) CreateMockExam(learnerID, mockTestID string, mockT
 			}
 			sections = append(sections, contracts.MockExamSessionItem{
 				SequenceNo:   i + 1,
+				SkillKind:    skillKindForExerciseType(ex.ExerciseType),
 				ExerciseID:   ex.ID,
 				ExerciseType: ex.ExerciseType,
 				MaxPoints:    defaultMaxPoints[kind],
@@ -89,6 +91,7 @@ func (s *memoryMockExamStore) CreateMockExam(learnerID, mockTestID string, mockT
 	s.nextSession++
 	session := &contracts.MockExamSession{
 		ID:                   id,
+		LearnerID:            learnerID,
 		Status:               "in_progress",
 		MockTestID:           mockTestID,
 		PassThresholdPercent: threshold,
@@ -96,6 +99,21 @@ func (s *memoryMockExamStore) CreateMockExam(learnerID, mockTestID string, mockT
 	}
 	s.sessions[id] = session
 	return *session, nil
+}
+
+func skillKindForExerciseType(exerciseType string) string {
+	switch {
+	case len(exerciseType) >= 6 && exerciseType[:6] == "uloha_":
+		return "noi"
+	case len(exerciseType) >= 8 && exerciseType[:8] == "poslech_":
+		return "nghe"
+	case len(exerciseType) >= 6 && exerciseType[:6] == "cteni_":
+		return "doc"
+	case len(exerciseType) >= 6 && exerciseType[:6] == "psani_":
+		return "viet"
+	default:
+		return "noi"
+	}
 }
 
 func (s *memoryMockExamStore) MockExamByID(id string) (contracts.MockExamSession, bool) {
@@ -119,8 +137,15 @@ func (s *memoryMockExamStore) AdvanceMockExam(id, attemptID string) (contracts.M
 	if session.Status == "completed" {
 		return contracts.MockExamSession{}, fmt.Errorf("mock exam already completed")
 	}
+	attempt, ok := s.attempts.Attempt(attemptID)
+	if !ok {
+		return contracts.MockExamSession{}, fmt.Errorf("attempt not found")
+	}
 	for i := range session.Sections {
 		if session.Sections[i].Status == "pending" {
+			if attempt.ExerciseID != session.Sections[i].ExerciseID {
+				return contracts.MockExamSession{}, fmt.Errorf("attempt exercise does not match section %d", session.Sections[i].SequenceNo)
+			}
 			session.Sections[i].AttemptID = attemptID
 			session.Sections[i].Status = "completed"
 			return *session, nil
@@ -155,16 +180,20 @@ func (s *memoryMockExamStore) CompleteMockExam(id string) (contracts.MockExamSes
 	s.mu.Unlock()
 
 	levels := make([]string, 0, len(attemptIDs))
-	for _, aid := range attemptIDs {
+	inputs := make([]mockExamScoringInput, 0, len(attemptIDs))
+	for i, aid := range attemptIDs {
 		attempt, ok := s.attempts.Attempt(aid)
-		if !ok || attempt.Feedback == nil {
-			levels = append(levels, "")
-			continue
+		if !ok {
+			return contracts.MockExamSession{}, fmt.Errorf("attempt %s not found", aid)
+		}
+		if attempt.Status != "completed" || attempt.Feedback == nil {
+			return contracts.MockExamSession{}, fmt.Errorf("attempt %s is not completed", aid)
 		}
 		levels = append(levels, attempt.Feedback.ReadinessLevel)
+		inputs = append(inputs, mockExamScoringInputFromFeedback(attempt.Feedback, maxPoints[i]))
 	}
 	level, summary := rollupReadiness(levels)
-	sectionScores, _, overallScore, passed := computeScoring(levels, maxPoints, session.PassThresholdPercent)
+	sectionScores, _, overallScore, passed := computeScoring(inputs, session.PassThresholdPercent, shouldApplyPronunciationBonus(session.Sections))
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

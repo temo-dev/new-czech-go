@@ -22,14 +22,17 @@ class ListeningExerciseScreen extends StatefulWidget {
     required this.client,
     required this.detail,
     this.onAttemptCompleted,
+    this.showResultOnCompletion = true,
   });
 
   final ApiClient client;
   final ExerciseDetail detail;
-  final void Function(String attemptId)? onAttemptCompleted;
+  final FutureOr<void> Function(String attemptId)? onAttemptCompleted;
+  final bool showResultOnCompletion;
 
   @override
-  State<ListeningExerciseScreen> createState() => _ListeningExerciseScreenState();
+  State<ListeningExerciseScreen> createState() =>
+      _ListeningExerciseScreenState();
 }
 
 class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
@@ -55,7 +58,10 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
   }
 
   Future<void> _loadAudio() async {
-    setState(() { _audioLoading = true; _audioError = false; });
+    setState(() {
+      _audioLoading = true;
+      _audioError = false;
+    });
     try {
       await _player.setAudioSource(
         AudioSource.uri(
@@ -65,32 +71,55 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
       );
       if (mounted) setState(() => _audioLoading = false);
     } catch (_) {
-      if (mounted) setState(() { _audioLoading = false; _audioError = true; });
+      if (mounted) {
+        setState(() {
+          _audioLoading = false;
+          _audioError = true;
+        });
+      }
     }
   }
 
   bool get _hasAllAnswers {
     final d = widget.detail;
     if (d.isPoslech5) {
-      return d.poslechQuestions.every((q) => _answers[q.questionNo.toString()]?.isNotEmpty == true);
+      return d.poslechQuestions.every(
+        (q) => _answers[q.questionNo.toString()]?.isNotEmpty == true,
+      );
     }
     final count = d.poslechItems.isNotEmpty ? d.poslechItems.length : 5;
-    return List.generate(count, (i) => (i + 1).toString())
-        .every((k) => _answers[k]?.isNotEmpty == true);
+    return List.generate(
+      count,
+      (i) => (i + 1).toString(),
+    ).every((k) => _answers[k]?.isNotEmpty == true);
   }
 
   Future<void> _submit() async {
     if (!_hasAllAnswers || _submitting) return;
-    setState(() { _submitting = true; _submitError = null; });
+    setState(() {
+      _submitting = true;
+      _submitError = null;
+    });
     try {
-      final attempt = await widget.client.createAttempt(widget.detail.id, locale: 'vi');
+      final attempt = await widget.client.createAttempt(
+        widget.detail.id,
+        locale: 'vi',
+      );
       final attemptId = attempt['id'] as String;
       final raw = await widget.client.submitAnswers(attemptId, _answers);
-      widget.onAttemptCompleted?.call(attemptId);
+      await widget.onAttemptCompleted?.call(attemptId);
       if (!mounted) return;
+      if (!widget.showResultOnCompletion) {
+        Navigator.of(context).pop();
+        return;
+      }
       setState(() => _result = AttemptResult.fromJson(raw));
     } catch (e) {
-      if (mounted) setState(() { _submitError = e.toString(); });
+      if (mounted) {
+        setState(() {
+          _submitError = e.toString();
+        });
+      }
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -105,7 +134,10 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
         backgroundColor: AppColors.surface,
         appBar: AppBar(
           backgroundColor: AppColors.surface,
-          title: Text(AppLocalizations.of(context).resultScreenTitle, style: AppTypography.titleMedium),
+          title: Text(
+            AppLocalizations.of(context).resultScreenTitle,
+            style: AppTypography.titleMedium,
+          ),
           elevation: 0,
         ),
         body: SafeArea(
@@ -140,7 +172,12 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
             ],
 
             // Audio player
-            _AudioPlayerBar(player: _player, loading: _audioLoading, error: _audioError, onRetry: _loadAudio),
+            _AudioPlayerBar(
+              player: _player,
+              loading: _audioLoading,
+              error: _audioError,
+              onRetry: _loadAudio,
+            ),
             const SizedBox(height: AppSpacing.x4),
 
             // Answer UI
@@ -155,7 +192,10 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
 
             if (_submitError != null) ...[
               const SizedBox(height: AppSpacing.x2),
-              Text(_submitError!, style: AppTypography.bodySmall.copyWith(color: AppColors.error)),
+              Text(
+                _submitError!,
+                style: AppTypography.bodySmall.copyWith(color: AppColors.error),
+              ),
             ],
 
             const SizedBox(height: AppSpacing.x6),
@@ -164,11 +204,26 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
-              child: _submitting
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text(AppLocalizations.of(context).submitAnswersCta, style: AppTypography.labelLarge.copyWith(color: Colors.white)),
+              child:
+                  _submitting
+                      ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                      : Text(
+                        AppLocalizations.of(context).submitAnswersCta,
+                        style: AppTypography.labelLarge.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
             ),
           ],
         ),
@@ -203,13 +258,20 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
             if (item.question.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.x2),
-                child: Text(item.question, style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+                child: Text(
+                  item.question,
+                  style: AppTypography.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             MultipleChoiceWidget(
               questionNo: item.questionNo,
               options: opts,
               selected: _answers[item.questionNo.toString()],
-              onSelect: (k) => setState(() => _answers[item.questionNo.toString()] = k),
+              onSelect:
+                  (k) =>
+                      setState(() => _answers[item.questionNo.toString()] = k),
             ),
           ],
         ),
@@ -226,7 +288,12 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
 }
 
 class _AudioPlayerBar extends StatefulWidget {
-  const _AudioPlayerBar({required this.player, required this.loading, required this.error, this.onRetry});
+  const _AudioPlayerBar({
+    required this.player,
+    required this.loading,
+    required this.error,
+    this.onRetry,
+  });
   final AudioPlayer player;
   final bool loading;
   final bool error;
@@ -268,11 +335,23 @@ class _AudioPlayerBarState extends State<_AudioPlayerBar> {
           Icon(Icons.headphones_rounded, color: AppColors.secondary, size: 20),
           const SizedBox(width: 10),
           Expanded(
-            child: widget.error
-                ? Text(AppLocalizations.of(context).audioError, style: AppTypography.bodySmall.copyWith(color: AppColors.error))
-                : widget.loading
-                    ? Text(AppLocalizations.of(context).audioLoading, style: AppTypography.bodySmall)
-                    : Text(AppLocalizations.of(context).audioHint, style: AppTypography.bodySmall),
+            child:
+                widget.error
+                    ? Text(
+                      AppLocalizations.of(context).audioError,
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.error,
+                      ),
+                    )
+                    : widget.loading
+                    ? Text(
+                      AppLocalizations.of(context).audioLoading,
+                      style: AppTypography.bodySmall,
+                    )
+                    : Text(
+                      AppLocalizations.of(context).audioHint,
+                      style: AppTypography.bodySmall,
+                    ),
           ),
           if (widget.error && widget.onRetry != null)
             IconButton(
@@ -283,7 +362,9 @@ class _AudioPlayerBarState extends State<_AudioPlayerBar> {
             ),
           if (!widget.error && !widget.loading) ...[
             IconButton(
-              icon: Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+              icon: Icon(
+                _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              ),
               color: AppColors.secondary,
               onPressed: () async {
                 if (_playing) {

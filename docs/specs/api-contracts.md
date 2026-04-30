@@ -347,7 +347,7 @@ Optional endpoint to mark that the learner began recording.
 ## POST /v1/attempts/:attempt_id/upload-url
 Creates a presigned upload target for the final audio file.
 
-In the current dev implementation, this target points back to the backend host so the learner app can exercise the same request sequence before durable object storage is added.
+The target points back to the backend host in local mode. When `ATTEMPT_UPLOAD_PROVIDER=s3`, it returns an S3 presigned `PUT` target and the same `storage_key` is later used by Amazon Transcribe and provider-aware playback.
 
 ### Request
 ```json
@@ -566,7 +566,8 @@ Returns authenticated playback of the model-answer TTS audio when the review art
 Notes:
 - this now mirrors the current completed-attempt audio replay pattern for local-backed review audio
 - in the current slice, local/dev review audio is served from backend temp storage using the persisted `tts_audio.storage_key`
-- provider-aware replay for cloud-only review audio is still a follow-up concern
+- `GET /v1/attempts/:attempt_id/review/audio/url` is the preferred learner-app endpoint; it returns a short-lived HMAC-signed backend stream URL for locally generated review audio
+- when attempt playback is configured for S3, review audio still falls back to the local signed stream because model-answer TTS is stored by the backend
 
 ## GET /v1/attempts
 Returns recent attempts for the authenticated learner, newest first.
@@ -611,12 +612,35 @@ Notes:
 - a learner may only fetch their own attempt audio
 - local dev returns the stored file directly from backend temp storage
 - cloud-backed deployments may satisfy the same endpoint by redirecting or streaming from durable storage
-- the current Flutter learner implementation may download this file into app temp storage before playback instead of streaming the authenticated URL directly
-- local or cloud `s3` upload mode may still return `404` here until backend replay becomes provider-aware, because the current implementation is strongest when the backend also owns a local `stored_file_path`
+- this is now a compatibility endpoint; the Flutter learner should prefer `GET /v1/attempts/:attempt_id/audio/url`
+- in `s3` upload mode, this endpoint can still return `404` for cloud-only attempts that have no backend `stored_file_path`
 
 ### Response
 - `200` with binary audio body
 - `Content-Type` matches the stored attempt audio mime type
+
+## GET /v1/attempts/:attempt_id/audio/url
+Returns a short-lived playable URL for the learner's submitted attempt audio.
+
+Notes:
+- requires learner auth to mint the URL
+- local upload mode returns an HMAC-signed backend stream URL under `/v1/attempt-audio/stream`
+- `s3` upload mode returns a presigned S3 `GET` URL for attempt audio
+- if `ATTEMPT_AUDIO_URL_PROVIDER` is unset and `ATTEMPT_UPLOAD_PROVIDER=s3`, the backend automatically uses S3 presigned playback for attempt audio
+- if `ATTEMPT_AUDIO_URL_PROVIDER=local` is explicitly set, the backend uses the local stream path and cloud-only attempts without `stored_file_path` can still fail to play
+- the returned URL is already authorized; the audio player must not add the learner bearer token to a cloud URL
+
+### Response
+```json
+{
+  "data": {
+    "url": "https://...",
+    "mime_type": "audio/m4a",
+    "expires_at": "2026-04-30T09:10:00Z"
+  },
+  "meta": {}
+}
+```
 
 ## GET /v1/attempts
 Returns learner history.
@@ -727,7 +751,14 @@ Returns mock exam session progress and section status.
 ```
 
 ## POST /v1/mock-exams/:session_id/advance
-Associates the next pending section with a submitted attempt ID.
+Associates the next pending section with an attempt ID.
+
+Notes:
+- the attempt must belong to the authenticated learner
+- the attempt exercise must match the next pending section exercise
+- for speaking sections, the attempt may be recorded but not analysed yet; this lets the learner complete all recordings before the bulk analysis step
+- for listening, reading, and writing sections, the Flutter flow calls this only after the section attempt is already scored
+- this endpoint does not compute section scores
 
 ### Request
 ```json
@@ -739,6 +770,12 @@ Updated session (same shape as GET).
 
 ## POST /v1/mock-exams/:session_id/complete
 Computes scores, marks session complete, returns final result.
+
+Preconditions:
+- every section has a linked attempt
+- every linked attempt has `status=completed`
+- every linked attempt has feedback or objective scoring metadata
+- speaking-only mock tests receive the 3-point pronunciation/readiness bonus only for the canonical 4-section, 37-point oral exam shape
 
 ### Request
 ```json

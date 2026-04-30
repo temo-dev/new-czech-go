@@ -66,6 +66,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mockExamIntroBody => 'Record each Uloha in order. After all four sections, your answers are analysed together.';
 
   @override
+  String mockExamProgressIntroTitle(int count) {
+    return '$count sections, one attempt each';
+  }
+
+  @override
+  String get mockExamProgressIntroBodyWithSpeaking => 'Complete each section in order. The exam score is calculated after the final section; speaking recordings are analysed together at the end.';
+
+  @override
+  String get mockExamProgressIntroBodyNoSpeaking => 'Complete each section in order. Your result is calculated after the final section.';
+
+  @override
   String mockExamSectionLabel(int index) {
     return 'Section $index';
   }
@@ -92,6 +103,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mockExamActionDone => 'Done';
+
+  @override
+  String mockExamSectionMeta(String skill, String exercise, int points) {
+    return '$skill · $exercise · $points pts';
+  }
+
+  @override
+  String mockExamTaskTypeUloha(int n) {
+    return 'Úloha $n';
+  }
+
+  @override
+  String mockExamTaskTypeListening(int n) {
+    return 'Listening $n';
+  }
+
+  @override
+  String mockExamTaskTypeReading(int n) {
+    return 'Reading $n';
+  }
+
+  @override
+  String mockExamTaskTypeWriting(int n) {
+    return 'Writing $n';
+  }
+
+  @override
+  String get mockExamTaskTypeWritingForm => 'Writing 1 - form';
+
+  @override
+  String get mockExamTaskTypeWritingEmail => 'Writing 2 - email';
 
   @override
   String get mockExamResultTitle => 'Mock exam result';
@@ -168,6 +210,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mockTestIntroStartCta => 'Start exam';
+
+  @override
+  String get mockTestMissingTemplateId => 'This mock test is missing its template ID. Please reload the exam list and try again.';
 
   @override
   String mockTestIntroPoints(int pts) {
@@ -329,6 +374,39 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get recordStatusStopped => 'STOPPED';
+
+  @override
+  String get recordHintTapToStart => 'TAP TO START';
+
+  @override
+  String get recordHintTapToStop => 'TAP TO STOP';
+
+  @override
+  String get historyBadgeReady => 'READY';
+
+  @override
+  String get historyBadgeAlmost => 'ALMOST';
+
+  @override
+  String get historyBadgeNeedsWork => 'NEEDS WORK';
+
+  @override
+  String get historyBadgeNotReady => 'NOT READY';
+
+  @override
+  String get historyBadgeFailed => 'FAILED';
+
+  @override
+  String get historyBadgeCreated => 'CREATED';
+
+  @override
+  String get historyCtaTitle => 'Keep up the pace!';
+
+  @override
+  String get historyCtaSubtitle => 'Practice one more topic to boost your Czech fluency.';
+
+  @override
+  String get historyCtaButton => 'Start training';
 
   @override
   String get recordHintStopped => 'Listen to your recording. Press \"Analyze\" when ready.';

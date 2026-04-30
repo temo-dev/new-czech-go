@@ -75,6 +75,8 @@ Implemented today:
 - learner-authenticated backend routes now expose the first review-artifact slice through `GET /v1/attempts/:attempt_id/review` and `GET /v1/attempts/:attempt_id/review/audio/file`
 - when no full review artifact has been stored yet, the review endpoint now returns a lightweight `pending` stub instead of breaking the attempt flow
 - local-backed review-audio playback now works through the same backend temp-storage pattern already used for completed-attempt audio replay
+- provider-aware attempt-audio playback now uses `GET /v1/attempts/:attempt_id/audio/url`: local attempts receive an HMAC-signed backend stream URL, while S3-backed attempts receive a presigned S3 `GET` URL
+- when `ATTEMPT_AUDIO_URL_PROVIDER` is unset, `ATTEMPT_UPLOAD_PROVIDER=s3` automatically selects S3 playback for submitted attempt audio
 - Flutter result UI now renders a dedicated `Repair and shadowing` block after a completed attempt
 - that review block now polls the backend review endpoint until the artifact is `ready` or `failed`
 - the learner can now see `Transcript cua ban`, `Ban nen noi`, `Ban mau de shadow`, readable diff items, practical speaking-focus items, and playback for the model-answer audio
@@ -95,6 +97,8 @@ Not implemented yet:
 - `POST /v1/attempts/:attempt_id/upload-complete`
 - `GET /v1/attempts/:attempt_id`
 - `GET /v1/attempts/:attempt_id/audio/file`
+- `GET /v1/attempts/:attempt_id/audio/url`
+- `GET /v1/attempts/:attempt_id/review/audio/url`
 - `GET /v1/attempts`
 
 ## Out Of Scope
@@ -108,9 +112,9 @@ Not implemented yet:
 - polling UX has not yet been tested against real cloud latency
 - the current backend still auto-creates the attempt persistence schema on startup, so migration orchestration is not separated yet
 - the `S3` upload and `Amazon Transcribe` path has not yet been smoke-tested with a real bucket and AWS credentials in this workspace
-- completed-attempt playback is now stable in local iOS testing, but cloud-backed replay may still need a provider-aware download strategy when the backend is no longer serving a local temp file
+- completed-attempt playback is now provider-aware through signed URLs, but old `/audio/file` callers can still fail for S3-only attempts
 - the local compose stack now reaches `S3` upload successfully, but real transcript mode still fails until the active local AWS identity is allowed to call `transcribe:StartTranscriptionJob`
-- in `s3` mode, `GET /v1/attempts/:attempt_id/audio/file` can still return `404` because the current replay path expects a backend-stored file path unless a provider-aware download strategy is added
+- in `s3` mode, use `GET /v1/attempts/:attempt_id/audio/url` for replay; `GET /audio/file` remains local-file oriented
 
 ## Next Step
 Extend the same repair-and-shadowing loop to `Uloha 2`, then add the history compare view that can line up a retry against the previous review artifact.

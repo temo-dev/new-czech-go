@@ -80,9 +80,9 @@ Or the more specific version:
 - Flutter now also renders registered prompt images for `Uloha 3` and optional choice images for `Uloha 4`.
 - Flutter can now replay the just-recorded local audio file from the exercise screen.
 - Backend now exposes `GET /v1/attempts/:attempt_id/audio/file` so learners can replay the submitted audio of a completed attempt from backend storage.
-- Flutter result UI now shows the backend transcript more explicitly and can replay the completed-attempt audio from the backend.
+- Flutter result UI now shows the backend transcript more explicitly and replays the completed-attempt audio through `GET /v1/attempts/:attempt_id/audio/url`.
 - Backend now logs each HTTP request plus attempt-audio replay failures, so local debugging of playback issues is much faster.
-- iOS remote-attempt playback no longer streams the authenticated backend URL directly; Flutter now downloads the completed-attempt audio into app temp storage and plays the cached local file.
+- iOS remote-attempt playback now streams a short-lived signed URL with `just_audio`; the final audio URL is either a backend HMAC stream or an S3 presigned GET URL, so bearer tokens are not forwarded to cloud storage.
 - `GET /v1/attempts` now returns only the authenticated learner's attempts in newest-first order.
 - Learner shell now shows a `Lan tap gan day` section with recent readiness, feedback summary, and transcript preview cards.
 - Backend feedback summaries and retry advice are now task-aware for `Uloha 1` and `Uloha 2`, so the learner sees guidance tied to topic coverage, supporting detail, question form, required slots, and extra questions.
@@ -91,7 +91,7 @@ Or the more specific version:
 - Compose and EC2 env examples now include `REQUIRE_REAL_TRANSCRIPT`, and the env check script validates that strict real-transcript mode is only used with `amazon_transcribe + s3`.
 - Local compose has now reached the real `S3` upload path with container-visible AWS credentials, so `upload-url` and `upload-complete` are no longer the blocker in strict real-transcript mode.
 - The current local blocker is IAM on the active AWS identity: the latest local compose run failed at `transcribe:StartTranscriptionJob` with `AccessDeniedException` for the `veggie-team` user.
-- In local `s3` mode, `GET /v1/attempts/:attempt_id/audio/file` can still return `404` because replay is strongest for backend-owned local files and is not fully provider-aware yet.
+- In local `s3` mode, replay should use `GET /v1/attempts/:attempt_id/audio/url`; `/audio/file` remains a compatibility path and can still return `404` for cloud-only attempts with no backend `stored_file_path`.
 - The next major feature after the current transcript-and-feedback flow has now been documented as `Attempt Repair And Shadowing`.
 - The build-ready doc pack for that feature now exists in:
   - [docs/ideas/attempt-repair-and-shadowing.md](/Users/daniel.dev/Desktop/czech-go-system/docs/ideas/attempt-repair-and-shadowing.md)

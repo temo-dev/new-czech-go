@@ -15,24 +15,24 @@ import (
 )
 
 type MemoryStore struct {
-	mu             sync.RWMutex
-	usersByToken   map[string]contracts.User
-	tokenExpiry    map[string]time.Time // only set for dynamically issued tokens
-	adminEmail     string
-	adminPassword  string
-	plan           contracts.LearningPlan
-	courses        CourseStore
-	modules        ModuleStore
-	skills         SkillStore
-	exercises      ExerciseStore
-	attempts       AttemptStore
-	mockExams      MockExamStore
-	mockTests      MockTestStore
+	mu                 sync.RWMutex
+	usersByToken       map[string]contracts.User
+	tokenExpiry        map[string]time.Time // only set for dynamically issued tokens
+	adminEmail         string
+	adminPassword      string
+	plan               contracts.LearningPlan
+	courses            CourseStore
+	modules            ModuleStore
+	skills             SkillStore
+	exercises          ExerciseStore
+	attempts           AttemptStore
+	mockExams          MockExamStore
+	mockTests          MockTestStore
 	exerciseAudioStore ExerciseAudioStore // Postgres-backed when available
 	fullExamStore      FullExamStore      // Postgres-backed when available
-	vocabulary     VocabularyStore
-	grammar        GrammarStore
-	generationJobs GenerationJobStore
+	vocabulary         VocabularyStore
+	grammar            GrammarStore
+	generationJobs     GenerationJobStore
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -100,18 +100,18 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 			CurrentDay: 1,
 			Status:     "active",
 		},
-		courses:   newMemoryCourseStore(seedCourses()),
-		modules:   newMemoryModuleStore(seedDailyPlanModules()),
-		skills:    newMemorySkillStore(seedSkills(seedDailyPlanModules())),
-		exercises: exercises,
-		attempts:  attempts,
-		mockExams:      newMemoryMockExamStore(exercises, attempts),
-		mockTests:      newMemoryMockTestStore(),
+		courses:            newMemoryCourseStore(seedCourses()),
+		modules:            newMemoryModuleStore(seedDailyPlanModules()),
+		skills:             newMemorySkillStore(seedSkills(seedDailyPlanModules())),
+		exercises:          exercises,
+		attempts:           attempts,
+		mockExams:          newMemoryMockExamStore(exercises, attempts),
+		mockTests:          newMemoryMockTestStore(),
 		exerciseAudioStore: newMemoryExerciseAudioStore(),
 		fullExamStore:      newMemoryFullExamStore(),
-		vocabulary:    newMemoryVocabularyStore(),
-		grammar:        newMemoryGrammarStore(),
-		generationJobs: newMemoryGenerationJobStore(),
+		vocabulary:         newMemoryVocabularyStore(),
+		grammar:            newMemoryGrammarStore(),
+		generationJobs:     newMemoryGenerationJobStore(),
 	}
 }
 
@@ -563,31 +563,24 @@ func (s *MemoryStore) SetExerciseAudio(exerciseID string, audio contracts.Exerci
 	s.exerciseAudioStore.SetExerciseAudio(exerciseID, audio)
 }
 
-
 func rollupReadiness(levels []string) (string, string) {
 	if len(levels) == 0 {
 		return "not_ready", "Chưa có đủ feedback để đánh giá."
 	}
-	score := map[string]int{
-		"ready":      3,
-		"almost":     2,
-		"needs_work": 1,
-		"not_ready":  0,
-	}
-	total := 0
+	total := 0.0
 	for _, lv := range levels {
-		total += score[lv]
+		total += readinessToFraction(lv)
 	}
 	avg := float64(total) / float64(len(levels))
 	var overall, summary string
 	switch {
-	case avg >= 2.5:
+	case avg >= 0.875:
 		overall = "ready"
 		summary = "Bạn đã sẵn sàng cho bài thi! Cả 4 phần đều đạt yêu cầu."
-	case avg >= 1.5:
+	case avg >= 0.625:
 		overall = "almost"
 		summary = "Gần đến rồi! Ôn thêm một vài phần và bạn sẽ sẵn sàng."
-	case avg >= 0.75:
+	case avg >= 0.375:
 		overall = "needs_work"
 		summary = "Cần luyện thêm. Hãy ôn lại các phần chưa đạt trước khi thi."
 	default:
@@ -650,4 +643,3 @@ func seedDailyPlanModules() []contracts.Module {
 	})
 	return mods
 }
-

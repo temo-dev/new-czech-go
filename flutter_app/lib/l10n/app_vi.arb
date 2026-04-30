@@ -30,6 +30,12 @@
     "mockExamTitle": "Mock thi nói",
     "mockExamIntroTitle": "4 phần, mỗi phần 1 lần",
     "mockExamIntroBody": "Ghi âm lần lượt từng Uloha. Sau khi xong cả 4 phần, hệ thống sẽ phân tích và cho kết quả tổng.",
+    "mockExamProgressIntroTitle": "{count} phần, mỗi phần 1 lần",
+    "@mockExamProgressIntroTitle": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "mockExamProgressIntroBodyWithSpeaking": "Làm từng phần theo thứ tự. Điểm bài thi chỉ được tính sau phần cuối; phần nói sẽ được phân tích cùng nhau ở cuối.",
+    "mockExamProgressIntroBodyNoSpeaking": "Làm từng phần theo thứ tự. Kết quả sẽ được tính sau phần cuối cùng.",
     "mockExamSectionLabel": "Phần {index}",
     "@mockExamSectionLabel": {
         "placeholders": { "index": { "type": "int" } }
@@ -47,6 +53,24 @@
     },
     "mockExamActionStart": "Bắt đầu",
     "mockExamActionDone": "Xong",
+    "mockExamSectionMeta": "{skill} · {exercise} · {points} điểm",
+    "@mockExamSectionMeta": {
+        "placeholders": {
+            "skill": { "type": "String" },
+            "exercise": { "type": "String" },
+            "points": { "type": "int" }
+        }
+    },
+    "mockExamTaskTypeUloha": "Úloha {n}",
+    "@mockExamTaskTypeUloha": { "placeholders": { "n": { "type": "int" } } },
+    "mockExamTaskTypeListening": "Nghe {n}",
+    "@mockExamTaskTypeListening": { "placeholders": { "n": { "type": "int" } } },
+    "mockExamTaskTypeReading": "Đọc {n}",
+    "@mockExamTaskTypeReading": { "placeholders": { "n": { "type": "int" } } },
+    "mockExamTaskTypeWriting": "Viết {n}",
+    "@mockExamTaskTypeWriting": { "placeholders": { "n": { "type": "int" } } },
+    "mockExamTaskTypeWritingForm": "Viết 1 - form",
+    "mockExamTaskTypeWritingEmail": "Viết 2 - email",
     "mockExamResultTitle": "Kết quả mock exam",
     "mockExamOverallTitle": "Mức sẵn sàng tổng",
     "mockExamBackHome": "Về trang chủ",
@@ -73,6 +97,7 @@
     "mockTestCardSections": "{n} phần",
     "@mockTestCardSections": { "placeholders": { "n": { "type": "int" } } },
     "mockTestIntroStartCta": "Bắt đầu thi",
+    "mockTestMissingTemplateId": "Đề thi này đang thiếu ID mẫu. Hãy tải lại danh sách đề và thử lại.",
     "mockTestIntroPoints": "Tổng {pts} điểm",
     "@mockTestIntroPoints": { "placeholders": { "pts": { "type": "int" } } },
     "mockTestIntroPassThreshold": "Đạt: từ {pts} điểm trở lên",
@@ -147,6 +172,17 @@
     "recordCtaAnalyze": "Phân tích",
     "recordCtaRerecord": "Ghi lại",
     "recordStatusStopped": "ĐÃ DỪNG",
+    "recordHintTapToStart": "NHẤN ĐỂ BẮT ĐẦU",
+    "recordHintTapToStop": "NHẤN ĐỂ DỪNG",
+    "historyBadgeReady": "SẴN SÀNG",
+    "historyBadgeAlmost": "GẦN ĐẠT",
+    "historyBadgeNeedsWork": "CẦN LUYỆN",
+    "historyBadgeNotReady": "CHƯA SẴN SÀNG",
+    "historyBadgeFailed": "LỖI",
+    "historyBadgeCreated": "MỚI TẠO",
+    "historyCtaTitle": "Tiếp tục luyện tập!",
+    "historyCtaSubtitle": "Ôn thêm một chủ đề nữa để tăng độ lưu loát tiếng Séc.",
+    "historyCtaButton": "Bắt đầu luyện",
     "recordHintStopped": "Nghe lại bản ghi. Ấn \"Phân tích\" khi ưng ý.",
     "analysisScreenTitle": "Đang phân tích",
     "analysisUploading": "Đang tải lên bản ghi...",

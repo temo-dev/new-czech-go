@@ -1088,6 +1088,204 @@ func TestGetCoursesReturnsPublishedList(t *testing.T) {
 	}
 }
 
+func TestCreateMockExamDecodesChunkedMockTestID(t *testing.T) {
+	repo := store.NewMemoryStore()
+	mockTest, err := repo.CreateMockTest(contracts.MockTest{
+		Title:                "Mixed sprint",
+		Status:               "published",
+		PassThresholdPercent: 80,
+		Sections: []contracts.MockTestSection{
+			{
+				SequenceNo:   1,
+				SkillKind:    "noi",
+				ExerciseID:   "exercise-uloha1-weather",
+				ExerciseType: "uloha_1_topic_answers",
+				MaxPoints:    8,
+			},
+			{
+				SequenceNo:   2,
+				SkillKind:    "nghe",
+				ExerciseID:   "exercise-poslech-2",
+				ExerciseType: "poslech_2",
+				MaxPoints:    5,
+			},
+			{
+				SequenceNo:   3,
+				SkillKind:    "doc",
+				ExerciseID:   "exercise-cteni-1",
+				ExerciseType: "cteni_1",
+				MaxPoints:    5,
+			},
+			{
+				SequenceNo:   4,
+				SkillKind:    "viet",
+				ExerciseID:   "exercise-psani-1",
+				ExerciseType: "psani_1_formular",
+				MaxPoints:    8,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateMockTest: %v", err)
+	}
+
+	server := httptest.NewServer(NewServer(repo, nil, nil))
+	defer server.Close()
+
+	payload, err := json.Marshal(map[string]any{"mock_test_id": mockTest.ID})
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	request, err := http.NewRequest(
+		http.MethodPost,
+		server.URL+"/v1/mock-exams",
+		io.NopCloser(bytes.NewReader(payload)),
+	)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	request.ContentLength = -1
+	request.Header.Set("Authorization", "Bearer dev-learner-token")
+	request.Header.Set("Content-Type", "application/json")
+
+	response, err := server.Client().Do(request)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(response.Body)
+		t.Fatalf("expected 201, got %d: %s", response.StatusCode, body)
+	}
+
+	var decoded map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	data := decoded["data"].(map[string]any)
+	if data["mock_test_id"] != mockTest.ID {
+		t.Fatalf("mock_test_id = %v, want %s", data["mock_test_id"], mockTest.ID)
+	}
+	sections := data["sections"].([]any)
+	if len(sections) != 4 {
+		t.Fatalf("sections length = %d, want 4", len(sections))
+	}
+	gotTypes := make([]string, 0, len(sections))
+	for _, raw := range sections {
+		section := raw.(map[string]any)
+		gotTypes = append(gotTypes, section["exercise_type"].(string))
+	}
+	wantTypes := []string{
+		"uloha_1_topic_answers",
+		"poslech_2",
+		"cteni_1",
+		"psani_1_formular",
+	}
+	for i := range wantTypes {
+		if gotTypes[i] != wantTypes[i] {
+			t.Fatalf("section types = %v, want %v", gotTypes, wantTypes)
+		}
+	}
+}
+
+func TestAdvanceMockExamRejectsAttemptOwnedByAnotherLearner(t *testing.T) {
+	repo := store.NewMemoryStore()
+	exercise := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "cteni_1",
+		Status:       "published",
+		Pool:         "exam",
+	})
+	mockTest, err := repo.CreateMockTest(contracts.MockTest{
+		Title:                "Reading sprint",
+		Status:               "published",
+		PassThresholdPercent: 60,
+		Sections: []contracts.MockTestSection{
+			{
+				SequenceNo:   1,
+				SkillKind:    "doc",
+				ExerciseID:   exercise.ID,
+				ExerciseType: exercise.ExerciseType,
+				MaxPoints:    5,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateMockTest: %v", err)
+	}
+	session, err := repo.CreateMockExam("user-learner-1", mockTest.ID)
+	if err != nil {
+		t.Fatalf("CreateMockExam: %v", err)
+	}
+	foreignAttempt, err := repo.CreateAttempt("user-learner-2", exercise.ID, "ios", "0.1.0", "vi")
+	if err != nil {
+		t.Fatalf("CreateAttempt: %v", err)
+	}
+
+	server := httptest.NewServer(NewServer(repo, nil, nil))
+	defer server.Close()
+
+	status, decoded := postJSONAllowErrorWithToken(t, server, "/v1/mock-exams/"+session.ID+"/advance", "dev-learner-token", map[string]any{
+		"attempt_id": foreignAttempt.ID,
+	})
+	if status != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %#v", status, decoded)
+	}
+	errorPayload := decoded["error"].(map[string]any)
+	if errorPayload["code"] != "forbidden" {
+		t.Fatalf("expected forbidden error, got %v", errorPayload["code"])
+	}
+}
+
+func TestAdvanceMockExamAcceptsRecordedSpeakingAttemptBeforeAnalysis(t *testing.T) {
+	repo := store.NewMemoryStore()
+	exercise := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_1_topic_answers",
+		Status:       "published",
+		Pool:         "exam",
+	})
+	mockTest, err := repo.CreateMockTest(contracts.MockTest{
+		Title:                "Speaking sprint",
+		Status:               "published",
+		PassThresholdPercent: 60,
+		Sections: []contracts.MockTestSection{
+			{
+				SequenceNo:   1,
+				SkillKind:    "noi",
+				ExerciseID:   exercise.ID,
+				ExerciseType: exercise.ExerciseType,
+				MaxPoints:    8,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateMockTest: %v", err)
+	}
+	session, err := repo.CreateMockExam("user-learner-1", mockTest.ID)
+	if err != nil {
+		t.Fatalf("CreateMockExam: %v", err)
+	}
+	recordedAttempt, err := repo.CreateAttempt("user-learner-1", exercise.ID, "ios", "0.1.0", "vi")
+	if err != nil {
+		t.Fatalf("CreateAttempt: %v", err)
+	}
+
+	server := httptest.NewServer(NewServer(repo, nil, nil))
+	defer server.Close()
+
+	status, decoded := postJSONAllowErrorWithToken(t, server, "/v1/mock-exams/"+session.ID+"/advance", "dev-learner-token", map[string]any{
+		"attempt_id": recordedAttempt.ID,
+	})
+	if status != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %#v", status, decoded)
+	}
+	data := decoded["data"].(map[string]any)
+	sections := data["sections"].([]any)
+	first := sections[0].(map[string]any)
+	if first["attempt_id"] != recordedAttempt.ID {
+		t.Fatalf("attempt_id = %v, want %s", first["attempt_id"], recordedAttempt.ID)
+	}
+}
+
 func postJSON(t *testing.T, server *httptest.Server, path string, body map[string]any) map[string]any {
 	t.Helper()
 	status, decoded := postJSONAllowError(t, server, path, body)

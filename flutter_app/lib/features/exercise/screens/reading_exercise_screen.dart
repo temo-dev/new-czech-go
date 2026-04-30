@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
@@ -19,11 +21,13 @@ class ReadingExerciseScreen extends StatefulWidget {
     required this.client,
     required this.detail,
     this.onAttemptCompleted,
+    this.showResultOnCompletion = true,
   });
 
   final ApiClient client;
   final ExerciseDetail detail;
-  final void Function(String attemptId)? onAttemptCompleted;
+  final FutureOr<void> Function(String attemptId)? onAttemptCompleted;
+  final bool showResultOnCompletion;
 
   @override
   State<ReadingExerciseScreen> createState() => _ReadingExerciseScreenState();
@@ -38,24 +42,39 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
   bool get _hasAllAnswers {
     final d = widget.detail;
     if (d.isCteni5) {
-      return d.cteniQuestions.every((q) => _answers[q.questionNo.toString()]?.isNotEmpty == true);
+      return d.cteniQuestions.every(
+        (q) => _answers[q.questionNo.toString()]?.isNotEmpty == true,
+      );
     }
-    final count = d.cteniQuestions.isNotEmpty
-        ? d.cteniQuestions.length
-        : (d.cteniItems.isNotEmpty ? d.cteniItems.length : 5);
-    return List.generate(count, (i) => (i + 1).toString())
-        .every((k) => _answers[k]?.isNotEmpty == true);
+    final count =
+        d.cteniQuestions.isNotEmpty
+            ? d.cteniQuestions.length
+            : (d.cteniItems.isNotEmpty ? d.cteniItems.length : 5);
+    return List.generate(
+      count,
+      (i) => (i + 1).toString(),
+    ).every((k) => _answers[k]?.isNotEmpty == true);
   }
 
   Future<void> _submit() async {
     if (!_hasAllAnswers || _submitting) return;
-    setState(() { _submitting = true; _error = null; });
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
     try {
-      final attempt = await widget.client.createAttempt(widget.detail.id, locale: 'vi');
+      final attempt = await widget.client.createAttempt(
+        widget.detail.id,
+        locale: 'vi',
+      );
       final attemptId = attempt['id'] as String;
       final raw = await widget.client.submitAnswers(attemptId, _answers);
-      widget.onAttemptCompleted?.call(attemptId);
+      await widget.onAttemptCompleted?.call(attemptId);
       if (!mounted) return;
+      if (!widget.showResultOnCompletion) {
+        Navigator.of(context).pop();
+        return;
+      }
       setState(() => _result = AttemptResult.fromJson(raw));
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -71,20 +90,35 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
     if (_result != null) {
       return Scaffold(
         backgroundColor: AppColors.surface,
-        appBar: AppBar(backgroundColor: AppColors.surface, elevation: 0,
-          title: Text(AppLocalizations.of(context).resultScreenTitle, style: AppTypography.titleMedium)),
-        body: SafeArea(child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.x4),
-          child: ObjectiveResultCard(result: _result!, onRetry: () => Navigator.of(context).pop()),
-        )),
+        appBar: AppBar(
+          backgroundColor: AppColors.surface,
+          elevation: 0,
+          title: Text(
+            AppLocalizations.of(context).resultScreenTitle,
+            style: AppTypography.titleMedium,
+          ),
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.x4),
+            child: ObjectiveResultCard(
+              result: _result!,
+              onRetry: () => Navigator.of(context).pop(),
+            ),
+          ),
+        ),
       );
     }
 
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: AppBar(
-        backgroundColor: AppColors.surface, elevation: 0,
-        title: Text(d.exerciseType.replaceAll('_', ' ').toUpperCase(), style: AppTypography.titleMedium),
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        title: Text(
+          d.exerciseType.replaceAll('_', ' ').toUpperCase(),
+          style: AppTypography.titleMedium,
+        ),
       ),
       body: SafeArea(
         child: ListView(
@@ -104,7 +138,10 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AppColors.outlineVariant),
                 ),
-                child: SelectableText(d.cteniText, style: AppTypography.bodyMedium),
+                child: SelectableText(
+                  d.cteniText,
+                  style: AppTypography.bodyMedium,
+                ),
               ),
               const SizedBox(height: AppSpacing.x4),
             ],
@@ -127,7 +164,10 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
 
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.x2),
-              Text(_error!, style: AppTypography.bodySmall.copyWith(color: AppColors.error)),
+              Text(
+                _error!,
+                style: AppTypography.bodySmall.copyWith(color: AppColors.error),
+              ),
             ],
             const SizedBox(height: AppSpacing.x6),
             FilledButton(
@@ -135,11 +175,26 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
-              child: _submitting
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text(AppLocalizations.of(context).submitAnswersCta, style: AppTypography.labelLarge.copyWith(color: Colors.white)),
+              child:
+                  _submitting
+                      ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                      : Text(
+                        AppLocalizations.of(context).submitAnswersCta,
+                        style: AppTypography.labelLarge.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
             ),
           ],
         ),
@@ -165,9 +220,22 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 28, height: 28,
-                decoration: BoxDecoration(color: AppColors.secondary, shape: BoxShape.circle),
-                child: Center(child: Text('$no', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: AppColors.secondary,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    '$no',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(child: Text(text, style: AppTypography.bodySmall)),
@@ -182,16 +250,20 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
     // For cteni_1 (match image → option): one selection per item
     // For cteni_2/4 (multiple choice): one per question with options
     // For cteni_3 (match text → person): one per item with person options
-    final questionCount = d.cteniQuestions.isNotEmpty ? d.cteniQuestions.length
-        : d.cteniItems.isNotEmpty ? d.cteniItems.length
-        : 5;
+    final questionCount =
+        d.cteniQuestions.isNotEmpty
+            ? d.cteniQuestions.length
+            : d.cteniItems.isNotEmpty
+            ? d.cteniItems.length
+            : 5;
 
     return List.generate(questionCount, (i) {
       final qno = i + 1;
       final opts = d.cteniOptions.isNotEmpty ? d.cteniOptions : _defaultABCD();
-      final prompt = d.cteniQuestions.isNotEmpty && i < d.cteniQuestions.length
-          ? d.cteniQuestions[i].prompt
-          : null;
+      final prompt =
+          d.cteniQuestions.isNotEmpty && i < d.cteniQuestions.length
+              ? d.cteniQuestions[i].prompt
+              : null;
       return Padding(
         padding: const EdgeInsets.only(bottom: AppSpacing.x4),
         child: Column(
@@ -214,7 +286,9 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
   }
 
   List<PoslechOptionView> _defaultABCD() => const [
-    PoslechOptionView(key: 'A', text: 'A'), PoslechOptionView(key: 'B', text: 'B'),
-    PoslechOptionView(key: 'C', text: 'C'), PoslechOptionView(key: 'D', text: 'D'),
+    PoslechOptionView(key: 'A', text: 'A'),
+    PoslechOptionView(key: 'B', text: 'B'),
+    PoslechOptionView(key: 'C', text: 'C'),
+    PoslechOptionView(key: 'D', text: 'D'),
   ];
 }
