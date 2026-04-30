@@ -102,11 +102,30 @@ Mỗi module nên có ít nhất 1 skill `noi`:
 
 **Trang:** `/mock-tests` → **"Mock mới"**
 
-### Bước 1: Tạo 4 exercises dùng cho thi (pool = exam)
+### Chọn loại kỳ thi — **Thi thật** hay **Luyện thi**
+
+Đây là quyết định đầu tiên cần chọn:
+
+| | **Thi thật** (`real`) | **Luyện thi** (`practice`) |
+|---|---|---|
+| Mục đích | Mô phỏng đúng format kỳ thi A2 NPI ČR | Luyện tập linh hoạt, sprint theo chủ đề |
+| Sections | Admin tự chọn exercises phù hợp | Admin tự chọn bất kỳ skill nào |
+| Ngưỡng đạt | Cố định theo spec NPI (≥24/40 nói, ≥42/70 viết) | Admin tự đặt (ví dụ: 70%, 80%) |
+| Thời gian | Theo format thật | Linh hoạt |
+
+> **Mặc định:** Nếu không chọn → hệ thống xử lý như "Luyện thi".
+
+---
+
+### Bước 1: Tạo exercises dùng cho thi (pool = exam)
 
 Tạo ở trang `/` như trên, nhưng trong Tab "Metadata":
 - Pool: **`Bài thi mock exam (exam)`**
 - Không cần chọn module/skill
+
+Số lượng exercises cần tạo phụ thuộc vào loại mock test:
+- **Thi thật 4 kỹ năng:** cần exercises cho nói (Úloha 1-4), nghe (Poslech 1-5), đọc (Čtení 1-5), viết (Psaní 1-2)
+- **Luyện thi sprint nói:** chỉ cần 4 exercises Úloha 1-4
 
 ### Bước 2: Tạo Mock Test
 
@@ -115,15 +134,30 @@ Tạo ở trang `/` như trên, nhưng trong Tab "Metadata":
 | Tiêu đề | `Mock Test 01 — Bản thân & nhà ở` |
 | Mô tả | `Đề thi thử A2 toàn phần, 4 úloha` |
 | Thời gian | `12` phút |
+| **Loại kỳ thi** | `Luyện thi` hoặc `Thi thật` ← **chọn ở đây** |
+| **Ngưỡng đạt %** | `80` (luyện thi) hoặc `60` (thi thật standard) |
 | Status | `published` |
 
 ### Bước 3: Gán exercises vào sections
 
-Mỗi mock test có 4 sections:
+#### Ví dụ — Sprint nói (Luyện thi, 4 sections)
+
 - Section 1 → exercise Úloha 1 (max 8 điểm)
 - Section 2 → exercise Úloha 2 (max 12 điểm)
 - Section 3 → exercise Úloha 3 (max 10 điểm)
 - Section 4 → exercise Úloha 4 (max 7 điểm)
+
+#### Ví dụ — Thi thật toàn phần (Thi thật, nhiều sections)
+
+- Section 1 → Úloha 1 (max 8đ)
+- Section 2 → Úloha 2 (max 12đ)
+- Section 3 → Úloha 3 (max 10đ)
+- Section 4 → Úloha 4 (max 7đ)
+- Section 5 → Poslech 1 (max 5đ)
+- Section 6 → Poslech 2 (max 5đ)
+- ... (thêm các section nghe/đọc/viết)
+
+> **Lưu ý:** Flutter app tự động route đúng màn hình theo exercise type. Không cần config thêm — `uloha_*` → màn hình nói, `poslech_*` → màn hình nghe, `cteni_*` → màn hình đọc, `psani_*` → màn hình viết.
 
 ---
 
@@ -148,3 +182,5 @@ TRUNCATE TABLE attempt_review_artifacts, attempt_feedback, attempt_audio,
   mock_test_sections, mock_tests, exercises,
   skills, modules, courses CASCADE;
 ```
+
+> **Lưu ý V9:** Bảng `full_exam_sessions` đã được xóa — không còn tồn tại trong schema.
