@@ -323,3 +323,134 @@ export function ExerciseMatrix({ items, modules, courses, activeCell, onCellClic
     </div>
   );
 }
+
+// ─── ExamPoolMatrix ───────────────────────────────────────────────────────────
+
+type ExamRow = {
+  exerciseType: string;
+  total: number;
+  published: number;
+  hasAudio: number;
+};
+
+type ExamPoolMatrixProps = {
+  items: Exercise[];
+  activeType?: string | null;
+  onTypeClick?: (exerciseType: string | null) => void;
+};
+
+export function ExamPoolMatrix({ items, activeType, onTypeClick }: ExamPoolMatrixProps) {
+  // Build counts per exercise_type
+  const byType = new Map<string, ExamRow>();
+  for (const item of items) {
+    if (!byType.has(item.exercise_type)) {
+      byType.set(item.exercise_type, { exerciseType: item.exercise_type, total: 0, published: 0, hasAudio: 0 });
+    }
+    const row = byType.get(item.exercise_type)!;
+    row.total++;
+    if (item.status === 'published') row.published++;
+    if ((item.assets?.length ?? 0) > 0) row.hasAudio++;
+  }
+
+  const rows: ExamRow[] = [...byType.values()].sort((a, b) =>
+    a.exerciseType.localeCompare(b.exerciseType),
+  );
+
+  if (rows.length === 0) {
+    return (
+      <div
+        style={{
+          padding: '32px 24px',
+          textAlign: 'center',
+          color: 'var(--ink-3)',
+          background: 'var(--surface)',
+          borderRadius: 16,
+          border: '1px solid var(--border)',
+        }}
+      >
+        <p style={{ margin: 0 }}>Chưa có exercise nào trong Exam Pool.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        background: 'var(--surface)',
+        borderRadius: 16,
+        border: '1px solid var(--border)',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '2fr 80px 80px 80px',
+          padding: '8px 16px',
+          background: 'var(--surface-alt)',
+          borderBottom: '1px solid var(--border)',
+          gap: 8,
+        }}
+      >
+        {['Exercise type', 'Tổng', 'Published', 'Có audio'].map((h) => (
+          <span
+            key={h}
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: 'var(--ink-3)',
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+              textAlign: h === 'Exercise type' ? 'left' : 'center',
+            }}
+          >
+            {h}
+          </span>
+        ))}
+      </div>
+
+      {/* Rows */}
+      {rows.map((row, idx) => {
+        const active = activeType === row.exerciseType;
+        return (
+          <button
+            key={row.exerciseType}
+            type="button"
+            onClick={() =>
+              onTypeClick?.(active ? null : row.exerciseType)
+            }
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '2fr 80px 80px 80px',
+              padding: '10px 16px',
+              gap: 8,
+              width: '100%',
+              textAlign: 'left',
+              border: 'none',
+              borderBottom: idx < rows.length - 1 ? '1px solid var(--border)' : 'none',
+              background: active ? 'rgba(255,106,20,0.06)' : 'transparent',
+              cursor: 'pointer',
+              alignItems: 'center',
+              outline: active ? '2px solid #FF6A14' : 'none',
+              outlineOffset: -2,
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>
+              {row.exerciseType.replace(/_/g, ' ')}
+            </span>
+            <span style={{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: row.total === 0 ? 'var(--error)' : 'var(--ink)' }}>
+              {row.total === 0 ? '—' : row.total}
+            </span>
+            <span style={{ textAlign: 'center', fontSize: 13, color: 'var(--ink-2)' }}>
+              {row.published}
+            </span>
+            <span style={{ textAlign: 'center', fontSize: 13, color: 'var(--ink-2)' }}>
+              {row.hasAudio > 0 ? `${row.hasAudio} (${Math.round((row.hasAudio / row.total) * 100)}%)` : '—'}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}

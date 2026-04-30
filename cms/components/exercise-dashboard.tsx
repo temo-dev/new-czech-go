@@ -5,7 +5,7 @@ import { useS } from '../lib/i18n';
 import { adminFetch } from '../lib/api';
 import { ExerciseList, ExerciseListFilters } from './exercise-list';
 import { ExerciseSlideOver } from './exercise-form';
-import { ExerciseMatrix, MatrixSkillKind } from './exercise-matrix';
+import { ExerciseMatrix, ExamPoolMatrix, MatrixSkillKind } from './exercise-matrix';
 import {
   CmsCourse,
   CmsModule,
@@ -19,6 +19,7 @@ import {
 } from './exercise-utils';
 
 type ActiveCell = { moduleId: string | null; skillKind: MatrixSkillKind } | null;
+type FormPrefill = { moduleId?: string; skillKind?: string; pool?: string } | null;
 
 export function ExerciseDashboard() {
   const S = useS();
@@ -35,7 +36,9 @@ export function ExerciseDashboard() {
   const [activeTab, setActiveTab] = useState<'course' | 'exam'>('course');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [formPrefill, setFormPrefill] = useState<FormPrefill>(null);
   const [activeCell, setActiveCell] = useState<ActiveCell>(null);
+  const [activeExamType, setActiveExamType] = useState<string | null>(null);
   const [listFilters, setListFilters] = useState<ExerciseListFilters>({
     courseId: '', moduleId: '', skillKind: '', mockTestId: '', text: '',
   });
@@ -96,7 +99,6 @@ export function ExerciseDashboard() {
 
   // ── Matrix cell click ────────────────────────────────────────────────────────
   function handleCellClick(moduleId: string | null, skillKind: MatrixSkillKind) {
-    // Toggle: clicking active cell clears filters
     if (activeCell?.moduleId === moduleId && activeCell?.skillKind === skillKind) {
       setActiveCell(null);
       patchFilters({ moduleId: '', skillKind: '' });
@@ -104,17 +106,18 @@ export function ExerciseDashboard() {
     }
     setActiveCell({ moduleId, skillKind });
     patchFilters({ moduleId: moduleId ?? '', skillKind });
-    // Scroll to list
     listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // ── Form callbacks ───────────────────────────────────────────────────────────
-  function openCreate() {
+  function openCreate(prefill?: FormPrefill) {
+    setFormPrefill(prefill ?? null);
     setEditingId(null);
     setShowForm(true);
   }
 
   function startEditing(item: Exercise) {
+    setFormPrefill(null);
     setEditingId(item.id);
     setShowForm(true);
   }
@@ -122,6 +125,7 @@ export function ExerciseDashboard() {
   function handleClose() {
     setShowForm(false);
     setEditingId(null);
+    setFormPrefill(null);
   }
 
   async function handleSaved() {
@@ -130,6 +134,20 @@ export function ExerciseDashboard() {
 
   async function handleDeleted(_id: string) {
     await loadExercises();
+  }
+
+  async function handleDelete(id: string) {
+    if (!window.confirm(S.exercise.deleteConfirm)) return;
+    try {
+      const res = await adminFetch(`/api/admin/exercises/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const p = await res.json();
+        throw new Error(p.error?.message ?? 'Could not delete exercise.');
+      }
+      await loadExercises();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    }
   }
 
   // ── Tab styles ───────────────────────────────────────────────────────────────
@@ -147,8 +165,40 @@ export function ExerciseDashboard() {
     };
   }
 
-  // ── Exam pool items ──────────────────────────────────────────────────────────
+  // ── Derived data ─────────────────────────────────────────────────────────────
   const examItems = items.filter((i) => i.pool === 'exam');
+  const examFiltered = activeExamType
+    ? examItems.filter((i) => i.exercise_type === activeExamType)
+    : examItems;
+
+  // ── Skeleton ─────────────────────────────────────────────────────────────────
+  const MatrixSkeleton = () => (
+    <div
+      style={{
+        background: 'var(--surface)',
+        borderRadius: 28,
+        border: '1px solid var(--border)',
+        padding: 24,
+        display: 'grid',
+        gap: 12,
+      }}
+    >
+      {[1, 2, 3, 4].map((n) => (
+        <div
+          key={n}
+          style={{
+            height: 44,
+            borderRadius: 8,
+            background: 'linear-gradient(90deg, var(--surface-alt) 25%, var(--border) 50%, var(--surface-alt) 75%)',
+            backgroundSize: '200% 100%',
+            animation: 'shimmer 1.4s infinite',
+            opacity: 0.7,
+          }}
+        />
+      ))}
+      <style>{`@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
+    </div>
+  );
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -170,25 +220,11 @@ export function ExerciseDashboard() {
           <h1 style={{ margin: 0, fontSize: 'clamp(2.2rem, 3vw, 3.5rem)', lineHeight: 1.02 }}>
             {S.exercise.heroTitle}
           </h1>
-          <p
-            style={{
-              margin: 0,
-              maxWidth: 760,
-              color: 'var(--text-secondary)',
-              fontSize: 16,
-              lineHeight: 1.55,
-            }}
-          >
+          <p style={{ margin: 0, maxWidth: 760, color: 'var(--text-secondary)', fontSize: 16, lineHeight: 1.55 }}>
             {S.exercise.heroDesc}
           </p>
         </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            gap: 14,
-          }}
-        >
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
           <div style={metricCardStyle}>
             <span style={metricLabelStyle}>{S.exercise.metricSliceLabel}</span>
             <strong style={metricValueStyle}>{S.exercise.metricSliceValue}</strong>
@@ -207,11 +243,37 @@ export function ExerciseDashboard() {
         </div>
       </section>
 
+      {/* API error banner */}
+      {error && (
+        <div
+          style={{
+            padding: '12px 18px',
+            background: 'var(--error-bg)',
+            borderRadius: 12,
+            border: '1px solid var(--error)',
+            display: 'flex',
+            gap: 12,
+            alignItems: 'center',
+          }}
+        >
+          <span style={{ flex: 1, color: 'var(--error)', fontSize: 14 }}>{error}</span>
+          <button
+            onClick={() => { setError(null); void loadExercises(); }}
+            style={{ background: 'var(--error)', color: '#fff', border: 'none', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
+
       {/* Slide-over form */}
       <ExerciseSlideOver
         open={showForm}
         editingItem={editingItem}
         modules={availableModules}
+        prefillModuleId={formPrefill?.moduleId}
+        prefillSkillKind={formPrefill?.skillKind}
+        prefillPool={formPrefill?.pool}
         onSaved={handleSaved}
         onDeleted={handleDeleted}
         onClose={handleClose}
@@ -221,12 +283,12 @@ export function ExerciseDashboard() {
       <div
         style={{
           display: 'flex',
-          borderBottom: '1px solid var(--border)',
           background: 'var(--surface)',
           borderRadius: '16px 16px 0 0',
-          paddingTop: 4,
           overflow: 'hidden',
           border: '1px solid var(--border)',
+          borderBottom: 'none',
+          marginBottom: -1,
         }}
       >
         <button style={tabStyle(activeTab === 'course')} onClick={() => setActiveTab('course')}>
@@ -235,17 +297,7 @@ export function ExerciseDashboard() {
         <button style={tabStyle(activeTab === 'exam')} onClick={() => setActiveTab('exam')}>
           Exam Pool
           {examItems.length > 0 && (
-            <span
-              style={{
-                marginLeft: 6,
-                fontSize: 11,
-                background: 'var(--surface-alt)',
-                color: 'var(--ink-3)',
-                padding: '1px 6px',
-                borderRadius: 99,
-                fontWeight: 600,
-              }}
-            >
+            <span style={{ marginLeft: 6, fontSize: 11, background: 'var(--surface-alt)', color: 'var(--ink-3)', padding: '1px 6px', borderRadius: 99, fontWeight: 600 }}>
               {examItems.length}
             </span>
           )}
@@ -255,13 +307,17 @@ export function ExerciseDashboard() {
       {/* Tab: Khoá học */}
       {activeTab === 'course' && (
         <>
-          <ExerciseMatrix
-            items={items}
-            modules={availableModules}
-            courses={courses}
-            activeCell={activeCell}
-            onCellClick={handleCellClick}
-          />
+          {loading ? (
+            <MatrixSkeleton />
+          ) : (
+            <ExerciseMatrix
+              items={items}
+              modules={availableModules}
+              courses={courses}
+              activeCell={activeCell}
+              onCellClick={handleCellClick}
+            />
+          )}
           <div ref={listRef}>
             <ExerciseList
               items={items.filter((i) => i.pool !== 'exam')}
@@ -269,25 +325,25 @@ export function ExerciseDashboard() {
               courses={courses}
               mockTests={mockTests}
               loading={loading}
-              error={error}
+              error={null}
               filters={listFilters}
-              onFilterChange={patchFilters}
-              onEdit={startEditing}
-              onDelete={async (id) => {
-                if (!window.confirm(S.exercise.deleteConfirm)) return;
-                try {
-                  const res = await adminFetch(`/api/admin/exercises/${id}`, { method: 'DELETE' });
-                  if (!res.ok) {
-                    const p = await res.json();
-                    throw new Error(p.error?.message ?? 'Could not delete exercise.');
-                  }
-                  await loadExercises();
-                } catch (err) {
-                  setError(err instanceof Error ? err.message : 'Unknown error');
+              onFilterChange={(patch) => {
+                patchFilters(patch);
+                // Clear active cell if user manually changes filters
+                if (patch.moduleId !== undefined || patch.skillKind !== undefined) {
+                  setActiveCell(null);
                 }
               }}
+              onEdit={startEditing}
+              onDelete={handleDelete}
               onReload={loadExercises}
-              onOpenCreate={openCreate}
+              onOpenCreate={() =>
+                openCreate(
+                  activeCell
+                    ? { moduleId: activeCell.moduleId ?? '', skillKind: activeCell.skillKind }
+                    : undefined,
+                )
+              }
             />
           </div>
         </>
@@ -295,32 +351,27 @@ export function ExerciseDashboard() {
 
       {/* Tab: Exam Pool */}
       {activeTab === 'exam' && (
-        <ExerciseList
-          items={examItems}
-          modules={availableModules}
-          courses={courses}
-          mockTests={mockTests}
-          loading={loading}
-          error={error}
-          filters={{ courseId: '', moduleId: '', skillKind: '', mockTestId: '', text: listFilters.text }}
-          onFilterChange={(patch) => patchFilters({ text: patch.text ?? listFilters.text })}
-          onEdit={startEditing}
-          onDelete={async (id) => {
-            if (!window.confirm(S.exercise.deleteConfirm)) return;
-            try {
-              const res = await adminFetch(`/api/admin/exercises/${id}`, { method: 'DELETE' });
-              if (!res.ok) {
-                const p = await res.json();
-                throw new Error(p.error?.message ?? 'Could not delete exercise.');
-              }
-              await loadExercises();
-            } catch (err) {
-              setError(err instanceof Error ? err.message : 'Unknown error');
-            }
-          }}
-          onReload={loadExercises}
-          onOpenCreate={openCreate}
-        />
+        <div style={{ display: 'grid', gap: 16 }}>
+          <ExamPoolMatrix
+            items={examItems}
+            activeType={activeExamType}
+            onTypeClick={setActiveExamType}
+          />
+          <ExerciseList
+            items={examFiltered}
+            modules={availableModules}
+            courses={courses}
+            mockTests={[]}
+            loading={loading}
+            error={null}
+            filters={{ courseId: '', moduleId: '', skillKind: '', mockTestId: '', text: listFilters.text }}
+            onFilterChange={(patch) => patchFilters({ text: patch.text ?? listFilters.text })}
+            onEdit={startEditing}
+            onDelete={handleDelete}
+            onReload={loadExercises}
+            onOpenCreate={() => openCreate({ pool: 'exam' })}
+          />
+        </div>
       )}
     </main>
   );

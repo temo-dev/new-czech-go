@@ -36,6 +36,9 @@ type Props = {
   open: boolean;
   editingItem: Exercise | null;
   modules: CmsModule[];
+  prefillModuleId?: string;
+  prefillSkillKind?: string;
+  prefillPool?: string;
   onSaved: () => void;
   onDeleted: (id: string) => void;
   onClose: () => void;
@@ -129,7 +132,7 @@ function WizardTypeStep({
   );
 }
 
-export function ExerciseSlideOver({ open, editingItem, modules, onSaved, onDeleted, onClose }: Props) {
+export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId, prefillSkillKind, prefillPool, onSaved, onDeleted, onClose }: Props) {
   const S = useS();
 
   const [form, setForm] = useState<ExerciseFormState>(createInitialFormState);
@@ -156,7 +159,12 @@ export function ExerciseSlideOver({ open, editingItem, modules, onSaved, onDelet
       initialFormSnap.current = JSON.stringify(state);
       setWizardStep('content');
     } else {
-      const initial = createInitialFormState();
+      const initial = {
+        ...createInitialFormState(),
+        ...(prefillModuleId !== undefined ? { moduleId: prefillModuleId } : {}),
+        ...(prefillSkillKind !== undefined ? { skillKind: prefillSkillKind } : {}),
+        ...(prefillPool !== undefined ? { pool: prefillPool } : {}),
+      };
       setForm(initial);
       initialFormSnap.current = JSON.stringify(initial);
       setWizardStep('skill');
@@ -167,7 +175,8 @@ export function ExerciseSlideOver({ open, editingItem, modules, onSaved, onDelet
     if (!editingItem && localStorage.getItem('ef-draft-v2')) {
       setDraftToast(true);
     }
-  }, [open, editingItem]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editingItem, prefillModuleId, prefillSkillKind, prefillPool]);
 
   // Autosave every 10s while panel is open
   useEffect(() => {
