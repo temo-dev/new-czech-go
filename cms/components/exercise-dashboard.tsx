@@ -293,7 +293,7 @@ function formStateFromExercise(item: Exercise): ExerciseFormState {
     title: item.title ?? '',
     shortInstruction: item.short_instruction ?? '',
     learnerInstruction: item.learner_instruction ?? '',
-    moduleId: item.module_id ?? 'module-day-1',
+    moduleId: item.module_id ?? '',
     skillKind: item.skill_kind ?? '',
     questions: (prompt.question_prompts ?? []).join('\n'),
     scenarioTitle: String(detail.scenario_title ?? ''),

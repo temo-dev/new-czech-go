@@ -339,10 +339,17 @@ func (s *Server) handleModuleExercises(w http.ResponseWriter, r *http.Request, _
 	}
 	if strings.HasSuffix(path, "/exercises") {
 		moduleID := strings.TrimSuffix(path, "/exercises")
-		writeJSON(w, http.StatusOK, map[string]any{
-			"data": s.repo.ExercisesByModule(moduleID),
-			"meta": map[string]any{},
-		})
+		exercises := s.repo.ExercisesByModule(moduleID)
+		if skillKind := r.URL.Query().Get("skill_kind"); skillKind != "" {
+			filtered := exercises[:0]
+			for _, ex := range exercises {
+				if ex.SkillKind == skillKind {
+					filtered = append(filtered, ex)
+				}
+			}
+			exercises = filtered
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": exercises, "meta": map[string]any{}})
 		return
 	}
 	writeNotFound(w)

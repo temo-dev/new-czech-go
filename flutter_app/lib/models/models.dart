@@ -332,12 +332,14 @@ class ExerciseSummary {
     required this.title,
     required this.exerciseType,
     required this.shortInstruction,
+    this.skillKind = '',
   });
 
   final String id;
   final String title;
   final String exerciseType;
   final String shortInstruction;
+  final String skillKind;
 
   factory ExerciseSummary.fromJson(Map<String, dynamic> json) {
     return ExerciseSummary(
@@ -345,6 +347,7 @@ class ExerciseSummary {
       title: json['title'] as String,
       exerciseType: json['exercise_type'] as String,
       shortInstruction: json['short_instruction'] as String? ?? '',
+      skillKind: json['skill_kind'] as String? ?? '',
     );
   }
 }

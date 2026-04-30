@@ -149,22 +149,24 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
     return exerciseType.split('_').take(2).join(' ').toUpperCase();
   }
 
-  static bool _exerciseMatchesSkillKind(String exerciseType, String skillKind) {
+  // Fallback for exercises without stored skill_kind.
+  static bool _exerciseMatchesSkillKindByType(String exerciseType, String skillKind) {
     switch (skillKind) {
-      case 'noi':      return exerciseType.startsWith('uloha_');
-      case 'viet':     return exerciseType.startsWith('psani_');
-      case 'nghe':     return exerciseType.startsWith('poslech_');
-      case 'doc':      return exerciseType.startsWith('cteni_');
-      case 'tu_vung':  return ['quizcard_basic', 'matching', 'fill_blank', 'choice_word'].contains(exerciseType);
-      case 'ngu_phap': return ['matching', 'fill_blank', 'choice_word'].contains(exerciseType);
-      default:         return true;
+      case 'noi':  return exerciseType.startsWith('uloha_');
+      case 'viet': return exerciseType.startsWith('psani_');
+      case 'nghe': return exerciseType.startsWith('poslech_');
+      case 'doc':  return exerciseType.startsWith('cteni_');
+      default:     return false;
     }
   }
 
   List<ExerciseSummary> get _filtered {
-    final kindFiltered = _exercises
-        .where((e) => _exerciseMatchesSkillKind(e.exerciseType, widget.skillKind))
-        .toList();
+    // Use stored skill_kind from API response (reliable since migration 017).
+    // Fallback to exercise_type prefix matching for exercises without skill_kind.
+    final kindFiltered = _exercises.where((e) {
+      if (e.skillKind.isNotEmpty) return e.skillKind == widget.skillKind;
+      return _exerciseMatchesSkillKindByType(e.exerciseType, widget.skillKind);
+    }).toList();
     if (_filterTag == null) return kindFiltered;
     if (widget.skillKind == 'noi') {
       return kindFiltered.where((e) => e.exerciseType.startsWith('uloha_$_filterTag')).toList();
