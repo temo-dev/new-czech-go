@@ -279,7 +279,7 @@ Do not mix these in one change unless the human asks:
 If you notice adjacent cleanup, note it separately instead of silently expanding scope.
 
 ## Good Next Steps
-V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ V8 ✅ — tất cả planned slices hoàn thành.
+V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ V8 ✅ V9 ✅ V10 ✅ — tất cả planned slices hoàn thành.
 Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 
 **V8 Schema Flatten — 2026-04-30:**
@@ -310,6 +310,19 @@ Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 - `ExerciseListFilters` state lifted để matrix cell click có thể control list filters
 - Vitest 49 unit tests: `buildMatrix`, parse/build utilities, formStateFromExercise, payload builders
 - Specs: `docs/specs/exercise-dashboard-upgrade.md`, user flow: `docs/specs/exercise-dashboard-user-flow.md`
+
+**V10 Exam Result Flow Redesign — 2026-04-30:**
+- `MockExamSectionDetailScreen` nhận `skillKind` + `maxPoints`, dispatch `SectionResultCard` thay vì luôn `ResultCard`
+- `SectionResultCard` mới: header thống nhất (skill icon + label + score + progress bar) + body theo skill (noi/viet → `ResultCard`, nghe/doc → `ObjectiveResultCard`)
+- `ObjectiveResultCard`: card-per-question (green/red bg), 2-line wrong answer layout, passage collapsible cho doc (`_PassageSection` async fetch `cteniText`)
+- `_buildAnalyzingView` upgrade: LinearProgressIndicator + step list per speaking section (✓/⏳/○)
+- 4 i18n keys mới: `objectiveYourAnswer`, `objectiveCorrectAnswer`, `viewPassage`, `hidePassage`
+- **Bug fix**: `AdvanceMockExam` query từ "first pending" → JOIN attempts ON exercise_id — fix 400 khi mixed-skill exam (speaking sections chưa analyzed khi objective sections complete)
+- **Feature**: `QuestionResult.question_text` — backend extract question prompt từ `items[].question` và `questions[].prompt`
+- **Feature**: `QuestionResult.learner_answer_text` + `correct_answer_text` — backend extract option text từ per-question `options[]` và global `options[]`/`persons[]`; Flutter `_AnswerDisplay` widget hiện "A — Nová kavárna" thay chỉ "A"
+- **Bug fix**: overall score invisible trong result hero — `RichText` root `TextSpan` không kế thừa `DefaultTextStyle`, thêm `color: AppColors.onSurface`
+- Specs: `docs/specs/exam-result-flow-redesign.md`, `docs/specs/exam-result-flow-implementation.md`, idea: `docs/ideas/exam-result-flow-redesign.md`
+- Tests: 16 widget tests trong `flutter_app/test/section_result_card_test.dart` (53 total Flutter tests)
 
 **Remaining backlog (low priority):**
 1. Nhập nội dung mẫu qua CMS: ít nhất 1 exercise mỗi loại để test Flutter end-to-end
