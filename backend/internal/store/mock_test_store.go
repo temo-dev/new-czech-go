@@ -16,6 +16,7 @@ type MockTestStore interface {
 	ListMockTests(statusFilter string) []contracts.MockTest
 	UpdateMockTest(id string, update contracts.MockTest) (contracts.MockTest, bool)
 	DeleteMockTest(id string) bool
+	SetMockTestBannerImage(id, storageKey string) bool
 }
 
 // defaultMaxPoints maps exercise_type → max speaking score per real A2 exam rubric.
@@ -218,5 +219,16 @@ func (s *memoryMockTestStore) DeleteMockTest(id string) bool {
 		return false
 	}
 	delete(s.tests, id)
+	return true
+}
+
+func (s *memoryMockTestStore) SetMockTestBannerImage(id, storageKey string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, ok := s.tests[id]
+	if !ok {
+		return false
+	}
+	t.BannerImageID = storageKey
 	return true
 }

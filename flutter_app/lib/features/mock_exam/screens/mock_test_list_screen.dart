@@ -106,6 +106,7 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
         (i) => _MockTestCard(
           test: _tests[i],
           index: i,
+          client: widget.client,
           onTap: () => _openIntro(_tests[i]),
         ),
       ),
@@ -126,11 +127,15 @@ class _MockTestCard extends StatelessWidget {
     required this.test,
     required this.onTap,
     required this.index,
+    required this.client,
   });
 
   final MockTest test;
   final VoidCallback onTap;
   final int index;
+  final ApiClient client;
+
+  bool get _hasBanner => test.bannerImageId.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -144,7 +149,6 @@ class _MockTestCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: AppRadius.lgAll,
         child: Container(
-          padding: const EdgeInsets.all(AppSpacing.x4),
           decoration: BoxDecoration(
             color: AppColors.surfaceContainerLowest,
             borderRadius: AppRadius.lgAll,
@@ -153,6 +157,43 @@ class _MockTestCard extends StatelessWidget {
             ),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Banner image (when available)
+              if (_hasBanner)
+                ClipRRect(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+                  child: Stack(
+                    children: [
+                      Image.network(
+                        client.mediaUri(test.bannerImageId).toString(),
+                        headers: client.authHeaders,
+                        height: 100,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        loadingBuilder: (_, child, progress) => progress == null
+                            ? child
+                            : Container(height: 100, color: AppColors.surfaceContainerLow),
+                      ),
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.3)],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              Padding(
+              padding: const EdgeInsets.all(AppSpacing.x4),
+              child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Row 1: brand pill + chevron
@@ -257,10 +298,13 @@ class _MockTestCard extends StatelessWidget {
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-      ),
+              ],
+            ),    // close inner Column
+          ),      // close inner Padding
+            ],    // close outer Column children
+          ),      // close outer Column
+        ),        // close outer Container
+      ),          // close InkWell
     );
   }
 }

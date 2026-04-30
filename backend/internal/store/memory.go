@@ -467,6 +467,9 @@ func (s *MemoryStore) UpdateMockTest(id string, update contracts.MockTest) (cont
 func (s *MemoryStore) DeleteMockTest(id string) bool {
 	return s.mockTests.DeleteMockTest(id)
 }
+func (s *MemoryStore) SetMockTestBannerImage(id, storageKey string) bool {
+	return s.mockTests.SetMockTestBannerImage(id, storageKey)
+}
 
 func (s *MemoryStore) MockExamByID(id string) (contracts.MockExamSession, bool) {
 	return s.mockExams.MockExamByID(id)

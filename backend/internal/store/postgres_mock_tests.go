@@ -52,6 +52,9 @@ ALTER TABLE mock_tests
 ALTER TABLE mock_tests
     ADD COLUMN IF NOT EXISTS exam_mode VARCHAR(20) NOT NULL DEFAULT '';
 
+ALTER TABLE mock_tests
+    ADD COLUMN IF NOT EXISTS banner_image_id TEXT NOT NULL DEFAULT '';
+
 -- V9: session_type was never persisted to this table (Go struct-only field).
 -- All existing rows get exam_mode = '' which the application treats as 'practice'.
 -- No data migration needed.
@@ -123,8 +126,8 @@ func (s *postgresMockTestStore) MockTestByID(id string) (contracts.MockTest, boo
 
 	var t contracts.MockTest
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, title, description, estimated_duration_minutes, status, pass_threshold_percent, exam_mode FROM mock_tests WHERE id = $1`, id,
-	).Scan(&t.ID, &t.Title, &t.Description, &t.EstimatedDurationMinutes, &t.Status, &t.PassThresholdPercent, &t.ExamMode)
+		`SELECT id, title, description, estimated_duration_minutes, status, pass_threshold_percent, exam_mode, banner_image_id FROM mock_tests WHERE id = $1`, id,
+	).Scan(&t.ID, &t.Title, &t.Description, &t.EstimatedDurationMinutes, &t.Status, &t.PassThresholdPercent, &t.ExamMode, &t.BannerImageID)
 	if err == sql.ErrNoRows {
 		return contracts.MockTest{}, false
 	}
@@ -153,7 +156,7 @@ func (s *postgresMockTestStore) ListMockTests(statusFilter string) []contracts.M
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	query := `SELECT id, title, description, estimated_duration_minutes, status, pass_threshold_percent, exam_mode FROM mock_tests`
+	query := `SELECT id, title, description, estimated_duration_minutes, status, pass_threshold_percent, exam_mode, banner_image_id FROM mock_tests`
 	args := []interface{}{}
 	if statusFilter != "" {
 		query += ` WHERE status = $1`
@@ -170,7 +173,7 @@ func (s *postgresMockTestStore) ListMockTests(statusFilter string) []contracts.M
 	var tests []contracts.MockTest
 	for rows.Next() {
 		var t contracts.MockTest
-		if err := rows.Scan(&t.ID, &t.Title, &t.Description, &t.EstimatedDurationMinutes, &t.Status, &t.PassThresholdPercent, &t.ExamMode); err != nil {
+		if err := rows.Scan(&t.ID, &t.Title, &t.Description, &t.EstimatedDurationMinutes, &t.Status, &t.PassThresholdPercent, &t.ExamMode, &t.BannerImageID); err != nil {
 			continue
 		}
 		tests = append(tests, t)
@@ -247,6 +250,20 @@ func (s *postgresMockTestStore) DeleteMockTest(id string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	res, err := s.db.ExecContext(ctx, `DELETE FROM mock_tests WHERE id = $1`, id)
+	if err != nil {
+		return false
+	}
+	n, _ := res.RowsAffected()
+	return n > 0
+}
+
+func (s *postgresMockTestStore) SetMockTestBannerImage(id, storageKey string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE mock_tests SET banner_image_id = $2, updated_at = now() WHERE id = $1`,
+		id, storageKey,
+	)
 	if err != nil {
 		return false
 	}

@@ -163,6 +163,7 @@ class MockTest {
     required this.sections,
     this.examMode = '',
     this.passThresholdPercent = 60,
+    this.bannerImageId = '',
   });
 
   final String id;
@@ -172,6 +173,7 @@ class MockTest {
   final String status;
   final String examMode;
   final int passThresholdPercent;
+  final String bannerImageId;
   final List<MockTestSection> sections;
 
   int get totalMaxPoints => sections.fold(0, (s, sec) => s + sec.maxPoints);
@@ -195,6 +197,7 @@ class MockTest {
       examMode: json['exam_mode'] as String? ?? '',
       passThresholdPercent:
           (json['pass_threshold_percent'] as num?)?.toInt() ?? 60,
+      bannerImageId: json['banner_image_id'] as String? ?? '',
       sections:
           raw
               .map((e) => MockTestSection.fromJson(e as Map<String, dynamic>))

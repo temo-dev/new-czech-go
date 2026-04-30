@@ -253,6 +253,44 @@ func (s *Server) handleAdminCourseBanner(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+// ── MockTest Banner ───────────────────────────────────────────────────────────
+
+func (s *Server) handleAdminMockTestBanner(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+	testID := strings.TrimPrefix(r.URL.Path, "/v1/admin/mock-tests/")
+	testID = strings.TrimSuffix(testID, "/banner")
+	if testID == "" {
+		writeNotFound(w)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPost:
+		getOld := func(id string) string {
+			if t, ok := s.repo.MockTestByID(id); ok {
+				return t.BannerImageID
+			}
+			return ""
+		}
+		s.uploadItemImage(w, r, testID, "mock-test-banners", getOld, s.repo.SetMockTestBannerImage)
+	case http.MethodDelete:
+		test, ok := s.repo.MockTestByID(testID)
+		if !ok {
+			writeNotFound(w)
+			return
+		}
+		if !s.repo.SetMockTestBannerImage(testID, "") {
+			writeNotFound(w)
+			return
+		}
+		if test.BannerImageID != "" {
+			os.Remove(localExerciseAssetPath(test.BannerImageID))
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"id": testID, "banner_image_id": ""}, "meta": map[string]any{}})
+	default:
+		writeMethodNotAllowed(w)
+	}
+}
+
 // handleMediaFile serves any local asset by storage key (query param ?key=).
 // Requires learner auth. Used by Flutter to load vocabulary/grammar images from exercise details.
 func (s *Server) handleMediaFile(w http.ResponseWriter, r *http.Request, _ contracts.User) {

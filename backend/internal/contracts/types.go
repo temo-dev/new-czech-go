@@ -459,9 +459,10 @@ type MockTest struct {
 	Title                    string            `json:"title"`
 	Description              string            `json:"description"`
 	EstimatedDurationMinutes int               `json:"estimated_duration_minutes"`
-	Status                   string            `json:"status"`                 // draft, published
-	ExamMode                 string            `json:"exam_mode"`              // "real" | "practice" | "" (default practice)
-	PassThresholdPercent     int               `json:"pass_threshold_percent"` // 0 = use default 60
+	Status                   string            `json:"status"`                    // draft, published
+	ExamMode                 string            `json:"exam_mode"`                 // "real" | "practice" | "" (default practice)
+	PassThresholdPercent     int               `json:"pass_threshold_percent"`    // 0 = use default 60
+	BannerImageID            string            `json:"banner_image_id,omitempty"` // storage key for exam card banner
 	Sections                 []MockTestSection `json:"sections"`
 }
 

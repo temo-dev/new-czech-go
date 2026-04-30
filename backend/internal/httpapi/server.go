@@ -1282,8 +1282,13 @@ func (s *Server) handleAdminMockTests(w http.ResponseWriter, r *http.Request, _ 
 	}
 }
 
-func (s *Server) handleAdminMockTestByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
-	id := strings.TrimPrefix(r.URL.Path, "/v1/admin/mock-tests/")
+func (s *Server) handleAdminMockTestByID(w http.ResponseWriter, r *http.Request, u contracts.User) {
+	path := strings.TrimPrefix(r.URL.Path, "/v1/admin/mock-tests/")
+	if strings.HasSuffix(path, "/banner") {
+		s.handleAdminMockTestBanner(w, r, u)
+		return
+	}
+	id := path
 	if id == "" {
 		writeNotFound(w)
 		return

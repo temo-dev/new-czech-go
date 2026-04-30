@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useS } from '../lib/i18n';
 
 type Exercise = {
@@ -26,6 +26,7 @@ type MockTest = {
   status: 'draft' | 'published';
   exam_mode?: string;
   pass_threshold_percent?: number;
+  banner_image_id?: string;
   sections: MockTestSection[];
 };
 
@@ -102,10 +103,29 @@ export function MockTestDashboard() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState<string | null>(null);
+  const bannerInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
     Promise.all([fetchTests(), fetchExercises()]);
   }, []);
+
+  async function handleBannerUpload(testId: string, file: File) {
+    setUploadingBanner(testId);
+    try {
+      const formData = new FormData();
+      formData.set('file', file);
+      const res = await fetch(`/api/admin/mock-tests/${testId}/banner`, { method: 'POST', body: formData });
+      if (res.ok) await fetchTests();
+    } finally {
+      setUploadingBanner(null);
+    }
+  }
+
+  async function handleBannerDelete(testId: string) {
+    await fetch(`/api/admin/mock-tests/${testId}/banner`, { method: 'DELETE' });
+    await fetchTests();
+  }
 
   async function fetchTests() {
     setLoading(true);
@@ -279,6 +299,15 @@ export function MockTestDashboard() {
           {tests.length === 0 && <p style={{ color: '#6b7280' }}>No mock tests yet.</p>}
           {tests.map(t => (
             <div key={t.id} style={cardStyle}>
+              {/* Banner image strip */}
+              {t.banner_image_id && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`/api/media/file?key=${encodeURIComponent(t.banner_image_id)}`}
+                  alt="banner"
+                  style={{ width: 'calc(100% + 32px)', height: 80, objectFit: 'cover', borderRadius: '8px 8px 0 0', display: 'block', marginTop: -16, marginLeft: -16, marginRight: -16, marginBottom: 12 }}
+                />
+              )}
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -295,7 +324,11 @@ export function MockTestDashboard() {
                     </span>
                   </p>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'flex-start' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6, border: `1px ${t.banner_image_id ? 'solid #22c55e' : 'dashed #d1d5db'}`, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: t.banner_image_id ? '#15803d' : '#6b7280', background: t.banner_image_id ? '#f0fdf4' : 'transparent', whiteSpace: 'nowrap' }}>
+                    {uploadingBanner === t.id ? '⏳' : t.banner_image_id ? '🖼 ✓' : '🖼'}
+                    <input ref={el => { bannerInputRefs.current[t.id] = el; }} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} disabled={uploadingBanner !== null} onChange={e => { const f = e.target.files?.[0]; if (f) void handleBannerUpload(t.id, f); e.target.value = ''; }} />
+                  </label>
                   <button onClick={() => openEdit(t)} style={btnStyle('secondary')}>{S.action.edit}</button>
                   <button onClick={() => handleDelete(t.id)} style={btnStyle('danger')}>{S.action.delete}</button>
                 </div>
@@ -467,6 +500,31 @@ export function MockTestDashboard() {
               </p>
             )}
           </div>
+
+          {/* Banner upload — only for saved tests */}
+          {editingId && (() => {
+            const test = tests.find(t => t.id === editingId);
+            const hasBanner = !!test?.banner_image_id;
+            return (
+              <div style={{ marginTop: 16 }}>
+                <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 600, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.4 }}>Ảnh banner</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {hasBanner && test?.banner_image_id && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={`/api/media/file?key=${encodeURIComponent(test.banner_image_id)}`} alt="banner" style={{ width: 80, height: 52, objectFit: 'cover', borderRadius: 6, border: '1px solid #e5e7eb' }} />
+                  )}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, border: `1px ${hasBanner ? 'solid #22c55e' : 'dashed #d1d5db'}`, borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: hasBanner ? '#15803d' : '#6b7280', background: hasBanner ? '#f0fdf4' : 'transparent' }}>
+                    {uploadingBanner === editingId ? '⏳ Đang tải...' : hasBanner ? '🔄 Đổi banner' : '🖼 Tải banner'}
+                    <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} disabled={uploadingBanner !== null} onChange={e => { const f = e.target.files?.[0]; if (f && editingId) void handleBannerUpload(editingId, f); e.target.value = ''; }} />
+                  </label>
+                  {hasBanner && editingId && (
+                    <button type="button" onClick={() => void handleBannerDelete(editingId)} style={{ ...btnStyle('danger'), fontSize: 12, padding: '6px 10px' }}>Xóa</button>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+          {!editingId && <p style={{ margin: '16px 0 0', fontSize: 12, color: '#9ca3af' }}>Tạo đề thi trước, sau đó upload banner.</p>}
 
           {error && <p style={{ color: 'red', margin: '12px 0 0' }}>{error}</p>}
 
