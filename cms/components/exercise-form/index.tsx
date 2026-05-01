@@ -7,6 +7,7 @@ import { PoslechFields } from './PoslechFields';
 import { CteniFields } from './CteniFields';
 import { SpeakingFields } from './SpeakingFields';
 import { WritingFields } from './WritingFields';
+import { VocabGrammarFields } from './VocabGrammarFields';
 import { validateExercise } from './validation';
 import {
   adminApi,
@@ -690,6 +691,14 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                     initialData={form.typePayload ?? {}}
                     onChange={(payload) => setForm((f) => ({ ...f, typePayload: payload }))}
                     exerciseId={editingId}
+                  />
+                )}
+
+                {(['quizcard_basic', 'matching', 'fill_blank', 'choice_word'] as string[]).includes(form.exerciseType) && (
+                  <VocabGrammarFields
+                    exerciseType={form.exerciseType as 'quizcard_basic' | 'matching' | 'fill_blank' | 'choice_word'}
+                    initialData={form.typePayload ?? {}}
+                    onChange={(payload) => setForm((f) => ({ ...f, typePayload: payload }))}
                   />
                 )}
 

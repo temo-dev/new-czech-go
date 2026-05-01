@@ -278,6 +278,26 @@ func extractOptionTexts(exercise contracts.Exercise) map[string]map[string]strin
 		}
 	}
 
+	// Matching exercise: right-column options keyed by right_id (A/B/C/D...).
+	var withPairs struct {
+		Pairs []struct {
+			RightID string `json:"right_id"`
+			Right   string `json:"right"`
+		} `json:"pairs"`
+	}
+	if json.Unmarshal(b, &withPairs) == nil && len(withPairs.Pairs) > 0 {
+		global := result["*"]
+		if global == nil {
+			global = make(map[string]string)
+		}
+		for _, p := range withPairs.Pairs {
+			if p.RightID != "" && p.Right != "" {
+				global[strings.ToUpper(p.RightID)] = p.Right
+			}
+		}
+		result["*"] = global
+	}
+
 	return result
 }
 
@@ -319,6 +339,21 @@ func extractQuestionTexts(exercise contracts.Exercise) map[string]string {
 		for _, q := range withQuestions.Questions {
 			if q.Prompt != "" {
 				texts[fmt.Sprintf("%d", q.QuestionNo)] = q.Prompt
+			}
+		}
+	}
+
+	// Matching exercise: left column (left_id → left text).
+	var withPairsQ struct {
+		Pairs []struct {
+			LeftID string `json:"left_id"`
+			Left   string `json:"left"`
+		} `json:"pairs"`
+	}
+	if json.Unmarshal(b, &withPairsQ) == nil {
+		for _, p := range withPairsQ.Pairs {
+			if p.LeftID != "" && p.Left != "" {
+				texts[p.LeftID] = p.Left
 			}
 		}
 	}

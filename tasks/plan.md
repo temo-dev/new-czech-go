@@ -1400,3 +1400,315 @@ Manual: послech_2 exercise với 4 options đều có ảnh → grid. пос
 
 **[CHECKPOINT ME-C]** `make verify` (backend-build + backend-test + cms-lint + cms-build + flutter-analyze + flutter-test).
 Manual end-to-end: (1) Upload ảnh vocab → flashcard có hình. (2) послech_2 với 4 ảnh option → grid. (3) Exercise bất kỳ với context image → hiện phía trên.
+
+---
+
+## V12 — Deck Session Mode (Từ vựng & Ngữ pháp)
+
+**Spec:** `docs/specs/deck-session-vocab-grammar.md`  
+**Design:** `docs/designs/deck-session-vocab-grammar.html`  
+**Idea:** `docs/ideas/deck-session-vocab-grammar.md`  
+**Scope:** Flutter iOS only. No backend. No CMS.
+
+### Dependency graph
+
+```
+DS-1 (entry point change)
+  └─ DS-2 (TypeGroupScreen)
+       └─ DS-3 (VocabTypeListScreen + _openExercise)
+            └─ DS-4 (DeckSessionScreen — quizcard core)
+                 ├─ DS-5 (DeckSessionScreen — choice_word + fill_blank)
+                 ├─ DS-6 (DeckSessionScreen — matching)
+                 └─ DS-7 (widget tests)
+```
+
+### DS-1 — Entry point: module_detail_screen.dart
+
+**File:** `flutter_app/lib/features/home/screens/module_detail_screen.dart`
+
+**Change** (line ~123): wrap existing `Navigator.push(ExerciseListScreen(...))` trong condition:
+```dart
+onTap: sk.isImplemented ? () {
+  if (sk.skillKind == 'tu_vung' || sk.skillKind == 'ngu_phap') {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => TypeGroupScreen(
+        client: widget.client,
+        moduleId: widget.module.id,
+        skillKind: sk.skillKind,
+        moduleTitle: widget.module.title,
+      ),
+    ));
+  } else {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ExerciseListScreen(
+        client: widget.client,
+        moduleId: widget.module.id,
+        skillKind: sk.skillKind,
+      ),
+    ));
+  }
+} : null,
+```
+
+Import `TypeGroupScreen` từ `type_group_screen.dart`.
+
+**AC:** Tap "Từ vựng" hoặc "Ngữ pháp" → TypeGroupScreen. Các skill khác (noi/nghe/doc/viet) → ExerciseListScreen unchanged.
+
+---
+
+### DS-2 — TypeGroupScreen
+
+**File:** `flutter_app/lib/features/exercise/screens/type_group_screen.dart`
+
+**Data loading:**
+```dart
+final raw = await widget.client.listModuleExercises(widget.moduleId, skillKind: widget.skillKind);
+final exercises = raw.map((e) => ExerciseSummary.fromJson(e)).toList();
+// group: Map<String, List<ExerciseSummary>>
+final grouped = <String, List<ExerciseSummary>>{};
+for (final ex in exercises) { grouped.putIfAbsent(ex.exerciseType, () => []).add(ex); }
+```
+
+**Type config (const list, order matters):**
+```dart
+static const _types = [
+  _TypeConfig(type: 'quizcard_basic', label: 'Flashcard',  icon: '📚'),
+  _TypeConfig(type: 'matching',       label: 'Ghép đôi',   icon: '↔'),
+  _TypeConfig(type: 'fill_blank',     label: 'Điền từ',    icon: '✏'),
+  _TypeConfig(type: 'choice_word',    label: 'Chọn từ',    icon: '✓'),
+];
+```
+
+**UI:**
+- AppBar: skill label ("Từ vựng" / "Ngữ pháp") với back button
+- Subtitle: `widget.moduleTitle`
+- Body: 2-col `GridView` (hoặc `Wrap`) với `_TypeCard` widgets
+- Chỉ render card nếu `grouped[type] != null && grouped[type]!.isNotEmpty`
+- Loading: `CircularProgressIndicator` centered
+- Error: retry button
+
+**_TypeCard tap** → `Navigator.push(VocabTypeListScreen(exercises: grouped[type]!, ...))`
+
+**AC:** TypeGroupScreen load đúng count, chỉ hiện types có bài, tap card navigate đúng.
+
+---
+
+### DS-3 — VocabTypeListScreen
+
+**File:** `flutter_app/lib/features/exercise/screens/vocab_type_list_screen.dart`
+
+**Constructor:**
+```dart
+const VocabTypeListScreen({
+  required this.client,
+  required this.moduleId,
+  required this.exerciseType,
+  required this.typeLabel,
+  required this.exercises,   // pre-loaded, filtered by exerciseType
+});
+```
+
+**Không fetch API** — nhận `exercises` từ parent.
+
+**UI:**
+```
+AppBar(title: typeLabel, actions: [count badge])
+Column(
+  ElevatedButton("▶ Bắt đầu học tất cả (N)")  → DeckSessionScreen
+  SizedBox(height: 8)
+  Text("Hoặc học từng bài", style: labelSmall)
+  Expanded(ListView(exercises.map(_ExerciseListTile)))
+)
+```
+
+**`_openExercise`** — copy pattern từ `ExerciseListScreen._openExercise`:
+- `await client.getExercise(exercise.id)` → parse `ExerciseDetail`
+- Push `VocabGrammarExerciseScreen(client, detail, onOpenNext: null)`
+- Error → SnackBar
+
+**"Bắt đầu học tất cả"** → `Navigator.push(DeckSessionScreen(client, moduleId, exerciseType, typeLabel, exercises))`
+
+**AC:** Button visible với count đúng; individual exercise tap mở VocabGrammarExerciseScreen; deck button mở DeckSessionScreen.
+
+---
+
+### DS-4 — DeckSessionScreen: core + quizcard_basic
+
+**File:** `flutter_app/lib/features/exercise/screens/deck_session_screen.dart`
+
+**State:**
+```dart
+late ListQueue<ExerciseSummary> _queue;
+final Set<String> _knownIds = {};
+int _totalCount = 0;
+ExerciseDetail? _currentDetail;
+bool _loadingDetail = false;
+bool _sessionComplete = false;
+```
+
+**initState:**
+```dart
+_totalCount = widget.exercises.length;
+_queue = ListQueue.from(widget.exercises);
+_loadCurrentDetail();
+```
+
+**`_loadCurrentDetail()`:**
+```dart
+Future<void> _loadCurrentDetail() async {
+  if (_queue.isEmpty) return;
+  setState(() { _loadingDetail = true; _currentDetail = null; });
+  try {
+    final raw = await widget.client.getExercise(_queue.first.id);
+    if (mounted) setState(() { _currentDetail = ExerciseDetail.fromJson(raw); _loadingDetail = false; });
+  } catch (_) {
+    if (mounted) setState(() => _loadingDetail = false);
+  }
+}
+```
+
+**AppBar:**
+- Back → `showDialog` confirm nếu `!_sessionComplete && _queue.isNotEmpty`
+- Title: `widget.typeLabel`
+
+**Progress header:**
+```dart
+// "3 / 8 đã biết"
+Text('${_knownIds.length} / $_totalCount đã biết')
+LinearProgressIndicator(value: _knownIds.length / _totalCount)
+```
+
+**Body switch:**
+- `_sessionComplete` → `_CompletionView`
+- `_loadingDetail || _currentDetail == null` → loading spinner
+- `_currentDetail!.isQuizcard` → `_QuizcardDeckCard`
+- else → `_OtherTypeDeckCard` (DS-5/DS-6)
+
+**`_QuizcardDeckCard`:**
+- Wrap `QuizcardWidget(front, back, example, submitting: false, onChoice: _handleQuizcardChoice)`
+- `QuizcardWidget` đã có flip animation + Đã biết/Ôn lại buttons
+
+**`_handleQuizcardChoice(String choice)`:**
+```dart
+void _handleQuizcardChoice(String choice) {
+  final current = _queue.removeFirst();
+  if (choice == 'known') {
+    _knownIds.add(current.id);
+  } else {
+    _queue.addLast(current);
+  }
+  if (_queue.isEmpty) {
+    setState(() => _sessionComplete = true);
+  } else {
+    _loadCurrentDetail();
+  }
+}
+```
+
+**`_CompletionView` (private widget):**
+```dart
+// params: knownCount, totalCount, onRetry (replay với exercises chưa known), onDone
+// UI: icon + title + stat + primary/secondary buttons
+```
+
+**AC:**
+- Quizcard deck: flip → unlock buttons → Đã biết removes card, progress tăng
+- Ôn lại: card xuất hiện lại cuối queue
+- Queue rỗng → CompletionView inline
+- Back button mid-session: dialog confirm
+- Không có network call đến `/v1/attempts`
+
+---
+
+### DS-5 — DeckSessionScreen: choice_word + fill_blank
+
+**Thêm vào `deck_session_screen.dart`:**
+
+**Choice word card `_ChoiceWordDeckCard`:**
+```dart
+// state: String? _selectedKey, bool _revealed
+// UI: stem text + 4 option buttons
+// tap option:
+//   if !_revealed: _selectedKey = key; _revealed = true;
+//   highlight: correct=green, selected wrong=red
+//   show "Tiếp theo →" FilledButton
+
+// Local check:
+bool _isCorrect(ExerciseDetail d, String key) =>
+    key.toLowerCase() == (d.correctAnswers['1'] ?? '').toLowerCase();
+```
+
+**Advance (choice/fill):** `_advanceKnown()`:
+```dart
+void _advanceKnown() {
+  _knownIds.add(_queue.removeFirst().id);
+  if (_queue.isEmpty) setState(() => _sessionComplete = true);
+  else _loadCurrentDetail();
+}
+```
+
+**Fill blank card `_FillBlankDeckCard`:**
+```dart
+// state: TextEditingController _ctrl, bool _submitted, bool _isCorrect
+// UI: sentence với ___ highlighted + TextField + Submit button
+// Submit:
+//   _isCorrect = answer.trim().toLowerCase().contains(correct.toLowerCase())
+//   _submitted = true
+//   show result feedback + "Tiếp theo →"
+
+// Fill blank local check:
+bool _checkFill(ExerciseDetail d, String answer) =>
+    answer.trim().toLowerCase().contains(
+      (d.correctAnswers['1'] ?? '').toLowerCase()
+    );
+```
+
+**AC:**
+- Choice word: tap option → highlight đúng/sai → "Tiếp theo →" → advance
+- Fill blank: type → submit → feedback → "Tiếp theo →" → advance
+- Tất cả advance → treated as known (queue.removeFirst + knownIds.add)
+
+---
+
+### DS-6 — DeckSessionScreen: matching
+
+**Matching card `_MatchingDeckCard`:**
+```dart
+// state: Map<String,String> _answers = {}
+// UI: MatchingWidget(pairs: d.matchPairs, answers: _answers, onChanged: (a) => setState(() => _answers = a))
+// "Tiếp theo →" enabled when _answers.length == d.matchPairs.length
+// tap → _advanceKnown()
+```
+
+**Note:** `MatchingWidget` đã có đầy đủ interaction logic (select/pair/un-pair). Deck chỉ cần wrap và detect completion.
+
+**AC:** Matching deck: pair all items → "Tiếp theo →" active → advance.
+
+---
+
+### DS-7 — Widget tests
+
+**File:** `flutter_app/test/deck_session_test.dart`
+
+**Tests:**
+1. `TypeGroupScreen` renders 4 type cards khi có exercises đủ các loại
+2. `TypeGroupScreen` ẩn type card khi không có exercise cho loại đó
+3. `VocabTypeListScreen` hiện "Bắt đầu học tất cả (N)" với đúng count
+4. `DeckSessionScreen` quizcard: `onChoice('known')` → progress tăng + card advance
+5. `DeckSessionScreen` quizcard: `onChoice('review')` → card push back, không tăng known
+6. `DeckSessionScreen`: queue empty sau known → CompletionView renders
+7. `_CompletionView`: hiện đúng knownCount/totalCount
+
+**Verification:** `make flutter-test` pass, `make flutter-analyze` pass.
+
+---
+
+### [CHECKPOINT DS-A] — sau DS-4
+
+`make flutter-analyze && make flutter-test`  
+Manual: Tap Từ vựng → TypeGroupScreen → Flashcard list → "Bắt đầu học tất cả" → deck với quizcard → completion.
+
+### [CHECKPOINT DS-FINAL]
+
+`make flutter-analyze && make flutter-test`  
+Manual: deck qua đủ 4 types. Verify no network call đến `/v1/attempts` trong deck mode.

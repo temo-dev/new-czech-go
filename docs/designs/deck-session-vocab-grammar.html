@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deck Session — Từ vựng & Ngữ pháp · UI/UX Design</title>
+<style>
+  :root {
+    --primary: #FF6A14;
+    --primary-soft: #FFE5D2;
+    --primary-dim: #FFB07A;
+    --teal: #0F3D3A;
+    --teal-soft: #D9E5E3;
+    --amber: #C28012;
+    --amber-soft: #F8EAC9;
+    --surface: #FBF3E7;
+    --surface-card: #FFFFFF;
+    --on-surface: #1C1B1F;
+    --on-surface-variant: #49454F;
+    --outline: #79747E;
+    --outline-variant: #CAC4D0;
+    --success: #2E7D32;
+    --success-soft: #E8F5E9;
+    --error: #B71C1C;
+    --error-soft: #FFEBEE;
+
+    --phone-w: 375px;
+    --phone-h: 812px;
+    --radius-phone: 44px;
+    --radius-card: 16px;
+    --radius-btn: 14px;
+    --font: 'Inter', -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: #F0EDE8;
+    color: var(--on-surface);
+    padding: 40px 24px 80px;
+  }
+
+  /* ── Doc header ─────────────────────────────────────────────────── */
+  .doc-header {
+    max-width: 1200px;
+    margin: 0 auto 48px;
+  }
+  .doc-header h1 {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--teal);
+    margin-bottom: 8px;
+  }
+  .doc-header p {
+    font-size: 16px;
+    color: var(--on-surface-variant);
+    max-width: 640px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-right: 6px;
+    margin-top: 12px;
+  }
+  .badge-orange { background: var(--primary-soft); color: var(--primary); }
+  .badge-teal   { background: var(--teal-soft);    color: var(--teal);    }
+  .badge-amber  { background: var(--amber-soft);   color: var(--amber);   }
+
+  /* ── Section ────────────────────────────────────────────────────── */
+  section {
+    max-width: 1200px;
+    margin: 0 auto 64px;
+  }
+  section h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--teal);
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--outline-variant);
+  }
+  section h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 16px;
+  }
+
+  /* ── Phone shell ─────────────────────────────────────────────────── */
+  .phones-row {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .phone-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--on-surface-variant);
+    text-align: center;
+    max-width: var(--phone-w);
+  }
+  .phone {
+    width: var(--phone-w);
+    height: var(--phone-h);
+    background: var(--surface-card);
+    border-radius: var(--radius-phone);
+    box-shadow:
+      0 0 0 10px #1C1B1F,
+      0 32px 80px rgba(0,0,0,0.35),
+      0 8px 24px rgba(0,0,0,0.2);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Status bar ──────────────────────────────────────────────────── */
+  .status-bar {
+    height: 44px;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    flex-shrink: 0;
+  }
+  .status-time { font-size: 15px; font-weight: 600; }
+  .status-icons { display: flex; gap: 6px; align-items: center; }
+  .status-dot { width: 14px; height: 8px; background: var(--on-surface); border-radius: 2px; opacity: 0.8; }
+  .status-dot.wifi { width: 12px; }
+  .status-dot.battery { width: 18px; }
+
+  /* ── App bar ──────────────────────────────────────────────────────── */
+  .app-bar {
+    height: 56px;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--outline-variant);
+  }
+  .app-bar-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--on-surface);
+    flex: 1;
+  }
+  .back-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 20px;
+  }
+  .back-arrow {
+    width: 10px;
+    height: 10px;
+    border-left: 2px solid var(--on-surface);
+    border-bottom: 2px solid var(--on-surface);
+    transform: rotate(45deg);
+    margin-left: 4px;
+  }
+
+  /* ── Screen body ─────────────────────────────────────────────────── */
+  .screen-body {
+    flex: 1;
+    overflow: hidden;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+  }
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* ── Type Group Screen ────────────────────────────────────────────── */
+  .screen-hero {
+    padding: 20px 16px 8px;
+    background: var(--surface);
+  }
+  .screen-hero h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--on-surface);
+    margin-bottom: 4px;
+  }
+  .screen-hero p {
+    font-size: 13px;
+    color: var(--on-surface-variant);
+    line-height: 1.5;
+  }
+
+  .type-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 16px;
+  }
+  .type-card {
+    background: var(--surface-card);
+    border-radius: var(--radius-card);
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    position: relative;
+  }
+  .type-card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+  }
+  .type-card-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--on-surface);
+  }
+  .type-card-count {
+    font-size: 12px;
+    color: var(--on-surface-variant);
+  }
+  .type-card-arrow {
+    position: absolute;
+    top: 16px;
+    right: 14px;
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid var(--outline);
+    border-top: 2px solid var(--outline);
+    transform: rotate(45deg);
+  }
+  .icon-orange { background: var(--primary-soft); }
+  .icon-teal   { background: var(--teal-soft); }
+  .icon-amber  { background: var(--amber-soft); }
+  .icon-purple { background: #EDE9FE; }
+
+  /* ── Type List Screen ─────────────────────────────────────────────── */
+  .start-all-btn {
+    margin: 16px 16px 4px;
+    background: var(--primary);
+    color: white;
+    border-radius: var(--radius-btn);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    box-shadow: 0 4px 16px rgba(255,106,20,0.35);
+  }
+  .start-all-icon {
+    width: 20px;
+    height: 20px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+  }
+  .exercise-item {
+    background: var(--surface-card);
+    border-radius: var(--radius-card);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  }
+  .exercise-item-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .exercise-item-content { flex: 1; min-width: 0; }
+  .exercise-item-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--on-surface);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .exercise-item-sub {
+    font-size: 12px;
+    color: var(--on-surface-variant);
+    margin-top: 2px;
+  }
+  .exercise-item-chevron {
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid var(--outline-variant);
+    border-top: 2px solid var(--outline-variant);
+    transform: rotate(45deg);
+    flex-shrink: 0;
+  }
+
+  /* ── Deck Session Screen ─────────────────────────────────────────── */
+  .deck-progress-bar-wrap {
+    padding: 12px 16px 0;
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .deck-counter {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--on-surface-variant);
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .deck-progress-track {
+    height: 6px;
+    background: var(--outline-variant);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .deck-progress-fill {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 3px;
+    transition: width 0.3s;
+  }
+
+  .deck-card-area {
+    flex: 1;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Quizcard flip card */
+  .quizcard {
+    flex: 1;
+    background: var(--surface-card);
+    border-radius: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    gap: 12px;
+    position: relative;
+  }
+  .quizcard-front {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--on-surface);
+    text-align: center;
+  }
+  .quizcard-hint {
+    font-size: 12px;
+    color: var(--on-surface-variant);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .quizcard-back {
+    display: none;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--teal);
+    text-align: center;
+  }
+  .quizcard-example {
+    display: none;
+    font-size: 12px;
+    color: var(--on-surface-variant);
+    text-align: center;
+    font-style: italic;
+  }
+  .quizcard.flipped .quizcard-back { display: block; }
+  .quizcard.flipped .quizcard-example { display: block; }
+  .quizcard.flipped .quizcard-hint { display: none; }
+  .quizcard-divider {
+    display: none;
+    width: 40px;
+    height: 2px;
+    background: var(--outline-variant);
+    border-radius: 1px;
+  }
+  .quizcard.flipped .quizcard-divider { display: block; }
+
+  .deck-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 0 16px 16px;
+    flex-shrink: 0;
+  }
+  .deck-btn {
+    border-radius: var(--radius-btn);
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .deck-btn-retry {
+    background: var(--error-soft);
+    color: var(--error);
+    border: 1.5px solid rgba(183,28,28,0.2);
+  }
+  .deck-btn-know {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 4px 12px rgba(255,106,20,0.3);
+  }
+  .deck-btn-submit {
+    grid-column: 1 / -1;
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 4px 12px rgba(255,106,20,0.3);
+  }
+
+  /* Fill blank in deck */
+  .fill-blank-card {
+    flex: 1;
+    background: var(--surface-card);
+    border-radius: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+    padding: 28px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .fill-sentence {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--on-surface);
+    line-height: 1.6;
+    text-align: center;
+  }
+  .fill-blank {
+    display: inline-block;
+    min-width: 80px;
+    border-bottom: 2.5px solid var(--primary);
+    color: var(--primary);
+    font-weight: 700;
+  }
+  .fill-input {
+    border: 1.5px solid var(--outline-variant);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 16px;
+    color: var(--on-surface);
+    background: var(--surface);
+  }
+  .fill-input.focus {
+    border-color: var(--primary);
+    background: white;
+  }
+
+  /* Choice word in deck */
+  .choice-stem {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--on-surface);
+    text-align: center;
+    line-height: 1.5;
+  }
+  .choice-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .choice-opt {
+    background: var(--surface);
+    border: 1.5px solid var(--outline-variant);
+    border-radius: 12px;
+    padding: 12px 10px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--on-surface);
+  }
+  .choice-opt.selected {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+  .choice-opt.correct {
+    background: var(--success-soft);
+    border-color: var(--success);
+    color: var(--success);
+  }
+  .choice-opt.wrong {
+    background: #FFEBEE;
+    border-color: var(--error);
+    color: var(--error);
+  }
+
+  /* ── Completion Screen ───────────────────────────────────────────── */
+  .completion-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    gap: 24px;
+    background: var(--surface);
+  }
+  .completion-icon {
+    width: 88px;
+    height: 88px;
+    background: var(--primary-soft);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 44px;
+  }
+  .completion-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--on-surface);
+    text-align: center;
+  }
+  .completion-stat {
+    text-align: center;
+  }
+  .completion-stat-num {
+    font-size: 48px;
+    font-weight: 900;
+    color: var(--primary);
+    line-height: 1;
+  }
+  .completion-stat-label {
+    font-size: 14px;
+    color: var(--on-surface-variant);
+    margin-top: 4px;
+  }
+  .completion-pills {
+    display: flex;
+    gap: 10px;
+  }
+  .completion-pill {
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .pill-know {
+    background: var(--success-soft);
+    color: var(--success);
+  }
+  .pill-retry {
+    background: #FFF3E0;
+    color: #E65100;
+  }
+  .completion-actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .completion-primary-btn {
+    background: var(--primary);
+    color: white;
+    border-radius: var(--radius-btn);
+    padding: 16px;
+    font-size: 16px;
+    font-weight: 700;
+    text-align: center;
+    box-shadow: 0 4px 16px rgba(255,106,20,0.35);
+  }
+  .completion-secondary-btn {
+    background: transparent;
+    border: 1.5px solid var(--outline-variant);
+    border-radius: var(--radius-btn);
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--on-surface-variant);
+    text-align: center;
+  }
+
+  /* ── User flow diagram ───────────────────────────────────────────── */
+  .flow-diagram {
+    background: var(--surface-card);
+    border-radius: var(--radius-card);
+    padding: 32px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    margin-bottom: 0;
+  }
+  .flow-node {
+    background: var(--teal);
+    color: white;
+    border-radius: 12px;
+    padding: 12px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    min-width: 110px;
+    line-height: 1.4;
+  }
+  .flow-node.orange { background: var(--primary); }
+  .flow-node.amber { background: var(--amber); }
+  .flow-node.success { background: var(--success); }
+  .flow-node.outline {
+    background: transparent;
+    color: var(--on-surface-variant);
+    border: 1.5px solid var(--outline-variant);
+  }
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+  }
+  .flow-arrow-line {
+    width: 40px;
+    height: 2px;
+    background: var(--outline-variant);
+    position: relative;
+  }
+  .flow-arrow-line::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    top: -4px;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid var(--outline-variant);
+    border-top: 2px solid var(--outline-variant);
+    transform: rotate(45deg);
+  }
+  .flow-label {
+    font-size: 11px;
+    color: var(--on-surface-variant);
+    font-weight: 600;
+    text-align: center;
+    margin-top: 6px;
+  }
+  .flow-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .flow-branch {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .flow-branch-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .flow-branch-label {
+    font-size: 11px;
+    color: var(--on-surface-variant);
+    font-style: italic;
+    min-width: 60px;
+  }
+
+  /* ── Spec table ──────────────────────────────────────────────────── */
+  .spec-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .spec-card {
+    background: var(--surface-card);
+    border-radius: var(--radius-card);
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  }
+  .spec-card h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--teal);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+  .spec-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--outline-variant);
+    font-size: 13px;
+  }
+  .spec-row:last-child { border-bottom: none; }
+  .spec-key { color: var(--on-surface-variant); font-weight: 500; }
+  .spec-val { color: var(--on-surface); font-weight: 600; text-align: right; }
+  .spec-val.orange { color: var(--primary); }
+  .spec-val.teal   { color: var(--teal); }
+  .spec-val.amber  { color: var(--amber); }
+</style>
+</head>
+<body>
+
+<!-- ── DOC HEADER ──────────────────────────────────────────────────────── -->
+<div class="doc-header">
+  <h1>Deck Session Mode</h1>
+  <p>Sequential learning flow cho Từ vựng & Ngữ pháp — học hết một loại bài, Anki-style queue, local scoring.</p>
+  <div>
+    <span class="badge badge-orange">Flutter · iOS</span>
+    <span class="badge badge-teal">3 screens mới</span>
+    <span class="badge badge-amber">Local only · No API</span>
+  </div>
+</div>
+
+<!-- ── USER FLOW ────────────────────────────────────────────────────────── -->
+<section>
+  <h2>User Flow</h2>
+  <div class="flow-diagram">
+    <div class="flow-row" style="margin-bottom: 24px;">
+      <div class="flow-col">
+        <div class="flow-node">Module Detail<br><small style="font-weight:400;font-size:11px">Từ vựng card</small></div>
+        <div class="flow-label">tap "Từ vựng"</div>
+      </div>
+      <div class="flow-arrow"><div class="flow-arrow-line"></div></div>
+      <div class="flow-col">
+        <div class="flow-node orange">Type Group<br><small style="font-weight:400;font-size:11px">Screen MỚI</small></div>
+        <div class="flow-label">4 loại bài</div>
+      </div>
+      <div class="flow-arrow"><div class="flow-arrow-line"></div></div>
+      <div class="flow-col">
+        <div class="flow-node">Type List<br><small style="font-weight:400;font-size:11px">Screen MỚI</small></div>
+        <div class="flow-label">tap loại bài</div>
+      </div>
+      <div class="flow-arrow"><div class="flow-arrow-line"></div></div>
+      <div class="flow-col">
+        <div class="flow-branch">
+          <div class="flow-branch-item">
+            <div class="flow-branch-label">Học tất cả →</div>
+            <div class="flow-node orange" style="min-width:90px;padding:8px 12px;">Deck Session<br><small style="font-weight:400;font-size:11px">Screen MỚI</small></div>
+          </div>
+          <div class="flow-branch-item">
+            <div class="flow-branch-label">Tap 1 bài →</div>
+            <div class="flow-node outline" style="min-width:90px;padding:8px 12px;">Vocab Exercise<br><small style="font-weight:400;font-size:11px">Hiện tại</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid var(--outline-variant); padding-top: 20px;">
+      <div style="font-size: 12px; font-weight: 700; color: var(--on-surface-variant); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.06em;">Deck Session Internal Loop</div>
+      <div class="flow-row">
+        <div class="flow-col">
+          <div class="flow-node orange">Hiện card</div>
+          <div class="flow-label">exercise type</div>
+        </div>
+        <div class="flow-arrow"><div class="flow-arrow-line"></div></div>
+        <div class="flow-col">
+          <div class="flow-branch">
+            <div class="flow-branch-item">
+              <div class="flow-branch-label" style="color:#2E7D32">Đã biết →</div>
+              <div class="flow-node" style="background:var(--success);min-width:80px;padding:8px 10px;">Remove<br><small style="font-weight:400;font-size:10px">từ queue</small></div>
+            </div>
+            <div class="flow-branch-item">
+              <div class="flow-branch-label" style="color:var(--error)">Ôn lại →</div>
+              <div class="flow-node" style="background:var(--error);min-width:80px;padding:8px 10px;">Push back<br><small style="font-weight:400;font-size:10px">cuối queue</small></div>
+            </div>
+          </div>
+        </div>
+        <div class="flow-arrow"><div class="flow-arrow-line"></div></div>
+        <div class="flow-col">
+          <div class="flow-branch">
+            <div class="flow-branch-item">
+              <div class="flow-branch-label">Queue còn →</div>
+              <div class="flow-node orange" style="min-width:80px;padding:8px 10px;">Card tiếp</div>
+            </div>
+            <div class="flow-branch-item">
+              <div class="flow-branch-label">Queue rỗng →</div>
+              <div class="flow-node success" style="min-width:80px;padding:8px 10px;">Completion</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── SCREENS ───────────────────────────────────────────────────────────── -->
+<section>
+  <h2>Screen Designs</h2>
+  <div class="phones-row">
+
+    <!-- Screen 1: Type Group -->
+    <div class="phone-wrap">
+      <div class="phone-label">① Type Group Screen<br>(thay thế exercise list cho tu_vung/ngu_phap)</div>
+      <div class="phone">
+        <div class="status-bar">
+          <span class="status-time">9:41</span>
+          <div class="status-icons">
+            <div class="status-dot wifi"></div>
+            <div class="status-dot"></div>
+            <div class="status-dot battery"></div>
+          </div>
+        </div>
+        <div class="app-bar">
+          <div class="back-btn"><div class="back-arrow"></div></div>
+          <div class="app-bar-title">Từ vựng</div>
+        </div>
+        <div class="screen-body">
+          <div class="screen-hero">
+            <p style="font-size:14px;color:var(--on-surface-variant);margin-bottom:4px;">Giao tiếp cơ bản · Module 1</p>
+            <h1 style="font-size:22px;margin-bottom:6px;">Chọn loại bài tập</h1>
+            <p>Học theo từng dạng — hoặc tap vào bài cụ thể để luyện ngay.</p>
+          </div>
+          <div class="type-grid">
+            <div class="type-card">
+              <div class="type-card-icon icon-orange">📚</div>
+              <div class="type-card-label">Flashcard</div>
+              <div class="type-card-count">8 thẻ</div>
+              <div class="type-card-arrow"></div>
+            </div>
+            <div class="type-card">
+              <div class="type-card-icon icon-teal" style="font-size:20px;">↔</div>
+              <div class="type-card-label">Ghép đôi</div>
+              <div class="type-card-count">3 bài</div>
+              <div class="type-card-arrow"></div>
+            </div>
+            <div class="type-card">
+              <div class="type-card-icon icon-amber" style="font-size:20px;">✏</div>
+              <div class="type-card-label">Điền từ</div>
+              <div class="type-card-count">6 bài</div>
+              <div class="type-card-arrow"></div>
+            </div>
+            <div class="type-card">
+              <div class="type-card-icon icon-purple" style="font-size:20px;">✓</div>
+              <div class="type-card-label">Chọn từ</div>
+              <div class="type-card-count">5 bài</div>
+              <div class="type-card-arrow"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen 2: Type List -->
+    <div class="phone-wrap">
+      <div class="phone-label">② Type List Screen<br>(Flashcard list + "Bắt đầu học tất cả")</div>
+      <div class="phone">
+        <div class="status-bar">
+          <span class="status-time">9:41</span>
+          <div class="status-icons">
+            <div class="status-dot wifi"></div>
+            <div class="status-dot"></div>
+            <div class="status-dot battery"></div>
+          </div>
+        </div>
+        <div class="app-bar">
+          <div class="back-btn"><div class="back-arrow"></div></div>
+          <div class="app-bar-title">Flashcard</div>
+          <div style="font-size:12px;background:var(--primary-soft);color:var(--primary);padding:4px 10px;border-radius:999px;font-weight:700;">8 thẻ</div>
+        </div>
+        <div class="screen-body">
+          <div class="start-all-btn">
+            <div class="start-all-icon">▶</div>
+            Bắt đầu học tất cả (8)
+          </div>
+          <div class="scroll-area" style="padding-top:12px;">
+            <div style="font-size:11px;font-weight:700;color:var(--on-surface-variant);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Hoặc học từng thẻ</div>
+            <div class="exercise-item">
+              <div class="exercise-item-icon icon-orange">📚</div>
+              <div class="exercise-item-content">
+                <div class="exercise-item-title">mluvit</div>
+                <div class="exercise-item-sub">Lật thẻ để xem nghĩa</div>
+              </div>
+              <div class="exercise-item-chevron"></div>
+            </div>
+            <div class="exercise-item">
+              <div class="exercise-item-icon icon-orange">📚</div>
+              <div class="exercise-item-content">
+                <div class="exercise-item-title">On mluví česky.</div>
+                <div class="exercise-item-sub">Lật thẻ để xem nghĩa</div>
+              </div>
+              <div class="exercise-item-chevron"></div>
+            </div>
+            <div class="exercise-item">
+              <div class="exercise-item-icon icon-orange">📚</div>
+              <div class="exercise-item-content">
+                <div class="exercise-item-title">rozumět</div>
+                <div class="exercise-item-sub">Lật thẻ để xem nghĩa</div>
+              </div>
+              <div class="exercise-item-chevron"></div>
+            </div>
+            <div class="exercise-item">
+              <div class="exercise-item-icon icon-orange">📚</div>
+              <div class="exercise-item-content">
+                <div class="exercise-item-title">psát</div>
+                <div class="exercise-item-sub">Lật thẻ để xem nghĩa</div>
+              </div>
+              <div class="exercise-item-chevron"></div>
+            </div>
+            <div class="exercise-item">
+              <div class="exercise-item-icon icon-orange">📚</div>
+              <div class="exercise-item-content">
+                <div class="exercise-item-title">číst</div>
+                <div class="exercise-item-sub">Lật thẻ để xem nghĩa</div>
+              </div>
+              <div class="exercise-item-chevron"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen 3a: Deck - Quizcard (front) -->
+    <div class="phone-wrap">
+      <div class="phone-label">③a Deck Session · Flashcard<br>(trước khi lật — thẻ mặt trước)</div>
+      <div class="phone">
+        <div class="status-bar">
+          <span class="status-time">9:41</span>
+          <div class="status-icons">
+            <div class="status-dot wifi"></div>
+            <div class="status-dot"></div>
+            <div class="status-dot battery"></div>
+          </div>
+        </div>
+        <div class="app-bar">
+          <div class="back-btn"><div class="back-arrow"></div></div>
+          <div class="app-bar-title">Flashcard</div>
+        </div>
+        <div class="screen-body">
+          <div class="deck-progress-bar-wrap">
+            <div class="deck-counter">
+              <span>Thẻ 3 / 8</span>
+              <span style="color:var(--primary);font-weight:700;">37%</span>
+            </div>
+            <div class="deck-progress-track">
+              <div class="deck-progress-fill" style="width:37%"></div>
+            </div>
+          </div>
+          <div class="deck-card-area">
+            <div class="quizcard">
+              <div class="quizcard-front">mluvit</div>
+              <div class="quizcard-divider"></div>
+              <div class="quizcard-back">nói / nói chuyện</div>
+              <div class="quizcard-example">On mluví česky. — Anh ấy nói tiếng Séc.</div>
+              <div class="quizcard-hint">
+                <span style="font-size:16px;">👆</span>
+                <span style="font-size:13px;">Tap để xem nghĩa</span>
+              </div>
+            </div>
+          </div>
+          <div class="deck-actions">
+            <div class="deck-btn deck-btn-retry" style="opacity:0.4;">✕ Ôn lại</div>
+            <div class="deck-btn deck-btn-know" style="opacity:0.4;">✓ Đã biết</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen 3b: Deck - Quizcard (flipped) -->
+    <div class="phone-wrap">
+      <div class="phone-label">③b Deck Session · Flashcard<br>(sau khi lật — hiện đáp án + actions)</div>
+      <div class="phone">
+        <div class="status-bar">
+          <span class="status-time">9:41</span>
+          <div class="status-icons">
+            <div class="status-dot wifi"></div>
+            <div class="status-dot"></div>
+            <div class="status-dot battery"></div>
+          </div>
+        </div>
+        <div class="app-bar">
+          <div class="back-btn"><div class="back-arrow"></div></div>
+          <div class="app-bar-title">Flashcard</div>
+        </div>
+        <div class="screen-body">
+          <div class="deck-progress-bar-wrap">
+            <div class="deck-counter">
+              <span>Thẻ 3 / 8</span>
+              <span style="color:var(--primary);font-weight:700;">37%</span>
+            </div>
+            <div class="deck-progress-track">
+              <div class="deck-progress-fill" style="width:37%"></div>
+            </div>
+          </div>
+          <div class="deck-card-area">
+            <div class="quizcard flipped" style="background: linear-gradient(145deg, #FFFFFF, #FFF8F3);">
+              <div class="quizcard-front" style="font-size:22px;">mluvit</div>
+              <div class="quizcard-divider" style="display:block;"></div>
+              <div class="quizcard-back" style="display:block;">nói / nói chuyện</div>
+              <div class="quizcard-example" style="display:block;">On mluví česky.<br>→ Anh ấy nói tiếng Séc.</div>
+            </div>
+          </div>
+          <div class="deck-actions">
+            <div class="deck-btn deck-btn-retry">✕ Ôn lại</div>
+            <div class="deck-btn deck-btn-know">✓ Đã biết</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen 3c: Deck - Choice word -->
+    <div class="phone-wrap">
+      <div class="phone-label">③c Deck Session · Chọn từ<br>(chọn xong → auto next)</div>
+      <div class="phone">
+        <div class="status-bar">
+          <span class="status-time">9:41</span>
+          <div class="status-icons">
+            <div class="status-dot wifi"></div>
+            <div class="status-dot"></div>
+            <div class="status-dot battery"></div>
+          </div>
+        </div>
+        <div class="app-bar">
+          <div class="back-btn"><div class="back-arrow"></div></div>
+          <div class="app-bar-title">Chọn từ</div>
+        </div>
+        <div class="screen-body">
+          <div class="deck-progress-bar-wrap">
+            <div class="deck-counter">
+              <span>Câu 2 / 5</span>
+              <span style="color:var(--primary);font-weight:700;">40%</span>
+            </div>
+            <div class="deck-progress-track">
+              <div class="deck-progress-fill" style="width:40%"></div>
+            </div>
+          </div>
+          <div class="deck-card-area">
+            <div class="fill-blank-card">
+              <div style="font-size:11px;font-weight:700;color:var(--on-surface-variant);text-transform:uppercase;letter-spacing:0.06em;">Chọn từ đúng</div>
+              <div class="choice-stem">Já ___ s přáteli každý víkend.</div>
+              <div class="choice-options">
+                <div class="choice-opt">mluvím</div>
+                <div class="choice-opt correct">trávím</div>
+                <div class="choice-opt wrong">jedu</div>
+                <div class="choice-opt">píšu</div>
+              </div>
+              <div style="padding:12px;background:var(--success-soft);border-radius:12px;font-size:13px;color:var(--success);font-weight:600;margin-top:8px;">
+                ✓ Đúng! "trávit" = dành thời gian
+              </div>
+            </div>
+          </div>
+          <div class="deck-actions">
+            <div class="deck-btn deck-btn-submit">Tiếp theo →</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen 4: Completion -->
+    <div class="phone-wrap">
+      <div class="phone-label">④ Completion Screen<br>(queue rỗng — kết quả session)</div>
+      <div class="phone">
+        <div class="status-bar">
+          <span class="status-time">9:41</span>
+          <div class="status-icons">
+            <div class="status-dot wifi"></div>
+            <div class="status-dot"></div>
+            <div class="status-dot battery"></div>
+          </div>
+        </div>
+        <div class="screen-body">
+          <div class="completion-body">
+            <div class="completion-icon">🎉</div>
+            <div>
+              <div class="completion-title">Hoàn thành session!</div>
+              <p style="font-size:14px;color:var(--on-surface-variant);text-align:center;margin-top:6px;">Flashcard · Module 1</p>
+            </div>
+            <div class="completion-stat">
+              <div class="completion-stat-num">6<span style="font-size:24px;color:var(--outline)">/8</span></div>
+              <div class="completion-stat-label">thẻ đã nhớ</div>
+            </div>
+            <div class="completion-pills">
+              <div class="completion-pill pill-know">✓ Đã biết: 6</div>
+              <div class="completion-pill pill-retry">↻ Ôn lại: 2</div>
+            </div>
+            <div class="completion-actions">
+              <div class="completion-primary-btn">↻ Ôn lại 2 thẻ còn lại</div>
+              <div class="completion-secondary-btn">Xong — về danh sách</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /phones-row -->
+</section>
+
+<!-- ── SPEC ─────────────────────────────────────────────────────────────── -->
+<section>
+  <h2>Implementation Spec</h2>
+  <div class="spec-grid">
+
+    <div class="spec-card">
+      <h4>New Screens</h4>
+      <div class="spec-row"><span class="spec-key">TypeGroupScreen</span><span class="spec-val teal">features/exercise/screens/</span></div>
+      <div class="spec-row"><span class="spec-key">TypeListScreen</span><span class="spec-val teal">features/exercise/screens/</span></div>
+      <div class="spec-row"><span class="spec-key">DeckSessionScreen</span><span class="spec-val teal">features/exercise/screens/</span></div>
+    </div>
+
+    <div class="spec-card">
+      <h4>DeckSession State</h4>
+      <div class="spec-row"><span class="spec-key">queue</span><span class="spec-val">List&lt;Exercise&gt; (mutable)</span></div>
+      <div class="spec-row"><span class="spec-key">knownIds</span><span class="spec-val">Set&lt;String&gt;</span></div>
+      <div class="spec-row"><span class="spec-key">current index</span><span class="spec-val">0 → front of queue</span></div>
+      <div class="spec-row"><span class="spec-key">Đã biết</span><span class="spec-val orange">queue.removeFirst()</span></div>
+      <div class="spec-row"><span class="spec-key">Ôn lại</span><span class="spec-val orange">queue.addLast(current)</span></div>
+      <div class="spec-row"><span class="spec-key">Done</span><span class="spec-val">queue.isEmpty</span></div>
+    </div>
+
+    <div class="spec-card">
+      <h4>Per-Type Behavior</h4>
+      <div class="spec-row"><span class="spec-key">quizcard_basic</span><span class="spec-val">Tap → flip → Đã biết/Ôn lại</span></div>
+      <div class="spec-row"><span class="spec-key">choice_word</span><span class="spec-val">Tap option → check locally → Next</span></div>
+      <div class="spec-row"><span class="spec-key">fill_blank</span><span class="spec-val">Type → Submit → check → Next</span></div>
+      <div class="spec-row"><span class="spec-key">matching</span><span class="spec-val">Complete game → all correct → Next</span></div>
+    </div>
+
+    <div class="spec-card">
+      <h4>Routing</h4>
+      <div class="spec-row"><span class="spec-key">Existing route</span><span class="spec-val">/module/:id → tu_vung list</span></div>
+      <div class="spec-row"><span class="spec-key">New route</span><span class="spec-val">/module/:id/type-group</span></div>
+      <div class="spec-row"><span class="spec-key">New route</span><span class="spec-val">/type-list/:moduleId/:type</span></div>
+      <div class="spec-row"><span class="spec-key">New route</span><span class="spec-val">/deck/:moduleId/:type</span></div>
+      <div class="spec-row"><span class="spec-key">Data source</span><span class="spec-val">GET /v1/modules/:id/exercises?skill_kind=X</span></div>
+    </div>
+
+    <div class="spec-card">
+      <h4>Local Scoring (choice_word)</h4>
+      <div class="spec-row"><span class="spec-key">Correct check</span><span class="spec-val">tapped key == correct_answers["1"]</span></div>
+      <div class="spec-row"><span class="spec-key">Fill blank</span><span class="spec-val">trim().lower() contains correct</span></div>
+      <div class="spec-row"><span class="spec-key">Quizcard</span><span class="spec-val">self-assessed (Đã biết/Ôn lại)</span></div>
+      <div class="spec-row"><span class="spec-key">Matching</span><span class="spec-val">MatchingWidget existing logic</span></div>
+      <div class="spec-row"><span class="spec-key">No API call</span><span class="spec-val orange">No attempt created</span></div>
+    </div>
+
+    <div class="spec-card">
+      <h4>Entry Point Change</h4>
+      <div class="spec-row"><span class="spec-key">Trigger</span><span class="spec-val">skill_kind == tu_vung hoặc ngu_phap</span></div>
+      <div class="spec-row"><span class="spec-key">Current flow</span><span class="spec-val">→ exercise list (flat)</span></div>
+      <div class="spec-row"><span class="spec-key">New flow</span><span class="spec-val teal">→ TypeGroupScreen</span></div>
+      <div class="spec-row"><span class="spec-key">Other skills</span><span class="spec-val">Không thay đổi</span></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── ANIMATION ─────────────────────────────────────────────────────────── -->
+<section>
+  <h2>Animation & Interaction Notes</h2>
+  <div class="spec-grid">
+    <div class="spec-card">
+      <h4>Card Flip (Quizcard)</h4>
+      <div class="spec-row"><span class="spec-key">Trigger</span><span class="spec-val">GestureDetector onTap</span></div>
+      <div class="spec-row"><span class="spec-key">Animation</span><span class="spec-val">AnimationController 350ms</span></div>
+      <div class="spec-row"><span class="spec-key">Transform</span><span class="spec-val">rotateY 0→π (Matrix4)</span></div>
+      <div class="spec-row"><span class="spec-key">Easing</span><span class="spec-val">Curves.easeInOut</span></div>
+      <div class="spec-row"><span class="spec-key">Unlock actions</span><span class="spec-val orange">sau khi flip xong</span></div>
+    </div>
+    <div class="spec-card">
+      <h4>Card → Card Transition</h4>
+      <div class="spec-row"><span class="spec-key">Đã biết</span><span class="spec-val">Slide left + fade out 200ms</span></div>
+      <div class="spec-row"><span class="spec-key">Ôn lại</span><span class="spec-val">Slide right + fade out 200ms</span></div>
+      <div class="spec-row"><span class="spec-key">Next card</span><span class="spec-val">Slide in from right 200ms</span></div>
+      <div class="spec-row"><span class="spec-key">Progress bar</span><span class="spec-val">Animate width 300ms</span></div>
+    </div>
+    <div class="spec-card">
+      <h4>Touch Targets</h4>
+      <div class="spec-row"><span class="spec-key">Type card (group)</span><span class="spec-val">full card tappable</span></div>
+      <div class="spec-row"><span class="spec-key">Deck actions btns</span><span class="spec-val">min 52px height</span></div>
+      <div class="spec-row"><span class="spec-key">Choice options</span><span class="spec-val">min 48px height</span></div>
+      <div class="spec-row"><span class="spec-key">Haptic</span><span class="spec-val">HapticFeedback.lightImpact() on flip + answer</span></div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

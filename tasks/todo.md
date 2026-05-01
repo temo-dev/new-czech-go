@@ -194,3 +194,21 @@ Spec: `docs/specs/media-enrichment.md` · UI/UX: `docs/designs/media-enrichment.
 - [x] **ME-extra** cteni_1 per-item image upload: `C1Item` mode image/text; CMS CteniFields upload UI; Flutter `_buildCteni1Layout` redesign (2026-05-01)
 - [x] **ME-extra** Exercise form context image: `DELETE /admin/exercises/:id/assets/:assetId`; CMS "🖼 Ảnh minh họa" section trong exercise slide-over; quizcard image priority: context_image > flashcardImageAssetId (2026-05-01)
 - [x] **ME-bugfix** Inline `ALTER TABLE ADD COLUMN IF NOT EXISTS` cho `banner_image_id` + `image_asset_id` trong `NewPostgresCourseStore`, `NewPostgresVocabularyStore`, `NewPostgresGrammarStore`, `postgresMockTestStore.ensureSchema` (2026-05-01)
+
+---
+
+## V12 — Deck Session Mode (Từ vựng & Ngữ pháp)
+
+Spec: `docs/specs/deck-session-vocab-grammar.md` · Design: `docs/designs/deck-session-vocab-grammar.html`  
+Flutter iOS only. No backend. No CMS.
+
+- [x] **DS-1** Entry point: `module_detail_screen.dart` — tu_vung/ngu_phap → `TypeGroupScreen`; các skill khác unchanged (2026-05-01)
+- [x] **DS-2** `type_group_screen.dart` — load exercises by skillKind, group by exerciseType, 2-col grid với count badge (2026-05-01)
+- [x] **DS-3** `vocab_type_list_screen.dart` — "Bắt đầu học tất cả (N)" button + exercise list + `_openExercise` → VocabGrammarExerciseScreen (2026-05-01)
+- **[CHECKPOINT DS-A]** ✅ Passed 2026-05-01 — flutter analyze clean, 53 tests pass
+- [x] **DS-4** `deck_session_screen.dart` core: queue (`ListQueue`), progress bar, quizcard_basic flow (reuse `QuizcardWidget`), `_CompletionView` (2026-05-01)
+- **[CHECKPOINT DS-B]** ✅ Passed 2026-05-01
+- [x] **DS-5** Deck: choice_word (`_ChoiceWordDeckCard` local check) + fill_blank (`_FillBlankDeckCard` substring check) (2026-05-01)
+- [x] **DS-6** Deck: matching (`_MatchingDeckCard` wraps `MatchingWidget`, advance when all paired) (2026-05-01)
+- [x] **DS-7** Widget tests: 11 test cases trong `deck_session_test.dart` (2026-05-01)
+- **[CHECKPOINT DS-FINAL]** ✅ Passed 2026-05-01 — flutter analyze clean, 64/64 tests pass

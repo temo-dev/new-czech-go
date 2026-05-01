@@ -130,7 +130,7 @@ class _TypeGroupScreenState extends State<TypeGroupScreen> {
                             children: [
                               Text(_error!, textAlign: TextAlign.center),
                               const SizedBox(height: 12),
-                              TextButton(onPressed: _load, child: const Text('Thử lại')),
+                              TextButton(onPressed: _load, child: Text(AppLocalizations.of(context).retry)),
                             ],
                           ),
                         )

@@ -530,7 +530,12 @@ export function formStateFromExercise(item: Exercise): ExerciseFormState {
           .join('\n')
       : '',
     typePayload:
-      item.exercise_type.startsWith('poslech_') || item.exercise_type.startsWith('cteni_')
+      item.exercise_type.startsWith('poslech_') ||
+      item.exercise_type.startsWith('cteni_') ||
+      item.exercise_type === 'quizcard_basic' ||
+      item.exercise_type === 'matching' ||
+      item.exercise_type === 'fill_blank' ||
+      item.exercise_type === 'choice_word'
         ? (detail as Record<string, unknown>)
         : undefined,
   };
@@ -729,6 +734,15 @@ export function buildCreatePayload(form: ExerciseFormState) {
       },
     };
   }
+  if (['quizcard_basic', 'matching', 'fill_blank', 'choice_word'].includes(form.exerciseType)) {
+    return {
+      module_id: form.moduleId, skill_kind: form.skillKind,
+      exercise_type: form.exerciseType, title: form.title,
+      short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
+      status: form.status, pool: form.pool,
+      detail: form.typePayload ?? {},
+    };
+  }
   return {
     module_id: form.moduleId, exercise_type: form.exerciseType, title: form.title,
     short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
@@ -817,6 +831,15 @@ export function buildUpdatePayload(form: ExerciseFormState) {
         prompt: form.emailPrompt.trim(), topics: parseLineList(form.emailTopics),
         image_asset_ids: parseLineList(form.imageAssetIds), min_words: form.emailMinWords,
       },
+    };
+  }
+  if (['quizcard_basic', 'matching', 'fill_blank', 'choice_word'].includes(form.exerciseType)) {
+    return {
+      module_id: form.moduleId, skill_kind: form.skillKind,
+      exercise_type: form.exerciseType, title: form.title,
+      short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
+      status: form.status, pool: form.pool,
+      detail: form.typePayload ?? {},
     };
   }
   return {

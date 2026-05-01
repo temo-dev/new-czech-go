@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flutter_app/core/api/api_client.dart';
-import 'package:flutter_app/features/exercise/screens/deck_session_screen.dart';
-import 'package:flutter_app/features/exercise/screens/type_group_screen.dart';
 import 'package:flutter_app/features/exercise/screens/vocab_type_list_screen.dart';
 import 'package:flutter_app/l10n/generated/app_localizations.dart';
 import 'package:flutter_app/models/models.dart';

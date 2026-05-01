@@ -43,6 +43,7 @@ class _DeckSessionScreenState extends State<DeckSessionScreen> {
   int _totalCount = 0;
   ExerciseDetail? _currentDetail;
   bool _loadingDetail = false;
+  bool _detailError = false;
   bool _sessionComplete = false;
 
   @override
@@ -55,7 +56,7 @@ class _DeckSessionScreenState extends State<DeckSessionScreen> {
 
   Future<void> _loadCurrentDetail() async {
     if (_queue.isEmpty) return;
-    setState(() { _loadingDetail = true; _currentDetail = null; });
+    setState(() { _loadingDetail = true; _currentDetail = null; _detailError = false; });
     try {
       final raw = await widget.client.getExercise(_queue.first.id);
       if (!mounted) return;
@@ -65,7 +66,7 @@ class _DeckSessionScreenState extends State<DeckSessionScreen> {
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loadingDetail = false);
+      setState(() { _loadingDetail = false; _detailError = true; });
     }
   }
 
@@ -151,6 +152,8 @@ class _DeckSessionScreenState extends State<DeckSessionScreen> {
                     : _DeckBody(
                         detail: _currentDetail,
                         loading: _loadingDetail,
+                        hasError: _detailError,
+                        onRetry: _loadCurrentDetail,
                         knownCount: _knownIds.length,
                         totalCount: _totalCount,
                         onQuizcardChoice: _handleQuizcardChoice,
@@ -197,6 +200,8 @@ class _DeckBody extends StatelessWidget {
   const _DeckBody({
     required this.detail,
     required this.loading,
+    required this.hasError,
+    required this.onRetry,
     required this.knownCount,
     required this.totalCount,
     required this.onQuizcardChoice,
@@ -206,6 +211,8 @@ class _DeckBody extends StatelessWidget {
 
   final ExerciseDetail? detail;
   final bool loading;
+  final bool hasError;
+  final VoidCallback onRetry;
   final int knownCount;
   final int totalCount;
   final void Function(String) onQuizcardChoice;
@@ -254,16 +261,31 @@ class _DeckBody extends StatelessWidget {
 
         // ── Card area ─────────────────────────────────────────────────
         Expanded(
-          child: loading || detail == null
-              ? const Center(
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppColors.primary))
-              : _CardArea(
-                  detail: detail!,
-                  onQuizcardChoice: onQuizcardChoice,
-                  onAdvance: onAdvance,
-                  client: client,
-                ),
+          child: hasError
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.wifi_off_rounded,
+                          size: 40, color: AppColors.outlineVariant),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: onRetry,
+                        child: Text(AppLocalizations.of(context).retry),
+                      ),
+                    ],
+                  ),
+                )
+              : loading || detail == null
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.primary))
+                  : _CardArea(
+                      detail: detail!,
+                      onQuizcardChoice: onQuizcardChoice,
+                      onAdvance: onAdvance,
+                      client: client,
+                    ),
         ),
       ],
     );
