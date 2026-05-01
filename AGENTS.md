@@ -28,8 +28,8 @@ MockTest (đề thi)
 **Implemented skills:**
 - `noi` (Speaking) — fully implemented: Úloha 1-4, AI scoring, review artifact, MockTest speaking flow
 - `viet` (Writing) — V2: `psani_1_formular` + `psani_2_email`, LLM scoring, `WritingExerciseScreen`, Polly TTS for model_answer_text
-- `nghe` (Listening) — V3: `poslech_1-5`, Polly TTS exercise audio (2 voices for poslech_4 dialogs), objective scoring, `ListeningExerciseScreen`
-- `doc` (Reading) — V4: `cteni_1-5`, objective scoring (substring fill-in), `ReadingExerciseScreen`
+- `nghe` (Listening) — V3: `poslech_1-5`, Polly TTS exercise audio (2 voices for poslech_4 dialogs), objective scoring, `ListeningExerciseScreen`; **V13**: `poslech_6` Ano/Ne (TTS passage + 1–5 true/false statements)
+- `doc` (Reading) — V4: `cteni_1-5`, objective scoring (substring fill-in), `ReadingExerciseScreen`; **V13**: `cteni_6` Ano/Ne (passage card + 1–5 true/false statements)
 - `tu_vung` — V6: fully implemented. CMS `/vocabulary` với VocabularySet CRUD + AI generation (Claude tool_use async job) + inline review/publish. Flutter: `VocabGrammarExerciseScreen` với `QuizcardWidget`, `MatchingWidget`, filter pills.
 - `ngu_phap` — V6: fully implemented. CMS `/grammar` với GrammarRule CRUD (conjugation table, constraints) + same AI flow. Exercises: matching + fill_blank + choice_word.
 
@@ -194,6 +194,8 @@ Important current limitations:
 - learner-surface feedback copy and `sample_answer_text` coverage for `Uloha 3` và `Uloha 4` lighter than `Uloha 1` / `Uloha 2`
 - Exercise form file split ✅ hoàn thành trong V9 CMS Dashboard Upgrade
 - `_DiffTextBlock` chỉ highlight khi LLM trả về `diff_chunks` khác nhau; nếu learner text và corrected giống nhau hoàn toàn → all `unchanged` → không có highlight (đúng behavior)
+- `poslech_6` passage text sent to Polly as-is; admin phải nhập prose (không dùng bảng cột) — Polly TTS không xử lý tốt markdown/ASCII tables
+- `matchObjectiveAnswer` dùng exact-match cho ANO/NE keys (via `isAnoNeKey()`); fill-in vẫn dùng bidirectional substring match như trước
 
 ## Working Rules
 - Build in thin vertical slices.
@@ -279,7 +281,7 @@ Do not mix these in one change unless the human asks:
 If you notice adjacent cleanup, note it separately instead of silently expanding scope.
 
 ## Good Next Steps
-V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ V8 ✅ V9 ✅ V10 ✅ V11 ✅ — tất cả planned slices hoàn thành.
+V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ V8 ✅ V9 ✅ V10 ✅ V11 ✅ V12 ✅ V13 ✅ — tất cả planned slices hoàn thành.
 Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 
 **V8 Schema Flatten — 2026-04-30:**
@@ -338,9 +340,24 @@ Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 - DB fix: inline `ALTER TABLE ADD COLUMN IF NOT EXISTS` tại startup cho tất cả stores — không cần chạy goose migrations thủ công. **RDS caveat**: `ALTER TABLE` yêu cầu table owner; nếu goose chạy bằng user khác (e.g. `odoo`) thì app user (`czech_user`) không thể ALTER. Fix: (1) chạy `DO $$ ... ALTER TABLE ... OWNER TO czech_user $$` một lần sau initial migration (xem `deploy-first-release-checklist.md`); (2) code dùng `addColumnIfMissing()` helper (`store/postgres_migrate.go`) check `information_schema` trước — không gọi `ALTER TABLE` nếu column đã tồn tại
 - Specs: `docs/specs/media-enrichment.md`, idea: `docs/ideas/media-enrichment.md`, UI/UX: `docs/designs/media-enrichment.html`
 
+**V12 Deck Session Mode — 2026-05-01:**
+- `TypeGroupScreen`: tu_vung/ngu_phap → group exercises by exerciseType, 2-col grid với count badge
+- `DeckSessionScreen`: queue (`ListQueue`), progress bar, 4 card types (quizcard_basic, choice_word, fill_blank, matching)
+- Local scoring: choice_word/fill_blank substring check on-device — không gọi backend
+- `_CompletionView`: Đã biết / Ôn lại counts
+- 11 widget tests trong `deck_session_test.dart`
+
+**V13 Ano/Ne Exercise Type — 2026-05-02:**
+- Hai exercise types mới: `cteni_6` (đọc passage → Ano/Ne) + `poslech_6` (nghe TTS passage → Ano/Ne), 1–5 statements mỗi bài
+- Backend: `AnoNeDetail`/`AnoNeStatement` contracts; `extractQuestionTexts` nhánh `statements[].statement`; `BuildExerciseAudioText` case `poslech_6`; `isAnoNeKey()` exact-match guard ngăn substring collision ("NEANO" ≠ "ANO")
+- CMS: `AnoNeFields.tsx` (passage textarea + statement repeater + ANO/NE toggle + max_points + Polly button); wired trước `startsWith` checks trong `exercise-form/index.tsx`; 4 Vitest tests
+- Flutter: `AnoNeWidget` + `_AnoNeRow` (44pt tap target, animated states); `_buildCteni6Layout` + poslech_6 branch; `_hasAllAnswers` empty-guard; `AnoNeStatementView` model; 5 i18n keys VI+EN; 5 widget tests
+- Scoring: reuse `objective_scorer.go` — no LLM, no new DB migrations, no new endpoints
+- Specs: `SPEC.md` § V13, `docs/specs/ano-ne-exercise-type.md`, `docs/designs/ano-ne-exercise-type.html`
+- Tests: 243 backend, 53 CMS Vitest, 69 Flutter
+
 **Remaining backlog (low priority):**
 1. Nhập nội dung mẫu qua CMS: ít nhất 1 exercise mỗi loại để test Flutter end-to-end
-2. Vocab item audio per-item (Polly TTS deferred từ V11)
 2. Vocab item audio per-item (Polly TTS deferred từ V11)
 
 **Next coaching slice (if expanding):**
