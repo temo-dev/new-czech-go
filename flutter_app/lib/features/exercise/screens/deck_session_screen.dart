@@ -766,64 +766,151 @@ class _MatchingDeckCardState extends State<_MatchingDeckCard> {
 
   void _check() => setState(() => _checked = true);
 
+  /// Gets display text for a given rightId from the pairs list.
+  String _rightText(String rightId) {
+    for (final p in widget.detail.matchingPairs) {
+      if (p.rightId == rightId) return p.right;
+    }
+    return rightId;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final h = widget.padding;
     final totalPairs = widget.detail.matchingPairs.length;
+    final pairs = widget.detail.matchingPairs;
+    final ca = widget.detail.correctAnswers;
 
     return Column(
       children: [
         Expanded(
           child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(h, AppSpacing.x3, h, 0),
-            child: Column(
-              children: [
-                MatchingWidget(
-                  pairs: widget.detail.matchingPairs,
-                  answers: _answers,
-                  onChanged: _onPairChanged,
-                ),
-                // ── Result feedback after check ────────────────────────
-                if (_checked) ...[
-                  const SizedBox(height: AppSpacing.x4),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(AppSpacing.x3),
-                    decoration: BoxDecoration(
-                      color: _correctCount == totalPairs
-                          ? AppColors.success.withAlpha(20)
-                          : AppColors.error.withAlpha(15),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _correctCount == totalPairs
-                              ? l.deckCorrect
-                              : l.deckWrong,
-                          style: AppTypography.bodySmall.copyWith(
-                            fontWeight: FontWeight.w700,
+            padding: EdgeInsets.fromLTRB(h, AppSpacing.x3, h, AppSpacing.x3),
+            child: _checked
+                // ── Per-pair result breakdown ───────────────────────────
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Score header
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.x4, vertical: AppSpacing.x3),
+                        decoration: BoxDecoration(
+                          color: _correctCount == totalPairs
+                              ? AppColors.success.withAlpha(20)
+                              : AppColors.error.withAlpha(15),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          border: Border.all(
+                            color: _correctCount == totalPairs
+                                ? AppColors.success.withAlpha(60)
+                                : AppColors.error.withAlpha(40),
+                          ),
+                        ),
+                        child: Row(children: [
+                          Icon(
+                            _correctCount == totalPairs
+                                ? Icons.check_circle_rounded
+                                : Icons.cancel_rounded,
+                            size: 20,
                             color: _correctCount == totalPairs
                                 ? AppColors.success
                                 : AppColors.error,
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '$_correctCount / $totalPairs',
-                          style: AppTypography.bodySmall.copyWith(
-                            color: AppColors.onSurfaceVariant,
+                          const SizedBox(width: 8),
+                          Text(
+                            _correctCount == totalPairs
+                                ? l.deckCorrect
+                                : '$_correctCount / $totalPairs ${l.deckKnownLabel}',
+                            style: AppTypography.bodySmall.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: _correctCount == totalPairs
+                                  ? AppColors.success
+                                  : AppColors.error,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ]),
+                      ),
+                      const SizedBox(height: AppSpacing.x3),
+                      // Per-pair cards
+                      ...pairs.map((pair) {
+                        final userRightId = _answers[pair.leftId] ?? '';
+                        final correctRightId = ca[pair.leftId] ?? pair.rightId;
+                        final isCorrect = userRightId == correctRightId;
+                        final bg = isCorrect
+                            ? AppColors.success.withAlpha(15)
+                            : AppColors.error.withAlpha(12);
+                        final borderColor = isCorrect
+                            ? AppColors.success.withAlpha(50)
+                            : AppColors.error.withAlpha(35);
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(AppSpacing.x3),
+                          decoration: BoxDecoration(
+                            color: bg,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            border: Border.all(color: borderColor),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                isCorrect
+                                    ? Icons.check_circle_rounded
+                                    : Icons.cancel_rounded,
+                                size: 18,
+                                color: isCorrect
+                                    ? AppColors.success
+                                    : AppColors.error,
+                              ),
+                              const SizedBox(width: AppSpacing.x2),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Czech term (question)
+                                    Text(pair.left,
+                                        style: AppTypography.bodySmall
+                                            .copyWith(fontWeight: FontWeight.w600)),
+                                    const SizedBox(height: 4),
+                                    // Learner answer
+                                    Text(
+                                      '${l.objectiveYourAnswer} ${_rightText(userRightId)}',
+                                      style: AppTypography.bodySmall.copyWith(
+                                        color: isCorrect
+                                            ? AppColors.success
+                                            : AppColors.error,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    // Correct answer (only if wrong)
+                                    if (!isCorrect) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${l.objectiveCorrectAnswer} ${_rightText(correctRightId)}',
+                                        style: AppTypography.bodySmall.copyWith(
+                                          color: AppColors.success,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  )
+                // ── Interactive matching widget ─────────────────────────
+                : MatchingWidget(
+                    pairs: pairs,
+                    answers: _answers,
+                    onChanged: _onPairChanged,
                   ),
-                  const SizedBox(height: AppSpacing.x3),
-                ],
-              ],
-            ),
           ),
         ),
         // ── Action button ─────────────────────────────────────────────
