@@ -37,6 +37,29 @@ rtk make package-ec2-deploy EC2_ENV_FILE=.env.ec2
 scp dist/czech-go-system-ec2-deploy.tar.gz ec2-user@<ec2-host>:~/
 ```
 
+## RDS Table Ownership (run once after initial goose migrations)
+
+If goose ran as a different Postgres user than the app user (e.g. `odoo` vs `czech_user`),
+the app cannot run `ALTER TABLE` at startup. Fix: transfer ownership to the app user once.
+
+Connect to RDS as the master user (`odoo`):
+
+```sql
+\c czech_go_system
+DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP
+    EXECUTE 'ALTER TABLE public.' || quote_ident(r.tablename) || ' OWNER TO czech_user';
+  END LOOP;
+END $$;
+```
+
+Replace `czech_user` with the value from `DATABASE_URL` in `.env.ec2`.
+This only needs to run once per RDS instance. Future inline column additions use
+`addColumnIfMissing()` which checks `information_schema` and skips `ALTER TABLE`
+when the column already exists.
+
 ## Create ECR Repositories
 Run once:
 

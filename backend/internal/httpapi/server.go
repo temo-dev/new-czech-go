@@ -186,11 +186,7 @@ func (s *Server) handleVoicePreviewURL(w http.ResponseWriter, r *http.Request, v
 		writeError(w, http.StatusNotFound, "not_found", "Voice not found.", false)
 		return
 	}
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	audioURL := fmt.Sprintf("%s://%s/v1/voices/%s/preview/audio", scheme, r.Host, voiceID)
+	audioURL := buildAbsoluteURL(r, fmt.Sprintf("/v1/voices/%s/preview/audio", voiceID))
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{"url": audioURL, "mime_type": "audio/mpeg"},
 		"meta": map[string]any{},

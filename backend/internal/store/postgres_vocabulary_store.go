@@ -22,10 +22,8 @@ func NewPostgresVocabularyStore(databaseURL string) (VocabularyStore, error) {
 		db.Close()
 		return nil, fmt.Errorf("ping vocab db: %w", err)
 	}
-	// Migration 020: image_asset_id on vocabulary_items (idempotent)
-	if _, err := db.ExecContext(ctx,
-		`ALTER TABLE vocabulary_items ADD COLUMN IF NOT EXISTS image_asset_id TEXT NOT NULL DEFAULT ''`,
-	); err != nil {
+	// Migration 020: image_asset_id on vocabulary_items
+	if err := addColumnIfMissing(ctx, db, "vocabulary_items", "image_asset_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("migrate vocabulary_items image_asset_id: %w", err)
 	}

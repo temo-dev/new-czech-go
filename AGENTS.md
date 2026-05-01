@@ -335,7 +335,7 @@ Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 - cteni_1 per-item image upload trong CMS (CteniFields mode image/text toggle); Flutter `_buildCteni1Layout` redesign
 - `Course.BannerImageID` + `MockTest.BannerImageID`: `POST/DELETE /admin/{courses,mock-tests}/:id/banner`; CMS card header hiện banner + upload UI; Flutter CourseCard/MockTestCard banner image
 - Security fix: `isSafeAssetKey()` dùng `filepath.Clean + HasPrefix` thay `strings.Contains("..")`
-- DB fix: inline `ALTER TABLE ADD COLUMN IF NOT EXISTS` tại startup cho tất cả stores — không cần chạy goose migrations thủ công
+- DB fix: inline `ALTER TABLE ADD COLUMN IF NOT EXISTS` tại startup cho tất cả stores — không cần chạy goose migrations thủ công. **RDS caveat**: `ALTER TABLE` yêu cầu table owner; nếu goose chạy bằng user khác (e.g. `odoo`) thì app user (`czech_user`) không thể ALTER. Fix: (1) chạy `DO $$ ... ALTER TABLE ... OWNER TO czech_user $$` một lần sau initial migration (xem `deploy-first-release-checklist.md`); (2) code dùng `addColumnIfMissing()` helper (`store/postgres_migrate.go`) check `information_schema` trước — không gọi `ALTER TABLE` nếu column đã tồn tại
 - Specs: `docs/specs/media-enrichment.md`, idea: `docs/ideas/media-enrichment.md`, UI/UX: `docs/designs/media-enrichment.html`
 
 **Remaining backlog (low priority):**
