@@ -738,57 +738,130 @@ class _MatchingDeckCard extends StatefulWidget {
 
 class _MatchingDeckCardState extends State<_MatchingDeckCard> {
   final Map<String, String> _answers = {};
+  bool _checked = false;
 
   bool get _allPaired =>
+      widget.detail.matchingPairs.isNotEmpty &&
       _answers.length == widget.detail.matchingPairs.length &&
       _answers.values.every((v) => v.isNotEmpty);
 
+  int get _correctCount {
+    final ca = widget.detail.correctAnswers;
+    return _answers.entries
+        .where((e) => ca[e.key] == e.value)
+        .length;
+  }
+
   void _onPairChanged(String leftId, String rightId) {
+    if (_checked) return; // frozen after check
     setState(() {
       if (rightId.isEmpty) {
         _answers.remove(leftId);
       } else {
-        // Remove any existing entry with same rightId (un-pair previous)
         _answers.removeWhere((_, v) => v == rightId);
         _answers[leftId] = rightId;
       }
     });
   }
 
+  void _check() => setState(() => _checked = true);
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final h = widget.padding;
+    final totalPairs = widget.detail.matchingPairs.length;
 
     return Column(
       children: [
         Expanded(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(h, AppSpacing.x3, h, 0),
-            child: MatchingWidget(
-              pairs: widget.detail.matchingPairs,
-              answers: _answers,
-              onChanged: _onPairChanged,
+            child: Column(
+              children: [
+                MatchingWidget(
+                  pairs: widget.detail.matchingPairs,
+                  answers: _answers,
+                  onChanged: _onPairChanged,
+                ),
+                // ── Result feedback after check ────────────────────────
+                if (_checked) ...[
+                  const SizedBox(height: AppSpacing.x4),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.x3),
+                    decoration: BoxDecoration(
+                      color: _correctCount == totalPairs
+                          ? AppColors.success.withAlpha(20)
+                          : AppColors.error.withAlpha(15),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _correctCount == totalPairs
+                              ? l.deckCorrect
+                              : l.deckWrong,
+                          style: AppTypography.bodySmall.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: _correctCount == totalPairs
+                                ? AppColors.success
+                                : AppColors.error,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$_correctCount / $totalPairs',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.x3),
+                ],
+              ],
             ),
           ),
         ),
+        // ── Action button ─────────────────────────────────────────────
         Padding(
-          padding: EdgeInsets.fromLTRB(h, AppSpacing.x3, h, AppSpacing.x4),
+          padding: EdgeInsets.fromLTRB(h, AppSpacing.x2, h, AppSpacing.x4),
           child: SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _allPaired ? widget.onAdvance : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.onPrimary,
-                disabledBackgroundColor: AppColors.primary.withAlpha(100),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.md)),
-                elevation: 0,
-              ),
-              child: Text(l.deckNext),
-            ),
+            child: _checked
+                ? ElevatedButton(
+                    onPressed: widget.onAdvance,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.onPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md)),
+                      elevation: 0,
+                    ),
+                    child: Text(l.deckNext),
+                  )
+                : ElevatedButton(
+                    onPressed: _allPaired ? _check : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.onPrimary,
+                      // Clearly muted when disabled — no more "looks enabled" confusion
+                      disabledBackgroundColor:
+                          AppColors.outlineVariant.withAlpha(180),
+                      disabledForegroundColor: AppColors.onSurfaceVariant,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md)),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      _allPaired ? l.confirm : l.vocabMatchInstruction,
+                    ),
+                  ),
           ),
         ),
       ],
