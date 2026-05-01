@@ -642,6 +642,13 @@ class _FillBlankDeckCardState extends State<_FillBlankDeckCard> {
   bool _isCorrect = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Rebuild on every keystroke so onPressed correctly reflects isEmpty state.
+    _ctrl.addListener(() => setState(() {}));
+  }
+
+  @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
