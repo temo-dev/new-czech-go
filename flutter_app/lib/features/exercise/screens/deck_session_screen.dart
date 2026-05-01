@@ -310,8 +310,11 @@ class _CardArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final h = AppSpacing.pagePaddingH(context);
+    // key=ValueKey(detail.id) forces a fresh widget state for each exercise,
+    // preventing stale _revealed/_submitted/_isFlipped from prior card.
     if (detail.isQuizcard) {
       return Padding(
+        key: ValueKey(detail.id),
         padding: EdgeInsets.symmetric(horizontal: h),
         child: QuizcardWidget(
           front: detail.flashcardFront,
@@ -333,14 +336,15 @@ class _CardArea extends StatelessWidget {
     }
     if (detail.isChoiceWord) {
       return _ChoiceWordDeckCard(
-          detail: detail, onAdvance: onAdvance, padding: h);
+          key: ValueKey(detail.id), detail: detail, onAdvance: onAdvance, padding: h);
     }
     if (detail.isFillBlank) {
       return _FillBlankDeckCard(
-          detail: detail, onAdvance: onAdvance, padding: h);
+          key: ValueKey(detail.id), detail: detail, onAdvance: onAdvance, padding: h);
     }
     if (detail.isMatching) {
-      return _MatchingDeckCard(detail: detail, onAdvance: onAdvance, padding: h);
+      return _MatchingDeckCard(
+          key: ValueKey(detail.id), detail: detail, onAdvance: onAdvance, padding: h);
     }
     return const SizedBox.shrink();
   }
@@ -350,6 +354,7 @@ class _CardArea extends StatelessWidget {
 
 class _ChoiceWordDeckCard extends StatefulWidget {
   const _ChoiceWordDeckCard({
+    super.key,
     required this.detail,
     required this.onAdvance,
     required this.padding,
@@ -365,11 +370,18 @@ class _ChoiceWordDeckCard extends StatefulWidget {
 
 class _ChoiceWordDeckCardState extends State<_ChoiceWordDeckCard> {
   String? _selectedKey;
-  bool _revealed = false;
+  bool _revealed = false; // true after "Xác nhận" pressed
 
+  String get _correctKey => widget.detail.correctAnswers['1'] ?? '';
   bool _isCorrect(String key) =>
-      key.toLowerCase() ==
-      (widget.detail.correctAnswers['1'] ?? '').toLowerCase();
+      key.toLowerCase() == _correctKey.toLowerCase();
+
+  String _optionText(String key) {
+    for (final opt in widget.detail.poslechOptions) {
+      if (opt.key.toLowerCase() == key.toLowerCase()) return opt.text;
+    }
+    return key;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -445,10 +457,7 @@ class _ChoiceWordDeckCardState extends State<_ChoiceWordDeckCard> {
                     return GestureDetector(
                       onTap: _revealed
                           ? null
-                          : () => setState(() {
-                                _selectedKey = opt.key;
-                                _revealed = true;
-                              }),
+                          : () => setState(() => _selectedKey = opt.key),
                       child: Container(
                         decoration: BoxDecoration(
                           color: bg,
@@ -469,58 +478,142 @@ class _ChoiceWordDeckCardState extends State<_ChoiceWordDeckCard> {
                     );
                   }).toList(),
                 ),
-                // ── Result feedback ──────────────────────────────────────
-                if (_revealed) ...[
-                  const SizedBox(height: AppSpacing.x4),
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.x3),
-                    decoration: BoxDecoration(
-                      color: (_selectedKey != null &&
-                              _isCorrect(_selectedKey!))
-                          ? AppColors.success.withAlpha(20)
-                          : AppColors.error.withAlpha(15),
-                      borderRadius:
-                          BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Text(
-                      (_selectedKey != null && _isCorrect(_selectedKey!))
-                          ? l.deckCorrect
-                          : l.deckWrong,
-                      style: AppTypography.bodySmall.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: (_selectedKey != null &&
-                                _isCorrect(_selectedKey!))
-                            ? AppColors.success
-                            : AppColors.error,
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
         ),
-        // ── Next button ───────────────────────────────────────────────
-        if (_revealed)
-          Padding(
-            padding: EdgeInsets.fromLTRB(h, AppSpacing.x3, h, AppSpacing.x4),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: widget.onAdvance,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.md)),
-                  elevation: 0,
-                ),
-                child: Text(l.deckNext),
-              ),
-            ),
+        if (_revealed && _selectedKey != null)
+          _ChoiceResultCard(
+            selectedKey: _selectedKey!,
+            correctKey: _correctKey,
+            isCorrect: _isCorrect(_selectedKey!),
+            yourAnswerLabel: AppLocalizations.of(context).objectiveYourAnswer,
+            correctAnswerLabel: AppLocalizations.of(context).objectiveCorrectAnswer,
+            correctLabel: AppLocalizations.of(context).deckCorrect,
+            wrongLabel: AppLocalizations.of(context).deckWrong,
+            optionText: _optionText,
+            padding: h,
           ),
+        // ── Action button ──────────────────────────────────────────────
+        Padding(
+          padding: EdgeInsets.fromLTRB(h, AppSpacing.x2, h, AppSpacing.x4),
+          child: SizedBox(
+            width: double.infinity,
+            child: _revealed
+                ? ElevatedButton(
+                    onPressed: widget.onAdvance,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.onPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md)),
+                      elevation: 0,
+                    ),
+                    child: Text(l.deckNext),
+                  )
+                : ElevatedButton(
+                    onPressed: _selectedKey != null
+                        ? () => setState(() => _revealed = true)
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.onPrimary,
+                      disabledBackgroundColor:
+                          AppColors.outlineVariant.withAlpha(180),
+                      disabledForegroundColor: AppColors.onSurfaceVariant,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md)),
+                      elevation: 0,
+                    ),
+                    child: Text(l.confirm),
+                  ),
+          ),
+        ),
       ],
+    );
+  }
+}
+
+// ── Choice result card (extracted to avoid final inside spread) ───────────────
+
+class _ChoiceResultCard extends StatelessWidget {
+  const _ChoiceResultCard({
+    required this.selectedKey,
+    required this.correctKey,
+    required this.isCorrect,
+    required this.yourAnswerLabel,
+    required this.correctAnswerLabel,
+    required this.correctLabel,
+    required this.wrongLabel,
+    required this.optionText,
+    required this.padding,
+  });
+
+  final String selectedKey;
+  final String correctKey;
+  final bool isCorrect;
+  final String yourAnswerLabel;
+  final String correctAnswerLabel;
+  final String correctLabel;
+  final String wrongLabel;
+  final String Function(String key) optionText;
+  final double padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(padding, 0, padding, 0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.x3),
+        decoration: BoxDecoration(
+          color: isCorrect
+              ? AppColors.success.withAlpha(20)
+              : AppColors.error.withAlpha(15),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(
+            color: isCorrect
+                ? AppColors.success.withAlpha(60)
+                : AppColors.error.withAlpha(40),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(
+                isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                size: 18,
+                color: isCorrect ? AppColors.success : AppColors.error,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                isCorrect ? correctLabel : wrongLabel,
+                style: AppTypography.bodySmall.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: isCorrect ? AppColors.success : AppColors.error,
+                ),
+              ),
+            ]),
+            if (!isCorrect) ...[
+              const SizedBox(height: 6),
+              Text(
+                '$yourAnswerLabel $selectedKey — ${optionText(selectedKey)}',
+                style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.error, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$correctAnswerLabel $correctKey — ${optionText(correctKey)}',
+                style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.success, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -529,6 +622,7 @@ class _ChoiceWordDeckCardState extends State<_ChoiceWordDeckCard> {
 
 class _FillBlankDeckCard extends StatefulWidget {
   const _FillBlankDeckCard({
+    super.key,
     required this.detail,
     required this.onAdvance,
     required this.padding,
@@ -723,6 +817,7 @@ class _FillBlankDeckCardState extends State<_FillBlankDeckCard> {
 
 class _MatchingDeckCard extends StatefulWidget {
   const _MatchingDeckCard({
+    super.key,
     required this.detail,
     required this.onAdvance,
     required this.padding,
