@@ -5,6 +5,7 @@ import { useS } from '../../lib/i18n';
 import { adminFetch } from '../../lib/api';
 import { PoslechFields } from './PoslechFields';
 import { CteniFields } from './CteniFields';
+import { AnoNeFields } from './AnoNeFields';
 import { SpeakingFields } from './SpeakingFields';
 import { WritingFields } from './WritingFields';
 import { VocabGrammarFields } from './VocabGrammarFields';
@@ -651,7 +652,39 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                   <WritingFields form={form as never} setForm={setForm as never} />
                 )}
 
-                {form.exerciseType.startsWith('poslech_') && (
+                {(form.exerciseType === 'cteni_6' || form.exerciseType === 'poslech_6') && (
+                  <AnoNeFields
+                    exerciseType={form.exerciseType as 'cteni_6' | 'poslech_6'}
+                    initialData={form.typePayload ?? {}}
+                    onChange={(payload) => setForm((f) => ({ ...f, typePayload: payload }))}
+                    editingId={editingId}
+                    audioGenerating={audioGenerating}
+                    audioGenMsg={audioGenMsg}
+                    onGenerateAudio={async () => {
+                      if (!editingId) { setAudioGenMsg('Lưu bài trước khi tạo audio.'); return; }
+                      setAudioGenerating(true);
+                      setAudioGenMsg(null);
+                      try {
+                        const saveRes = await adminFetch(`${adminApi}/${editingId}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(buildUpdatePayload(form)),
+                        });
+                        if (!saveRes.ok) throw new Error('Lưu thất bại trước khi tạo audio.');
+                        const res = await adminFetch(`${adminApi}/${editingId}/generate-audio`, { method: 'POST' });
+                        const j = await res.json();
+                        if (!res.ok) throw new Error(j.error?.message ?? 'Failed');
+                        setAudioGenMsg('Đã tạo audio.');
+                      } catch (e) {
+                        setAudioGenMsg(e instanceof Error ? e.message : 'Error');
+                      } finally {
+                        setAudioGenerating(false);
+                      }
+                    }}
+                  />
+                )}
+
+                {form.exerciseType.startsWith('poslech_') && form.exerciseType !== 'poslech_6' && (
                   <PoslechFields
                     exerciseType={form.exerciseType as 'poslech_1' | 'poslech_2' | 'poslech_3' | 'poslech_4' | 'poslech_5'}
                     initialData={form.typePayload ?? {}}
@@ -685,7 +718,7 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                   />
                 )}
 
-                {form.exerciseType.startsWith('cteni_') && (
+                {form.exerciseType.startsWith('cteni_') && form.exerciseType !== 'cteni_6' && (
                   <CteniFields
                     exerciseType={form.exerciseType as 'cteni_1' | 'cteni_2' | 'cteni_3' | 'cteni_4' | 'cteni_5'}
                     initialData={form.typePayload ?? {}}

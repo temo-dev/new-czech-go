@@ -49,11 +49,13 @@ export type ExerciseType =
   | 'poslech_3'
   | 'poslech_4'
   | 'poslech_5'
+  | 'poslech_6'
   | 'cteni_1'
   | 'cteni_2'
   | 'cteni_3'
   | 'cteni_4'
   | 'cteni_5'
+  | 'cteni_6'
   | 'quizcard_basic'
   | 'matching'
   | 'fill_blank'
@@ -115,11 +117,13 @@ export const exerciseTypeOptions: Array<{ value: ExerciseType; label: string; hi
   { value: 'poslech_3',  label: 'Poslech 3', hint: 'Listening: 5 passages → match A-G (5 pts).' },
   { value: 'poslech_4',  label: 'Poslech 4', hint: 'Listening: 5 dialogs → choose image A-F (5 pts).' },
   { value: 'poslech_5',  label: 'Poslech 5', hint: 'Listening: voicemail → fill info (5 pts).' },
+  { value: 'poslech_6',  label: 'Poslech 6 — Ano/Ne', hint: 'Listening: hear passage → 1-5 Ano/Ne statements.' },
   { value: 'cteni_1',    label: 'Čtení 1',   hint: 'Reading: match 5 images/messages → A-H (5 pts).' },
   { value: 'cteni_2',    label: 'Čtení 2',   hint: 'Reading: read text → choose A-D, 5 questions (5 pts).' },
   { value: 'cteni_3',    label: 'Čtení 3',   hint: 'Reading: match 4 texts → persons A-E (4 pts).' },
   { value: 'cteni_4',    label: 'Čtení 4',   hint: 'Reading: choose A-D, 6 questions (6 pts).' },
   { value: 'cteni_5',    label: 'Čtení 5',   hint: 'Reading: read text → fill info, 5 items (5 pts).' },
+  { value: 'cteni_6',    label: 'Čtení 6 — Ano/Ne', hint: 'Reading: read passage → 1-5 Ano/Ne statements.' },
   { value: 'quizcard_basic', label: 'Flashcard', hint: 'Từ vựng — lật thẻ, biết/ôn lại.' },
   { value: 'matching',       label: 'Ghép đôi',  hint: 'Ghép 4-6 cặp Czech→Vietnamese. Exact match.' },
   { value: 'fill_blank',     label: 'Điền từ',   hint: 'Câu với ___ — điền từ thích hợp.' },
@@ -129,8 +133,8 @@ export const exerciseTypeOptions: Array<{ value: ExerciseType; label: string; hi
 export const SKILL_KIND_EXERCISE_TYPES: Record<string, ExerciseType[]> = {
   noi:      ['uloha_1_topic_answers', 'uloha_2_dialogue_questions', 'uloha_3_story_narration', 'uloha_4_choice_reasoning'],
   viet:     ['psani_1_formular', 'psani_2_email'],
-  nghe:     ['poslech_1', 'poslech_2', 'poslech_3', 'poslech_4', 'poslech_5'],
-  doc:      ['cteni_1', 'cteni_2', 'cteni_3', 'cteni_4', 'cteni_5'],
+  nghe:     ['poslech_1', 'poslech_2', 'poslech_3', 'poslech_4', 'poslech_5', 'poslech_6'],
+  doc:      ['cteni_1', 'cteni_2', 'cteni_3', 'cteni_4', 'cteni_5', 'cteni_6'],
   tu_vung:  ['quizcard_basic', 'matching', 'fill_blank', 'choice_word'],
   ngu_phap: ['matching', 'fill_blank', 'choice_word'],
 };
@@ -853,5 +857,47 @@ export function buildUpdatePayload(form: ExerciseFormState) {
       options: parseChoiceOptions(form.choiceOptions),
       expected_reasoning_axes: parseLineList(form.expectedReasoningAxes),
     },
+  };
+}
+
+// ─── V13: Ano/Ne helpers ──────────────────────────────────────────────────────
+
+export type AnoNeStatementRow = { statement: string; correct: 'ANO' | 'NE' };
+
+export type AnoNeFormState = {
+  passage: string;
+  statements: AnoNeStatementRow[];
+  maxPoints: number;
+};
+
+export function buildAnoNePayload(form: AnoNeFormState): Record<string, unknown> {
+  if (form.statements.length < 1 || form.statements.length > 5) {
+    throw new Error(`statements length must be 1–5, got ${form.statements.length}`);
+  }
+  const correct_answers: Record<string, string> = {};
+  const statements = form.statements.map((s, i) => {
+    correct_answers[String(i + 1)] = s.correct;
+    return { question_no: i + 1, statement: s.statement };
+  });
+  return {
+    passage: form.passage,
+    statements,
+    correct_answers,
+    max_points: form.maxPoints,
+  };
+}
+
+export function formStateFromAnoNe(detail: Record<string, unknown>): AnoNeFormState {
+  const rawStatements = Array.isArray(detail.statements)
+    ? (detail.statements as Array<Record<string, unknown>>)
+    : [];
+  const correctAnswers = (detail.correct_answers ?? {}) as Record<string, string>;
+  return {
+    passage: String(detail.passage ?? ''),
+    statements: rawStatements.map((s, i) => ({
+      statement: String(s.statement ?? ''),
+      correct: (correctAnswers[String(i + 1)] === 'ANO' ? 'ANO' : 'NE') as 'ANO' | 'NE',
+    })),
+    maxPoints: typeof detail.max_points === 'number' ? detail.max_points : 3,
   };
 }

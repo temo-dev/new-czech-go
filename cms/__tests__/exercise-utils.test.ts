@@ -280,3 +280,63 @@ describe('buildUpdatePayload', () => {
     expect(payload.prompt.question_prompts).toEqual(['Q1?', 'Q2?']);
   });
 });
+
+// ─── V13: Ano/Ne tests ────────────────────────────────────────────────────────
+
+import { buildAnoNePayload, formStateFromAnoNe } from '../components/exercise-utils';
+
+describe('buildAnoNePayload', () => {
+  it('builds valid 3-statement payload', () => {
+    const payload = buildAnoNePayload({
+      passage: 'Vlašim text',
+      statements: [
+        { statement: 'Je zavřeno v pátek.', correct: 'ANO' },
+        { statement: 'Polední přestávka je do 13h.', correct: 'NE' },
+        { statement: 'Úřední hodiny v úterý končí ve 14h.', correct: 'ANO' },
+      ],
+      maxPoints: 3,
+    });
+    expect(payload.passage).toBe('Vlašim text');
+    expect((payload.statements as unknown[]).length).toBe(3);
+    expect(payload.correct_answers).toEqual({ '1': 'ANO', '2': 'NE', '3': 'ANO' });
+    expect(payload.max_points).toBe(3);
+  });
+
+  it('throws for >5 statements', () => {
+    expect(() =>
+      buildAnoNePayload({
+        passage: 'x',
+        statements: Array(6).fill({ statement: 's', correct: 'ANO' as const }),
+        maxPoints: 6,
+      }),
+    ).toThrow('1–5');
+  });
+
+  it('uppercase ANO/NE in correct_answers', () => {
+    const payload = buildAnoNePayload({
+      passage: 'x',
+      statements: [{ statement: 's', correct: 'NE' }],
+      maxPoints: 1,
+    });
+    expect((payload.correct_answers as Record<string, string>)['1']).toBe('NE');
+  });
+});
+
+describe('formStateFromAnoNe', () => {
+  it('roundtrip: buildAnoNePayload → formStateFromAnoNe', () => {
+    const original = {
+      passage: 'Test passage',
+      statements: [
+        { statement: 'Stmt A', correct: 'ANO' as const },
+        { statement: 'Stmt B', correct: 'NE' as const },
+      ],
+      maxPoints: 2,
+    };
+    const payload = buildAnoNePayload(original);
+    const restored = formStateFromAnoNe(payload);
+    expect(restored.passage).toBe('Test passage');
+    expect(restored.statements[0].correct).toBe('ANO');
+    expect(restored.statements[1].correct).toBe('NE');
+    expect(restored.maxPoints).toBe(2);
+  });
+});
