@@ -404,6 +404,9 @@ class ExerciseDetail {
     this.choiceWordExplanation = '',
     this.choiceWordGrammarNote = '',
     this.correctAnswers = const {},
+    // V13: ano/ne
+    this.anoNePassage = '',
+    this.anoNeStatements = const [],
   });
 
   final String id;
@@ -456,12 +459,19 @@ class ExerciseDetail {
   final String choiceWordGrammarNote;
   final Map<String, String> correctAnswers;
 
+  // V13: cteni_6 / poslech_6
+  final String anoNePassage;
+  final List<AnoNeStatementView> anoNeStatements;
+
   bool get isPsani1 => exerciseType == 'psani_1_formular';
   bool get isPsani2 => exerciseType == 'psani_2_email';
   bool get isPoslech => exerciseType.startsWith('poslech_');
   bool get isPoslech5 => exerciseType == 'poslech_5';
   bool get isCteni => exerciseType.startsWith('cteni_');
   bool get isCteni5 => exerciseType == 'cteni_5';
+  bool get isCteni6 => exerciseType == 'cteni_6';
+  bool get isPoslech6 => exerciseType == 'poslech_6';
+  bool get isAnoNe => exerciseType == 'cteni_6' || exerciseType == 'poslech_6';
 
   // V6: Vocab & Grammar exercise types
   bool get isQuizcard => exerciseType == 'quizcard_basic';
@@ -615,6 +625,27 @@ class ExerciseDetail {
       choiceWordGrammarNote: detail['grammar_note'] as String? ?? '',
       correctAnswers: (detail['correct_answers'] as Map<String, dynamic>? ?? const {})
           .map((k, v) => MapEntry(k, v.toString())),
+      // V13: ano/ne
+      anoNePassage: detail['passage'] as String? ?? '',
+      anoNeStatements: (detail['statements'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(AnoNeStatementView.fromJson)
+          .toList(),
+    );
+  }
+}
+
+// V13: One statement in a cteni_6 / poslech_6 exercise.
+class AnoNeStatementView {
+  const AnoNeStatementView({required this.questionNo, required this.statement});
+
+  final int questionNo;
+  final String statement;
+
+  factory AnoNeStatementView.fromJson(Map<String, dynamic> json) {
+    return AnoNeStatementView(
+      questionNo: (json['question_no'] as num?)?.toInt() ?? 0,
+      statement: json['statement'] as String? ?? '',
     );
   }
 }

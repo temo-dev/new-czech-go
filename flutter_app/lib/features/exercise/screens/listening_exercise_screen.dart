@@ -9,6 +9,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../widgets/ano_ne_widget.dart';
 import '../widgets/exercise_context_image.dart';
 import '../widgets/fill_in_widget.dart';
 import '../widgets/multiple_choice_widget.dart';
@@ -83,6 +84,11 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
 
   bool get _hasAllAnswers {
     final d = widget.detail;
+    if (d.isPoslech6) {
+      return d.anoNeStatements.every(
+        (s) => _answers[s.questionNo.toString()]?.isNotEmpty == true,
+      );
+    }
     if (d.isPoslech5) {
       return d.poslechQuestions.every(
         (q) => _answers[q.questionNo.toString()]?.isNotEmpty == true,
@@ -184,7 +190,18 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
             const SizedBox(height: AppSpacing.x4),
 
             // Answer UI
-            if (d.isPoslech5)
+            if (d.isPoslech6)
+              AnoNeWidget(
+                statements: d.anoNeStatements,
+                onAnswersChanged: (a) => setState(() {
+                  _answers
+                    ..clear()
+                    ..addAll(a);
+                }),
+                result: _result?.feedback?.objectiveResult,
+                enabled: _result == null,
+              )
+            else if (d.isPoslech5)
               FillInWidget(
                 questions: d.poslechQuestions,
                 answers: _answers,

@@ -958,4 +958,21 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get confirm => 'Xác nhận';
+
+  @override
+  String get anoButton => 'ANO';
+
+  @override
+  String get neButton => 'NE';
+
+  @override
+  String get anoNeInstruction => 'Đúng hay sai?';
+
+  @override
+  String get anoNeCorrectHint => 'Đúng ✓';
+
+  @override
+  String anoNeWrongHint(String answer) {
+    return 'Sai — đáp án: $answer';
+  }
 }

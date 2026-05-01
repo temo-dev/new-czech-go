@@ -393,5 +393,11 @@
     "deckRetryLabel": "Review",
     "emptyExerciseList": "No exercises yet",
     "cancel": "Cancel",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "anoButton": "ANO",
+    "neButton": "NE",
+    "anoNeInstruction": "True or false?",
+    "anoNeCorrectHint": "Correct ✓",
+    "anoNeWrongHint": "Wrong — correct: {answer}",
+    "@anoNeWrongHint": { "placeholders": { "answer": { "type": "String" } } }
 }

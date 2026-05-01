@@ -1828,6 +1828,36 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Xác nhận'**
   String get confirm;
+
+  /// No description provided for @anoButton.
+  ///
+  /// In vi, this message translates to:
+  /// **'ANO'**
+  String get anoButton;
+
+  /// No description provided for @neButton.
+  ///
+  /// In vi, this message translates to:
+  /// **'NE'**
+  String get neButton;
+
+  /// No description provided for @anoNeInstruction.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đúng hay sai?'**
+  String get anoNeInstruction;
+
+  /// No description provided for @anoNeCorrectHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đúng ✓'**
+  String get anoNeCorrectHint;
+
+  /// No description provided for @anoNeWrongHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Sai — đáp án: {answer}'**
+  String anoNeWrongHint(String answer);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -8,6 +8,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../widgets/ano_ne_widget.dart';
 import '../widgets/exercise_context_image.dart';
 import '../widgets/fill_in_widget.dart';
 import '../widgets/multiple_choice_widget.dart';
@@ -42,6 +43,11 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
 
   bool get _hasAllAnswers {
     final d = widget.detail;
+    if (d.isCteni6) {
+      return d.anoNeStatements.every(
+        (s) => _answers[s.questionNo.toString()]?.isNotEmpty == true,
+      );
+    }
     if (d.isCteni5) {
       return d.cteniQuestions.every(
         (q) => _answers[q.questionNo.toString()]?.isNotEmpty == true,
@@ -149,8 +155,12 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
               const SizedBox(height: AppSpacing.x4),
             ],
 
+            // cteni_6: passage + AnoNe widget
+            if (d.isCteni6) ...[
+              ..._buildCteni6Layout(d),
+            ]
             // cteni_1: combined item+answer layout (image/text per item + A-H select)
-            if (d.exerciseType == 'cteni_1') ...[
+            else if (d.exerciseType == 'cteni_1') ...[
               ..._buildCteni1Layout(d),
             ]
             else ...[
@@ -209,6 +219,38 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
         ),
       ),
     );
+  }
+
+  /// cteni_6 layout: passage card + AnoNeWidget.
+  List<Widget> _buildCteni6Layout(ExerciseDetail d) {
+    return [
+      if (d.anoNePassage.isNotEmpty) ...[
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.x4),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.outlineVariant),
+          ),
+          child: SelectableText(
+            d.anoNePassage,
+            style: AppTypography.bodyMedium,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.x4),
+      ],
+      AnoNeWidget(
+        statements: d.anoNeStatements,
+        onAnswersChanged: (a) => setState(() {
+          _answers
+            ..clear()
+            ..addAll(a);
+        }),
+        result: _result?.feedback?.objectiveResult,
+        enabled: _result == null,
+      ),
+    ];
   }
 
   /// cteni_1 combined layout: each item shows its content (image or text) with

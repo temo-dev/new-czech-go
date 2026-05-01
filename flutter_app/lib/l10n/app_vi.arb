@@ -438,5 +438,11 @@
     "deckRetryLabel": "Ôn lại",
     "emptyExerciseList": "Chưa có bài tập",
     "cancel": "Hủy",
-    "confirm": "Xác nhận"
+    "confirm": "Xác nhận",
+    "anoButton": "ANO",
+    "neButton": "NE",
+    "anoNeInstruction": "Đúng hay sai?",
+    "anoNeCorrectHint": "Đúng ✓",
+    "anoNeWrongHint": "Sai — đáp án: {answer}",
+    "@anoNeWrongHint": { "placeholders": { "answer": { "type": "String" } } }
 }

@@ -958,4 +958,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get confirm => 'Confirm';
+
+  @override
+  String get anoButton => 'ANO';
+
+  @override
+  String get neButton => 'NE';
+
+  @override
+  String get anoNeInstruction => 'True or false?';
+
+  @override
+  String get anoNeCorrectHint => 'Correct ✓';
+
+  @override
+  String anoNeWrongHint(String answer) {
+    return 'Wrong — correct: $answer';
+  }
 }
