@@ -276,6 +276,24 @@ type Cteni5Detail struct {
 	CorrectAnswers map[string]string `json:"correct_answers"`
 }
 
+// --- Ano/Ne (V13) ---
+
+// AnoNeDetail is shared by cteni_6 and poslech_6 (true/false statement verification).
+// passage: display text (cteni_6) or Polly TTS prose script (poslech_6).
+// correct_answers keys are stringified question_no ("1", "2", ...).
+// Values are uppercase "ANO" or "NE".
+type AnoNeDetail struct {
+	Passage        string            `json:"passage"`
+	Statements     []AnoNeStatement  `json:"statements"`
+	CorrectAnswers map[string]string `json:"correct_answers"`
+	MaxPoints      int               `json:"max_points,omitempty"`
+}
+
+type AnoNeStatement struct {
+	QuestionNo int    `json:"question_no"`
+	Statement  string `json:"statement"`
+}
+
 // --- Writing (V2) ---
 
 type Psani1Detail struct {

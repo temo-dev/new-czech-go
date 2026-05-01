@@ -358,5 +358,20 @@ func extractQuestionTexts(exercise contracts.Exercise) map[string]string {
 		}
 	}
 
+	// Ano/Ne statements (cteni_6, poslech_6 — AnoNeStatement.statement).
+	var withStatements struct {
+		Statements []struct {
+			QuestionNo int    `json:"question_no"`
+			Statement  string `json:"statement"`
+		} `json:"statements"`
+	}
+	if json.Unmarshal(b, &withStatements) == nil {
+		for _, s := range withStatements.Statements {
+			if s.Statement != "" {
+				texts[fmt.Sprintf("%d", s.QuestionNo)] = s.Statement
+			}
+		}
+	}
+
 	return texts
 }

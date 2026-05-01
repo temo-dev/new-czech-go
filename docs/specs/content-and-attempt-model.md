@@ -105,6 +105,7 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026).
 - `poslech_3` — 5 đoạn → match A-G, 2 dư (5 điểm)
 - `poslech_4` — 5 dialog → chọn ảnh A-F, 1 dư (5 điểm)
 - `poslech_5` — Nghe voicemail → điền thông tin, 5 ô (5 điểm)
+- `poslech_6` — Nghe văn bản (TTS) → Ano/Ne, 1–5 câu (admin nhập điểm) — V13
 
 **Reading (doc) — V4:**
 - `cteni_1` — Match 5 ảnh/tin nhắn → A-H, 3 dư (5 điểm)
@@ -112,6 +113,7 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026).
 - `cteni_3` — Match 4 text → nhân vật A-E, 1 dư (4 điểm)
 - `cteni_4` — Chọn A-D, 6 câu (6 điểm)
 - `cteni_5` — Đọc text → điền thông tin, 5 ô (5 điểm)
+- `cteni_6` — Đọc văn bản → Ano/Ne, 1–5 câu (admin nhập điểm) — V13
 
 **Vocabulary / Grammar (tu_vung, ngu_phap) — course-only, chưa implement:**
 - `vocabulary_match` — Ghép từ Czech → nghĩa
@@ -123,8 +125,8 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026).
 ```
 noi      → uloha_1_*, uloha_2_*, uloha_3_*, uloha_4_*
 viet     → psani_1_formular, psani_2_email
-nghe     → poslech_1, poslech_2, poslech_3, poslech_4, poslech_5
-doc      → cteni_1, cteni_2, cteni_3, cteni_4, cteni_5
+nghe     → poslech_1, poslech_2, poslech_3, poslech_4, poslech_5, poslech_6
+doc      → cteni_1, cteni_2, cteni_3, cteni_4, cteni_5, cteni_6
 tu_vung  → vocabulary_*
 ngu_phap → grammar_*
 ```

@@ -26,8 +26,24 @@ func BuildExerciseAudioText(exercise contracts.Exercise) string {
 		return buildFromDialogItems(toListening4Items(exercise.Detail))
 	case "poslech_5":
 		return buildFromAudioSource(toListening5Source(exercise.Detail))
+	case "poslech_6":
+		return buildAnoNeAudioText(exercise.Detail)
 	}
 	return ""
+}
+
+func buildAnoNeAudioText(detail any) string {
+	b, err := json.Marshal(detail)
+	if err != nil {
+		return ""
+	}
+	var d struct {
+		Passage string `json:"passage"`
+	}
+	if err := json.Unmarshal(b, &d); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(d.Passage)
 }
 
 func buildFromAudioSource(src contracts.ListeningAudioSource) string {

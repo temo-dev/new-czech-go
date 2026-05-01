@@ -1712,3 +1712,332 @@ Manual: Tap Từ vựng → TypeGroupScreen → Flashcard list → "Bắt đầu
 
 `make flutter-analyze && make flutter-test`  
 Manual: deck qua đủ 4 types. Verify no network call đến `/v1/attempts` trong deck mode.
+
+---
+
+## V13 — Ano/Ne Exercise Type
+
+Spec: `SPEC.md` § V13 · `docs/specs/ano-ne-exercise-type.md`  
+Design: `docs/designs/ano-ne-exercise-type.html`  
+Idea: `docs/ideas/ano-ne-exercise-type.md`
+
+### Dependency graph
+
+```
+AN-1 (Backend foundation)
+  ├── AN-2 (Backend tests)        — requires AN-1
+  └── AN-3 (Docs update)         — requires AN-1
+  
+[CHECKPOINT AN-A]                — requires AN-1, AN-2, AN-3
+
+AN-4 (CMS utils + AnoNeFields)   — độc lập, chạy song song với Flutter
+AN-5 (CMS wire + tests)         — requires AN-4
+
+[CHECKPOINT AN-B]               — requires AN-4, AN-5
+
+AN-6 (Flutter widget + model)    — độc lập, chạy song song với CMS
+AN-7 (Flutter screens + i18n)   — requires AN-6
+AN-8 (Flutter tests)            — requires AN-6, AN-7
+
+[CHECKPOINT AN-FINAL]           — requires tất cả
+```
+
+### Slice AN-1 — Backend foundation
+
+**Files:**
+- `backend/internal/contracts/types.go` — thêm `AnoNeDetail`, `AnoNeStatement`
+- `backend/internal/processing/objective_scorer.go` — thêm nhánh `statements[].statement` trong `extractQuestionTexts`
+- `backend/internal/processing/exercise_audio.go` — thêm `case "poslech_6": return buildAnoNeAudioText(exercise.Detail)`
+- `backend/internal/server.go` (hoặc exercise handler) — accept `"cteni_6"`, `"poslech_6"` trong valid exercise type list
+
+**Changes chi tiết:**
+
+```go
+// contracts/types.go
+type AnoNeDetail struct {
+    Passage        string            `json:"passage"`
+    Statements     []AnoNeStatement  `json:"statements"`
+    CorrectAnswers map[string]string `json:"correct_answers"` // "1"→"ANO"
+    MaxPoints      int               `json:"max_points,omitempty"`
+}
+type AnoNeStatement struct {
+    QuestionNo int    `json:"question_no"`
+    Statement  string `json:"statement"`
+}
+
+// objective_scorer.go — extractQuestionTexts, sau nhánh "questions"
+var withStatements struct {
+    Statements []struct {
+        QuestionNo int    `json:"question_no"`
+        Statement  string `json:"statement"`
+    } `json:"statements"`
+}
+if json.Unmarshal(b, &withStatements) == nil {
+    for _, s := range withStatements.Statements {
+        if s.Statement != "" {
+            texts[fmt.Sprintf("%d", s.QuestionNo)] = s.Statement
+        }
+    }
+}
+
+// exercise_audio.go — BuildExerciseAudioText switch
+case "poslech_6":
+    return buildAnoNeAudioText(exercise.Detail)
+```
+
+**AC:**
+- `make backend-build` pass, 0 compiler errors
+- `POST /v1/admin/exercises` với `exercise_type: "cteni_6"` không trả 400 "invalid type"
+
+---
+
+### Slice AN-2 — Backend tests
+
+**File:** `backend/internal/processing/objective_scorer_test.go`
+
+Test cases cần thêm:
+```go
+TestScoreObjectiveAnswers_AnoNe_AllCorrect       // {"1":"ANO","2":"NE"} vs same → score=2
+TestScoreObjectiveAnswers_AnoNe_SomeWrong         // {"1":"ANO","2":"ANO"} vs {"1":"ANO","2":"NE"} → score=1
+TestScoreObjectiveAnswers_AnoNe_CaseInsensitive   // {"1":"ano"} vs {"1":"ANO"} → correct
+TestExtractQuestionTexts_Statements               // statements[].statement → map["1"]="Na úřadu..."
+TestBuildExerciseAudioText_Poslech6               // exercise.Detail = AnoNeDetail{passage:"..."} → "..."
+```
+
+**AC:** `make backend-test` pass, 5 test cases mới đều green.
+
+---
+
+### Slice AN-3 — Docs update
+
+**Files:**
+- `docs/specs/content-and-attempt-model.md` — thêm `cteni_6` và `poslech_6` vào `ExerciseType` enum
+- `docs/specs/api-contracts.md` — ghi chú `cteni_6`/`poslech_6` hợp lệ với `submit-answers`
+
+**AC:** Docs updated, không cần build check.
+
+---
+
+### [CHECKPOINT AN-A]
+
+```
+make backend-build && make backend-test
+```
+
+Manual: `POST /v1/admin/exercises` body `{"exercise_type":"cteni_6","title":"Test","module_id":"...","skill_kind":"doc","pool":"course","status":"draft","detail":{"passage":"Vlašim...","statements":[{"question_no":1,"statement":"Je zavřeno v pátek?"}],"correct_answers":{"1":"ANO"},"max_points":1}}` → 200.
+
+---
+
+### Slice AN-4 — CMS utils + AnoNeFields
+
+**Files:**
+- `cms/lib/exercise-utils.ts` — thêm `ANO_NE_TYPES`, `AnoNeFormState`, `buildAnoNePayload()`, `formStateFromAnoNe()`
+- `cms/components/exercise-form/AnoNeFields.tsx` — NEW component
+
+**AnoNeFields layout:**
+1. Passage textarea (required, label "Văn bản / Script", helper text cho poslech_6)
+2. Max points input (number, min 1, default 3)
+3. Statement repeater (1–5 rows):
+   - Row: index badge (A/B/C/D/E) + statement input + ANO/NE toggle buttons + delete icon
+   - "+ Thêm câu" button (disabled khi = 5 rows)
+4. Validation inline: passage non-empty, ≥1 statement, mỗi statement non-empty
+
+**AC:** `make cms-build` pass. Component render đúng trong storybook/dev với 3 statements.
+
+---
+
+### Slice AN-5 — CMS wire + tests
+
+**File:** `cms/components/exercise-form/index.tsx`
+
+Thêm trước `startsWith('poslech_')` và `startsWith('cteni_')` checks:
+
+```tsx
+// IMPORTANT: cteni_6 và poslech_6 phải check TRƯỚC startsWith vì chúng cần AnoNeFields, không phải CteniFields/PoslechFields
+{(form.exerciseType === 'cteni_6' || form.exerciseType === 'poslech_6') && (
+  <AnoNeFields
+    value={formState as AnoNeFormState}
+    onChange={setFormState}
+    exerciseType={form.exerciseType as 'cteni_6' | 'poslech_6'}
+  />
+)}
+{form.exerciseType.startsWith('poslech_') && form.exerciseType !== 'poslech_6' && (
+  <PoslechFields ... />
+)}
+{form.exerciseType.startsWith('cteni_') && form.exerciseType !== 'cteni_6' && (
+  <CteniFields ... />
+)}
+```
+
+**File:** `cms/lib/exercise-utils.test.ts` — thêm test cases:
+```ts
+describe('buildAnoNePayload', () => {
+  it('builds valid 3-statement payload')
+  it('rejects >5 statements')
+  it('uppercase ANO/NE in correct_answers')
+})
+describe('formStateFromAnoNe', () => {
+  it('roundtrip: buildAnoNePayload → formStateFromAnoNe')
+})
+```
+
+**AC:** `make cms-lint && make cms-build && cd cms && npm test` pass.
+
+---
+
+### [CHECKPOINT AN-B]
+
+```
+make cms-lint && make cms-build && cd cms && npm test
+```
+
+Manual CMS: Tạo exercise type `cteni_6` → AnoNeFields render → thêm 3 statements → toggle ANO/NE → Lưu → reload → data đúng.
+
+---
+
+### Slice AN-6 — Flutter widget + model extension
+
+**Files:**
+
+1. `flutter_app/lib/features/exercise/widgets/ano_ne_widget.dart` — NEW
+
+```dart
+class AnoNeWidget extends StatefulWidget {
+  const AnoNeWidget({
+    super.key,
+    required this.statements,          // List<AnoNeStatement>
+    required this.onAnswersChanged,    // void Function(Map<String,String>)
+    this.result,                       // ObjectiveResult? — null trước submit
+    this.enabled = true,
+  });
+}
+
+class _AnoNeRow extends StatelessWidget {
+  // statement text + ANO button + NE button
+  // selected: ANO = green filled, NE = red filled
+  // post-submit: disabled, correct = filled, wrong = strikethrough + correct highlighted
+  // min tap target: 44×44
+}
+```
+
+2. `flutter_app/lib/models/models.dart` — thêm `AnoNeStatement` model + getters vào `ExerciseDetail`:
+
+```dart
+class AnoNeStatement {
+  final int questionNo;
+  final String statement;
+  const AnoNeStatement({required this.questionNo, required this.statement});
+  factory AnoNeStatement.fromJson(Map<String, dynamic> j) =>
+      AnoNeStatement(questionNo: j['question_no'] as int, statement: j['statement'] as String? ?? '');
+}
+
+// Trong ExerciseDetail:
+List<AnoNeStatement> get anoNeStatements =>
+    (detail['statements'] as List? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(AnoNeStatement.fromJson)
+        .toList();
+
+String get passage => detail['passage'] as String? ?? '';
+```
+
+3. `flutter_app/lib/l10n/intl_vi.arb` + `intl_en.arb` — thêm 5 keys:
+   - `anoButton`: `ANO` / `YES`
+   - `neButton`: `NE` / `NO`
+   - `anoNeInstruction`: `Đúng hay sai?` / `True or false?`
+   - `anoNeCorrectHint`: `Đúng ✓` / `Correct ✓`
+   - `anoNeWrongHint`: `Sai — đáp án: {answer}` / `Wrong — correct: {answer}`
+
+4. Regenerate: `flutter gen-l10n` (hoặc `make flutter-analyze` tự trigger)
+
+**AC:** `make flutter-analyze` pass, 0 errors.
+
+---
+
+### Slice AN-7 — Flutter screens + i18n wiring
+
+**File 1:** `flutter_app/lib/features/exercise/screens/reading_exercise_screen.dart`
+
+Thêm branch TRƯỚC `if (d.exerciseType == 'cteni_1')`:
+
+```dart
+// cteni_6: passage card + AnoNe widget
+if (d.exerciseType == 'cteni_6') ...[
+  ..._buildCteni6Layout(d),
+] else if (d.exerciseType == 'cteni_1') ...[
+  ..._buildCteni1Layout(d),
+] else ...[
+  // existing cteni_2/3/4/5 layout
+]
+```
+
+```dart
+List<Widget> _buildCteni6Layout(ExerciseDetail d) {
+  return [
+    // Passage card (white card, tên địa điểm, passage text)
+    Card(child: Padding(padding: ..., child: SelectableText(d.passage))),
+    const SizedBox(height: 12),
+    AnoNeWidget(
+      statements: d.anoNeStatements,
+      onAnswersChanged: (a) => setState(() => _answers = a),
+      result: _result?.objectiveResult,
+      enabled: _result == null,
+    ),
+  ];
+}
+```
+
+**File 2:** `flutter_app/lib/features/exercise/screens/listening_exercise_screen.dart`
+
+Thêm branch cho `poslech_6`:
+
+```dart
+// Trong body build, thêm sau AudioPlayerWidget:
+if (d.exerciseType == 'poslech_6') ...[
+  AnoNeWidget(
+    statements: d.anoNeStatements,
+    onAnswersChanged: (a) => setState(() => _answers = a),
+    result: _result?.objectiveResult,
+    enabled: _result == null,
+  ),
+] else ...[
+  // existing _buildItemAnswers(d)
+]
+```
+
+**Submit gate** (cả 2 screens): submit button enabled khi `_answers.length == d.anoNeStatements.length`.
+
+**AC:** `make flutter-analyze` pass, 0 errors.
+
+---
+
+### Slice AN-8 — Flutter tests
+
+**File:** `flutter_app/test/ano_ne_widget_test.dart` — NEW
+
+```dart
+// 5 test cases:
+testWidgets('renders all statements', ...)
+testWidgets('ANO selects → NE deselects for same row', ...)
+testWidgets('selecting different rows independent', ...)
+testWidgets('onAnswersChanged called with correct map', ...)
+testWidgets('post-result: correct row green, wrong row red, buttons disabled', ...)
+```
+
+**AC:** `make flutter-test` pass. Test count tăng từ 64 → 69+.
+
+---
+
+### [CHECKPOINT AN-FINAL]
+
+```
+make backend-build && make backend-test
+make cms-lint && make cms-build && cd cms && npm test
+make flutter-analyze && make flutter-test
+```
+
+Manual E2E (iOS Simulator):
+1. CMS: tạo `cteni_6` với 3 statements → publish
+2. Flutter: Module → exercise list → mở cteni_6 → đọc passage → chọn ANO/NE cho 3 câu → submit → ObjectiveResultCard hiện score + per-statement ✓/✗
+3. CMS: tạo `poslech_6` → generate audio → publish
+4. Flutter: mở poslech_6 → play audio → chọn ANO/NE → submit → kết quả đúng

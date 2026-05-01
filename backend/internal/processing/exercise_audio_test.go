@@ -179,3 +179,35 @@ func TestDevExerciseAudioGenerator_WritesFile(t *testing.T) {
 		t.Fatal("expected non-empty stub audio file")
 	}
 }
+
+func TestBuildExerciseAudioText_Poslech6_Passage(t *testing.T) {
+	exercise := contracts.Exercise{
+		ExerciseType: "poslech_6",
+		Detail: contracts.AnoNeDetail{
+			Passage: "Vlašim. Městský úřad je otevřen v pondělí od osmi hodin.",
+			Statements: []contracts.AnoNeStatement{
+				{QuestionNo: 1, Statement: "Úřad je zavřen v pátek."},
+			},
+			CorrectAnswers: map[string]string{"1": "ANO"},
+		},
+	}
+	got := BuildExerciseAudioText(exercise)
+	want := "Vlašim. Městský úřad je otevřen v pondělí od osmi hodin."
+	if got != want {
+		t.Errorf("BuildExerciseAudioText = %q, want %q", got, want)
+	}
+}
+
+func TestBuildExerciseAudioText_Cteni6_ReturnsEmpty(t *testing.T) {
+	exercise := contracts.Exercise{
+		ExerciseType: "cteni_6",
+		Detail: contracts.AnoNeDetail{
+			Passage:        "Vlašim text",
+			CorrectAnswers: map[string]string{"1": "ANO"},
+		},
+	}
+	got := BuildExerciseAudioText(exercise)
+	if got != "" {
+		t.Errorf("cteni_6 should return empty (no audio), got %q", got)
+	}
+}

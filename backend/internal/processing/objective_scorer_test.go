@@ -145,3 +145,79 @@ func TestBuildObjectiveFeedback_Basic(t *testing.T) {
 		t.Errorf("ObjectiveResult.Score = %d, want 3", fb.ObjectiveResult.Score)
 	}
 }
+
+// --- V13: Ano/Ne tests ---
+
+func TestScoreObjectiveAnswers_AnoNe_AllCorrect(t *testing.T) {
+	correct := map[string]string{"1": "ANO", "2": "NE", "3": "ANO"}
+	learner := map[string]string{"1": "ANO", "2": "NE", "3": "ANO"}
+
+	result := ScoreObjectiveAnswers(learner, correct, nil, nil)
+
+	if result.Score != 3 {
+		t.Errorf("Score = %d, want 3", result.Score)
+	}
+	if result.MaxScore != 3 {
+		t.Errorf("MaxScore = %d, want 3", result.MaxScore)
+	}
+}
+
+func TestScoreObjectiveAnswers_AnoNe_SomeWrong(t *testing.T) {
+	correct := map[string]string{"1": "ANO", "2": "NE", "3": "ANO"}
+	learner := map[string]string{"1": "ANO", "2": "ANO", "3": "NE"}
+
+	result := ScoreObjectiveAnswers(learner, correct, nil, nil)
+
+	if result.Score != 1 {
+		t.Errorf("Score = %d, want 1", result.Score)
+	}
+	for _, q := range result.Breakdown {
+		if q.QuestionNo == 2 && q.IsCorrect {
+			t.Error("Q2 expected wrong (ANO vs NE)")
+		}
+		if q.QuestionNo == 3 && q.IsCorrect {
+			t.Error("Q3 expected wrong (NE vs ANO)")
+		}
+	}
+}
+
+func TestScoreObjectiveAnswers_AnoNe_CaseInsensitive(t *testing.T) {
+	correct := map[string]string{"1": "ANO", "2": "NE"}
+	learner := map[string]string{"1": "ano", "2": "ne"}
+
+	result := ScoreObjectiveAnswers(learner, correct, nil, nil)
+
+	if result.Score != 2 {
+		t.Errorf("Score = %d, want 2 (case-insensitive match)", result.Score)
+	}
+}
+
+func TestExtractQuestionTexts_Statements(t *testing.T) {
+	exercise := contracts.Exercise{
+		ExerciseType: "cteni_6",
+		Detail: contracts.AnoNeDetail{
+			Passage: "Vlašim\nMěstský úřad",
+			Statements: []contracts.AnoNeStatement{
+				{QuestionNo: 1, Statement: "Na úřadu města je zavřeno ve středu."},
+				{QuestionNo: 2, Statement: "Ve čtvrtek je polední přestávka do jedné hodiny."},
+				{QuestionNo: 3, Statement: "V úterý úřední hodiny končí ve dvě hodiny odpoledne."},
+			},
+			CorrectAnswers: map[string]string{"1": "NE", "2": "NE", "3": "ANO"},
+		},
+	}
+
+	texts := extractQuestionTexts(exercise)
+
+	if texts["1"] != "Na úřadu města je zavřeno ve středu." {
+		t.Errorf("texts[1] = %q, want Na úřadu...", texts["1"])
+	}
+	if texts["2"] != "Ve čtvrtek je polední přestávka do jedné hodiny." {
+		t.Errorf("texts[2] = %q", texts["2"])
+	}
+	if texts["3"] != "V úterý úřední hodiny končí ve dvě hodiny odpoledne." {
+		t.Errorf("texts[3] = %q", texts["3"])
+	}
+	if len(texts) != 3 {
+		t.Errorf("len(texts) = %d, want 3", len(texts))
+	}
+}

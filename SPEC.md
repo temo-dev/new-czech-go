@@ -627,4 +627,174 @@ ASK FIRST:
 | EX-2 | `make backend-build && make backend-test` | `GET /v1/mock-tests` → trả `exam_mode`, không có `session_type` |
 | EX-3 | `make cms-lint && make cms-build` | Tạo MockTest → chọn real/practice → reload → đúng |
 | EX-4 | `make flutter-analyze && make flutter-test` | 0 errors, 0 FullExam references |
+
+---
+
+## V13 — Ano/Ne Exercise Type (2026-05-01)
+
+Thêm `cteni_6` (Đọc) và `poslech_6` (Nghe) — dạng bài True/False theo format Modelový test A2 NPI.
+
+### Objective
+
+Learner đọc/nghe một văn bản thực tế (lịch giờ, thông báo, biển hiệu) rồi xác nhận từng câu phát biểu là đúng (ANO) hay sai (NE).
+
+Thiết kế: `docs/designs/ano-ne-exercise-type.html`
+Idea doc: `docs/ideas/ano-ne-exercise-type.md`
+
+### Exercise Types mới
+
+| exercise_type | skill_kind | Mô tả | Điểm |
+|---|---|---|---|
+| `cteni_6` | `doc` | Đọc văn bản + 1–5 câu ANO/NE | admin nhập |
+| `poslech_6` | `nghe` | Nghe audio (Polly TTS passage) + 1–5 câu ANO/NE | admin nhập |
+
+### Detail Payload (frozen)
+
+```json
+{
+  "passage": "Vlašim\nMěstský úřad – úřední hodiny\n...",
+  "statements": [
+    { "question_no": 1, "statement": "Na úřadu města je zavřeno ve středu." },
+    { "question_no": 2, "statement": "Ve čtvrtek je polední přestávka do jedné hodiny." },
+    { "question_no": 3, "statement": "V úterý úřední hodiny končí ve dvě hodiny odpoledne." }
+  ],
+  "correct_answers": { "1": "ANO", "2": "NE", "3": "ANO" }
+}
+```
+
+Ghi chú:
+- `correct_answers` dùng uppercase `"ANO"`/`"NE"` — `matchObjectiveAnswer` case-insensitive nên match được
+- `poslech_6`: `passage` là prose script để Polly đọc; không cần bảng cột
+- Không có `options` — `extractOptionTexts` trả về rỗng → `LearnerAnswerText`/`CorrectAnswerText` = `""` → `_AnswerDisplay` hiển thị raw `"ANO"`/`"NE"` từ `LearnerAnswer`/`CorrectAnswer` (behaviour đúng)
+- statement count: 1–5, validate tại CMS
+
+### Kiến trúc quyết định (frozen)
+
+**Scoring:** Reuse `objective_scorer.go` — không thay đổi. `extractCorrectAnswers` đọc `correct_answers` map, `matchObjectiveAnswer` xử lý "ANO"/"NE" qua substring match (không bị nhầm vì "ano" ∩ "ne" = ∅).
+
+**Question text extraction:** Thêm nhánh trong `extractQuestionTexts` để đọc `statements[].statement` → `texts[question_no]`.
+
+**Audio (poslech_6):** Thêm `case "poslech_6"` trong `exercise_audio.go` trả về `detail.passage` làm TTS text.
+
+**Submit endpoint:** Reuse `POST /v1/attempts/:id/submit-answers` — không thay đổi.
+
+**Flutter routing:** `exerciseType.startsWith('poslech_')` và `startsWith('cteni_')` đã route đúng screen — chỉ thêm layout builders.
+
+**Result display:** `ObjectiveResultCard` đã hoạt động — không thay đổi. Hiển thị `ANO`/`NE` uppercase từ `LearnerAnswer`/`CorrectAnswer`.
+
+**DB:** Không cần migration. Exercises dùng `detail jsonb` column hiện tại.
+
+### API Changes (không có endpoint mới)
+
+Chỉ cần cập nhật validation trong `handleCreateExercise`/`handleUpdateExercise`:
+- Accept `cteni_6` và `poslech_6` như valid exercise types
+- Validate `statements` length 1–5
+- `correct_answers` keys phải map 1:1 với `statements[].question_no`
+
+### Data Model mới
+
+**Go structs (contracts/types.go):**
+
+```go
+// Dùng chung cho cteni_6 và poslech_6
+type AnoNeDetail struct {
+    Passage        string           `json:"passage"`
+    Statements     []AnoNeStatement `json:"statements"`
+    CorrectAnswers map[string]string `json:"correct_answers"` // "1"→"ANO", "2"→"NE"
+    MaxPoints      int              `json:"max_points,omitempty"`
+}
+
+type AnoNeStatement struct {
+    QuestionNo int    `json:"question_no"`
+    Statement  string `json:"statement"`
+}
+```
+
+**content-and-attempt-model.md:** Thêm `cteni_6` và `poslech_6` vào `ExerciseType` enum.
+
+### Changes per Layer
+
+**Backend (Go):**
+- `contracts/types.go`: thêm `AnoNeDetail`, `AnoNeStatement`
+- `processing/objective_scorer.go`: thêm nhánh trong `extractQuestionTexts` cho `statements[].statement`
+- `processing/exercise_audio.go`: thêm `case "poslech_6": return detail.passage`
+- `server.go` (hoặc `exercise_handler.go`): accept `cteni_6`/`poslech_6` trong valid type list
+
+**CMS (Next.js):**
+- `exercise-utils.ts`: thêm `"cteni_6"` và `"poslech_6"` vào type list; thêm `buildAnoNePayload()` và `formStateFromAnoNe()`
+- `components/exercise-form/AnoNeFields.tsx`: passage textarea + statement repeater (max 5) với ANO/NE toggle per row + max_points field
+- `components/exercise-form/index.tsx`: wire `cteni_6`/`poslech_6` → `AnoNeFields`
+
+**Flutter (Dart):**
+- `lib/features/exercise/widgets/ano_ne_widget.dart`: `AnoNeWidget` — list of `_AnoNeRow` (statement text + ANO/NE buttons, 44pt tap target)
+- `lib/features/exercise/screens/reading_exercise_screen.dart`: thêm `_buildCteni6Layout()` — PassageCard + `AnoNeWidget`
+- `lib/features/exercise/screens/listening_exercise_screen.dart`: thêm `_buildPoslech6Layout()` — `AudioPlayerWidget` + `AnoNeWidget`
+- `lib/l10n/`: thêm 4 keys: `anoNeInstruction`, `anoButton`, `neButton`, `anoNeCorrectHint`, `anoNeWrongHint`
+- `lib/l10n/intl_vi.arb` + `intl_en.arb`: điền giá trị
+
+**Docs:**
+- `docs/specs/content-and-attempt-model.md`: cập nhật `ExerciseType` enum
+- `docs/specs/api-contracts.md`: ghi chú `cteni_6`/`poslech_6` hợp lệ với `submit-answers`
+
+### Testing Strategy
+
+**Backend:**
+```go
+// objective_scorer_test.go — thêm:
+TestScoreObjectiveAnswers_AnoNe_AllCorrect
+TestScoreObjectiveAnswers_AnoNe_SomeWrong
+TestScoreObjectiveAnswers_AnoNe_CaseInsensitive  // "ano" vs "ANO"
+TestExtractQuestionTexts_Statements              // statements[].statement → texts map
+TestBuildExerciseAudioText_Poslech6              // returns passage string
+```
+
+**CMS (Vitest):**
+```ts
+// exercise-utils.test.ts — thêm:
+buildAnoNePayload — valid 3-statement payload
+buildAnoNePayload — rejects >5 statements
+formStateFromAnoNe — roundtrip
+```
+
+**Flutter:**
+```dart
+// ano_ne_widget_test.dart (mới):
+renders all statements
+ANO button selects → NE deselects
+NE button selects → ANO deselects
+submit disabled until all answered
+post-submit: disabled, correct row green, wrong row red
+```
+
+### V13 Boundaries
+
+ALWAYS:
+- `correct_answers` keys = stringified `question_no` ("1", "2"...) — nhất quán với mọi objective type khác
+- Uppercase "ANO"/"NE" trong payload — display-ready, case-insensitive matching vẫn đúng
+- Validate `statements.length >= 1 && <= 5` trong CMS trước khi gọi API
+- `passage` cho poslech_6 phải là prose (không có bảng cột) — Polly TTS đọc tự nhiên hơn
+- Submit button chỉ kích hoạt khi tất cả statements đã được chọn
+
+NEVER:
+- Thêm LLM scoring cho ano/ne — pure objective, không cần LLM
+- Thêm database migration mới — `detail jsonb` đã đủ
+- Thêm endpoint mới — `submit-answers` đã cover
+- Thêm `statements` parsing vào exercise types khác ngoài cteni_6/poslech_6
+
+ASK FIRST:
+- Thêm "passage reveal" toggle trong result card (hiện tại không có, nhưng có thể cần)
+- Thay đổi statement limit (hiện tại 1–5)
+- Thêm per-statement feedback text
+
+### V13 Verification
+
+| Step | Lệnh | Manual check |
+|------|------|--------------|
+| AN-1 | `make backend-build && make backend-test` | `TestScoreObjectiveAnswers_AnoNe_*` pass |
+| AN-2 | `make backend-build` | POST `submit-answers` với `{"1":"ANO","2":"NE"}` → `completed`, score đúng |
+| AN-3 | `make cms-lint && make cms-build && cd cms && npm test` | AnoNeFields render, statement repeater + ANO/NE toggle |
+| AN-4 | `make flutter-analyze && make flutter-test` | `AnoNeWidget` tests pass, 0 analyze errors |
+| AN-5 | Manual (iOS sim) | cteni_6: đọc passage → chọn ANO/NE → submit → ObjectiveResultCard hiển thị đúng |
+| AN-6 | Manual (iOS sim) | poslech_6: audio play → chọn ANO/NE → submit → score hiển thị |
+| AN-7 | Manual (CMS) | Tạo cteni_6 → 3 statements → ANO/NE toggle → publish → hiện trong app |
 | CHECKPOINT | `make verify` | Full pass |

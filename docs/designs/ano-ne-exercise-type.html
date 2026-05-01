@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ano/Ne Exercise — UI/UX Design</title>
+<style>
+  :root {
+    --orange: #FF6A14;
+    --cream: #FBF3E7;
+    --teal: #0F3D3A;
+    --teal-light: #1A5C58;
+    --white: #FFFFFF;
+    --grey-50: #F9F9F9;
+    --grey-100: #F0F0F0;
+    --grey-200: #E0E0E0;
+    --grey-400: #9E9E9E;
+    --grey-600: #616161;
+    --grey-900: #212121;
+    --green: #2E7D32;
+    --green-light: #E8F5E9;
+    --red: #C62828;
+    --red-light: #FFEBEE;
+    --blue: #1565C0;
+    --blue-light: #E3F2FD;
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 16px;
+    --r-xl: 24px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.12);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.12);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.14);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #1A1A2E;
+    color: var(--grey-900);
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+
+  /* ── Page layout ─────────────────────────────── */
+  .page-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .page-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--white);
+    letter-spacing: -0.5px;
+  }
+  .page-header p {
+    margin-top: 8px;
+    font-size: 14px;
+    color: rgba(255,255,255,0.6);
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--white);
+    margin-bottom: 8px;
+  }
+  .section-desc {
+    font-size: 13px;
+    color: rgba(255,255,255,0.55);
+    margin-bottom: 32px;
+    line-height: 1.6;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 32px;
+    max-width: 960px;
+    margin: 0 auto 64px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    max-width: 1100px;
+    margin: 0 auto 64px;
+  }
+  .grid-1 {
+    max-width: 420px;
+    margin: 0 auto 64px;
+  }
+  .full-width {
+    max-width: 960px;
+    margin: 0 auto 64px;
+  }
+
+  /* ── Phone shell ─────────────────────────────── */
+  .phone {
+    width: 375px;
+    margin: 0 auto;
+    background: var(--cream);
+    border-radius: 40px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg), 0 0 0 2px rgba(255,255,255,0.1);
+    position: relative;
+  }
+  .phone-notch {
+    height: 44px;
+    background: var(--teal);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+  }
+  .phone-notch .time {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--white);
+  }
+  .phone-notch .status {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .phone-notch .status span {
+    width: 16px;
+    height: 8px;
+    background: var(--white);
+    border-radius: 2px;
+    opacity: 0.9;
+  }
+
+  .phone-screen {
+    background: var(--cream);
+    min-height: 700px;
+    overflow: hidden;
+  }
+
+  /* ── App navbar ──────────────────────────────── */
+  .app-bar {
+    background: var(--teal);
+    padding: 14px 20px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .app-bar .back-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .app-bar .back-btn svg { width:16px;height:16px; }
+  .app-bar .title-block { flex: 1 }
+  .app-bar .skill-chip {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.7);
+  }
+  .app-bar .exercise-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--white);
+    margin-top: 2px;
+  }
+  .app-bar .progress-bar {
+    width: 40px;
+    height: 40px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .app-bar .progress-bar svg { position:absolute;top:0;left:0; }
+  .app-bar .progress-bar span {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--white);
+  }
+
+  /* ── Skill badge ─────────────────────────────── */
+  .skill-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .skill-badge.reading { background: var(--blue-light); color: var(--blue); }
+  .skill-badge.listening { background: #FFF3E0; color: #E65100; }
+
+  /* ── Scrollable content ──────────────────────── */
+  .screen-content {
+    padding: 16px 16px 24px;
+    overflow-y: auto;
+    max-height: 640px;
+  }
+
+  /* ── Passage card ────────────────────────────── */
+  .passage-card {
+    background: var(--white);
+    border-radius: var(--r-lg);
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--grey-200);
+  }
+  .passage-card .passage-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .passage-card .passage-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--grey-400);
+  }
+  .passage-card .passage-number {
+    width: 22px;
+    height: 22px;
+    background: var(--teal);
+    color: var(--white);
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .passage-card .location {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--teal);
+    margin-bottom: 4px;
+  }
+  .passage-card .sub-location {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--grey-900);
+    margin-bottom: 12px;
+  }
+  .schedule-table {
+    width: 100%;
+    font-size: 13px;
+    border-collapse: collapse;
+  }
+  .schedule-table td {
+    padding: 5px 0;
+    color: var(--grey-900);
+    line-height: 1.4;
+  }
+  .schedule-table td:first-child {
+    font-weight: 600;
+    width: 70px;
+    color: var(--teal);
+  }
+  .schedule-table tr:not(:last-child) td {
+    border-bottom: 1px solid var(--grey-100);
+  }
+  .closed-tag {
+    display: inline-block;
+    background: var(--red-light);
+    color: var(--red);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* ── Audio player ────────────────────────────── */
+  .audio-player {
+    background: var(--teal);
+    border-radius: var(--r-lg);
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .audio-play-btn {
+    width: 40px;
+    height: 40px;
+    background: var(--orange);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(255,106,20,0.4);
+  }
+  .audio-play-btn svg { width:16px;height:16px; fill: white; margin-left:2px; }
+  .audio-info { flex: 1 }
+  .audio-info .audio-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 4px;
+  }
+  .audio-progress {
+    height: 3px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .audio-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--orange);
+    border-radius: 2px;
+  }
+  .audio-time {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.6);
+    margin-top: 3px;
+  }
+  .audio-replay {
+    width: 32px;
+    height: 32px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .audio-replay svg { width:14px;height:14px; }
+
+  /* ── Instruction strip ───────────────────────── */
+  .instruction {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--grey-600);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .instruction .count-badge {
+    background: var(--orange);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+  }
+
+  /* ── AnoNe Widget ────────────────────────────── */
+  .ano-ne-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .ano-ne-row {
+    background: var(--white);
+    border-radius: var(--r-md);
+    padding: 14px;
+    box-shadow: var(--shadow-sm);
+    border: 1.5px solid var(--grey-200);
+    transition: border-color 0.2s;
+  }
+  .ano-ne-row.answered-correct {
+    border-color: var(--green);
+    background: var(--green-light);
+  }
+  .ano-ne-row.answered-wrong {
+    border-color: var(--red);
+    background: var(--red-light);
+  }
+
+  .statement-text {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--grey-900);
+    margin-bottom: 12px;
+    display: flex;
+    gap: 8px;
+  }
+  .statement-index {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--grey-400);
+    flex-shrink: 0;
+    margin-top: 1px;
+    width: 16px;
+  }
+
+  .ano-ne-buttons {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-ano, .btn-ne {
+    flex: 1;
+    height: 44px;
+    border-radius: var(--r-sm);
+    border: 2px solid var(--grey-200);
+    background: var(--grey-50);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+    color: var(--grey-600);
+  }
+  .btn-ano:hover { border-color: var(--green); color: var(--green); background: var(--green-light); }
+  .btn-ne:hover { border-color: var(--red); color: var(--red); background: var(--red-light); }
+
+  .btn-ano.selected {
+    background: var(--green);
+    border-color: var(--green);
+    color: white;
+    box-shadow: 0 2px 8px rgba(46,125,50,0.3);
+  }
+  .btn-ne.selected {
+    background: var(--red);
+    border-color: var(--red);
+    color: white;
+    box-shadow: 0 2px 8px rgba(198,40,40,0.3);
+  }
+
+  /* disabled state after submit */
+  .btn-ano.correct-answer {
+    background: var(--green);
+    border-color: var(--green);
+    color: white;
+  }
+  .btn-ne.correct-answer {
+    background: var(--red);
+    border-color: var(--red);
+    color: white;
+  }
+  .btn-ano.wrong-answer, .btn-ne.wrong-answer {
+    background: rgba(0,0,0,0.05);
+    border-color: var(--grey-200);
+    color: var(--grey-400);
+    opacity: 0.6;
+  }
+  .btn-ano.user-wrong, .btn-ne.user-wrong {
+    background: rgba(198,40,40,0.1);
+    border-color: var(--red);
+    color: var(--red);
+    text-decoration: line-through;
+  }
+
+  .answer-row-hint {
+    margin-top: 8px;
+    font-size: 11.5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .hint-correct { color: var(--green); font-weight: 600; }
+  .hint-wrong { color: var(--red); font-weight: 600; }
+
+  /* ── Submit button ───────────────────────────── */
+  .submit-btn {
+    width: 100%;
+    height: 52px;
+    background: var(--orange);
+    color: white;
+    border: none;
+    border-radius: var(--r-lg);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(255,106,20,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .submit-btn:disabled {
+    background: var(--grey-200);
+    color: var(--grey-400);
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+
+  /* ── Result card (ObjectiveResultCard) ───────── */
+  .result-header {
+    background: var(--teal);
+    padding: 20px 16px 24px;
+    text-align: center;
+  }
+  .result-header .score-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 6px;
+  }
+  .result-header .score-value {
+    font-size: 42px;
+    font-weight: 800;
+    color: white;
+    line-height: 1;
+  }
+  .result-header .score-max {
+    font-size: 16px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.6);
+  }
+  .result-header .score-bar-wrap {
+    margin-top: 12px;
+    background: rgba(255,255,255,0.15);
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .result-header .score-bar-fill {
+    height: 100%;
+    background: var(--orange);
+    border-radius: 3px;
+    width: 67%;
+  }
+
+  .result-questions {
+    padding: 16px;
+  }
+  .result-q-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--grey-100);
+  }
+  .result-q-row:last-child { border-bottom: none; }
+  .result-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+  .result-icon.correct { background: var(--green-light); color: var(--green); }
+  .result-icon.wrong { background: var(--red-light); color: var(--red); }
+  .result-icon svg { width:13px;height:13px; }
+  .result-q-text { flex: 1; }
+  .result-q-statement {
+    font-size: 13px;
+    color: var(--grey-900);
+    line-height: 1.45;
+    margin-bottom: 5px;
+  }
+  .result-q-answers {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .result-chip {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.3px;
+  }
+  .result-chip.your-answer.correct { background: var(--green); color: white; }
+  .result-chip.your-answer.wrong { background: var(--red); color: white; text-decoration: line-through; opacity: 0.8; }
+  .result-chip.correct-answer-chip { background: var(--green-light); color: var(--green); }
+
+  /* ── CMS form ────────────────────────────────── */
+  .cms-card {
+    background: white;
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+  }
+  .cms-header {
+    background: var(--teal);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .cms-header h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+  }
+  .cms-header .type-chip {
+    background: rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.9);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+  .cms-body {
+    padding: 20px;
+  }
+  .cms-field {
+    margin-bottom: 18px;
+  }
+  .cms-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--grey-600);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .cms-label .required { color: var(--orange); }
+  .cms-input {
+    width: 100%;
+    border: 1.5px solid var(--grey-200);
+    border-radius: var(--r-sm);
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--grey-900);
+    outline: none;
+    background: var(--grey-50);
+    font-family: inherit;
+    resize: vertical;
+  }
+  .cms-input:focus { border-color: var(--teal); background: white; }
+  .cms-input.textarea { min-height: 90px; }
+
+  .statements-section {
+    border: 1.5px dashed var(--grey-200);
+    border-radius: var(--r-md);
+    padding: 14px;
+  }
+  .statement-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--grey-100);
+  }
+  .statement-row:last-child { border-bottom: none; }
+  .stmt-index-badge {
+    width: 24px;
+    height: 24px;
+    background: var(--teal);
+    color: white;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .stmt-input {
+    flex: 1;
+    border: 1px solid var(--grey-200);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 12px;
+    color: var(--grey-900);
+    outline: none;
+    background: var(--grey-50);
+    font-family: inherit;
+  }
+  .stmt-input:focus { border-color: var(--teal); background: white; }
+  .ans-toggle {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .ans-btn {
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 6px;
+    border: 1.5px solid var(--grey-200);
+    background: var(--grey-50);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--grey-600);
+  }
+  .ans-btn.selected-ano { background: var(--green); border-color: var(--green); color: white; }
+  .ans-btn.selected-ne { background: var(--red); border-color: var(--red); color: white; }
+  .stmt-delete {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--grey-200);
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .stmt-delete svg { width:12px;height:12px;color:var(--grey-400); }
+
+  .add-stmt-btn {
+    width: 100%;
+    height: 36px;
+    border: 1.5px dashed var(--grey-300);
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--grey-600);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .add-stmt-btn:hover { border-color: var(--teal); color: var(--teal); }
+
+  .cms-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .cms-select {
+    width: 100%;
+    border: 1.5px solid var(--grey-200);
+    border-radius: var(--r-sm);
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--grey-900);
+    background: var(--grey-50);
+    outline: none;
+    font-family: inherit;
+    -webkit-appearance: none;
+  }
+
+  .cms-footer {
+    padding: 14px 20px;
+    border-top: 1px solid var(--grey-100);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    background: var(--grey-50);
+  }
+  .cms-btn-secondary {
+    height: 36px;
+    padding: 0 16px;
+    border: 1.5px solid var(--grey-200);
+    border-radius: var(--r-sm);
+    background: white;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--grey-600);
+    cursor: pointer;
+  }
+  .cms-btn-primary {
+    height: 36px;
+    padding: 0 16px;
+    border: none;
+    border-radius: var(--r-sm);
+    background: var(--orange);
+    font-size: 13px;
+    font-weight: 700;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(255,106,20,0.3);
+  }
+
+  /* ── User flow diagram ───────────────────────── */
+  .flow-diagram {
+    max-width: 860px;
+    margin: 0 auto 64px;
+  }
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 0;
+    position: relative;
+  }
+  .flow-node {
+    flex: 1;
+    background: white;
+    border-radius: var(--r-md);
+    padding: 14px 16px;
+    box-shadow: var(--shadow-sm);
+    border: 1.5px solid var(--grey-200);
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
+  .flow-node.teal-node {
+    background: var(--teal);
+    border-color: var(--teal);
+  }
+  .flow-node.orange-node {
+    background: var(--orange);
+    border-color: var(--orange);
+  }
+  .flow-node.green-node {
+    background: var(--green-light);
+    border-color: var(--green);
+  }
+  .flow-node.red-node {
+    background: var(--red-light);
+    border-color: var(--red);
+  }
+  .flow-node .node-step {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .flow-node.teal-node .node-step { color: rgba(255,255,255,0.6); }
+  .flow-node .node-step { color: var(--grey-400); }
+  .flow-node .node-title {
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .flow-node.teal-node .node-title,
+  .flow-node.orange-node .node-title { color: white; }
+  .flow-node .node-title { color: var(--grey-900); }
+  .flow-node .node-desc {
+    font-size: 11px;
+    color: var(--grey-600);
+    margin-top: 3px;
+    line-height: 1.4;
+  }
+  .flow-node.teal-node .node-desc { color: rgba(255,255,255,0.65); }
+  .flow-node.green-node .node-title { color: var(--green); }
+  .flow-node.red-node .node-title { color: var(--red); }
+
+  .flow-arrow {
+    width: 36px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.4);
+    font-size: 18px;
+  }
+  .flow-branch {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .flow-branch-item {
+    flex: 1;
+    background: white;
+    border-radius: var(--r-md);
+    padding: 12px 14px;
+    box-shadow: var(--shadow-sm);
+    border: 1.5px solid var(--grey-200);
+  }
+  .flow-connector {
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,0.3);
+    font-size: 20px;
+  }
+
+  /* ── State annotations ───────────────────────── */
+  .states-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    max-width: 960px;
+    margin: 0 auto 64px;
+  }
+  .state-card {
+    background: white;
+    border-radius: var(--r-md);
+    padding: 14px;
+    box-shadow: var(--shadow-sm);
+  }
+  .state-card .state-name {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--grey-400);
+    margin-bottom: 10px;
+  }
+
+  /* ── Divider ─────────────────────────────────── */
+  .divider {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    margin: 0 auto 48px;
+    max-width: 960px;
+  }
+
+  /* ── Token table ─────────────────────────────── */
+  .token-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: white;
+    border-radius: var(--r-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+  .token-table th {
+    background: var(--teal);
+    color: white;
+    font-weight: 600;
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 12px;
+  }
+  .token-table td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--grey-100);
+    color: var(--grey-900);
+    vertical-align: middle;
+  }
+  .token-table tr:last-child td { border-bottom: none; }
+  .swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 6px;
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+  code {
+    background: var(--grey-100);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11.5px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--teal);
+  }
+</style>
+</head>
+<body>
+
+<!-- ─────────────────────────────────────────────
+     PAGE HEADER
+──────────────────────────────────────────────── -->
+<div class="page-header">
+  <h1>Ano/Ne Exercise Type — UI/UX Design</h1>
+  <p>cteni_6 (Đọc) · poslech_6 (Nghe) · Flutter learner app + CMS · V12</p>
+</div>
+
+<!-- ─────────────────────────────────────────────
+     1. CLARIFIED REQUIREMENTS
+──────────────────────────────────────────────── -->
+<div class="full-width">
+  <div class="section-label">01 — Clarified Requirements</div>
+  <div style="background:white;border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-md);">
+    <table class="token-table">
+      <thead><tr><th>Dimension</th><th>Decision</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Exercise types</strong></td><td><code>cteni_6</code> · <code>poslech_6</code></td><td>Tiếp nối chuỗi cteni_1–5 / poslech_1–5 hiện tại</td></tr>
+        <tr><td><strong>Format</strong></td><td>Passage (văn bản / audio) + 1–5 statements</td><td>Mỗi statement: chọn ANO hoặc NE</td></tr>
+        <tr><td><strong>Statement count</strong></td><td>Biến đổi 1–5, do admin nhập</td><td>Min 1, max 5 — validate trong CMS</td></tr>
+        <tr><td><strong>Scoring</strong></td><td>Admin nhập <code>max_points</code></td><td>Điểm phân bổ đều: mỗi câu = max_points / n</td></tr>
+        <tr><td><strong>Flutter widget</strong></td><td>Widget mới <code>AnoNeWidget</code></td><td>2 button ANO / NE per row, 44pt tap target</td></tr>
+        <tr><td><strong>poslech_6 audio</strong></td><td>Polly TTS đọc passage prose</td><td>Admin nhập prose riêng (không dùng bảng cột)</td></tr>
+        <tr><td><strong>Backend scoring</strong></td><td>Reuse <code>objective_scorer.go</code></td><td>Thêm <code>EXERCISE_TYPE_CTENI_6</code>, <code>EXERCISE_TYPE_POSLECH_6</code> constants</td></tr>
+        <tr><td><strong>Submit endpoint</strong></td><td>Reuse <code>POST /v1/attempts/:id/submit-answers</code></td><td>Không cần endpoint mới</td></tr>
+        <tr><td><strong>Result UI</strong></td><td>Extend <code>ObjectiveResultCard</code></td><td>Thêm nhánh cho ano/ne display format</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="divider" />
+
+<!-- ─────────────────────────────────────────────
+     2. USER FLOW
+──────────────────────────────────────────────── -->
+<div class="full-width">
+  <div class="section-label">02 — User Flow</div>
+  <div class="section-title">cteni_6 · Learner Flow (Đọc)</div>
+
+  <div class="flow-diagram">
+    <!-- Row 1 -->
+    <div class="flow-row">
+      <div class="flow-node teal-node">
+        <div class="node-step">1</div>
+        <div class="node-title">Mở exercise</div>
+        <div class="node-desc">Từ ModuleDetail hoặc MockExam section list</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node teal-node">
+        <div class="node-step">2</div>
+        <div class="node-title">ReadingExerciseScreen</div>
+        <div class="node-desc">dispatch tới <code>buildCteni6Layout()</code></div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <div class="node-step">3</div>
+        <div class="node-title">Đọc Passage Card</div>
+        <div class="node-desc">Văn bản thực tế: bảng giờ, thông báo, biển hiệu</div>
+      </div>
+    </div>
+
+    <div class="flow-connector">↓</div>
+
+    <div class="flow-row">
+      <div class="flow-node">
+        <div class="node-step">4</div>
+        <div class="node-title">Xem danh sách câu</div>
+        <div class="node-desc">AnoNeWidget: 1–5 rows, mỗi row có statement text + ANO/NE buttons</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node orange-node">
+        <div class="node-step">5</div>
+        <div class="node-title">Chọn ANO / NE</div>
+        <div class="node-desc">Tap button → highlight xanh (ANO) hoặc đỏ (NE). Có thể đổi lại trước khi submit</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <div class="node-step">6</div>
+        <div class="node-title">Submit</div>
+        <div class="node-desc">Button kích hoạt khi đã chọn tất cả n câu. POST submit-answers</div>
+      </div>
+    </div>
+
+    <div class="flow-connector">↓</div>
+
+    <div class="flow-branch">
+      <div class="flow-branch-item" style="border-color:var(--green);">
+        <div style="font-size:11px;font-weight:700;color:var(--green);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">✓ Scoring done</div>
+        <div style="font-size:13px;font-weight:700;color:var(--grey-900);">ObjectiveResultCard (Ano/Ne variant)</div>
+        <div style="font-size:12px;color:var(--grey-600);margin-top:3px;">Score header + per-statement result (✓/✗ + correct answer chip)</div>
+      </div>
+      <div class="flow-branch-item" style="border-color:var(--red);">
+        <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">Error</div>
+        <div style="font-size:13px;font-weight:700;color:var(--grey-900);">Toast lỗi + retry</div>
+        <div style="font-size:12px;color:var(--grey-600);margin-top:3px;">Giữ nguyên answers đã chọn</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:40px;">poslech_6 · Learner Flow (Nghe) — Delta so với cteni_6</div>
+  <div style="background:white;border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-md);max-width:860px;margin:0 auto;">
+    <table class="token-table">
+      <thead><tr><th>Bước</th><th>cteni_6</th><th>poslech_6 (thay đổi)</th></tr></thead>
+      <tbody>
+        <tr><td>Screen</td><td>ReadingExerciseScreen</td><td><strong>ListeningExerciseScreen</strong></td></tr>
+        <tr><td>Layout builder</td><td><code>buildCteni6Layout()</code></td><td><code>buildPoslech6Layout()</code></td></tr>
+        <tr><td>Passage display</td><td>Passage Card (văn bản hiển thị)</td><td><strong>AudioPlayerWidget</strong> — Polly TTS audio. Passage ẩn (chỉ có audio)</td></tr>
+        <tr><td>Replay</td><td>Không cần</td><td>Nút replay audio, có thể nghe lại 1–2 lần</td></tr>
+        <tr><td>AnoNeWidget</td><td>Hiển thị ngay</td><td>Hiển thị ngay (không cần đợi audio xong)</td></tr>
+        <tr><td>Submit logic</td><td>Giống nhau</td><td>Giống nhau</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="divider" />
+
+<!-- ─────────────────────────────────────────────
+     3. SCREENS
+──────────────────────────────────────────────── -->
+<div class="section-label" style="text-align:center;">03 — Screen Designs</div>
+
+<div class="grid-3">
+
+  <!-- cteni_6: Empty state -->
+  <div>
+    <div class="section-title" style="font-size:14px;text-align:center;margin-bottom:12px;">cteni_6 — Chưa trả lời</div>
+    <div class="phone">
+      <div class="phone-notch">
+        <span class="time">9:41</span>
+        <div class="status"><span></span></div>
+      </div>
+      <div class="phone-screen">
+        <div class="app-bar">
+          <div class="back-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+          </div>
+          <div class="title-block">
+            <div class="skill-chip">Čtení · Bài 6</div>
+            <div class="exercise-title">Úřední hodiny</div>
+          </div>
+          <div class="progress-bar">
+            <svg width="40" height="40" viewBox="0 0 40 40">
+              <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3"/>
+              <circle cx="20" cy="20" r="16" fill="none" stroke="#FF6A14" stroke-width="3" stroke-dasharray="100 100" stroke-dashoffset="75" stroke-linecap="round" transform="rotate(-90 20 20)"/>
+            </svg>
+            <span>2/8</span>
+          </div>
+        </div>
+        <div class="screen-content">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+            <span class="skill-badge reading">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+              Čtení
+            </span>
+            <span style="font-size:12px;color:var(--grey-400);">3 điểm</span>
+          </div>
+
+          <div class="passage-card">
+            <div class="passage-header">
+              <div class="passage-number">2</div>
+              <span class="passage-label">Văn bản</span>
+            </div>
+            <div class="location">Vlašim</div>
+            <div class="sub-location">Městský úřad – úřední hodiny</div>
+            <table class="schedule-table">
+              <tr><td>Pondělí</td><td>8:00–11:30 &nbsp; 12:30–17:00</td></tr>
+              <tr><td>Úterý</td><td>8:00–11:30 &nbsp; 12:30–14:00</td></tr>
+              <tr><td>Středa</td><td>8:00–11:30 &nbsp; 12:30–17:00</td></tr>
+              <tr><td>Čtvrtek</td><td>8:00–11:30</td></tr>
+              <tr><td>Pátek</td><td><span class="closed-tag">Zavřeno</span></td></tr>
+            </table>
+          </div>
+
+          <div class="instruction">
+            <span>Đúng hay sai?</span>
+            <span class="count-badge">3 câu</span>
+          </div>
+
+          <div class="ano-ne-list">
+            <div class="ano-ne-row">
+              <div class="statement-text">
+                <span class="statement-index">A)</span>
+                <span>Na úřadu města je zavřeno ve středu.</span>
+              </div>
+              <div class="ano-ne-buttons">
+                <button class="btn-ano">ANO</button>
+                <button class="btn-ne">NE</button>
+              </div>
+            </div>
+            <div class="ano-ne-row">
+              <div class="statement-text">
+                <span class="statement-index">B)</span>
+                <span>Ve čtvrtek je polední přestávka do jedné hodiny.</span>
+              </div>
+              <div class="ano-ne-buttons">
+                <button class="btn-ano">ANO</button>
+                <button class="btn-ne">NE</button>
+              </div>
+            </div>
+            <div class="ano-ne-row">
+              <div class="statement-text">
+                <span class="statement-index">C)</span>
+                <span>V úterý úřední hodiny končí ve dvě hodiny odpoledne.</span>
+              </div>
+              <div class="ano-ne-buttons">
+                <button class="btn-ano">ANO</button>
+                <button class="btn-ne">NE</button>
+              </div>
+            </div>
+          </div>
+
+          <button class="submit-btn" disabled>
+            Xác nhận
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- cteni_6: In progress (partially answered) -->
+  <div>
+    <div class="section-title" style="font-size:14px;text-align:center;margin-bottom:12px;">cteni_6 — Đang trả lời</div>
+    <div class="phone">
+      <div class="phone-notch">
+        <span class="time">9:41</span>
+        <div class="status"><span></span></div>
+      </div>
+      <div class="phone-screen">
+        <div class="app-bar">
+          <div class="back-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+          </div>
+          <div class="title-block">
+            <div class="skill-chip">Čtení · Bài 6</div>
+            <div class="exercise-title">Úřední hodiny</div>
+          </div>
+          <div class="progress-bar">
+            <svg width="40" height="40" viewBox="0 0 40 40">
+              <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3"/>
+              <circle cx="20" cy="20" r="16" fill="none" stroke="#FF6A14" stroke-width="3" stroke-dasharray="100 100" stroke-dashoffset="75" stroke-linecap="round" transform="rotate(-90 20 20)"/>
+            </svg>
+            <span>2/8</span>
+          </div>
+        </div>
+        <div class="screen-content">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+            <span class="skill-badge reading">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+              Čtení
+            </span>
+            <span style="font-size:12px;color:var(--grey-400);">3 điểm</span>
+          </div>
+
+          <div class="passage-card">
+            <div class="passage-header">
+              <div class="passage-number">2</div>
+              <span class="passage-label">Văn bản</span>
+            </div>
+            <div class="location">Vlašim</div>
+            <div class="sub-location">Městský úřad – úřední hodiny</div>
+            <table class="schedule-table">
+              <tr><td>Pondělí</td><td>8:00–11:30 &nbsp; 12:30–17:00</td></tr>
+              <tr><td>Úterý</td><td>8:00–11:30 &nbsp; 12:30–14:00</td></tr>
+              <tr><td>Středa</td><td>8:00–11:30 &nbsp; 12:30–17:00</td></tr>
+              <tr><td>Čtvrtek</td><td>8:00–11:30</td></tr>
+              <tr><td>Pátek</td><td><span class="closed-tag">Zavřeno</span></td></tr>
+            </table>
+          </div>
+
+          <div class="instruction">
+            <span>Đúng hay sai?</span>
+            <span class="count-badge">3 câu</span>
+          </div>
+
+          <div class="ano-ne-list">
+            <!-- A: NE selected (wrong answer) -->
+            <div class="ano-ne-row">
+              <div class="statement-text">
+                <span class="statement-index">A)</span>
+                <span>Na úřadu města je zavřeno ve středu.</span>
+              </div>
+              <div class="ano-ne-buttons">
+                <button class="btn-ano">ANO</button>
+                <button class="btn-ne selected">NE</button>
+              </div>
+            </div>
+            <!-- B: ANO selected -->
+            <div class="ano-ne-row">
+              <div class="statement-text">
+                <span class="statement-index">B)</span>
+                <span>Ve čtvrtek je polední přestávka do jedné hodiny.</span>
+              </div>
+              <div class="ano-ne-buttons">
+                <button class="btn-ano selected">ANO</button>
+                <button class="btn-ne">NE</button>
+              </div>
+            </div>
+            <!-- C: Not yet answered -->
+            <div class="ano-ne-row">
+              <div class="statement-text">
+                <span class="statement-index">C)</span>
+                <span>V úterý úřední hodiny končí ve dvě hodiny odpoledne.</span>
+              </div>
+              <div class="ano-ne-buttons">
+                <button class="btn-ano">ANO</button>
+                <button class="btn-ne">NE</button>
+              </div>
+            </div>
+          </div>
+
+          <button class="submit-btn" disabled style="background:var(--grey-200);color:var(--grey-400);box-shadow:none;">
+            Xác nhận <span style="font-size:12px;opacity:0.7;">(cần trả lời tất cả)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- poslech_6: Listening -->
+  <div>
+    <div class="section-title" style="font-size:14px;text-align:center;margin-bottom:12px;">poslech_6 — Listening variant</div>
+    <div class="phone">
+      <div class="phone-notch">
+        <span class="time">9:41</span>
+        <div class="status"><span></span></div>
+      </div>
+      <div class="phone-screen">
+        <div class="app-bar">
+          <div class="back-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+          </div>
+          <div class="title-block">
+            <div class="skill-chip">Poslech · Bài 6</div>
+            <div class="exercise-title">Informace v rádiu</div>
+          </div>
+          <div class="progress-bar">
+            <svg width="40" height="40" viewBox="0 0 40 40">
+              <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="3"/>
+              <circle cx="20" cy="20" r="16" fill="none" stroke="#FF6A14" stroke-width="3" stroke-dasharray="100 100" stroke-dashoffset="50" stroke-linecap="round" transform="rotate(-90 20 20)"/>
+            </svg>
+            <span>4/8</span>
+          </div>
+        </div>
+        <div class="screen-content">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+            <span class="skill-badge listening">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/><path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+              Poslech
+            </span>
+            <span style="font-size:12px;color:var(--grey-400);">5 điểm</span>
+          </div>
+
+          <!-- Audio player -->
+          <div class="audio-player">
+            <div class="audio-play-btn">
+              <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+            </div>
+            <div class="audio-info">
+              <div class="audio-title">Oznámení v rádiu</div>
+              <div class="audio-progress">
+                <div class="audio-progress-fill" style="width:35%"></div>
+              </div>
+              <div class="audio-time">0:14 / 0:38</div>
+            </div>
+            <div class="audio-replay">
+              <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2" width="14" height="14"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
+            </div>
+          </div>
+
+          <div class="instruction">
+            <span>Nghe và xác nhận:</span>
+            <span class="count-badge">5 câu</span>
+          </div>
+
+          <div class="ano-ne-list">
+            <div class="ano-ne-row">
+              <div class="statement-text"><span class="statement-index">A)</span><span>Akce je ve čtvrtek večer.</span></div>
+              <div class="ano-ne-buttons"><button class="btn-ano selected">ANO</button><button class="btn-ne">NE</button></div>
+            </div>
+            <div class="ano-ne-row">
+              <div class="statement-text"><span class="statement-index">B)</span><span>Vstup je zdarma.</span></div>
+              <div class="ano-ne-buttons"><button class="btn-ano">ANO</button><button class="btn-ne selected">NE</button></div>
+            </div>
+            <div class="ano-ne-row">
+              <div class="statement-text"><span class="statement-index">C)</span><span>Akce začíná v osm hodin.</span></div>
+              <div class="ano-ne-buttons"><button class="btn-ano">ANO</button><button class="btn-ne">NE</button></div>
+            </div>
+            <div class="ano-ne-row">
+              <div class="statement-text"><span class="statement-index">D)</span><span>Vstup pro děti do 12 let je jiný.</span></div>
+              <div class="ano-ne-buttons"><button class="btn-ano selected">ANO</button><button class="btn-ne">NE</button></div>
+            </div>
+            <div class="ano-ne-row">
+              <div class="statement-text"><span class="statement-index">E)</span><span>Akce se koná v parku.</span></div>
+              <div class="ano-ne-buttons"><button class="btn-ano">ANO</button><button class="btn-ne">NE</button></div>
+            </div>
+          </div>
+
+          <button class="submit-btn" disabled style="background:var(--grey-200);color:var(--grey-400);box-shadow:none;">
+            Xác nhận
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider" />
+
+<!-- ─────────────────────────────────────────────
+     4. RESULT SCREEN
+──────────────────────────────────────────────── -->
+<div class="grid-2">
+  <div>
+    <div class="section-title" style="font-size:14px;text-align:center;margin-bottom:12px;">Result — Kết quả sau submit</div>
+    <div class="phone">
+      <div class="phone-notch">
+        <span class="time">9:42</span>
+        <div class="status"><span></span></div>
+      </div>
+      <div class="phone-screen" style="background:var(--cream);">
+        <div class="result-header">
+          <div class="score-label">Kết quả · Čtení 6</div>
+          <div class="score-value">2<span class="score-max">/3</span></div>
+          <div class="score-bar-wrap">
+            <div class="score-bar-fill"></div>
+          </div>
+          <div style="margin-top:8px;font-size:12px;color:rgba(255,255,255,0.6);">67% · 2 đúng, 1 sai</div>
+        </div>
+
+        <div class="result-questions">
+          <!-- A: Wrong (user said NE, correct is NE → actually correct!) -->
+          <div class="result-q-row">
+            <div class="result-icon correct">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="result-q-text">
+              <div class="result-q-statement">Na úřadu města je zavřeno ve středu.</div>
+              <div class="result-q-answers">
+                <span class="result-chip your-answer correct">Bạn: NE ✓</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- B: Wrong (user said ANO, correct is NE) -->
+          <div class="result-q-row">
+            <div class="result-icon wrong">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </div>
+            <div class="result-q-text">
+              <div class="result-q-statement">Ve čtvrtek je polední přestávka do jedné hodiny.</div>
+              <div class="result-q-answers">
+                <span class="result-chip your-answer wrong">Bạn: ANO ✗</span>
+                <span class="result-chip correct-answer-chip">Đúng: NE</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- C: Correct (user said ANO, correct is ANO) -->
+          <div class="result-q-row">
+            <div class="result-icon correct">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="result-q-text">
+              <div class="result-q-statement">V úterý úřední hodiny končí ve dvě hodiny odpoledne.</div>
+              <div class="result-q-answers">
+                <span class="result-chip your-answer correct">Bạn: ANO ✓</span>
+              </div>
+            </div>
+          </div>
+
+          <button class="submit-btn" style="margin-top:16px;">
+            Tiếp tục
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4b. CMS Form -->
+  <div>
+    <div class="section-title" style="font-size:14px;text-align:center;margin-bottom:12px;">CMS — Exercise Form (cteni_6)</div>
+    <div class="cms-card">
+      <div class="cms-header">
+        <h3>Tạo Exercise</h3>
+        <span class="type-chip">cteni_6 · Ano/Ne</span>
+      </div>
+      <div class="cms-body">
+        <div class="cms-row-2">
+          <div class="cms-field">
+            <div class="cms-label">Module <span class="required">*</span></div>
+            <select class="cms-select">
+              <option>Modul 3 — Instituce</option>
+            </select>
+          </div>
+          <div class="cms-field">
+            <div class="cms-label">Điểm tối đa <span class="required">*</span></div>
+            <input class="cms-input" type="number" value="3" min="1" max="20" />
+          </div>
+        </div>
+
+        <div class="cms-field">
+          <div class="cms-label">Tiêu đề <span class="required">*</span></div>
+          <input class="cms-input" type="text" value="Úřední hodiny — Vlašim" />
+        </div>
+
+        <div class="cms-field">
+          <div class="cms-label">Văn bản passage <span class="required">*</span></div>
+          <textarea class="cms-input textarea">Vlašim
+Městský úřad – úřední hodiny
+
+Pondělí    8:00–11:30    12:30–17:00
+Úterý      8:00–11:30    12:30–14:00
+Středa     8:00–11:30    12:30–17:00
+Čtvrtek    8:00–11:30
+Pátek      Zavřeno</textarea>
+        </div>
+
+        <div class="cms-field">
+          <div class="cms-label">Câu phát biểu (1–5) <span class="required">*</span></div>
+          <div class="statements-section">
+            <div class="statement-row">
+              <div class="stmt-index-badge">A</div>
+              <input class="stmt-input" type="text" value="Na úřadu města je zavřeno ve středu." />
+              <div class="ans-toggle">
+                <button class="ans-btn">ANO</button>
+                <button class="ans-btn selected-ne">NE</button>
+              </div>
+              <div class="stmt-delete">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </div>
+            </div>
+            <div class="statement-row">
+              <div class="stmt-index-badge">B</div>
+              <input class="stmt-input" type="text" value="Ve čtvrtek je polední přestávka do jedné hodiny." />
+              <div class="ans-toggle">
+                <button class="ans-btn">ANO</button>
+                <button class="ans-btn selected-ne">NE</button>
+              </div>
+              <div class="stmt-delete">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </div>
+            </div>
+            <div class="statement-row">
+              <div class="stmt-index-badge">C</div>
+              <input class="stmt-input" type="text" value="V úterý úřední hodiny končí ve dvě hodiny odpoledne." />
+              <div class="ans-toggle">
+                <button class="ans-btn selected-ano">ANO</button>
+                <button class="ans-btn">NE</button>
+              </div>
+              <div class="stmt-delete">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </div>
+            </div>
+            <button class="add-stmt-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Thêm câu (tối đa 5)
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="cms-footer">
+        <button class="cms-btn-secondary">Huỷ</button>
+        <button class="cms-btn-primary">Lưu &amp; Publish</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider" />
+
+<!-- ─────────────────────────────────────────────
+     5. INTERACTION STATES (AnoNeWidget)
+──────────────────────────────────────────────── -->
+<div class="full-width">
+  <div class="section-label">04 — AnoNeWidget · Interaction States</div>
+  <div class="states-grid">
+
+    <div class="state-card">
+      <div class="state-name">1. Default</div>
+      <div class="ano-ne-row" style="margin:0;">
+        <div class="statement-text"><span class="statement-index">A)</span><span>Chưa chọn câu nào.</span></div>
+        <div class="ano-ne-buttons">
+          <button class="btn-ano">ANO</button>
+          <button class="btn-ne">NE</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="state-card">
+      <div class="state-name">2. ANO selected</div>
+      <div class="ano-ne-row" style="margin:0;">
+        <div class="statement-text"><span class="statement-index">A)</span><span>Learner chọn ANO.</span></div>
+        <div class="ano-ne-buttons">
+          <button class="btn-ano selected">ANO</button>
+          <button class="btn-ne">NE</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="state-card">
+      <div class="state-name">3. NE selected</div>
+      <div class="ano-ne-row" style="margin:0;">
+        <div class="statement-text"><span class="statement-index">A)</span><span>Learner chọn NE.</span></div>
+        <div class="ano-ne-buttons">
+          <button class="btn-ano">ANO</button>
+          <button class="btn-ne selected">NE</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="state-card">
+      <div class="state-name">4. After Submit (correct)</div>
+      <div class="ano-ne-row answered-correct" style="margin:0;">
+        <div class="statement-text"><span class="statement-index">A)</span><span>Trả lời đúng.</span></div>
+        <div class="ano-ne-buttons">
+          <button class="btn-ano" disabled style="opacity:0.4;">ANO</button>
+          <button class="btn-ne correct-answer" disabled>NE ✓</button>
+        </div>
+        <div class="answer-row-hint"><span class="hint-correct">✓ Đúng</span></div>
+      </div>
+    </div>
+
+    <div class="state-card">
+      <div class="state-name">5. After Submit (wrong)</div>
+      <div class="ano-ne-row answered-wrong" style="margin:0;">
+        <div class="statement-text"><span class="statement-index">B)</span><span>Trả lời sai.</span></div>
+        <div class="ano-ne-buttons">
+          <button class="btn-ano user-wrong" disabled>ANO ✗</button>
+          <button class="btn-ne correct-answer" disabled>NE ✓</button>
+        </div>
+        <div class="answer-row-hint"><span class="hint-wrong">✗ Đúng phải là NE</span></div>
+      </div>
+    </div>
+
+    <div class="state-card">
+      <div class="state-name">6. Submit enabled</div>
+      <div style="padding:8px 0;">
+        <button class="submit-btn">Xác nhận</button>
+      </div>
+      <div style="font-size:11px;color:var(--grey-600);text-align:center;margin-top:4px;">Kích hoạt khi tất cả n câu đã chọn</div>
+    </div>
+
+    <div class="state-card">
+      <div class="state-name">7. Submit disabled</div>
+      <div style="padding:8px 0;">
+        <button class="submit-btn" disabled>Xác nhận</button>
+      </div>
+      <div style="font-size:11px;color:var(--grey-600);text-align:center;margin-top:4px;">Khi còn câu chưa trả lời</div>
+    </div>
+
+    <div class="state-card">
+      <div class="state-name">8. Loading (submitting)</div>
+      <div style="padding:8px 0;">
+        <button class="submit-btn" disabled style="background:var(--orange);gap:10px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" width="18" height="18" style="animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10" stroke-dasharray="31 63" stroke-linecap="round"/></svg>
+          Đang xử lý…
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<hr class="divider" />
+
+<!-- ─────────────────────────────────────────────
+     6. DATA MODEL
+──────────────────────────────────────────────── -->
+<div class="full-width">
+  <div class="section-label">05 — Data Model &amp; API</div>
+  <div class="cms-card">
+    <div class="cms-header"><h3>Exercise payload — cteni_6 / poslech_6</h3><span class="type-chip">JSON schema</span></div>
+    <div class="cms-body" style="background:var(--grey-900);font-family:'JetBrains Mono',monospace;font-size:13px;color:#A8FF78;line-height:1.7;border-radius:0 0 var(--r-lg) var(--r-lg);">
+<pre style="white-space:pre-wrap;padding:4px 0;">{
+  "exercise_type": "cteni_6",          <span style="color:#888">// or "poslech_6"</span>
+  "title":    "Úřední hodiny — Vlašim",
+  "passage":  "Vlašim\nMěstský úřad...", <span style="color:#888">// display text (cteni_6)</span>
+                                          <span style="color:#888">// or TTS script (poslech_6)</span>
+  "questions": [
+    { "statement": "Na úřadu města je zavřeno ve středu." },
+    { "statement": "Ve čtvrtek je polední přestávka do jedné hodiny." },
+    { "statement": "V úterý úřední hodiny končí ve dvě hodiny odpoledne." }
+  ],
+  "correct_answers": ["ne", "ne", "ano"], <span style="color:#888">// parallel array</span>
+  "max_points": 3
+}
+
+<span style="color:#888">// Submit (reuse existing endpoint):</span>
+POST /v1/attempts/:id/submit-answers
+{ "answers": ["ne", "ano", "ano"] }
+
+<span style="color:#888">// QuestionResult (trong ObjectiveResultCard):</span>
+{
+  "question_text":       "Ve čtvrtek je polední přestávka do jedné hodiny.",
+  "learner_answer_text": "ANO",
+  "correct_answer_text": "NE",
+  "is_correct":          false
+}</pre>
+    </div>
+  </div>
+</div>
+
+<hr class="divider" />
+
+<!-- ─────────────────────────────────────────────
+     7. COLOR TOKENS
+──────────────────────────────────────────────── -->
+<div class="full-width">
+  <div class="section-label">06 — Color Tokens (AnoNeWidget)</div>
+  <table class="token-table">
+    <thead><tr><th>Token</th><th>Giá trị</th><th>Dùng khi</th></tr></thead>
+    <tbody>
+      <tr><td><code>anoSelected</code></td><td><span class="swatch" style="background:#2E7D32;"></span><code>#2E7D32</code></td><td>Button ANO được chọn (background + text)</td></tr>
+      <tr><td><code>neSelected</code></td><td><span class="swatch" style="background:#C62828;"></span><code>#C62828</code></td><td>Button NE được chọn (background + text)</td></tr>
+      <tr><td><code>anoHover</code></td><td><span class="swatch" style="background:#E8F5E9;"></span><code>#E8F5E9</code></td><td>Button ANO hover / pressed (bg)</td></tr>
+      <tr><td><code>neHover</code></td><td><span class="swatch" style="background:#FFEBEE;"></span><code>#FFEBEE</code></td><td>Button NE hover / pressed (bg)</td></tr>
+      <tr><td><code>rowCorrect</code></td><td><span class="swatch" style="background:#E8F5E9;border-color:#2E7D32;"></span><code>#E8F5E9 border #2E7D32</code></td><td>Row background sau submit — đúng</td></tr>
+      <tr><td><code>rowWrong</code></td><td><span class="swatch" style="background:#FFEBEE;border-color:#C62828;"></span><code>#FFEBEE border #C62828</code></td><td>Row background sau submit — sai</td></tr>
+      <tr><td><code>submitActive</code></td><td><span class="swatch" style="background:#FF6A14;"></span><code>#FF6A14</code></td><td>Submit button khi đã trả lời đủ</td></tr>
+      <tr><td><code>submitDisabled</code></td><td><span class="swatch" style="background:#E0E0E0;"></span><code>#E0E0E0</code></td><td>Submit button khi còn câu chưa chọn</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+</body>
+</html>
