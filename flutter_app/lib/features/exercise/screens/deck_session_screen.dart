@@ -10,6 +10,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../widgets/exercise_context_image.dart';
 import '../widgets/matching_widget.dart';
 import '../widgets/quizcard_widget.dart';
 
@@ -336,11 +337,11 @@ class _CardArea extends StatelessWidget {
     }
     if (detail.isChoiceWord) {
       return _ChoiceWordDeckCard(
-          key: ValueKey(detail.id), detail: detail, onAdvance: onAdvance, padding: h);
+          key: ValueKey(detail.id), detail: detail, onAdvance: onAdvance, padding: h, client: client);
     }
     if (detail.isFillBlank) {
       return _FillBlankDeckCard(
-          key: ValueKey(detail.id), detail: detail, onAdvance: onAdvance, padding: h);
+          key: ValueKey(detail.id), detail: detail, onAdvance: onAdvance, padding: h, client: client);
     }
     if (detail.isMatching) {
       return _MatchingDeckCard(
@@ -358,11 +359,13 @@ class _ChoiceWordDeckCard extends StatefulWidget {
     required this.detail,
     required this.onAdvance,
     required this.padding,
+    required this.client,
   });
 
   final ExerciseDetail detail;
   final VoidCallback onAdvance;
   final double padding;
+  final ApiClient client;
 
   @override
   State<_ChoiceWordDeckCard> createState() => _ChoiceWordDeckCardState();
@@ -399,6 +402,8 @@ class _ChoiceWordDeckCardState extends State<_ChoiceWordDeckCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ── Context image ─────────────────────────────────────
+                ExerciseContextImage(detail: d, client: widget.client),
                 // ── Grammar note ────────────────────────────────────────
                 if (d.choiceWordGrammarNote.isNotEmpty)
                   Container(
@@ -626,11 +631,13 @@ class _FillBlankDeckCard extends StatefulWidget {
     required this.detail,
     required this.onAdvance,
     required this.padding,
+    required this.client,
   });
 
   final ExerciseDetail detail;
   final VoidCallback onAdvance;
   final double padding;
+  final ApiClient client;
 
   @override
   State<_FillBlankDeckCard> createState() => _FillBlankDeckCardState();
@@ -692,6 +699,8 @@ class _FillBlankDeckCardState extends State<_FillBlankDeckCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ── Context image ─────────────────────────────────────
+                ExerciseContextImage(detail: d, client: widget.client),
                 // ── Sentence ─────────────────────────────────────────
                 Container(
                   width: double.infinity,
