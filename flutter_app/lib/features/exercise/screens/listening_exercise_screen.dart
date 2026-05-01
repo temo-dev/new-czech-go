@@ -85,6 +85,7 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
   bool get _hasAllAnswers {
     final d = widget.detail;
     if (d.isPoslech6) {
+      if (d.anoNeStatements.isEmpty) return false;
       return d.anoNeStatements.every(
         (s) => _answers[s.questionNo.toString()]?.isNotEmpty == true,
       );

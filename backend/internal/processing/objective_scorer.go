@@ -61,7 +61,9 @@ func lookupOptionText(optionTexts map[string]map[string]string, qno, key string)
 	return ""
 }
 
-// matchObjectiveAnswer: single-letter A-H = exact match (choice key); anything else = bidirectional substring (fill-in).
+// matchObjectiveAnswer: single-letter A-H = exact match (choice key);
+// "ano"/"ne" = exact match (ano/ne key — avoids substring collision like "neano");
+// anything else = bidirectional substring (fill-in).
 func matchObjectiveAnswer(learner, correct string) bool {
 	l := strings.ToLower(strings.TrimSpace(learner))
 	c := strings.ToLower(strings.TrimSpace(correct))
@@ -71,12 +73,20 @@ func matchObjectiveAnswer(learner, correct string) bool {
 	if isChoiceKey(c) {
 		return l == c
 	}
+	if isAnoNeKey(c) {
+		return l == c
+	}
 	return strings.Contains(l, c) || strings.Contains(c, l)
 }
 
 // isChoiceKey returns true for single-letter option keys A-H (case-insensitive).
 func isChoiceKey(s string) bool {
 	return len(s) == 1 && s[0] >= 'a' && s[0] <= 'h'
+}
+
+// isAnoNeKey returns true for Ano/Ne boolean answer keys (case-insensitive).
+func isAnoNeKey(s string) bool {
+	return s == "ano" || s == "ne"
 }
 
 func sortBreakdown(breakdown []contracts.QuestionResult) {

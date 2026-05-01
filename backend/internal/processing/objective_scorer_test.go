@@ -221,3 +221,23 @@ func TestExtractQuestionTexts_Statements(t *testing.T) {
 		t.Errorf("len(texts) = %d, want 3", len(texts))
 	}
 }
+
+func TestScoreObjectiveAnswers_AnoNe_SubstringCollision(t *testing.T) {
+	// "NEANO" contains "ANO" as a substring — must NOT score as correct.
+	correct := map[string]string{"1": "ANO"}
+	learner := map[string]string{"1": "NEANO"}
+	result := ScoreObjectiveAnswers(learner, correct, nil, nil)
+	if result.Score != 0 {
+		t.Errorf("Score = %d, want 0 (NEANO must not match ANO via substring)", result.Score)
+	}
+}
+
+func TestScoreObjectiveAnswers_AnoNe_NeInsideAno_NotMatch(t *testing.T) {
+	// "NEano" must NOT match correct="ANO".
+	correct := map[string]string{"1": "ANO"}
+	learner := map[string]string{"1": "neano"}
+	result := ScoreObjectiveAnswers(learner, correct, nil, nil)
+	if result.Score != 0 {
+		t.Errorf("Score = %d, want 0", result.Score)
+	}
+}

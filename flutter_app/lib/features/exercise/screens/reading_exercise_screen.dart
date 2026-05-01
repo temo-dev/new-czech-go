@@ -44,6 +44,7 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
   bool get _hasAllAnswers {
     final d = widget.detail;
     if (d.isCteni6) {
+      if (d.anoNeStatements.isEmpty) return false;
       return d.anoNeStatements.every(
         (s) => _answers[s.questionNo.toString()]?.isNotEmpty == true,
       );

@@ -51,9 +51,11 @@ export function AnoNeFields({
 }: Props) {
   const [state, setState] = useState(() => initState(initialData));
 
-  // Re-init when opening a different exercise in edit mode
+  // Re-init only when editingId changes (new exercise opened in edit mode).
+  // initialData is not in deps — object identity changes on every parent render,
+  // which would reset mid-edit state. editingId is the stable identity signal.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setState(initState(initialData)); }, [editingId, JSON.stringify(initialData)]);
+  useEffect(() => { setState(initState(initialData)); }, [editingId]);
 
   function emit(next: typeof state) {
     setState(next);
