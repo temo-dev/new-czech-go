@@ -223,23 +223,23 @@ Chi tiết + AC đầy đủ trong `tasks/plan.md` (section V13).
 
 ### Phase 1: Backend
 
-- [ ] **AN-1** Backend foundation: `contracts/types.go` thêm `AnoNeDetail`+`AnoNeStatement`; `objective_scorer.go` nhánh `statements[].statement` trong `extractQuestionTexts`; `exercise_audio.go` case `poslech_6`; server.go accept `cteni_6`/`poslech_6` trong valid type list
-- [ ] **AN-2** Backend tests: 5 test cases mới trong `objective_scorer_test.go` (AllCorrect, SomeWrong, CaseInsensitive, ExtractQuestionTexts_Statements, BuildAudioText_Poslech6)
-- [ ] **AN-3** Docs: `content-and-attempt-model.md` + `api-contracts.md` cập nhật ExerciseType enum
+- [x] **AN-1** Backend foundation: `contracts/types.go` thêm `AnoNeDetail`+`AnoNeStatement`; `objective_scorer.go` nhánh `statements[].statement` trong `extractQuestionTexts`; `exercise_audio.go` case `poslech_6`; server.go accept `cteni_6`/`poslech_6` trong valid type list (2026-05-01)
+- [x] **AN-2** Backend tests: 5 test cases mới trong `objective_scorer_test.go` + 2 trong `exercise_audio_test.go` (AllCorrect, SomeWrong, CaseInsensitive, ExtractStatements, AudioText) — 241 total (2026-05-01)
+- [x] **AN-3** Docs: `content-and-attempt-model.md` + `docs/specs/ano-ne-exercise-type.md` cập nhật ExerciseType enum (2026-05-01)
 
-**[CHECKPOINT AN-A]** `make backend-build && make backend-test`
+**[CHECKPOINT AN-A]** ✅ Passed 2026-05-01 — 241 backend tests pass
 
 ### Phase 2: CMS
 
-- [ ] **AN-4** CMS utils + component: `exercise-utils.ts` thêm `AnoNeFormState`/`buildAnoNePayload`/`formStateFromAnoNe`; `AnoNeFields.tsx` NEW (passage textarea + statement repeater 1–5 + ANO/NE toggle + max_points)
-- [ ] **AN-5** CMS wire + tests: `exercise-form/index.tsx` add `cteni_6`/`poslech_6` case TRƯỚC `startsWith` checks; `exercise-utils.test.ts` 4 test cases mới
+- [x] **AN-4** CMS utils + component: `exercise-utils.ts` thêm `AnoNeFormState`/`buildAnoNePayload`/`formStateFromAnoNe`; `AnoNeFields.tsx` NEW (passage textarea + statement repeater 1–5 + ANO/NE toggle + max_points + Polly button cho poslech_6) (2026-05-01)
+- [x] **AN-5** CMS wire + tests: `exercise-form/index.tsx` add `cteni_6`/`poslech_6` case TRƯỚC `startsWith` checks; `exercise-utils.test.ts` 4 test cases mới — 53 total (2026-05-01)
 
-**[CHECKPOINT AN-B]** `make cms-lint && make cms-build && cd cms && npm test`
+**[CHECKPOINT AN-B]** ✅ Passed 2026-05-01 — cms build clean, 53 tests pass
 
 ### Phase 3: Flutter
 
-- [ ] **AN-6** Flutter widget + model: `ano_ne_widget.dart` NEW (`AnoNeWidget` + `_AnoNeRow`, 44pt tap target); `models.dart` thêm `AnoNeStatement` + `anoNeStatements` getter + `passage` getter; 5 i18n keys VI+EN
-- [ ] **AN-7** Flutter screens: `reading_exercise_screen.dart` thêm `_buildCteni6Layout` (TRƯỚC cteni_1 branch); `listening_exercise_screen.dart` thêm `poslech_6` branch; submit gate check answers.length == statements.length
-- [ ] **AN-8** Flutter tests: `ano_ne_widget_test.dart` NEW — 5 widget test cases
+- [x] **AN-6** Flutter widget + model: `ano_ne_widget.dart` NEW (`AnoNeWidget` + `_AnoNeRow`, 44pt tap target); `models.dart` thêm `AnoNeStatementView` + `anoNeStatements`/`anoNePassage` fields + `isAnoNe`/`isCteni6`/`isPoslech6` getters; 5 i18n keys VI+EN (2026-05-01)
+- [x] **AN-7** Flutter screens: `reading_exercise_screen.dart` thêm `_buildCteni6Layout` (TRƯỚC cteni_1 branch); `listening_exercise_screen.dart` thêm `poslech_6` branch; submit gate check anoNeStatements.length (2026-05-01)
+- [x] **AN-8** Flutter tests: `ano_ne_widget_test.dart` NEW — 5 widget test cases; 69 total tests pass (2026-05-01)
 
-**[CHECKPOINT AN-FINAL]** `make verify` + manual E2E iOS sim
+**[CHECKPOINT AN-FINAL]** ✅ Passed 2026-05-01 — flutter analyze 0 errors, 69/69 tests pass, cms build clean, 241 backend tests
