@@ -1702,6 +1702,132 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Giải thích'**
   String get vocabExplanation;
+
+  /// No description provided for @exerciseTypeFlashcard.
+  ///
+  /// In vi, this message translates to:
+  /// **'Flashcard'**
+  String get exerciseTypeFlashcard;
+
+  /// No description provided for @exerciseTypeMatching.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ghép đôi'**
+  String get exerciseTypeMatching;
+
+  /// No description provided for @exerciseTypeFillBlank.
+  ///
+  /// In vi, this message translates to:
+  /// **'Điền từ'**
+  String get exerciseTypeFillBlank;
+
+  /// No description provided for @exerciseTypeChoiceWord.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chọn từ'**
+  String get exerciseTypeChoiceWord;
+
+  /// No description provided for @typeGroupSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chọn loại bài tập để luyện'**
+  String get typeGroupSubtitle;
+
+  /// No description provided for @deckStartAll.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bắt đầu học tất cả'**
+  String get deckStartAll;
+
+  /// No description provided for @deckOrStudyOne.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hoặc học từng bài'**
+  String get deckOrStudyOne;
+
+  /// No description provided for @deckSessionComplete.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hoàn thành session!'**
+  String get deckSessionComplete;
+
+  /// No description provided for @deckKnownOf.
+  ///
+  /// In vi, this message translates to:
+  /// **'{known} / {total} đã biết'**
+  String deckKnownOf(int known, int total);
+
+  /// No description provided for @deckRetryRemaining.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ôn lại {count} từ còn lại'**
+  String deckRetryRemaining(int count);
+
+  /// No description provided for @deckDone.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xong — về danh sách'**
+  String get deckDone;
+
+  /// No description provided for @deckCorrect.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đúng rồi!'**
+  String get deckCorrect;
+
+  /// No description provided for @deckWrong.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa đúng'**
+  String get deckWrong;
+
+  /// No description provided for @deckNext.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tiếp theo'**
+  String get deckNext;
+
+  /// No description provided for @deckConfirmExit.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thoát deck session?'**
+  String get deckConfirmExit;
+
+  /// No description provided for @deckConfirmExitBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tiến trình sẽ không được lưu.'**
+  String get deckConfirmExitBody;
+
+  /// No description provided for @deckKnownLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã biết'**
+  String get deckKnownLabel;
+
+  /// No description provided for @deckRetryLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ôn lại'**
+  String get deckRetryLabel;
+
+  /// No description provided for @emptyExerciseList.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa có bài tập'**
+  String get emptyExerciseList;
+
+  /// No description provided for @cancel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hủy'**
+  String get cancel;
+
+  /// No description provided for @confirm.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xác nhận'**
+  String get confirm;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

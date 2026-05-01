@@ -360,5 +360,38 @@
     "vocabMatchInstruction": "Match each term to its definition",
     "vocabFillInstruction": "Fill in the blank",
     "vocabChoiceInstruction": "Choose the correct word",
-    "vocabExplanation": "Explanation"
+    "vocabExplanation": "Explanation",
+
+    "exerciseTypeFlashcard": "Flashcard",
+    "exerciseTypeMatching": "Matching",
+    "exerciseTypeFillBlank": "Fill in",
+    "exerciseTypeChoiceWord": "Choose word",
+    "typeGroupSubtitle": "Choose exercise type to study",
+    "deckStartAll": "Start all",
+    "deckOrStudyOne": "Or study one at a time",
+    "deckSessionComplete": "Session complete!",
+    "deckKnownOf": "{known} / {total} known",
+    "@deckKnownOf": {
+        "placeholders": {
+            "known": { "type": "int" },
+            "total": { "type": "int" }
+        }
+    },
+    "deckRetryRemaining": "Review {count} remaining",
+    "@deckRetryRemaining": {
+        "placeholders": {
+            "count": { "type": "int" }
+        }
+    },
+    "deckDone": "Done — back to list",
+    "deckCorrect": "Correct!",
+    "deckWrong": "Not quite",
+    "deckNext": "Next",
+    "deckConfirmExit": "Exit deck session?",
+    "deckConfirmExitBody": "Progress will not be saved.",
+    "deckKnownLabel": "Known",
+    "deckRetryLabel": "Review",
+    "emptyExerciseList": "No exercises yet",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
 }

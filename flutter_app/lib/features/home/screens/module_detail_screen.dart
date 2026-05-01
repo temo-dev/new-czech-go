@@ -8,6 +8,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../exercise/screens/type_group_screen.dart';
 import 'exercise_list_screen.dart';
 
 class ModuleDetailScreen extends StatefulWidget {
@@ -120,15 +121,27 @@ class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
                                   description: _skillDesc(sk.skillKind, l),
                                   icon: skillIcon(sk.skillKind),
                                   comingSoon: l.skillComingSoon,
-                                  onTap: sk.isImplemented ? () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => ExerciseListScreen(
-                                        client: widget.client,
-                                        moduleId: sk.moduleId,
-                                        skillKind: sk.skillKind,
+                                  onTap: sk.isImplemented ? () {
+                                    final isVocabGrammar =
+                                        sk.skillKind == 'tu_vung' ||
+                                        sk.skillKind == 'ngu_phap';
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => isVocabGrammar
+                                            ? TypeGroupScreen(
+                                                client: widget.client,
+                                                moduleId: sk.moduleId,
+                                                skillKind: sk.skillKind,
+                                                moduleTitle: widget.module.title,
+                                              )
+                                            : ExerciseListScreen(
+                                                client: widget.client,
+                                                moduleId: sk.moduleId,
+                                                skillKind: sk.skillKind,
+                                              ),
                                       ),
-                                    ),
-                                  ) : null,
+                                    );
+                                  } : null,
                                 )).toList(),
                               ),
 

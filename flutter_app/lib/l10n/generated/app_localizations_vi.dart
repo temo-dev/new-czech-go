@@ -891,4 +891,71 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get vocabExplanation => 'Giải thích';
+
+  @override
+  String get exerciseTypeFlashcard => 'Flashcard';
+
+  @override
+  String get exerciseTypeMatching => 'Ghép đôi';
+
+  @override
+  String get exerciseTypeFillBlank => 'Điền từ';
+
+  @override
+  String get exerciseTypeChoiceWord => 'Chọn từ';
+
+  @override
+  String get typeGroupSubtitle => 'Chọn loại bài tập để luyện';
+
+  @override
+  String get deckStartAll => 'Bắt đầu học tất cả';
+
+  @override
+  String get deckOrStudyOne => 'Hoặc học từng bài';
+
+  @override
+  String get deckSessionComplete => 'Hoàn thành session!';
+
+  @override
+  String deckKnownOf(int known, int total) {
+    return '$known / $total đã biết';
+  }
+
+  @override
+  String deckRetryRemaining(int count) {
+    return 'Ôn lại $count từ còn lại';
+  }
+
+  @override
+  String get deckDone => 'Xong — về danh sách';
+
+  @override
+  String get deckCorrect => 'Đúng rồi!';
+
+  @override
+  String get deckWrong => 'Chưa đúng';
+
+  @override
+  String get deckNext => 'Tiếp theo';
+
+  @override
+  String get deckConfirmExit => 'Thoát deck session?';
+
+  @override
+  String get deckConfirmExitBody => 'Tiến trình sẽ không được lưu.';
+
+  @override
+  String get deckKnownLabel => 'Đã biết';
+
+  @override
+  String get deckRetryLabel => 'Ôn lại';
+
+  @override
+  String get emptyExerciseList => 'Chưa có bài tập';
+
+  @override
+  String get cancel => 'Hủy';
+
+  @override
+  String get confirm => 'Xác nhận';
 }

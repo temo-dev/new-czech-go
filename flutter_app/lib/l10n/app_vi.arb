@@ -405,5 +405,38 @@
     "vocabMatchInstruction": "Ghép từ với nghĩa tương ứng",
     "vocabFillInstruction": "Điền từ thích hợp vào chỗ trống",
     "vocabChoiceInstruction": "Chọn từ đúng để hoàn thành câu",
-    "vocabExplanation": "Giải thích"
+    "vocabExplanation": "Giải thích",
+
+    "exerciseTypeFlashcard": "Flashcard",
+    "exerciseTypeMatching": "Ghép đôi",
+    "exerciseTypeFillBlank": "Điền từ",
+    "exerciseTypeChoiceWord": "Chọn từ",
+    "typeGroupSubtitle": "Chọn loại bài tập để luyện",
+    "deckStartAll": "Bắt đầu học tất cả",
+    "deckOrStudyOne": "Hoặc học từng bài",
+    "deckSessionComplete": "Hoàn thành session!",
+    "deckKnownOf": "{known} / {total} đã biết",
+    "@deckKnownOf": {
+        "placeholders": {
+            "known": { "type": "int" },
+            "total": { "type": "int" }
+        }
+    },
+    "deckRetryRemaining": "Ôn lại {count} từ còn lại",
+    "@deckRetryRemaining": {
+        "placeholders": {
+            "count": { "type": "int" }
+        }
+    },
+    "deckDone": "Xong — về danh sách",
+    "deckCorrect": "Đúng rồi!",
+    "deckWrong": "Chưa đúng",
+    "deckNext": "Tiếp theo",
+    "deckConfirmExit": "Thoát deck session?",
+    "deckConfirmExitBody": "Tiến trình sẽ không được lưu.",
+    "deckKnownLabel": "Đã biết",
+    "deckRetryLabel": "Ôn lại",
+    "emptyExerciseList": "Chưa có bài tập",
+    "cancel": "Hủy",
+    "confirm": "Xác nhận"
 }

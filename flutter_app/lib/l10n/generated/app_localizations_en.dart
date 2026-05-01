@@ -891,4 +891,71 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vocabExplanation => 'Explanation';
+
+  @override
+  String get exerciseTypeFlashcard => 'Flashcard';
+
+  @override
+  String get exerciseTypeMatching => 'Matching';
+
+  @override
+  String get exerciseTypeFillBlank => 'Fill in';
+
+  @override
+  String get exerciseTypeChoiceWord => 'Choose word';
+
+  @override
+  String get typeGroupSubtitle => 'Choose exercise type to study';
+
+  @override
+  String get deckStartAll => 'Start all';
+
+  @override
+  String get deckOrStudyOne => 'Or study one at a time';
+
+  @override
+  String get deckSessionComplete => 'Session complete!';
+
+  @override
+  String deckKnownOf(int known, int total) {
+    return '$known / $total known';
+  }
+
+  @override
+  String deckRetryRemaining(int count) {
+    return 'Review $count remaining';
+  }
+
+  @override
+  String get deckDone => 'Done — back to list';
+
+  @override
+  String get deckCorrect => 'Correct!';
+
+  @override
+  String get deckWrong => 'Not quite';
+
+  @override
+  String get deckNext => 'Next';
+
+  @override
+  String get deckConfirmExit => 'Exit deck session?';
+
+  @override
+  String get deckConfirmExitBody => 'Progress will not be saved.';
+
+  @override
+  String get deckKnownLabel => 'Known';
+
+  @override
+  String get deckRetryLabel => 'Review';
+
+  @override
+  String get emptyExerciseList => 'No exercises yet';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get confirm => 'Confirm';
 }

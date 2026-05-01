@@ -403,6 +403,7 @@ class ExerciseDetail {
     this.choiceWordStem = '',
     this.choiceWordExplanation = '',
     this.choiceWordGrammarNote = '',
+    this.correctAnswers = const {},
   });
 
   final String id;
@@ -453,6 +454,7 @@ class ExerciseDetail {
   final String choiceWordStem;
   final String choiceWordExplanation;
   final String choiceWordGrammarNote;
+  final Map<String, String> correctAnswers;
 
   bool get isPsani1 => exerciseType == 'psani_1_formular';
   bool get isPsani2 => exerciseType == 'psani_2_email';
@@ -611,6 +613,8 @@ class ExerciseDetail {
       choiceWordStem: detail['stem'] as String? ?? '',
       choiceWordExplanation: detail['explanation'] as String? ?? '',
       choiceWordGrammarNote: detail['grammar_note'] as String? ?? '',
+      correctAnswers: (detail['correct_answers'] as Map<String, dynamic>? ?? const {})
+          .map((k, v) => MapEntry(k, v.toString())),
     );
   }
 }
