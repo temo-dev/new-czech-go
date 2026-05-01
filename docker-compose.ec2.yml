@@ -37,6 +37,10 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      LOCAL_ASSETS_DIR: /app/assets
+    volumes:
+      - backend_assets:/app/assets
+      - backend_attempts:/tmp/czech-go-system
     expose:
       - "8080"
     restart: unless-stopped
@@ -64,6 +68,10 @@ services:
     networks:
       - default
       - proxy
+
+volumes:
+  backend_assets:
+  backend_attempts:
 
 networks:
   proxy:

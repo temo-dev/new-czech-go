@@ -220,6 +220,48 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
 
     final widgets = <Widget>[];
 
+    // A-H legend: show all option texts so learner knows what each letter means
+    if (opts.isNotEmpty) {
+      widgets.add(
+        Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.x4),
+          padding: const EdgeInsets.all(AppSpacing.x3),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: opts.map((opt) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 24, height: 24,
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(opt.key,
+                          style: AppTypography.labelMedium.copyWith(
+                              color: AppColors.secondary, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(opt.text, style: AppTypography.bodyMedium),
+                  ),
+                ],
+              ),
+            )).toList(),
+          ),
+        ),
+      );
+    }
+
     for (int i = 0; i < items.length; i++) {
       final item = items[i] as Map<String, dynamic>? ?? {};
       final assetId = item['asset_id'] as String? ?? '';

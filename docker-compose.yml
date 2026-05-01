@@ -60,6 +60,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-}
       AUDIO_SIGN_SECRET: ${AUDIO_SIGN_SECRET:-}
+      LOCAL_ASSETS_DIR: /tmp/czech-go-system-assets
     volumes:
       - ${HOME}/.aws:/root/.aws:ro
       - backend_assets:/tmp/czech-go-system-assets

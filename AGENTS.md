@@ -90,7 +90,7 @@ The implemented V1 foundation currently includes:
 - opt-in `Amazon Polly` TTS for model-answer audio in review artifacts (`TTS_PROVIDER=amazon_polly`)
 - CMS CRUD for all four oral task types, with a `Status` select (draft / published / archived); only `published` exercises surface to learners
 - CMS prompt-asset upload and preview for `Uloha 3` and `Uloha 4`
-- Compose persistence: named volumes `backend_assets` + `backend_attempts` keep prompt assets and local-mode attempt audio across container rebuilds; `AUDIO_SIGN_SECRET` is wired through both compose files for stable signed audio URLs across restarts; `TRANSCRIBE_TIMEOUT` defaults to `3m`
+- Compose persistence: named volumes `backend_assets` + `backend_attempts` keep prompt assets and local-mode attempt audio across container rebuilds; `AUDIO_SIGN_SECRET` is wired through both compose files for stable signed audio URLs across restarts; `TRANSCRIBE_TIMEOUT` defaults to `3m`; `LOCAL_ASSETS_DIR` set to volume path in both compose files so Polly-generated exercise audio survives restarts
 - Flutter learner flow for all four oral tasks: recording with split Stop/Analyze, dedicated `AnalysisScreen` spinner, result rendering, recent attempts, audio replay, review artifact display with TTS audio playback
 - Flutter i18n (Vietnamese + English) via ARB + generated `AppLocalizations`, with in-app locale selector persisted via `SharedPreferences`; EN=VI=175 keys, zero hardcoded UI strings on learner surfaces (2026-04-27)
 - CMS full i18n (VI/EN) via `cms/lib/i18n.tsx` React context + localStorage — locale switcher in sidebar footer; all exercise-dashboard, mock-test/module/skill dashboards, sidebar nav labels reactive; `cms/lib/strings.ts` superseded by `i18n.tsx` (2026-04-27)
@@ -168,7 +168,7 @@ The implemented V1 foundation currently includes:
   - Inline validation: `validateExercise()` per type; submit disabled khi invalid
 
 - **Infrastructure hardening — 2026-04-29:**
-  - `ExerciseAudioStore` interface + `postgresExerciseAudioStore`: exercise audio persists qua restart
+  - `ExerciseAudioStore` interface + `postgresExerciseAudioStore`: exercise audio metadata persists qua restart; `LOCAL_ASSETS_DIR` must point to a named volume for the MP3 file to also persist (fixed 2026-05-01)
   - `FullExamStore` interface + `postgresFullExamStore`: full exam sessions persist
   - Polly 2 voices for poslech_4: `DialogExerciseAudioGenerator` + `GenerateDialogAudio()` alternating voices + MP3 concat
   - Polly TTS for writing `model_answer_text`: `ProcessWritingAttempt` generates TTS audio (same pattern as speaking)
@@ -330,7 +330,7 @@ Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 - `QuizcardWidget` image slot (16:9, priority: context_image asset > flashcardImageAssetId)
 - `MultipleChoiceWidget` tự switch 2×2 image grid khi tất cả options có `imageAssetId`
 - `MatchingWidget` right column hiện image card khi `imageAssetId` có
-- `ExerciseContextImage` widget trên tất cả 4 exercise screens (listening/reading/writing/vocab-grammar)
+- `ExerciseContextImage` widget trên tất cả 4 exercise screens (listening/reading/writing/vocab-grammar) + `DeckSessionScreen` (`_FillBlankDeckCard` và `_ChoiceWordDeckCard`)
 - Exercise form: "🖼 Ảnh minh họa" collapsible section cho mọi exercise type; `DELETE /admin/exercises/:id/assets/:assetId`
 - cteni_1 per-item image upload trong CMS (CteniFields mode image/text toggle); Flutter `_buildCteni1Layout` redesign
 - `Course.BannerImageID` + `MockTest.BannerImageID`: `POST/DELETE /admin/{courses,mock-tests}/:id/banner`; CMS card header hiện banner + upload UI; Flutter CourseCard/MockTestCard banner image
@@ -340,8 +340,8 @@ Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 
 **Remaining backlog (low priority):**
 1. Nhập nội dung mẫu qua CMS: ít nhất 1 exercise mỗi loại để test Flutter end-to-end
-2. Polly audio upload flow cho `exercise_audio` (hiện chỉ text→Polly, upload không persist)
-3. Vocab item audio per-item (Polly TTS deferred từ V11)
+2. Vocab item audio per-item (Polly TTS deferred từ V11)
+2. Vocab item audio per-item (Polly TTS deferred từ V11)
 
 **Next coaching slice (if expanding):**
 Đọc `docs/ideas/attempt-repair-and-shadowing.md` + spec/plan files trước khi bắt đầu.
