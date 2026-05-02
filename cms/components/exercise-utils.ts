@@ -59,7 +59,9 @@ export type ExerciseType =
   | 'quizcard_basic'
   | 'matching'
   | 'fill_blank'
-  | 'choice_word';
+  | 'choice_word'
+  | 'interview_conversation'
+  | 'interview_choice_explain';
 
 export type ExerciseFormState = {
   exerciseType: ExerciseType;
@@ -539,7 +541,9 @@ export function formStateFromExercise(item: Exercise): ExerciseFormState {
       item.exercise_type === 'quizcard_basic' ||
       item.exercise_type === 'matching' ||
       item.exercise_type === 'fill_blank' ||
-      item.exercise_type === 'choice_word'
+      item.exercise_type === 'choice_word' ||
+      item.exercise_type === 'interview_conversation' ||
+      item.exercise_type === 'interview_choice_explain'
         ? (detail as Record<string, unknown>)
         : undefined,
   };
@@ -663,6 +667,16 @@ export function buildCteniPayload(form: ExerciseFormState) {
 }
 
 export function buildCreatePayload(form: ExerciseFormState) {
+  if (form.exerciseType === 'interview_conversation' || form.exerciseType === 'interview_choice_explain') {
+    return {
+      module_id: form.moduleId, skill_kind: form.skillKind,
+      exercise_type: form.exerciseType, title: form.title,
+      short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
+      estimated_duration_sec: 600, sample_answer_enabled: false,
+      status: form.status, pool: form.pool,
+      detail: form.typePayload ?? {},
+    };
+  }
   if (form.exerciseType.startsWith('cteni_')) {
     if (form.typePayload !== undefined) return { ...buildCteniBase(form), detail: form.typePayload };
     return buildCteniPayload(form);
@@ -762,6 +776,16 @@ export function buildCreatePayload(form: ExerciseFormState) {
 }
 
 export function buildUpdatePayload(form: ExerciseFormState) {
+  if (form.exerciseType === 'interview_conversation' || form.exerciseType === 'interview_choice_explain') {
+    return {
+      module_id: form.moduleId, skill_kind: form.skillKind,
+      exercise_type: form.exerciseType, title: form.title,
+      short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
+      estimated_duration_sec: 600, sample_answer_enabled: false,
+      status: form.status, pool: form.pool,
+      detail: form.typePayload ?? {},
+    };
+  }
   if (form.exerciseType.startsWith('cteni_')) {
     if (form.typePayload !== undefined) return { ...buildCteniBase(form), detail: form.typePayload };
     return buildCteniPayload(form);
@@ -857,6 +881,101 @@ export function buildUpdatePayload(form: ExerciseFormState) {
       options: parseChoiceOptions(form.choiceOptions),
       expected_reasoning_axes: parseLineList(form.expectedReasoningAxes),
     },
+  };
+}
+
+// ─── V14: Interview helpers ───────────────────────────────────────────────────
+
+export type InterviewOptionRow = {
+  id: string;
+  label: string;
+  imageAssetId: string;
+};
+
+export type InterviewConversationFormState = {
+  topic: string;
+  tips: string[];
+  systemPrompt: string;
+  maxTurns: number;
+  showTranscript: boolean;
+};
+
+export type InterviewChoiceExplainFormState = {
+  question: string;
+  options: InterviewOptionRow[];
+  systemPrompt: string;
+  maxTurns: number;
+  showTranscript: boolean;
+};
+
+export function buildInterviewConversationPayload(
+  form: InterviewConversationFormState,
+): Record<string, unknown> {
+  if (!form.systemPrompt.trim()) {
+    throw new Error('system_prompt is required for interview_conversation');
+  }
+  return {
+    topic: form.topic,
+    tips: form.tips.filter((t) => t.trim()),
+    system_prompt: form.systemPrompt,
+    max_turns: form.maxTurns,
+    show_transcript: form.showTranscript,
+  };
+}
+
+export function buildInterviewChoiceExplainPayload(
+  form: InterviewChoiceExplainFormState,
+): Record<string, unknown> {
+  if (!form.systemPrompt.trim()) {
+    throw new Error('system_prompt is required for interview_choice_explain');
+  }
+  if (form.options.length < 3) {
+    throw new Error(`interview_choice_explain requires at least 3 options, got ${form.options.length}`);
+  }
+  if (form.options.length > 4) {
+    throw new Error(`interview_choice_explain requires at most 4 options, got ${form.options.length}`);
+  }
+  return {
+    question: form.question,
+    options: form.options.map((o) => ({
+      id: o.id,
+      label: o.label,
+      image_asset_id: o.imageAssetId,
+    })),
+    system_prompt: form.systemPrompt,
+    max_turns: form.maxTurns,
+    show_transcript: form.showTranscript,
+  };
+}
+
+export function formStateFromInterviewConversation(
+  detail: Record<string, unknown>,
+): InterviewConversationFormState {
+  return {
+    topic: String(detail.topic ?? ''),
+    tips: Array.isArray(detail.tips) ? (detail.tips as unknown[]).map(String) : [],
+    systemPrompt: String(detail.system_prompt ?? ''),
+    maxTurns: typeof detail.max_turns === 'number' ? detail.max_turns : 8,
+    showTranscript: detail.show_transcript === true,
+  };
+}
+
+export function formStateFromInterviewChoiceExplain(
+  detail: Record<string, unknown>,
+): InterviewChoiceExplainFormState {
+  const rawOptions = Array.isArray(detail.options)
+    ? (detail.options as Array<Record<string, unknown>>)
+    : [];
+  return {
+    question: String(detail.question ?? ''),
+    options: rawOptions.map((o) => ({
+      id: String(o.id ?? ''),
+      label: String(o.label ?? ''),
+      imageAssetId: String(o.image_asset_id ?? ''),
+    })),
+    systemPrompt: String(detail.system_prompt ?? ''),
+    maxTurns: typeof detail.max_turns === 'number' ? detail.max_turns : 6,
+    showTranscript: detail.show_transcript === true,
   };
 }
 

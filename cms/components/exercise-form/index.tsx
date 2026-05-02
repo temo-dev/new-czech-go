@@ -6,6 +6,8 @@ import { adminFetch } from '../../lib/api';
 import { PoslechFields } from './PoslechFields';
 import { CteniFields } from './CteniFields';
 import { AnoNeFields } from './AnoNeFields';
+import { InterviewConversationFields } from './InterviewConversationFields';
+import { InterviewChoiceExplainFields } from './InterviewChoiceExplainFields';
 import { SpeakingFields } from './SpeakingFields';
 import { WritingFields } from './WritingFields';
 import { VocabGrammarFields } from './VocabGrammarFields';
@@ -650,6 +652,22 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
 
                 {(form.exerciseType === 'psani_1_formular' || form.exerciseType === 'psani_2_email') && (
                   <WritingFields form={form as never} setForm={setForm as never} />
+                )}
+
+                {form.exerciseType === 'interview_conversation' && (
+                  <InterviewConversationFields
+                    initialData={form.typePayload ?? {}}
+                    onChange={(payload) => setForm((f) => ({ ...f, typePayload: payload }))}
+                    editingId={editingId}
+                  />
+                )}
+
+                {form.exerciseType === 'interview_choice_explain' && (
+                  <InterviewChoiceExplainFields
+                    initialData={form.typePayload ?? {}}
+                    onChange={(payload) => setForm((f) => ({ ...f, typePayload: payload }))}
+                    editingId={editingId}
+                  />
                 )}
 
                 {(form.exerciseType === 'cteni_6' || form.exerciseType === 'poslech_6') && (

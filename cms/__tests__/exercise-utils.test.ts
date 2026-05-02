@@ -340,3 +340,139 @@ describe('formStateFromAnoNe', () => {
     expect(restored.maxPoints).toBe(2);
   });
 });
+
+// ─── V14: Interview helpers ───────────────────────────────────────────────────
+
+import {
+  buildInterviewConversationPayload,
+  buildInterviewChoiceExplainPayload,
+  formStateFromInterviewConversation,
+  formStateFromInterviewChoiceExplain,
+} from '../components/exercise-utils';
+
+describe('buildInterviewConversationPayload', () => {
+  it('builds valid payload with all fields', () => {
+    const payload = buildInterviewConversationPayload({
+      topic: 'Gia đình',
+      tips: ['Trả lời đầy đủ', 'Dùng từ nối'],
+      systemPrompt: 'You are Jana, a Czech examiner.',
+      maxTurns: 8,
+      showTranscript: true,
+    });
+    expect(payload.topic).toBe('Gia đình');
+    expect(payload.tips).toEqual(['Trả lời đầy đủ', 'Dùng từ nối']);
+    expect(payload.system_prompt).toBe('You are Jana, a Czech examiner.');
+    expect(payload.max_turns).toBe(8);
+    expect(payload.show_transcript).toBe(true);
+  });
+
+  it('throws for empty system_prompt', () => {
+    expect(() =>
+      buildInterviewConversationPayload({
+        topic: 'Rodina',
+        tips: [],
+        systemPrompt: '',
+        maxTurns: 8,
+        showTranscript: false,
+      }),
+    ).toThrow('system_prompt');
+  });
+
+  it('roundtrip: buildPayload → formStateFrom', () => {
+    const original = {
+      topic: 'Práce',
+      tips: ['Tip 1'],
+      systemPrompt: 'You are Jana. Interview about work.',
+      maxTurns: 6,
+      showTranscript: false,
+    };
+    const payload = buildInterviewConversationPayload(original);
+    const restored = formStateFromInterviewConversation(payload);
+    expect(restored.topic).toBe('Práce');
+    expect(restored.tips).toEqual(['Tip 1']);
+    expect(restored.systemPrompt).toBe('You are Jana. Interview about work.');
+    expect(restored.maxTurns).toBe(6);
+    expect(restored.showTranscript).toBe(false);
+  });
+});
+
+describe('buildInterviewChoiceExplainPayload', () => {
+  const threeOptions = [
+    { id: '1', label: 'Praha', imageAssetId: '' },
+    { id: '2', label: 'Brno', imageAssetId: '' },
+    { id: '3', label: 'Ostrava', imageAssetId: '' },
+  ];
+
+  it('builds valid payload with 3 options', () => {
+    const payload = buildInterviewChoiceExplainPayload({
+      question: 'Kde chcete žít?',
+      options: threeOptions,
+      systemPrompt: 'You are Jana. The learner chose {selected_option}.',
+      maxTurns: 6,
+      showTranscript: false,
+    });
+    expect(payload.question).toBe('Kde chcete žít?');
+    expect((payload.options as unknown[]).length).toBe(3);
+    expect(payload.system_prompt).toContain('{selected_option}');
+  });
+
+  it('throws for fewer than 3 options', () => {
+    expect(() =>
+      buildInterviewChoiceExplainPayload({
+        question: 'Q',
+        options: [
+          { id: '1', label: 'A', imageAssetId: '' },
+          { id: '2', label: 'B', imageAssetId: '' },
+        ],
+        systemPrompt: 'You are Jana.',
+        maxTurns: 6,
+        showTranscript: false,
+      }),
+    ).toThrow('3');
+  });
+
+  it('throws for more than 4 options', () => {
+    expect(() =>
+      buildInterviewChoiceExplainPayload({
+        question: 'Q',
+        options: Array(5).fill({ id: '1', label: 'X', imageAssetId: '' }),
+        systemPrompt: 'You are Jana.',
+        maxTurns: 6,
+        showTranscript: false,
+      }),
+    ).toThrow('4');
+  });
+
+  it('throws for empty system_prompt', () => {
+    expect(() =>
+      buildInterviewChoiceExplainPayload({
+        question: 'Q',
+        options: threeOptions,
+        systemPrompt: '',
+        maxTurns: 6,
+        showTranscript: false,
+      }),
+    ).toThrow('system_prompt');
+  });
+
+  it('roundtrip: buildPayload → formStateFrom', () => {
+    const original = {
+      question: 'Kde bydlíte?',
+      options: [
+        { id: '1', label: 'Praha', imageAssetId: 'img-1' },
+        { id: '2', label: 'Brno', imageAssetId: '' },
+        { id: '3', label: 'Ostrava', imageAssetId: '' },
+      ],
+      systemPrompt: 'You are Jana. The learner chose {selected_option}.',
+      maxTurns: 5,
+      showTranscript: true,
+    };
+    const payload = buildInterviewChoiceExplainPayload(original);
+    const restored = formStateFromInterviewChoiceExplain(payload);
+    expect(restored.question).toBe('Kde bydlíte?');
+    expect(restored.options[0].label).toBe('Praha');
+    expect(restored.options[0].imageAssetId).toBe('img-1');
+    expect(restored.options.length).toBe(3);
+    expect(restored.showTranscript).toBe(true);
+  });
+});
