@@ -9,6 +9,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../../exercise/screens/type_group_screen.dart';
+import '../../interview/screens/interview_list_screen.dart';
 import 'exercise_list_screen.dart';
 
 class ModuleDetailScreen extends StatefulWidget {
@@ -126,8 +127,7 @@ class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
                                     final isVocabGrammar =
                                         sk.skillKind == 'tu_vung' ||
                                         sk.skillKind == 'ngu_phap';
-                                    // interview routes to ExerciseListScreen until
-                                    // InterviewListScreen is created in IV-7.
+                                    final isInterview = sk.skillKind == 'interview';
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
                                         builder: (_) => isVocabGrammar
@@ -137,11 +137,16 @@ class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
                                                 skillKind: sk.skillKind,
                                                 moduleTitle: widget.module.title,
                                               )
-                                            : ExerciseListScreen(
-                                                client: widget.client,
-                                                moduleId: sk.moduleId,
-                                                skillKind: sk.skillKind,
-                                              ),
+                                            : isInterview
+                                                ? InterviewListScreen(
+                                                    client: widget.client,
+                                                    moduleId: sk.moduleId,
+                                                  )
+                                                : ExerciseListScreen(
+                                                    client: widget.client,
+                                                    moduleId: sk.moduleId,
+                                                    skillKind: sk.skillKind,
+                                                  ),
                                       ),
                                     );
                                   } : null,
