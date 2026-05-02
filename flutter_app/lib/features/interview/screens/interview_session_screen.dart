@@ -145,8 +145,10 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
         );
       };
 
-      // 3. Connect — systemPrompt sent as conversation_initiation_client_data
+      // 3. Connect — systemPrompt + firstMessage sent via conversation_initiation_client_data.
+      // firstMessage ensures the agent speaks first without waiting for learner.
       _wsClient.systemPrompt = systemPrompt;
+      _wsClient.firstMessage = 'Dobrý den! Jsem Jana Nováková, váš zkušební komisař. Jak se jmenujete?';
       await _wsClient.connect(signedUrl);
     } catch (_) {
       if (!mounted) return;

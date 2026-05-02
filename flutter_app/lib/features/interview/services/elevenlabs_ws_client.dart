@@ -107,16 +107,27 @@ class ElevenLabsWsClient {
     }
   }
 
+  /// Optional first message — if set, the agent speaks this immediately
+  /// after session init (so learner doesn't have to speak first).
+  String? firstMessage;
+
   void _sendInitMessage() {
     final prompt = systemPrompt;
-    if (prompt == null || prompt.isEmpty) return;
+    final first = firstMessage;
+    // Always send even if prompt is empty, to set language and first_message.
+    final agentOverride = <String, dynamic>{
+      'language': 'cs',
+    };
+    if (prompt != null && prompt.isNotEmpty) {
+      agentOverride['prompt'] = {'prompt': prompt};
+    }
+    if (first != null && first.isNotEmpty) {
+      agentOverride['first_message'] = first;
+    }
     _ws?.add(jsonEncode({
       'type': 'conversation_initiation_client_data',
       'conversation_config_override': {
-        'agent': {
-          'prompt': {'prompt': prompt},
-          'language': 'cs',
-        },
+        'agent': agentOverride,
       },
     }));
   }
