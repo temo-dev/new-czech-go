@@ -10,6 +10,9 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../services/elevenlabs_ws_client.dart';
 import '../services/pcm_audio_player.dart';
+import '../services/simli_config.dart';
+import '../services/simli_session_manager.dart';
+import '../widgets/avatar_video_container.dart';
 import '../widgets/mic_waveform_widget.dart';
 import '../widgets/session_status_pill.dart';
 import 'interview_result_screen.dart';
@@ -48,6 +51,10 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   StreamSubscription<Uint8List>? _micSub;
   Timer? _sessionTimer;
 
+  // Sprint 2: Simli avatar. Only active when SIMLI_API_KEY is configured.
+  SimliSessionManager? _simli;
+  bool _simliConnected = false;
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +69,7 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     _wsClient.disconnect();
     _audioPlayer.dispose();
     _recorder.dispose();
+    _simli?.dispose();
     super.dispose();
   }
 
@@ -76,7 +84,23 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       final signedUrl = tokenData['signed_url'] as String? ?? '';
       if (signedUrl.isEmpty || !mounted) return;
 
-      // 2. Wire WS callbacks
+      // 2. Start Simli avatar if API key is configured (Sprint 2)
+      if (SimliConfig.apiKey.isNotEmpty) {
+        _simli = SimliSessionManager(
+          apiKey: SimliConfig.apiKey,
+          faceId: SimliConfig.faceId,
+        );
+        _simli!.onConnection = () {
+          if (mounted) setState(() => _simliConnected = true);
+        };
+        _simli!.onDisconnected = () {
+          if (mounted) setState(() => _simliConnected = false);
+        };
+        // Start Simli concurrently — don't await (non-blocking)
+        _simli!.start().catchError((_) {}); // failure is non-fatal
+      }
+
+      // 3. Wire WS callbacks
       _wsClient.onReady = () {
         if (!mounted) return;
         setState(() => _state = InterviewSessionState.ready);
@@ -85,6 +109,8 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       _wsClient.onAudioChunk = (Uint8List chunk) {
         if (!mounted) return;
         setState(() => _state = InterviewSessionState.speaking);
+        // Pipe to Simli for lip-sync (Sprint 2) + to audio player for sound
+        _simli?.sendAudio(chunk);
         _audioPlayer.addChunk(chunk);
       };
       _wsClient.onTranscript = (speaker, text) {
@@ -258,28 +284,10 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 160, height: 180,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A3A5C),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: _state == InterviewSessionState.speaking
-                          ? AppColors.primary.withAlpha(128)
-                          : Colors.transparent,
-                      width: 2,
-                    ),
-                  ),
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('👩‍💼', style: TextStyle(fontSize: 48)),
-                      SizedBox(height: 8),
-                      Text('Jana Nováková', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                      Text('Czech Examiner', style: TextStyle(color: Colors.white30, fontSize: 10)),
-                    ],
-                  ),
+                AvatarVideoContainer(
+                  videoRenderer: _simli?.videoRenderer,
+                  isConnected: _simliConnected,
+                  isSpeaking: _state == InterviewSessionState.speaking,
                 ),
               ],
             ),
