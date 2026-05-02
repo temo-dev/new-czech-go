@@ -519,7 +519,7 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                 </p>
               </div>
               <div style={{ display: 'grid', gap: 12 }}>
-                {(['noi', 'viet', 'nghe', 'doc', 'tu_vung', 'ngu_phap'] as const).map((kind) => {
+                {(['noi', 'viet', 'nghe', 'doc', 'tu_vung', 'ngu_phap', 'interview'] as const).map((kind) => {
                   const meta = SKILL_KIND_META[kind as keyof typeof SKILL_KIND_META];
                   if (!meta) return null;
                   return (

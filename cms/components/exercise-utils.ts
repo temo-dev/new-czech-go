@@ -133,21 +133,23 @@ export const exerciseTypeOptions: Array<{ value: ExerciseType; label: string; hi
 ];
 
 export const SKILL_KIND_EXERCISE_TYPES: Record<string, ExerciseType[]> = {
-  noi:      ['uloha_1_topic_answers', 'uloha_2_dialogue_questions', 'uloha_3_story_narration', 'uloha_4_choice_reasoning'],
-  viet:     ['psani_1_formular', 'psani_2_email'],
-  nghe:     ['poslech_1', 'poslech_2', 'poslech_3', 'poslech_4', 'poslech_5', 'poslech_6'],
-  doc:      ['cteni_1', 'cteni_2', 'cteni_3', 'cteni_4', 'cteni_5', 'cteni_6'],
-  tu_vung:  ['quizcard_basic', 'matching', 'fill_blank', 'choice_word'],
-  ngu_phap: ['matching', 'fill_blank', 'choice_word'],
+  noi:       ['uloha_1_topic_answers', 'uloha_2_dialogue_questions', 'uloha_3_story_narration', 'uloha_4_choice_reasoning'],
+  viet:      ['psani_1_formular', 'psani_2_email'],
+  nghe:      ['poslech_1', 'poslech_2', 'poslech_3', 'poslech_4', 'poslech_5', 'poslech_6'],
+  doc:       ['cteni_1', 'cteni_2', 'cteni_3', 'cteni_4', 'cteni_5', 'cteni_6'],
+  tu_vung:   ['quizcard_basic', 'matching', 'fill_blank', 'choice_word'],
+  ngu_phap:  ['matching', 'fill_blank', 'choice_word'],
+  interview: ['interview_conversation', 'interview_choice_explain'],
 };
 
 export const SKILL_KIND_META: Record<string, { label: string; icon: string; color: string }> = {
-  noi:      { label: 'Nói',      icon: '🎙️', color: '#FF6A14' },
-  viet:     { label: 'Viết',     icon: '✏️',  color: '#0F3D3A' },
-  nghe:     { label: 'Nghe',     icon: '🎧',  color: '#7C3AED' },
-  doc:      { label: 'Đọc',      icon: '📖',  color: '#0369A1' },
-  tu_vung:  { label: 'Từ vựng',  icon: '📚',  color: '#059669' },
-  ngu_phap: { label: 'Ngữ pháp', icon: '📝',  color: '#DC2626' },
+  noi:       { label: 'Nói',           icon: '🎙️', color: '#FF6A14' },
+  viet:      { label: 'Viết',          icon: '✏️',  color: '#0F3D3A' },
+  nghe:      { label: 'Nghe',          icon: '🎧',  color: '#7C3AED' },
+  doc:       { label: 'Đọc',           icon: '📖',  color: '#0369A1' },
+  tu_vung:   { label: 'Từ vựng',       icon: '📚',  color: '#059669' },
+  ngu_phap:  { label: 'Ngữ pháp',      icon: '📝',  color: '#DC2626' },
+  interview: { label: 'Phỏng vấn AI',  icon: '🎙',  color: '#0891B2' },
 };
 
 // ─── Style constants ──────────────────────────────────────────────────────────
