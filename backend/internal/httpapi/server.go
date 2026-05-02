@@ -21,15 +21,16 @@ import (
 )
 
 type Server struct {
-	repo             *store.MemoryStore
-	processor        *processing.Processor
-	uploadProvider   UploadTargetProvider
-	audioURLProvider AudioURLProvider
-	audioSignSecret  []byte
-	audioGenerator   processing.ExerciseAudioGenerator
-	contentGenerator processing.ContentGenerator
-	voiceRegistry    *processing.VoiceRegistry
-	mux              *http.ServeMux
+	repo               *store.MemoryStore
+	processor          *processing.Processor
+	uploadProvider     UploadTargetProvider
+	audioURLProvider   AudioURLProvider
+	audioSignSecret    []byte
+	audioGenerator     processing.ExerciseAudioGenerator
+	contentGenerator   processing.ContentGenerator
+	voiceRegistry      *processing.VoiceRegistry
+	elevenLabsAPIKey   string // for interview session token creation
+	mux                *http.ServeMux
 }
 
 func NewServer(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider) http.Handler {
@@ -82,6 +83,7 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 		audioGenerator:   audioGen,
 		contentGenerator: contentGen,
 		voiceRegistry:    voiceRegistry,
+		elevenLabsAPIKey: strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")),
 		mux:              http.NewServeMux(),
 	}
 	// Recover any jobs stuck in "running" from a previous server crash.
@@ -1429,6 +1431,8 @@ func skillKindForExerciseType(exerciseType string) string {
 		return "nghe"
 	case strings.HasPrefix(exerciseType, "cteni_"):
 		return "doc"
+	case strings.HasPrefix(exerciseType, "interview_"):
+		return "interview"
 	default:
 		return ""
 	}
@@ -1534,6 +1538,40 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 			}
 			if detail.ScenarioPrompt == "" || len(detail.Options) == 0 {
 				writeError(w, http.StatusBadRequest, "validation_error", "Scenario prompt and options are required for Uloha 4.", false)
+				return
+			}
+			exercise.Detail = detail
+		case "interview_conversation":
+			if len(req.Detail) == 0 || string(req.Detail) == "null" {
+				writeError(w, http.StatusBadRequest, "validation_error", "Detail is required for interview_conversation.", false)
+				return
+			}
+			var detail contracts.InterviewConversationDetail
+			if err := json.Unmarshal(req.Detail, &detail); err != nil {
+				writeError(w, http.StatusBadRequest, "validation_error", "Invalid interview_conversation detail payload.", false)
+				return
+			}
+			if strings.TrimSpace(detail.SystemPrompt) == "" {
+				writeError(w, http.StatusBadRequest, "validation_error", "system_prompt is required for interview_conversation.", false)
+				return
+			}
+			exercise.Detail = detail
+		case "interview_choice_explain":
+			if len(req.Detail) == 0 || string(req.Detail) == "null" {
+				writeError(w, http.StatusBadRequest, "validation_error", "Detail is required for interview_choice_explain.", false)
+				return
+			}
+			var detail contracts.InterviewChoiceExplainDetail
+			if err := json.Unmarshal(req.Detail, &detail); err != nil {
+				writeError(w, http.StatusBadRequest, "validation_error", "Invalid interview_choice_explain detail payload.", false)
+				return
+			}
+			if strings.TrimSpace(detail.SystemPrompt) == "" {
+				writeError(w, http.StatusBadRequest, "validation_error", "system_prompt is required for interview_choice_explain.", false)
+				return
+			}
+			if len(detail.Options) < 3 || len(detail.Options) > 4 {
+				writeError(w, http.StatusBadRequest, "validation_error", "interview_choice_explain requires 3 or 4 options.", false)
 				return
 			}
 			exercise.Detail = detail

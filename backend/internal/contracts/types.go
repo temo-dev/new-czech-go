@@ -294,6 +294,67 @@ type AnoNeStatement struct {
 	Statement  string `json:"statement"`
 }
 
+// --- Interview (V14) ---
+
+// InterviewConversationDetail is the detail payload for interview_conversation exercises.
+// system_prompt is sent to ElevenLabs Conversational AI agent to define the examiner persona.
+// {selected_option} placeholder is NOT used in this type (conversation only).
+type InterviewConversationDetail struct {
+	Topic          string   `json:"topic"`
+	Tips           []string `json:"tips,omitempty"`
+	SystemPrompt   string   `json:"system_prompt"`
+	MaxTurns       int      `json:"max_turns"`
+	ShowTranscript bool     `json:"show_transcript"`
+}
+
+// InterviewChoiceExplainDetail is the detail payload for interview_choice_explain exercises.
+// system_prompt may contain {selected_option} which the backend injects server-side
+// before creating the ElevenLabs signed session URL.
+type InterviewChoiceExplainDetail struct {
+	Question       string            `json:"question"`
+	Options        []InterviewOption `json:"options"` // 3–4 required
+	SystemPrompt   string            `json:"system_prompt"`
+	MaxTurns       int               `json:"max_turns"`
+	ShowTranscript bool              `json:"show_transcript"`
+}
+
+// InterviewOption is one selectable choice in an interview_choice_explain exercise.
+type InterviewOption struct {
+	ID           string `json:"id"`
+	Label        string `json:"label"`
+	ImageAssetID string `json:"image_asset_id,omitempty"`
+}
+
+// InterviewTokenRequest is the body for POST /v1/interview-sessions/token.
+// SelectedOption is the option label chosen by the learner; injected into
+// system_prompt before the ElevenLabs session is created.
+type InterviewTokenRequest struct {
+	ExerciseID     string `json:"exercise_id"`
+	AttemptID      string `json:"attempt_id"`
+	SelectedOption string `json:"selected_option,omitempty"`
+}
+
+// InterviewTokenResponse contains the short-lived signed URL returned by ElevenLabs.
+// Flutter must open the WebSocket within ExpiresIn seconds.
+type InterviewTokenResponse struct {
+	SignedURL  string `json:"signed_url"`
+	ExpiresIn int    `json:"expires_in"`
+}
+
+// InterviewTranscriptTurn is one turn in a completed interview session.
+// Speaker is "examiner" or "learner". AtSec is seconds from session start.
+type InterviewTranscriptTurn struct {
+	Speaker string `json:"speaker"`
+	Text    string `json:"text"`
+	AtSec   int    `json:"at_sec"`
+}
+
+// InterviewSubmitRequest is the body for POST /v1/attempts/:id/submit-interview.
+type InterviewSubmitRequest struct {
+	Transcript  []InterviewTranscriptTurn `json:"transcript"`
+	DurationSec int                       `json:"duration_sec"`
+}
+
 // --- Writing (V2) ---
 
 type Psani1Detail struct {
