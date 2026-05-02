@@ -82,6 +82,7 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
         selectedOption: widget.selectedOption,
       );
       final signedUrl = tokenData['signed_url'] as String? ?? '';
+      final systemPrompt = tokenData['system_prompt'] as String? ?? '';
       if (signedUrl.isEmpty || !mounted) return;
 
       // 2. Start Simli avatar if API key is configured (Sprint 2)
@@ -142,7 +143,8 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
         );
       };
 
-      // 3. Connect
+      // 3. Connect — systemPrompt sent as conversation_initiation_client_data
+      _wsClient.systemPrompt = systemPrompt;
       await _wsClient.connect(signedUrl);
     } catch (_) {
       if (!mounted) return;

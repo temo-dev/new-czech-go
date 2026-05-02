@@ -336,9 +336,12 @@ type InterviewTokenRequest struct {
 
 // InterviewTokenResponse contains the short-lived signed URL returned by ElevenLabs.
 // Flutter must open the WebSocket within ExpiresIn seconds.
+// SystemPrompt is the injected prompt (with {selected_option} replaced) — Flutter
+// sends this in the conversation_initiation_client_data WebSocket message.
 type InterviewTokenResponse struct {
-	SignedURL  string `json:"signed_url"`
-	ExpiresIn int    `json:"expires_in"`
+	SignedURL     string `json:"signed_url"`
+	ExpiresIn     int    `json:"expires_in"`
+	SystemPrompt  string `json:"system_prompt"`
 }
 
 // InterviewTranscriptTurn is one turn in a completed interview session.

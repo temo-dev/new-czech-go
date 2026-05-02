@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,6 +30,7 @@ type Server struct {
 	contentGenerator   processing.ContentGenerator
 	voiceRegistry      *processing.VoiceRegistry
 	elevenLabsAPIKey   string // for interview session token creation
+	elevenLabsAgentID  string // pre-created agent in ElevenLabs dashboard
 	mux                *http.ServeMux
 }
 
@@ -84,7 +84,8 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 		audioGenerator:   audioGen,
 		contentGenerator: contentGen,
 		voiceRegistry:    voiceRegistry,
-		elevenLabsAPIKey: strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")),
+		elevenLabsAPIKey:  strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")),
+		elevenLabsAgentID: strings.TrimSpace(os.Getenv("ELEVENLABS_AGENT_ID")),
 		mux:              http.NewServeMux(),
 	}
 	// Recover any jobs stuck in "running" from a previous server crash.
@@ -1263,6 +1264,10 @@ func (s *Server) handleInterviewSessionToken(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusServiceUnavailable, "elevenlabs_not_configured", "ElevenLabs API key is not configured.", false)
 		return
 	}
+	if s.elevenLabsAgentID == "" {
+		writeError(w, http.StatusServiceUnavailable, "elevenlabs_not_configured", "ElevenLabs Agent ID is not configured.", false)
+		return
+	}
 
 	// Extract system_prompt and inject {selected_option} if applicable.
 	systemPrompt := extractInterviewSystemPrompt(exercise)
@@ -1270,13 +1275,16 @@ func (s *Server) handleInterviewSessionToken(w http.ResponseWriter, r *http.Requ
 		systemPrompt = processing.InterviewTokenSystemPromptInjected(systemPrompt, req.SelectedOption)
 	}
 
-	// Call ElevenLabs Conversational AI to get a signed session URL.
-	tokenResp, err := createElevenLabsSignedURL(s.elevenLabsAPIKey, systemPrompt)
+	// Get a signed WebSocket URL for the pre-configured ElevenLabs agent.
+	// The system_prompt override is sent by Flutter in conversation_initiation_client_data.
+	tokenResp, err := createElevenLabsSignedURL(s.elevenLabsAPIKey, s.elevenLabsAgentID)
 	if err != nil {
 		log.Printf("interview token for attempt %s: ElevenLabs error: %v", req.AttemptID, err)
 		writeError(w, http.StatusBadGateway, "elevenlabs_error", "Could not create interview session.", false)
 		return
 	}
+	// Return system_prompt so Flutter can inject it via conversation_initiation_client_data.
+	tokenResp.SystemPrompt = systemPrompt
 
 	writeJSON(w, http.StatusOK, map[string]any{"data": tokenResp, "meta": map[string]any{}})
 }
@@ -1337,39 +1345,19 @@ func extractInterviewSystemPrompt(exercise contracts.Exercise) string {
 }
 
 // createElevenLabsSignedURL calls the ElevenLabs Conversational AI API to get
-// a short-lived signed WebSocket URL. The caller injects the system_prompt so
-// the agent persona is set per-session.
-func createElevenLabsSignedURL(apiKey, systemPrompt string) (contracts.InterviewTokenResponse, error) {
-	type overridePrompt struct {
-		Prompt string `json:"prompt"`
-	}
-	type overrideAgent struct {
-		Prompt overridePrompt `json:"prompt"`
-	}
-	type convConfigOverride struct {
-		Agent overrideAgent `json:"agent"`
-	}
-	body := map[string]any{
-		"conversation_config_override": convConfigOverride{
-			Agent: overrideAgent{
-				Prompt: overridePrompt{Prompt: systemPrompt},
-			},
-		},
-	}
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return contracts.InterviewTokenResponse{}, fmt.Errorf("marshal body: %w", err)
-	}
-
-	req, err := http.NewRequest(http.MethodPost,
-		"https://api.elevenlabs.io/v1/convai/conversation/get_signed_url",
-		bytes.NewReader(payload),
+// a short-lived signed WebSocket URL for the given agent.
+// Uses GET /v1/convai/conversation/get_signed_url?agent_id=<id>.
+// The system_prompt override is injected by Flutter via conversation_initiation_client_data.
+func createElevenLabsSignedURL(apiKey, agentID string) (contracts.InterviewTokenResponse, error) {
+	endpoint := fmt.Sprintf(
+		"https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=%s",
+		url.QueryEscape(agentID),
 	)
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return contracts.InterviewTokenResponse{}, fmt.Errorf("new request: %w", err)
 	}
 	req.Header.Set("xi-api-key", apiKey)
-	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -1390,7 +1378,7 @@ func createElevenLabsSignedURL(apiKey, systemPrompt string) (contracts.Interview
 
 	return contracts.InterviewTokenResponse{
 		SignedURL: result.SignedURL,
-		ExpiresIn: 30, // ElevenLabs signed URLs are valid for ~30 seconds
+		ExpiresIn: 30,
 	}, nil
 }
 

@@ -37,6 +37,10 @@ class ElevenLabsWsClient {
   /// @visibleForTesting
   void Function(String msg)? testSendSink;
 
+  /// System prompt to inject via conversation_initiation_client_data.
+  /// Set before calling [connect]. Sent as first WS message after connection.
+  String? systemPrompt;
+
   // ── State ─────────────────────────────────────────────────────────────────
 
   WebSocket? _ws;
@@ -86,6 +90,9 @@ class ElevenLabsWsClient {
   Future<void> _connectOnce(String url) async {
     try {
       _ws = await WebSocket.connect(url);
+      // Send system_prompt override as first message (before any audio).
+      // ElevenLabs ConvAI processes this before conversation_initiation_metadata.
+      _sendInitMessage();
       _sub = _ws!.listen(
         _onData,
         onDone: _onDone,
@@ -95,6 +102,20 @@ class ElevenLabsWsClient {
     } catch (e) {
       _onNetworkError(e);
     }
+  }
+
+  void _sendInitMessage() {
+    final prompt = systemPrompt;
+    if (prompt == null || prompt.isEmpty) return;
+    _ws?.add(jsonEncode({
+      'type': 'conversation_initiation_client_data',
+      'conversation_config_override': {
+        'agent': {
+          'prompt': {'prompt': prompt},
+          'language': 'cs',
+        },
+      },
+    }));
   }
 
   void _onData(dynamic raw) {
