@@ -281,7 +281,7 @@ Do not mix these in one change unless the human asks:
 If you notice adjacent cleanup, note it separately instead of silently expanding scope.
 
 ## Good Next Steps
-V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ V8 ✅ V9 ✅ V10 ✅ V11 ✅ V12 ✅ V13 ✅ — tất cả planned slices hoàn thành.
+V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ V8 ✅ V9 ✅ V10 ✅ V11 ✅ V12 ✅ V13 ✅ V14 ✅ — tất cả planned slices hoàn thành.
 Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 
 **V8 Schema Flatten — 2026-04-30:**
@@ -356,9 +356,22 @@ Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 - Specs: `SPEC.md` § V13, `docs/specs/ano-ne-exercise-type.md`, `docs/designs/ano-ne-exercise-type.html`
 - Tests: 243 backend, 53 CMS Vitest, 69 Flutter
 
+**V14 Interview Skill — 2026-05-02:**
+- `skill_kind = "interview"`, 2 exercise types: `interview_conversation` + `interview_choice_explain`
+- Backend: `POST /v1/interview-sessions/token` (ephemeral ElevenLabs signed URL, inject `{selected_option}`); `POST /v1/attempts/:id/submit-interview`; `interview_scorer.go` (LLM post-session)
+- CMS: `InterviewConversationFields.tsx` + `InterviewChoiceExplainFields.tsx` với `system_prompt`, `max_turns`, `show_transcript` toggle
+- Flutter: `ElevenLabsWsClient` (custom Dart WS, PCM16 streaming); `SimliSessionManager` (wraps `simli_client`); `InterviewListScreen` → `InterviewIntroScreen` → `InterviewSessionScreen` → `InterviewResultScreen`
+- Audio: PCM16 buffer → WAV → `just_audio` playback (Sprint 1); pipe to `simliClient.sendAudioData()` for avatar lip-sync (Sprint 2)
+- Security: API key server-side only, Flutter nhận ephemeral signed URL từ backend
+- iOS: deployment target 13.0 (flutter_webrtc requirement); camera + mic permissions
+- `SIMLI_API_KEY` + `SIMLI_FACE_ID` qua `--dart-define`; avatar disabled khi key trống
+- Specs: `SPEC.md` § V14, `docs/ideas/interview-skill.md`, `docs/designs/interview-skill.html`
+- Tests: 263 backend, 61 CMS Vitest, 102 Flutter
+
 **Remaining backlog (low priority):**
-1. Nhập nội dung mẫu qua CMS: ít nhất 1 exercise mỗi loại để test Flutter end-to-end
+1. Nhập nội dung mẫu qua CMS: ít nhất 1 exercise mỗi loại để test Flutter end-to-end (interview bao gồm)
 2. Vocab item audio per-item (Polly TTS deferred từ V11)
+3. Sprint 0 spike IV-0: manual verify ElevenLabs Czech quality + simli_client v1.0.1 trên iPhone
 
 **Next coaching slice (if expanding):**
 Đọc `docs/ideas/attempt-repair-and-shadowing.md` + spec/plan files trước khi bắt đầu.

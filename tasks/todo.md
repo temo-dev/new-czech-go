@@ -243,3 +243,37 @@ Chi tiết + AC đầy đủ trong `tasks/plan.md` (section V13).
 - [x] **AN-8** Flutter tests: `ano_ne_widget_test.dart` NEW — 5 widget test cases; 69 total tests pass (2026-05-01)
 
 **[CHECKPOINT AN-FINAL]** ✅ Passed 2026-05-01 — flutter analyze 0 errors, 69/69 tests pass, cms build clean, 241 backend tests
+
+---
+
+## V14 — Interview Skill: ElevenLabs Conversational AI + Simli Avatar
+
+Spec: `SPEC.md` § V14 · Idea: `docs/ideas/interview-skill.md` · Design: `docs/designs/interview-skill.html`  
+Plan chi tiết + AC đầy đủ trong `tasks/plan.md` (section V14).
+
+### Sprint 0 — Spike (BLOCKER: phải pass trước IV-1)
+
+- [x] **IV-0** Spike: (A) ElevenLabs ConvAI Czech quality test qua dashboard; (B) `simli_client` v1.0.1 build + RTCVideoView render trên iPhone thật; (C) PCM16 format compatibility; (D) latency đo thực tế < 1.5s
+
+**[GATE IV-0]** Tất cả 4 mục checked → ghi kết quả vào `docs/ideas/interview-skill.md`
+
+### Sprint 1 — Conversation without Avatar
+
+- [x] **IV-1** Backend contracts: 8 Interview* types trong `contracts/types.go`; exercise type validation cho `interview_conversation`/`interview_choice_explain`; `ELEVENLABS_API_KEY` env var wired (2026-05-02)
+- [x] **IV-2** Backend: `POST /v1/interview-sessions/token` (ephemeral signed URL từ ElevenLabs, inject `{selected_option}`); `POST /v1/attempts/:id/submit-interview` (save transcript, launch scorer goroutine); `interview_scorer.go` (LLM via tool_use, readiness + 3 dimension scores) (2026-05-02)
+- [x] **IV-3** Backend tests: `interview_scorer_test.go` — 6 test cases (strong/weak conversation, choice explain, inject/no-inject selected_option) · 263 backend tests total (2026-05-02)
+- [x] **IV-4** CMS: `InterviewConversationFields.tsx` + `InterviewChoiceExplainFields.tsx`; wire trong `exercise-form/index.tsx`; 7 Vitest tests trong `exercise-utils.test.ts` · 61 CMS tests total (2026-05-02)
+- [x] **IV-5** Flutter foundation: Interview* models trong `models.dart`; `getInterviewToken()`/`submitInterview()` trong `api_client.dart`; 22 i18n keys VI+EN; interview skill card trong `ModuleDetail` (2026-05-02)
+- [x] **IV-6** Flutter: `elevenlabs_ws_client.dart` — custom Dart WebSocket client; mic PCM16 streaming; transcript accumulation từ events; auto-reconnect 3 lần (2026-05-02)
+- [x] **IV-7** Flutter: `InterviewListScreen` (grouped exercises); `InterviewIntroScreen` (Luồng A: topic+tips; Luồng B: 2×2 option grid, selected state, disabled button) (2026-05-02)
+- [x] **IV-8** Flutter: `InterviewSessionScreen` (audio-only, no avatar: status pill, mic waveform, transcript overlay, choice chip, "Kết thúc" + confirm); `InterviewResultScreen` (score circle + 2 tabs: Nhận xét + Hội thoại) (2026-05-02)
+
+**[CHECKPOINT IV-A]** ✅ Passed 2026-05-02 — 263 backend tests, 61 CMS tests, 91 Flutter tests, flutter analyze clean
+
+### Sprint 2 — Simli Avatar
+
+- [x] **IV-9** Flutter: `pubspec.yaml` thêm `simli_client: ^1.0.1` + `flutter_webrtc`; `simli_session_manager.dart` (lifecycle wrapper, SimliConfig constants); iOS `Info.plist` camera permission; wire `onAudioChunk` → `simliManager.sendAudio()` (2026-05-02)
+- [x] **IV-10** Flutter: `avatar_video_container.dart` (RTCVideoView + fallback + ring pulse); `InterviewSessionScreen` swap placeholder → `AvatarVideoContainer`; transcript overlay final polish (2026-05-02)
+- [x] **IV-11** Flutter tests: 7 tests trong `interview_list_screen_test.dart` (grouping logic + model getters); 3 tests `avatar_video_container_test.dart`; 1 test `simli_session_manager_test.dart` · 102 Flutter tests total (2026-05-02)
+
+**[CHECKPOINT IV-FINAL]** ✅ Passed 2026-05-02 — 263 backend / 61 CMS / 102 Flutter / flutter analyze clean
