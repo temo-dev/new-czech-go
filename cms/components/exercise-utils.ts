@@ -130,6 +130,8 @@ export const exerciseTypeOptions: Array<{ value: ExerciseType; label: string; hi
   { value: 'matching',       label: 'Ghép đôi',  hint: 'Ghép 4-6 cặp Czech→Vietnamese. Exact match.' },
   { value: 'fill_blank',     label: 'Điền từ',   hint: 'Câu với ___ — điền từ thích hợp.' },
   { value: 'choice_word',    label: 'Chọn từ',   hint: 'Câu + 4 lựa chọn A-D — chọn từ đúng.' },
+  { value: 'interview_conversation',   label: 'Hội thoại theo chủ đề',      hint: 'Hội thoại real-time với avatar Czech examiner AI. Admin nhập system_prompt và chủ đề.' },
+  { value: 'interview_choice_explain', label: 'Chọn phương án + giải thích', hint: 'Learner chọn 1 trong 3–4 phương án, rồi hội thoại giải thích lý do với examiner AI.' },
 ];
 
 export const SKILL_KIND_EXERCISE_TYPES: Record<string, ExerciseType[]> = {
