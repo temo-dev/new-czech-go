@@ -110,6 +110,7 @@ flutter-test:
 
 flutter-run-ios:
 	cd $(FLUTTER_DIR) && $(RTK) $(FLUTTER) run -d "$(IOS_DEVICE)" \
+		--dart-define=API_BASE_URL=$(API_BASE_URL) \
 		--dart-define=SIMLI_API_KEY=$(SIMLI_API_KEY) \
 		--dart-define=SIMLI_FACE_ID=$(SIMLI_FACE_ID)
 
