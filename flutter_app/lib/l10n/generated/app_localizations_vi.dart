@@ -975,4 +975,79 @@ class AppLocalizationsVi extends AppLocalizations {
   String anoNeWrongHint(String answer) {
     return 'Sai — đáp án: $answer';
   }
+
+  @override
+  String get interviewSkillLabel => 'Phỏng vấn AI';
+
+  @override
+  String get interviewSkillDesc => 'Hội thoại thực tế với examiner Czech AI';
+
+  @override
+  String get interviewNewBadge => 'MỚI';
+
+  @override
+  String get interviewTopicLabel => 'Chủ đề hội thoại';
+
+  @override
+  String get interviewChoiceLabel => 'Chọn phương án';
+
+  @override
+  String get interviewChoiceInstruction => 'Chọn 1 và giải thích lý do';
+
+  @override
+  String get interviewTipsTitle => 'Examiner sẽ hỏi về';
+
+  @override
+  String get interviewTipsHint => 'Mẹo luyện tập';
+
+  @override
+  String get interviewStartBtn => 'Bắt đầu phỏng vấn';
+
+  @override
+  String get interviewStartWithChoice => 'Bắt đầu với lựa chọn này';
+
+  @override
+  String get interviewSelectedLabel => 'Đã chọn:';
+
+  @override
+  String get interviewStatusConnecting => 'Đang kết nối với examiner...';
+
+  @override
+  String get interviewStatusReady => 'Sẵn sàng';
+
+  @override
+  String get interviewStatusSpeaking => 'Examiner đang nói';
+
+  @override
+  String get interviewStatusListening => 'Đang lắng nghe bạn...';
+
+  @override
+  String get interviewEndBtn => 'Kết thúc';
+
+  @override
+  String get interviewEndConfirm => 'Bạn có muốn kết thúc phỏng vấn không?';
+
+  @override
+  String get interviewAnalyzing => 'Đang chấm điểm...';
+
+  @override
+  String get interviewResultTitle => 'Kết quả phỏng vấn';
+
+  @override
+  String get interviewTabFeedback => 'Nhận xét';
+
+  @override
+  String get interviewTabTranscript => 'Hội thoại';
+
+  @override
+  String get interviewExaminer => 'Examiner';
+
+  @override
+  String get interviewYou => 'Bạn';
+
+  @override
+  String get interviewConnectError => 'Không kết nối được, thử lại';
+
+  @override
+  String get interviewMicDenied => 'Cần quyền microphone';
 }

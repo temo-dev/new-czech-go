@@ -1858,6 +1858,156 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Sai — đáp án: {answer}'**
   String anoNeWrongHint(String answer);
+
+  /// No description provided for @interviewSkillLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phỏng vấn AI'**
+  String get interviewSkillLabel;
+
+  /// No description provided for @interviewSkillDesc.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hội thoại thực tế với examiner Czech AI'**
+  String get interviewSkillDesc;
+
+  /// No description provided for @interviewNewBadge.
+  ///
+  /// In vi, this message translates to:
+  /// **'MỚI'**
+  String get interviewNewBadge;
+
+  /// No description provided for @interviewTopicLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chủ đề hội thoại'**
+  String get interviewTopicLabel;
+
+  /// No description provided for @interviewChoiceLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chọn phương án'**
+  String get interviewChoiceLabel;
+
+  /// No description provided for @interviewChoiceInstruction.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chọn 1 và giải thích lý do'**
+  String get interviewChoiceInstruction;
+
+  /// No description provided for @interviewTipsTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Examiner sẽ hỏi về'**
+  String get interviewTipsTitle;
+
+  /// No description provided for @interviewTipsHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Mẹo luyện tập'**
+  String get interviewTipsHint;
+
+  /// No description provided for @interviewStartBtn.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bắt đầu phỏng vấn'**
+  String get interviewStartBtn;
+
+  /// No description provided for @interviewStartWithChoice.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bắt đầu với lựa chọn này'**
+  String get interviewStartWithChoice;
+
+  /// No description provided for @interviewSelectedLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã chọn:'**
+  String get interviewSelectedLabel;
+
+  /// No description provided for @interviewStatusConnecting.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang kết nối với examiner...'**
+  String get interviewStatusConnecting;
+
+  /// No description provided for @interviewStatusReady.
+  ///
+  /// In vi, this message translates to:
+  /// **'Sẵn sàng'**
+  String get interviewStatusReady;
+
+  /// No description provided for @interviewStatusSpeaking.
+  ///
+  /// In vi, this message translates to:
+  /// **'Examiner đang nói'**
+  String get interviewStatusSpeaking;
+
+  /// No description provided for @interviewStatusListening.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang lắng nghe bạn...'**
+  String get interviewStatusListening;
+
+  /// No description provided for @interviewEndBtn.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kết thúc'**
+  String get interviewEndBtn;
+
+  /// No description provided for @interviewEndConfirm.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn có muốn kết thúc phỏng vấn không?'**
+  String get interviewEndConfirm;
+
+  /// No description provided for @interviewAnalyzing.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang chấm điểm...'**
+  String get interviewAnalyzing;
+
+  /// No description provided for @interviewResultTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kết quả phỏng vấn'**
+  String get interviewResultTitle;
+
+  /// No description provided for @interviewTabFeedback.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nhận xét'**
+  String get interviewTabFeedback;
+
+  /// No description provided for @interviewTabTranscript.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hội thoại'**
+  String get interviewTabTranscript;
+
+  /// No description provided for @interviewExaminer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Examiner'**
+  String get interviewExaminer;
+
+  /// No description provided for @interviewYou.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn'**
+  String get interviewYou;
+
+  /// No description provided for @interviewConnectError.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không kết nối được, thử lại'**
+  String get interviewConnectError;
+
+  /// No description provided for @interviewMicDenied.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cần quyền microphone'**
+  String get interviewMicDenied;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

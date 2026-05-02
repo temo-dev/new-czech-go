@@ -975,4 +975,79 @@ class AppLocalizationsEn extends AppLocalizations {
   String anoNeWrongHint(String answer) {
     return 'Wrong — correct: $answer';
   }
+
+  @override
+  String get interviewSkillLabel => 'AI Interview';
+
+  @override
+  String get interviewSkillDesc => 'Real-time conversation with a Czech AI examiner';
+
+  @override
+  String get interviewNewBadge => 'NEW';
+
+  @override
+  String get interviewTopicLabel => 'Conversation topic';
+
+  @override
+  String get interviewChoiceLabel => 'Choose an option';
+
+  @override
+  String get interviewChoiceInstruction => 'Pick one and explain your choice';
+
+  @override
+  String get interviewTipsTitle => 'Examiner will ask about';
+
+  @override
+  String get interviewTipsHint => 'Practice tips';
+
+  @override
+  String get interviewStartBtn => 'Start interview';
+
+  @override
+  String get interviewStartWithChoice => 'Start with this choice';
+
+  @override
+  String get interviewSelectedLabel => 'Selected:';
+
+  @override
+  String get interviewStatusConnecting => 'Connecting to examiner...';
+
+  @override
+  String get interviewStatusReady => 'Ready';
+
+  @override
+  String get interviewStatusSpeaking => 'Examiner is speaking';
+
+  @override
+  String get interviewStatusListening => 'Listening to you...';
+
+  @override
+  String get interviewEndBtn => 'End';
+
+  @override
+  String get interviewEndConfirm => 'Do you want to end the interview?';
+
+  @override
+  String get interviewAnalyzing => 'Scoring...';
+
+  @override
+  String get interviewResultTitle => 'Interview result';
+
+  @override
+  String get interviewTabFeedback => 'Feedback';
+
+  @override
+  String get interviewTabTranscript => 'Conversation';
+
+  @override
+  String get interviewExaminer => 'Examiner';
+
+  @override
+  String get interviewYou => 'You';
+
+  @override
+  String get interviewConnectError => 'Connection failed, try again';
+
+  @override
+  String get interviewMicDenied => 'Microphone permission required';
 }

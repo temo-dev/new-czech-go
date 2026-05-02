@@ -46,13 +46,14 @@ class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
   }
 
   String _skillDesc(String kind, AppLocalizations l) => switch (kind) {
-    'noi'      => 'Luyện nói và phát âm tiếng Czech tự nhiên.',
-    'nghe'     => 'Nghe hiểu trong các tình huống thực tế A2.',
-    'doc'      => 'Đọc và hiểu văn bản từ tin nhắn đến bài báo.',
-    'viet'     => 'Viết email và điền biểu mẫu tiếng Czech.',
-    'tu_vung'  => 'Xây dựng vốn từ cho cuộc sống tại CH Séc.',
-    'ngu_phap' => 'Nắm vững ngữ pháp, cách và thì động từ A2.',
-    _          => '',
+    'noi'       => 'Luyện nói và phát âm tiếng Czech tự nhiên.',
+    'nghe'      => 'Nghe hiểu trong các tình huống thực tế A2.',
+    'doc'       => 'Đọc và hiểu văn bản từ tin nhắn đến bài báo.',
+    'viet'      => 'Viết email và điền biểu mẫu tiếng Czech.',
+    'tu_vung'   => 'Xây dựng vốn từ cho cuộc sống tại CH Séc.',
+    'ngu_phap'  => 'Nắm vững ngữ pháp, cách và thì động từ A2.',
+    'interview' => l.interviewSkillDesc,
+    _           => '',
   };
 
   @override
@@ -125,6 +126,8 @@ class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
                                     final isVocabGrammar =
                                         sk.skillKind == 'tu_vung' ||
                                         sk.skillKind == 'ngu_phap';
+                                    // interview routes to ExerciseListScreen until
+                                    // InterviewListScreen is created in IV-7.
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
                                         builder: (_) => isVocabGrammar

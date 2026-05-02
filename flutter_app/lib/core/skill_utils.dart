@@ -6,6 +6,7 @@ String skillKindForExerciseType(String exerciseType) {
   if (exerciseType.startsWith('psani_')) return 'viet';
   if (exerciseType.startsWith('poslech_')) return 'nghe';
   if (exerciseType.startsWith('cteni_')) return 'doc';
+  if (exerciseType.startsWith('interview_')) return 'interview';
   return '';
 }
 
@@ -16,6 +17,7 @@ String skillLabel(AppLocalizations l, String skillKind) => switch (skillKind) {
       'viet' => l.skillViet,
       'tu_vung' => l.skillTuVung,
       'ngu_phap' => l.skillNguPhap,
+      'interview' => l.interviewSkillLabel,
       _ => skillKind.toUpperCase(),
     };
 
@@ -26,5 +28,6 @@ IconData skillIcon(String skillKind) => switch (skillKind) {
       'viet' => Icons.edit,
       'tu_vung' => Icons.abc,
       'ngu_phap' => Icons.rule,
+      'interview' => Icons.record_voice_over,
       _ => Icons.school,
     };

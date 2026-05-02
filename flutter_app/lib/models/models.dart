@@ -49,7 +49,8 @@ class SkillSummary {
       skillKind == 'nghe' ||
       skillKind == 'doc' ||
       skillKind == 'tu_vung' ||
-      skillKind == 'ngu_phap';
+      skillKind == 'ngu_phap' ||
+      skillKind == 'interview';
 
   bool get isWriting => skillKind == 'viet';
 
@@ -407,6 +408,14 @@ class ExerciseDetail {
     // V13: ano/ne
     this.anoNePassage = '',
     this.anoNeStatements = const [],
+    // V14: interview
+    this.interviewTopic = '',
+    this.interviewTips = const [],
+    this.interviewSystemPrompt = '',
+    this.interviewMaxTurns = 8,
+    this.interviewShowTranscript = false,
+    this.interviewQuestion = '',
+    this.interviewOptions = const [],
   });
 
   final String id;
@@ -462,6 +471,19 @@ class ExerciseDetail {
   // V13: cteni_6 / poslech_6
   final String anoNePassage;
   final List<AnoNeStatementView> anoNeStatements;
+
+  // V14: interview_conversation / interview_choice_explain
+  final String interviewTopic;
+  final List<String> interviewTips;
+  final String interviewSystemPrompt;
+  final int interviewMaxTurns;
+  final bool interviewShowTranscript;
+  final String interviewQuestion;
+  final List<InterviewOptionView> interviewOptions;
+
+  bool get isInterviewConversation => exerciseType == 'interview_conversation';
+  bool get isInterviewChoiceExplain => exerciseType == 'interview_choice_explain';
+  bool get isInterview => exerciseType.startsWith('interview_');
 
   bool get isPsani1 => exerciseType == 'psani_1_formular';
   bool get isPsani2 => exerciseType == 'psani_2_email';
@@ -631,6 +653,17 @@ class ExerciseDetail {
           .whereType<Map<String, dynamic>>()
           .map(AnoNeStatementView.fromJson)
           .toList(),
+      // V14: interview
+      interviewTopic: detail['topic'] as String? ?? '',
+      interviewTips: (detail['tips'] as List<dynamic>? ?? const []).map((e) => e.toString()).toList(),
+      interviewSystemPrompt: detail['system_prompt'] as String? ?? '',
+      interviewMaxTurns: (detail['max_turns'] as num?)?.toInt() ?? 8,
+      interviewShowTranscript: detail['show_transcript'] as bool? ?? false,
+      interviewQuestion: detail['question'] as String? ?? '',
+      interviewOptions: (detail['options'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(InterviewOptionView.fromJson)
+          .toList(),
     );
   }
 }
@@ -646,6 +679,64 @@ class AnoNeStatementView {
     return AnoNeStatementView(
       questionNo: (json['question_no'] as num?)?.toInt() ?? 0,
       statement: json['statement'] as String? ?? '',
+    );
+  }
+}
+
+// V14: One selectable option in an interview_choice_explain exercise.
+class InterviewOptionView {
+  const InterviewOptionView({
+    required this.id,
+    required this.label,
+    this.imageAssetId = '',
+  });
+
+  final String id;
+  final String label;
+  final String imageAssetId;
+
+  factory InterviewOptionView.fromJson(Map<String, dynamic> json) {
+    return InterviewOptionView(
+      id: json['id'] as String? ?? '',
+      label: json['label'] as String? ?? '',
+      imageAssetId: json['image_asset_id'] as String? ?? '',
+    );
+  }
+}
+
+// V14: One turn in a completed interview session transcript.
+class InterviewTranscriptTurn {
+  const InterviewTranscriptTurn({
+    required this.speaker,
+    required this.text,
+    this.atSec = 0,
+  });
+
+  final String speaker; // "examiner" | "learner"
+  final String text;
+  final int atSec;
+
+  Map<String, dynamic> toJson() => {
+        'speaker': speaker,
+        'text': text,
+        'at_sec': atSec,
+      };
+}
+
+// V14: Signed session URL returned by POST /v1/interview-sessions/token.
+class InterviewTokenResponse {
+  const InterviewTokenResponse({
+    required this.signedUrl,
+    required this.expiresIn,
+  });
+
+  final String signedUrl;
+  final int expiresIn;
+
+  factory InterviewTokenResponse.fromJson(Map<String, dynamic> json) {
+    return InterviewTokenResponse(
+      signedUrl: json['signed_url'] as String? ?? '',
+      expiresIn: (json['expires_in'] as num?)?.toInt() ?? 30,
     );
   }
 }

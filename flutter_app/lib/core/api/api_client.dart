@@ -203,6 +203,44 @@ class ApiClient {
     await _authed('POST', '/v1/attempts/$attemptId/submit-text', body: body);
   }
 
+  /// Requests a short-lived ElevenLabs signed session URL for an interview.
+  /// [selectedOption] is the label chosen by the learner (choice_explain type only).
+  /// Returns an InterviewTokenResponse with signed_url and expires_in.
+  Future<Map<String, dynamic>> getInterviewToken({
+    required String exerciseId,
+    required String attemptId,
+    String? selectedOption,
+  }) async {
+    final body = <String, dynamic>{
+      'exercise_id': exerciseId,
+      'attempt_id': attemptId,
+    };
+    if (selectedOption != null && selectedOption.isNotEmpty) {
+      body['selected_option'] = selectedOption;
+    }
+    final payload = await _authed('POST', '/v1/interview-sessions/token', body: body);
+    return payload['data'] as Map<String, dynamic>;
+  }
+
+  /// Submits a completed interview session transcript for async LLM scoring.
+  /// [turns] is the list of conversation turns accumulated client-side.
+  /// Returns the attempt map (status=scoring).
+  Future<Map<String, dynamic>> submitInterview(
+    String attemptId, {
+    required List<Map<String, dynamic>> turns,
+    required int durationSec,
+  }) async {
+    final payload = await _authed(
+      'POST',
+      '/v1/attempts/$attemptId/submit-interview',
+      body: {
+        'transcript': turns,
+        'duration_sec': durationSec,
+      },
+    );
+    return payload['data'] as Map<String, dynamic>;
+  }
+
   /// Returns configured TTS voice list from GET /v1/voices.
   Future<List<VoiceOption>> getVoices() async {
     final payload = await _authed('GET', '/v1/voices');
