@@ -1,13 +1,16 @@
 package httpapi
 
 import (
+	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 	"github.com/danieldev/czech-go-system/backend/internal/store"
 )
 
-// Helpers postJSONWithToken and postJSONAllowErrorWithToken are defined in server_test.go.
+// Helpers are defined in server_test.go (same package).
 
 // IV-1: skillKindForExerciseType maps interview_* → "interview"
 
@@ -245,3 +248,163 @@ func TestAdminCreateExercise_InterviewChoiceExplain_EmptySystemPrompt_Rejected(t
 		t.Fatalf("expected 400 for empty system_prompt in choice_explain, got %d; resp: %v", status, resp)
 	}
 }
+
+// IV-2: interview-sessions/token — 503 when no API key configured
+
+func TestInterviewSessionToken_NoAPIKey_Returns503(t *testing.T) {
+	repo := store.NewMemoryStore()
+	server := httptest.NewServer(NewServer(repo, nil, nil))
+	defer server.Close()
+
+	// Create an exercise and attempt first
+	exerciseResp := postJSONWithToken(t, server, "/v1/admin/exercises", "dev-admin-token", map[string]any{
+		"module_id":     "mod-1",
+		"exercise_type": "interview_conversation",
+		"title":         "Test interview",
+		"detail": map[string]any{
+			"topic":         "Familie",
+			"system_prompt": "You are Jana.",
+			"max_turns":     6,
+		},
+	})
+	exerciseID := exerciseResp["data"].(map[string]any)["id"].(string)
+
+	attemptResp := postJSONWithToken(t, server, "/v1/attempts", "dev-learner-token", map[string]any{
+		"exercise_id": exerciseID,
+	})
+	attemptID := attemptResp["data"].(map[string]any)["attempt"].(map[string]any)["id"].(string)
+
+	status, _ := postJSONAllowErrorWithToken(t, server, "/v1/interview-sessions/token", "dev-learner-token", map[string]any{
+		"exercise_id": exerciseID,
+		"attempt_id":  attemptID,
+	})
+
+	// No ELEVENLABS_API_KEY set in test env → 503
+	if status != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 when no API key configured, got %d", status)
+	}
+}
+
+func TestInterviewSessionToken_WrongOwner_Returns403(t *testing.T) {
+	repo := store.NewMemoryStore()
+	server := httptest.NewServer(NewServer(repo, nil, nil))
+	defer server.Close()
+
+	exerciseResp := postJSONWithToken(t, server, "/v1/admin/exercises", "dev-admin-token", map[string]any{
+		"module_id":     "mod-1",
+		"exercise_type": "interview_conversation",
+		"title":         "Test interview",
+		"detail": map[string]any{
+			"topic":         "Familie",
+			"system_prompt": "You are Jana.",
+			"max_turns":     6,
+		},
+	})
+	exerciseID := exerciseResp["data"].(map[string]any)["id"].(string)
+
+	// Create attempt as learner 1
+	attemptResp := postJSONWithToken(t, server, "/v1/attempts", "dev-learner-token", map[string]any{
+		"exercise_id": exerciseID,
+	})
+	attemptID := attemptResp["data"].(map[string]any)["attempt"].(map[string]any)["id"].(string)
+
+	// Try to get token as learner 2
+	status, _ := postJSONAllowErrorWithToken(t, server, "/v1/interview-sessions/token", "dev-learner-2-token", map[string]any{
+		"exercise_id": exerciseID,
+		"attempt_id":  attemptID,
+	})
+
+	if status != http.StatusForbidden {
+		t.Fatalf("expected 403 for wrong owner, got %d", status)
+	}
+}
+
+func TestInterviewSessionToken_MissingFields_Returns400(t *testing.T) {
+	repo := store.NewMemoryStore()
+	server := httptest.NewServer(NewServer(repo, nil, nil))
+	defer server.Close()
+
+	status, _ := postJSONAllowErrorWithToken(t, server, "/v1/interview-sessions/token", "dev-learner-token", map[string]any{
+		"exercise_id": "ex-1",
+		// missing attempt_id
+	})
+
+	if status != http.StatusBadRequest {
+		t.Fatalf("expected 400 for missing attempt_id, got %d", status)
+	}
+}
+
+// IV-2: submit-interview
+
+func TestSubmitInterview_Valid_ReturnsScoringStatus(t *testing.T) {
+	repo := store.NewMemoryStore()
+	server := httptest.NewServer(NewServer(repo, nil, nil))
+	defer server.Close()
+
+	exerciseResp := postJSONWithToken(t, server, "/v1/admin/exercises", "dev-admin-token", map[string]any{
+		"module_id":     "mod-1",
+		"exercise_type": "interview_conversation",
+		"title":         "Familie",
+		"detail": map[string]any{
+			"topic":         "Familie",
+			"system_prompt": "You are Jana.",
+			"max_turns":     6,
+		},
+	})
+	exerciseID := exerciseResp["data"].(map[string]any)["id"].(string)
+
+	attemptResp := postJSONWithToken(t, server, "/v1/attempts", "dev-learner-token", map[string]any{
+		"exercise_id": exerciseID,
+	})
+	attemptID := attemptResp["data"].(map[string]any)["attempt"].(map[string]any)["id"].(string)
+
+	resp := postJSONWithToken(t, server, fmt.Sprintf("/v1/attempts/%s/submit-interview", attemptID), "dev-learner-token", map[string]any{
+		"transcript": []map[string]any{
+			{"speaker": "examiner", "text": "Jak se jmenujete?", "at_sec": 0},
+			{"speaker": "learner", "text": "Jmenuji se Anna.", "at_sec": 3},
+		},
+		"duration_sec": 60,
+	})
+
+	data := resp["data"].(map[string]any)
+	if data["status"] != "scoring" {
+		t.Fatalf("expected status=scoring, got %v", data["status"])
+	}
+	if data["attempt_id"] != attemptID {
+		t.Fatalf("expected attempt_id=%s, got %v", attemptID, data["attempt_id"])
+	}
+}
+
+func TestSubmitInterview_WrongOwner_Returns403(t *testing.T) {
+	repo := store.NewMemoryStore()
+	server := httptest.NewServer(NewServer(repo, nil, nil))
+	defer server.Close()
+
+	exerciseResp := postJSONWithToken(t, server, "/v1/admin/exercises", "dev-admin-token", map[string]any{
+		"module_id":     "mod-1",
+		"exercise_type": "interview_conversation",
+		"title":         "Familie",
+		"detail": map[string]any{
+			"topic":         "Familie",
+			"system_prompt": "You are Jana.",
+			"max_turns":     6,
+		},
+	})
+	exerciseID := exerciseResp["data"].(map[string]any)["id"].(string)
+
+	attemptResp := postJSONWithToken(t, server, "/v1/attempts", "dev-learner-token", map[string]any{
+		"exercise_id": exerciseID,
+	})
+	attemptID := attemptResp["data"].(map[string]any)["attempt"].(map[string]any)["id"].(string)
+
+	status, _ := postJSONAllowErrorWithToken(t, server, fmt.Sprintf("/v1/attempts/%s/submit-interview", attemptID), "dev-learner-2-token", map[string]any{
+		"transcript":   []map[string]any{},
+		"duration_sec": 10,
+	})
+	if status != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", status)
+	}
+}
+
+// Ensure unused import doesn't cause compile error
+var _ = contracts.InterviewOption{}

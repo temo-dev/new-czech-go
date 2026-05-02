@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -105,6 +106,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/exercises/", s.withAuth(s.handleExercise))
 	s.mux.HandleFunc("/v1/attempts", s.withAuth(s.handleAttempts))
 	s.mux.HandleFunc("/v1/attempts/", s.withAuth(s.handleAttemptByID))
+	s.mux.HandleFunc("/v1/interview-sessions/token", s.withAuth(s.handleInterviewSessionToken))
 	s.mux.HandleFunc("/v1/attempt-audio/stream", s.handleAttemptAudioStream)
 	s.mux.HandleFunc("/v1/mock-exams", s.withAuth(s.handleMockExams))
 	s.mux.HandleFunc("/v1/mock-exams/", s.withAuth(s.handleMockExamByID))
@@ -493,6 +495,10 @@ func (s *Server) handleAttemptByID(w http.ResponseWriter, r *http.Request, user 
 	}
 	if strings.HasSuffix(path, "/submit-answers") {
 		s.handleSubmitAnswers(w, r, user, strings.TrimSuffix(path, "/submit-answers"))
+		return
+	}
+	if strings.HasSuffix(path, "/submit-interview") {
+		s.handleSubmitInterview(w, r, user, strings.TrimSuffix(path, "/submit-interview"))
 		return
 	}
 	if r.Method != http.MethodGet {
@@ -1211,6 +1217,171 @@ func (s *Server) handleSubmitAnswers(w http.ResponseWriter, r *http.Request, use
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": completed, "meta": map[string]any{}})
+}
+
+// handleInterviewSessionToken creates a short-lived ElevenLabs signed session URL.
+// The Flutter app uses the URL to open a WebSocket directly to ElevenLabs ConvAI
+// without exposing the API key client-side.
+//
+// POST /v1/interview-sessions/token
+func (s *Server) handleInterviewSessionToken(w http.ResponseWriter, r *http.Request, user contracts.User) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+
+	var req contracts.InterviewTokenRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ExerciseID == "" || req.AttemptID == "" {
+		writeError(w, http.StatusBadRequest, "validation_error", "exercise_id and attempt_id are required.", false)
+		return
+	}
+
+	// Verify the attempt belongs to this learner.
+	attempt, ok := s.repo.Attempt(req.AttemptID)
+	if !ok || attempt.UserID != user.ID {
+		writeError(w, http.StatusForbidden, "forbidden", "Attempt not found or access denied.", false)
+		return
+	}
+
+	exercise, ok := s.repo.Exercise(req.ExerciseID)
+	if !ok || exercise.SkillKind != "interview" {
+		writeError(w, http.StatusBadRequest, "validation_error", "Exercise not found or not an interview exercise.", false)
+		return
+	}
+
+	if s.elevenLabsAPIKey == "" {
+		writeError(w, http.StatusServiceUnavailable, "elevenlabs_not_configured", "ElevenLabs API key is not configured.", false)
+		return
+	}
+
+	// Extract system_prompt and inject {selected_option} if applicable.
+	systemPrompt := extractInterviewSystemPrompt(exercise)
+	if req.SelectedOption != "" {
+		systemPrompt = processing.InterviewTokenSystemPromptInjected(systemPrompt, req.SelectedOption)
+	}
+
+	// Call ElevenLabs Conversational AI to get a signed session URL.
+	tokenResp, err := createElevenLabsSignedURL(s.elevenLabsAPIKey, systemPrompt)
+	if err != nil {
+		log.Printf("interview token for attempt %s: ElevenLabs error: %v", req.AttemptID, err)
+		writeError(w, http.StatusBadGateway, "elevenlabs_error", "Could not create interview session.", false)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"data": tokenResp, "meta": map[string]any{}})
+}
+
+// handleSubmitInterview receives the completed interview transcript and launches
+// async LLM scoring. Returns immediately with status=scoring.
+//
+// POST /v1/attempts/:id/submit-interview
+func (s *Server) handleSubmitInterview(w http.ResponseWriter, r *http.Request, user contracts.User, attemptID string) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	attempt, ok := s.authorizedAttemptForUser(w, user, attemptID)
+	if !ok {
+		return
+	}
+	if attempt.Status != "created" && attempt.Status != "scoring" {
+		writeError(w, http.StatusConflict, "attempt_not_pending", "Attempt has already been submitted.", false)
+		return
+	}
+
+	const maxSubmitInterviewBytes = 128 * 1024 // 128 KB — generous for long conversations
+	r.Body = http.MaxBytesReader(w, r.Body, maxSubmitInterviewBytes)
+	var req contracts.InterviewSubmitRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error", "Invalid submission body.", false)
+		return
+	}
+
+	s.repo.SetAttemptStatus(attemptID, "scoring")
+	turns := req.Transcript
+	durationSec := req.DurationSec
+	go s.processor.ProcessInterviewAttempt(attemptID, turns, durationSec)
+
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"data": map[string]any{"attempt_id": attemptID, "status": "scoring"},
+		"meta": map[string]any{},
+	})
+}
+
+// extractInterviewSystemPrompt retrieves system_prompt from an interview exercise detail.
+func extractInterviewSystemPrompt(exercise contracts.Exercise) string {
+	if exercise.Detail == nil {
+		return ""
+	}
+	raw, err := json.Marshal(exercise.Detail)
+	if err != nil {
+		return ""
+	}
+	var d struct {
+		SystemPrompt string `json:"system_prompt"`
+	}
+	if err := json.Unmarshal(raw, &d); err != nil {
+		return ""
+	}
+	return d.SystemPrompt
+}
+
+// createElevenLabsSignedURL calls the ElevenLabs Conversational AI API to get
+// a short-lived signed WebSocket URL. The caller injects the system_prompt so
+// the agent persona is set per-session.
+func createElevenLabsSignedURL(apiKey, systemPrompt string) (contracts.InterviewTokenResponse, error) {
+	type overridePrompt struct {
+		Prompt string `json:"prompt"`
+	}
+	type overrideAgent struct {
+		Prompt overridePrompt `json:"prompt"`
+	}
+	type convConfigOverride struct {
+		Agent overrideAgent `json:"agent"`
+	}
+	body := map[string]any{
+		"conversation_config_override": convConfigOverride{
+			Agent: overrideAgent{
+				Prompt: overridePrompt{Prompt: systemPrompt},
+			},
+		},
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return contracts.InterviewTokenResponse{}, fmt.Errorf("marshal body: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost,
+		"https://api.elevenlabs.io/v1/convai/conversation/get_signed_url",
+		bytes.NewReader(payload),
+	)
+	if err != nil {
+		return contracts.InterviewTokenResponse{}, fmt.Errorf("new request: %w", err)
+	}
+	req.Header.Set("xi-api-key", apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return contracts.InterviewTokenResponse{}, fmt.Errorf("elevenlabs request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return contracts.InterviewTokenResponse{}, fmt.Errorf("elevenlabs returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		SignedURL string `json:"signed_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return contracts.InterviewTokenResponse{}, fmt.Errorf("decode response: %w", err)
+	}
+
+	return contracts.InterviewTokenResponse{
+		SignedURL: result.SignedURL,
+		ExpiresIn: 30, // ElevenLabs signed URLs are valid for ~30 seconds
+	}, nil
 }
 
 func (s *Server) handleMockExams(w http.ResponseWriter, r *http.Request, user contracts.User) {
