@@ -1235,11 +1235,21 @@ func (s *Server) handleInterviewSessionToken(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusBadRequest, "validation_error", "exercise_id and attempt_id are required.", false)
 		return
 	}
+	if len(req.SelectedOption) > 200 {
+		writeError(w, http.StatusBadRequest, "validation_error", "selected_option exceeds maximum length.", false)
+		return
+	}
 
 	// Verify the attempt belongs to this learner.
 	attempt, ok := s.repo.Attempt(req.AttemptID)
 	if !ok || attempt.UserID != user.ID {
 		writeError(w, http.StatusForbidden, "forbidden", "Attempt not found or access denied.", false)
+		return
+	}
+	// Verify exercise_id matches the attempt — prevents mixing an owned attempt
+	// with an arbitrary exercise to get a signed session for unintended content.
+	if attempt.ExerciseID != req.ExerciseID {
+		writeError(w, http.StatusForbidden, "forbidden", "Exercise does not match attempt.", false)
 		return
 	}
 

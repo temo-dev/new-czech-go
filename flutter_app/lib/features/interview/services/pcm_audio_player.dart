@@ -29,23 +29,24 @@ class PcmAudioPlayer {
     final data = Uint8List.fromList(_pcmBuffer);
     _pcmBuffer.clear();
 
+    // Declare file outside try so finally can clean it up on any code path.
+    File? file;
     try {
       _playing = true;
       final wavBytes = _buildWav(data);
       final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/interview_audio_${DateTime.now().millisecondsSinceEpoch}.wav');
+      file = File('${dir.path}/interview_audio_${DateTime.now().millisecondsSinceEpoch}.wav');
       await file.writeAsBytes(wavBytes);
       await _player.setFilePath(file.path);
       await _player.play();
       await _player.processingStateStream.firstWhere(
         (s) => s == ProcessingState.completed || s == ProcessingState.idle,
       );
-      // Cleanup temp file
-      file.deleteSync();
     } catch (_) {
       // Audio playback failure is non-fatal — conversation continues.
     } finally {
       _playing = false;
+      if (file != null && file.existsSync()) file.deleteSync();
     }
   }
 
