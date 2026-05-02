@@ -215,6 +215,14 @@ class ElevenLabsWsClient {
         final text = event?['user_transcript'] as String? ?? '';
         if (text.isNotEmpty) onTranscript?.call('learner', text);
 
+      // Ping — must respond with pong or ElevenLabs closes the connection.
+      case 'ping':
+        final event = msg['ping_event'] as Map<String, dynamic>?;
+        final eventId = event?['event_id'];
+        if (eventId != null) {
+          _ws?.add(jsonEncode({'type': 'pong', 'event_id': eventId}));
+        }
+
       case 'interruption':
         onInterruption?.call();
         break;
