@@ -93,9 +93,8 @@ class ElevenLabsWsClient {
   Future<void> _connectOnce(String url) async {
     try {
       _ws = await WebSocket.connect(url);
-      // Send system_prompt override as first message (before any audio).
-      // ElevenLabs ConvAI processes this before conversation_initiation_metadata.
-      _sendInitMessage();
+      // Set up listener FIRST — if we send initMessage before listening,
+      // ElevenLabs may respond before we attach the listener and we miss events.
       _sub = _ws!.listen(
         _onData,
         onDone: _onDone,
@@ -113,21 +112,16 @@ class ElevenLabsWsClient {
 
   void _sendInitMessage() {
     final prompt = systemPrompt;
-    final first = firstMessage;
-    // Always send even if prompt is empty, to set language and first_message.
-    final agentOverride = <String, dynamic>{
-      'language': 'cs',
-    };
-    if (prompt != null && prompt.isNotEmpty) {
-      agentOverride['prompt'] = {'prompt': prompt};
-    }
-    if (first != null && first.isNotEmpty) {
-      agentOverride['first_message'] = first;
-    }
+    // Only send if we have a system_prompt to override.
+    // Avoid sending language or other overrides that might interfere with
+    // dashboard-configured voice/first_message settings.
+    if (prompt == null || prompt.isEmpty) return;
     _ws?.add(jsonEncode({
       'type': 'conversation_initiation_client_data',
       'conversation_config_override': {
-        'agent': agentOverride,
+        'agent': {
+          'prompt': {'prompt': prompt},
+        },
       },
     }));
   }
@@ -179,6 +173,8 @@ class ElevenLabsWsClient {
     final type = msg['type'] as String?;
     switch (type) {
       case 'conversation_initiation_metadata':
+        // Send override AFTER receiving metadata (listener is attached, no race).
+        _sendInitMessage();
         onReady?.call();
 
       case 'audio':
