@@ -31,6 +31,9 @@ class ElevenLabsWsClient {
   /// Fired on unrecoverable connection error after all retries.
   void Function(String error)? onError;
 
+  /// Fired when ElevenLabs interrupts the agent mid-speech.
+  VoidCallback? onInterruption;
+
   // ── Test injection ────────────────────────────────────────────────────────
 
   /// If set, [sendAudioChunk] writes to this sink instead of the real WS.
@@ -179,17 +182,30 @@ class ElevenLabsWsClient {
           }
         }
 
+      // Format v1: {"type":"transcript","transcript_event":{"role":"agent","message":"..."}}
       case 'transcript':
         final event = msg['transcript_event'] as Map<String, dynamic>?;
         final role = event?['role'] as String?;
-        final text = event?['message'] as String? ?? '';
+        final text = (event?['message'] ?? event?['text']) as String? ?? '';
         if (role != null && text.isNotEmpty) {
           final speaker = role == 'agent' ? 'examiner' : 'learner';
           onTranscript?.call(speaker, text);
         }
 
+      // Format v2: {"type":"agent_response","agent_response_event":{"agent_response":"..."}}
+      case 'agent_response':
+        final event = msg['agent_response_event'] as Map<String, dynamic>?;
+        final text = event?['agent_response'] as String? ?? '';
+        if (text.isNotEmpty) onTranscript?.call('examiner', text);
+
+      // Format v2: {"type":"user_transcript","user_transcript_event":{"user_transcript":"..."}}
+      case 'user_transcript':
+        final event = msg['user_transcript_event'] as Map<String, dynamic>?;
+        final text = event?['user_transcript'] as String? ?? '';
+        if (text.isNotEmpty) onTranscript?.call('learner', text);
+
       case 'interruption':
-        // Simli handles visual interruption; no action needed here.
+        onInterruption?.call();
         break;
 
       default:

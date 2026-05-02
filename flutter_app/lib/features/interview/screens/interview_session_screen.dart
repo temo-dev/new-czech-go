@@ -110,9 +110,11 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       _wsClient.onAudioChunk = (Uint8List chunk) {
         if (!mounted) return;
         setState(() => _state = InterviewSessionState.speaking);
-        // Pipe to Simli for lip-sync (Sprint 2) + to audio player for sound
         _simli?.sendAudio(chunk);
         _audioPlayer.addChunk(chunk);
+      };
+      _wsClient.onInterruption = () {
+        _audioPlayer.clearBuffer();
       };
       _wsClient.onTranscript = (speaker, text) {
         if (!mounted) return;
