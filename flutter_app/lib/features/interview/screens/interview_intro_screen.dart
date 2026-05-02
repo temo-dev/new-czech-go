@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import 'interview_session_screen.dart';
 
 /// Entry point when navigating from InterviewListScreen.
 /// Loads exercise detail from API and delegates to [_InterviewIntroBody].
@@ -122,9 +123,17 @@ class _InterviewIntroBodyState extends State<_InterviewIntroBody> {
       final attemptRaw = await widget.client.createAttempt(detail.id);
       final attemptId = attemptRaw['id'] as String;
       if (!mounted) return;
-      // Navigate to InterviewSessionScreen (created in IV-8).
-      // Placeholder: pop back for now.
-      Navigator.of(context).pop({'attempt_id': attemptId, 'selected_option': _selectedOptionLabel});
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => InterviewSessionScreen(
+            client: widget.client,
+            exerciseId: detail.id,
+            attemptId: attemptId,
+            detail: detail,
+            selectedOption: _selectedOptionLabel,
+          ),
+        ),
+      );
     } catch (_) {
       if (!mounted) return;
       setState(() => _starting = false);
