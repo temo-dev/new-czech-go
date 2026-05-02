@@ -109,11 +109,15 @@ flutter-test:
 	cd $(FLUTTER_DIR) && $(RTK) $(FLUTTER) test
 
 flutter-run-ios:
-	cd $(FLUTTER_DIR) && $(RTK) $(FLUTTER) run -d "$(IOS_DEVICE)"
+	cd $(FLUTTER_DIR) && $(RTK) $(FLUTTER) run -d "$(IOS_DEVICE)" \
+		--dart-define=SIMLI_API_KEY=$(SIMLI_API_KEY) \
+		--dart-define=SIMLI_FACE_ID=$(SIMLI_FACE_ID)
 
 flutter-build-ipa:
 	cd $(FLUTTER_DIR) && $(RTK) $(FLUTTER) build ipa \
 		--dart-define=API_BASE_URL=https://apicz.hadoo.eu \
+		--dart-define=SIMLI_API_KEY=$(SIMLI_API_KEY) \
+		--dart-define=SIMLI_FACE_ID=$(SIMLI_FACE_ID) \
 		--release
 
 flutter-devices:
