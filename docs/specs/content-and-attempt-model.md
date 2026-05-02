@@ -121,14 +121,19 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026).
 - `grammar_choice` — Chọn dạng ngữ pháp đúng
 - `grammar_fill` — Điền dạng đúng
 
+**Interview (interview) — V14:**
+- `interview_conversation` — Hội thoại thực tế với avatar Czech examiner AI (ElevenLabs ConvAI + Simli). Admin cung cấp topic, system_prompt, max_turns. Chấm điểm LLM post-session.
+- `interview_choice_explain` — Learner chọn 1 trong 3–4 phương án, sau đó hội thoại giải thích lý do. Admin cung cấp question, options (text/ảnh), system_prompt với `{selected_option}` placeholder.
+
 **SkillKind → valid ExerciseType mapping:**
 ```
-noi      → uloha_1_*, uloha_2_*, uloha_3_*, uloha_4_*
-viet     → psani_1_formular, psani_2_email
-nghe     → poslech_1, poslech_2, poslech_3, poslech_4, poslech_5, poslech_6
-doc      → cteni_1, cteni_2, cteni_3, cteni_4, cteni_5, cteni_6
-tu_vung  → vocabulary_*
-ngu_phap → grammar_*
+noi       → uloha_1_*, uloha_2_*, uloha_3_*, uloha_4_*
+viet      → psani_1_formular, psani_2_email
+nghe      → poslech_1, poslech_2, poslech_3, poslech_4, poslech_5, poslech_6
+doc       → cteni_1, cteni_2, cteni_3, cteni_4, cteni_5, cteni_6
+tu_vung   → vocabulary_*
+ngu_phap  → grammar_*
+interview → interview_conversation, interview_choice_explain
 ```
 
 ### ExerciseStatus

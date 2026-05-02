@@ -87,6 +87,8 @@ Nói / Viết / Nghe / Đọc / Từ vựng / Ngữ pháp
 | `Psaní 2` | Viết email theo 5 ảnh gợi ý (≥35 từ) |
 | `Poslech 1–5` | Các dạng nghe khác nhau |
 | `Čtení 1–5` | Các dạng đọc khác nhau |
+| `Phỏng vấn hội thoại` | Hội thoại thực tế với avatar AI examiner (V14) |
+| `Phỏng vấn chọn phương án` | Chọn 1 phương án rồi giải thích với examiner AI (V14) |
 
 **Bước 3 — Nhập nội dung:**
 
@@ -112,6 +114,72 @@ Nói / Viết / Nghe / Đọc / Từ vựng / Ngữ pháp
 ### Autosave
 
 Form tự lưu nháp vào localStorage mỗi 10 giây. Nếu thoát nhầm, lần sau mở form sẽ hỏi "Khôi phục bản nháp?".
+
+---
+
+---
+
+## 4. Tạo bài Phỏng vấn AI (V14)
+
+Skill kind: `interview`. Learner hội thoại real-time với avatar Czech examiner dùng ElevenLabs Conversational AI.
+
+> **Yêu cầu:** Backend phải có `ELEVENLABS_API_KEY` trong `.env`.
+
+### 4a. Phỏng vấn theo chủ đề (`interview_conversation`)
+
+**Trang:** `/` → "+ Tạo exercise" → Bước 1: chọn **"Phỏng vấn AI"** → Bước 2: **"Hội thoại theo chủ đề"**
+
+| Field | Gợi ý | Bắt buộc |
+|---|---|---|
+| Tiêu đề | `Gia đình và bạn bè` | ✓ |
+| Chủ đề | `Gia đình, anh chị em, sở thích` | ✓ |
+| System Prompt | Xem mẫu bên dưới | ✓ |
+| Max turns | `6` – `8` | |
+| Hiển thị transcript | Bật để learner thấy phụ đề | |
+| Gợi ý cho learner | Tối đa 5 tips hiển thị ở Intro screen | |
+
+**System Prompt mẫu:**
+```
+You are Jana Nováková, a friendly Czech language examiner for the A2 certification exam.
+Conduct a conversational interview in Czech about family and friends.
+Ask 5-7 natural questions appropriate for A2 level learners.
+Start with "Dobrý den!" and introduce yourself briefly.
+If the learner makes errors, continue naturally without correcting.
+Respond only in Czech.
+```
+
+> **Lưu ý:** System prompt quyết định hoàn toàn cách avatar AI hành xử. Viết rõ ngôn ngữ, chủ đề, phong cách hỏi và giới hạn level.
+
+### 4b. Phỏng vấn chọn phương án (`interview_choice_explain`)
+
+**Trang:** "/` → "+ Tạo exercise" → Bước 2: **"Chọn phương án + giải thích"**
+
+| Field | Gợi ý | Bắt buộc |
+|---|---|---|
+| Tiêu đề | `Chọn địa điểm du lịch` | ✓ |
+| Câu hỏi chính | `Bạn muốn đi du lịch ở đâu?` | ✓ |
+| Các phương án | 3–4 options (tên + ảnh tùy chọn) | ✓ (3 min) |
+| System Prompt | Phải chứa `{selected_option}` | ✓ |
+| Max turns | `5` – `6` | |
+
+**System Prompt mẫu:**
+```
+You are Jana Nováková, a Czech A2 examiner.
+The learner has chosen {selected_option} as their preferred travel destination.
+Acknowledge their choice in Czech, then ask 4-5 follow-up questions:
+why they chose it, what they would do there, who they would travel with, etc.
+Keep the conversation natural and at A2 level.
+```
+
+> **Quan trọng:** `{selected_option}` bắt buộc có trong System Prompt — backend inject lựa chọn thực tế của learner vào đây trước khi gọi ElevenLabs.
+
+### Kiểm tra bài phỏng vấn
+
+1. App → Module → **"Phỏng vấn AI"**
+2. Chọn bài → Intro screen hiện (topic / options)
+3. Nhấn "Bắt đầu" → màn hình tối, avatar hiện
+4. Nói tiếng Czech → avatar trả lời
+5. Nhấn "Kết thúc" → xác nhận → chờ chấm điểm → xem kết quả
 
 ---
 

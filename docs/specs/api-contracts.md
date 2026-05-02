@@ -1157,6 +1157,68 @@ Gọi Polly TTS để generate audio từ text trong exercise detail. Lưu vào 
 
 ---
 
+---
+
+## POST /v1/interview-sessions/token
+
+Tạo short-lived ElevenLabs Conversational AI signed URL. API key ở server — không expose cho Flutter.
+
+### Auth
+Bearer token (learner).
+
+### Request
+```json
+{
+  "exercise_id": "ex-abc",
+  "attempt_id": "att-xyz",
+  "selected_option": "Praha"
+}
+```
+- `selected_option`: tùy chọn, chỉ dùng cho `interview_choice_explain`. Inject vào `system_prompt` thay `{selected_option}`.
+- `selected_option` tối đa 200 ký tự.
+- `exercise_id` phải khớp `attempt.exercise_id`.
+
+### Response
+```json
+{ "data": { "signed_url": "wss://api.elevenlabs.io/...", "expires_in": 30 }, "meta": {} }
+```
+
+Flutter mở WebSocket tới `signed_url` trong vòng 30 giây.
+
+### Errors
+- `400` — thiếu fields hoặc `selected_option` > 200 chars
+- `403` — attempt không thuộc learner, hoặc exercise_id không khớp attempt
+- `503` — `ELEVENLABS_API_KEY` chưa cấu hình trên server
+
+---
+
+## POST /v1/attempts/:attempt_id/submit-interview
+
+Nộp transcript interview session. Kích hoạt async LLM scoring.
+
+### Auth
+Bearer token (learner, owner của attempt).
+
+### Request
+```json
+{
+  "transcript": [
+    { "speaker": "examiner", "text": "Jak se jmenujete?", "at_sec": 0 },
+    { "speaker": "learner",  "text": "Jmenuji se Anna.", "at_sec": 3 }
+  ],
+  "duration_sec": 187
+}
+```
+
+### Response
+```json
+{ "data": { "attempt_id": "att-xyz", "status": "scoring" }, "meta": {} }
+```
+
+Poll `GET /v1/attempts/:id` cho đến `status=completed`.
+
+---
+
 ## Open Questions
 - Do we want `POST /v1/auth/magic-link` later for pilot onboarding, or is email/password enough for now?
 - Keep `GET /v1/attempts/:attempt_id/audio/file` as the playback surface, or later fold playback URLs into the attempt payload if cloud-only playback becomes simpler?
