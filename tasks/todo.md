@@ -277,3 +277,17 @@ Plan chi tiết + AC đầy đủ trong `tasks/plan.md` (section V14).
 - [x] **IV-11** Flutter tests: 7 tests trong `interview_list_screen_test.dart` (grouping logic + model getters); 3 tests `avatar_video_container_test.dart`; 1 test `simli_session_manager_test.dart` · 102 Flutter tests total (2026-05-02)
 
 **[CHECKPOINT IV-FINAL]** ✅ Passed 2026-05-02 — 263 backend / 61 CMS / 102 Flutter / flutter analyze clean
+
+---
+
+## V15 — AI Image Generation in CMS
+
+Spec: `SPEC.md § V15` · Plan chi tiết: `tasks/plan.md` (section V15) · Design: `docs/designs/ai-image-generation.html`
+
+- [ ] **AI-1** Backend: thêm `replicateAPIKey` vào `Server` struct + register route `/v1/admin/ai/generate-image` + stub handler (503 khi thiếu key, 400 khi prompt sai) trong `ai_image.go`
+- [ ] **AI-2** Backend: Replicate HTTP client + polling (500ms interval, 30s timeout) + image download + lưu asset store (`asset_kind="ai_generated"`) + hoàn thiện handler
+- [ ] **AI-3** Backend tests: `ai_image_test.go` — 8 test cases (missing key, prompt validation, rate limit, timeout, failed, success, rate window reset) · target ≥ 271 backend tests
+- [ ] **AI-4** CMS: proxy route `app/api/admin/ai/generate-image/route.ts` + `AiImageButton.tsx` component (6-state machine: idle→open→generating→preview→uploading→done/error) + 9 Vitest tests · target ≥ 70 CMS tests
+- [ ] **AI-5** Tích hợp 5 placements: `exercise-form/index.tsx` (context_image) + `OptionRow.tsx` + `CteniFields.tsx` + `courses/page.tsx` (banner) + `mock-tests/page.tsx` (banner)
+
+**[CHECKPOINT AI-FINAL]** `make backend-test` ≥ 271 · `npm test` ≥ 70 · `make flutter-test` 102 · manual E2E 9-step checklist · `make verify`

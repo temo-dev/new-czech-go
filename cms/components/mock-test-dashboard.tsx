@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useS } from '../lib/i18n';
+import AiImageButton from './AiImageButton';
 
 type Exercise = {
   id: string;
@@ -329,6 +330,18 @@ export function MockTestDashboard() {
                     {uploadingBanner === t.id ? '⏳' : t.banner_image_id ? '🖼 ✓' : '🖼'}
                     <input ref={el => { bannerInputRefs.current[t.id] = el; }} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} disabled={uploadingBanner !== null} onChange={e => { const f = e.target.files?.[0]; if (f) void handleBannerUpload(t.id, f); e.target.value = ''; }} />
                   </label>
+                  <AiImageButton
+                    onAssetCreated={async result => {
+                      await fetch('/api/admin/ai/set-banner', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ entity_type: 'mock-test', entity_id: t.id, storage_key: result.storageKey }),
+                      });
+                      await fetchTests();
+                    }}
+                    disabled={false}
+                    existingAssetId={t.banner_image_id}
+                  />
                   <button onClick={() => openEdit(t)} style={btnStyle('secondary')}>{S.action.edit}</button>
                   <button onClick={() => handleDelete(t.id)} style={btnStyle('danger')}>{S.action.delete}</button>
                 </div>

@@ -6,6 +6,7 @@ import { adminApi } from '../exercise-utils';
 import { AnswerSelect } from './AnswerSelect';
 import { ItemRepeater } from './ItemRepeater';
 import { OptionRow } from './OptionRow';
+import AiImageButton from '../AiImageButton';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -273,19 +274,36 @@ export function CteniFields({ exerciseType, initialData, onChange, exerciseId }:
                     {!exerciseId ? (
                       <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-4)' }}>Lưu bài tập trước rồi upload ảnh.</p>
                     ) : (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px dashed var(--border)', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--ink-3)', background: 'var(--surface-alt)' }}>
-                        {uploadingItem === i ? '⏳ Đang tải...' : item.assetId ? '🔄 Đổi ảnh' : '+ Tải ảnh lên'}
-                        <input
-                          ref={el => { fileInputRefs.current[i] = el; }}
-                          type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
-                          disabled={uploadingItem !== null}
-                          onChange={e => {
-                            const f = e.target.files?.[0];
-                            if (f) void handleC1ImageUpload(f, i);
-                            e.target.value = '';
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: '1px dashed var(--border)', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--ink-3)', background: 'var(--surface-alt)' }}>
+                          {uploadingItem === i ? '⏳ Đang tải...' : item.assetId ? '🔄 Đổi ảnh' : '📁 Tải ảnh lên'}
+                          <input
+                            ref={el => { fileInputRefs.current[i] = el; }}
+                            type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+                            disabled={uploadingItem !== null}
+                            onChange={e => {
+                              const f = e.target.files?.[0];
+                              if (f) void handleC1ImageUpload(f, i);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                        <AiImageButton
+                          onAssetCreated={async result => {
+                            if (!exerciseId) return;
+                            await adminFetch(`/api/admin/exercises/${exerciseId}/assets/register`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ id: result.assetId, asset_kind: 'image', storage_key: result.storageKey, mime_type: 'image/jpeg' }),
+                            });
+                            const next = [...c1.items] as C1Item[];
+                            next[i] = { ...next[i], mode: 'image', assetId: result.assetId };
+                            update({ ...c1, items: next });
                           }}
+                          disabled={!exerciseId}
+                          existingAssetId={item.assetId || undefined}
                         />
-                      </label>
+                      </div>
                     )}
                   </div>
                 )}

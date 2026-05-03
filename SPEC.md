@@ -801,6 +801,207 @@ ASK FIRST:
 
 ---
 
+## V15 — AI Image Generation in CMS (2026-05-03)
+
+Idea doc: `docs/ideas/ai-image-generation.md`
+Design: `docs/designs/ai-image-generation.html`
+
+### Objective
+
+Thêm nút **"✨ Tạo bằng AI"** ngay cạnh nút upload ảnh ở mọi nơi CMS dùng ảnh. Admin nhập prompt tiếng Anh → backend gọi Flux.1-schnell (Replicate) → preview thumbnail → xác nhận → ảnh tự động upload vào asset store và gắn vào exercise/course/mock-test.
+
+**Target users:** CMS admin tạo nội dung — giảm thời gian tìm/chụp/upload ảnh thủ công.
+
+**Non-goals (V15):**
+- Auto-generate prompt từ nội dung bài
+- Batch generate nhiều ảnh cùng lúc
+- Generation history / gallery
+- Style preset picker
+- Provider nào khác ngoài Replicate Flux
+
+---
+
+### V15 Scope
+
+#### Backend changes
+
+**Env var mới:**
+```
+REPLICATE_API_KEY=r8_...   # Replicate account API key
+```
+
+**Endpoint mới:** `POST /api/admin/ai/generate-image`
+- Auth: cookie `admin_token` (same middleware)
+- Request: `{ "prompt": string }` — max 500 chars, min 3 chars
+- Flow nội bộ:
+  1. Validate prompt
+  2. Rate-limit check: max 5 req/phút per admin (in-memory, reset hàng phút)
+  3. POST Replicate `https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions`
+  4. Poll `GET /v1/predictions/{id}` mỗi 1s cho đến `status == "succeeded"` hoặc timeout 30s
+  5. Download image bytes từ `output[0]` URL
+  6. Lưu vào asset store (LocalFile hoặc S3 tùy `STORAGE_PROVIDER`) — `asset_kind = "ai_generated"`
+  7. Trả `{ "data": { "asset_id": string, "preview_url": string } }`
+- Error responses:
+  - `400` — prompt quá ngắn/dài
+  - `429` — rate limit exceeded (`{ "error": { "message": "Rate limit: 5 req/min" } }`)
+  - `503` — Replicate API unavailable hoặc `REPLICATE_API_KEY` chưa set
+  - `504` — Timeout sau 30s
+- Image format: JPEG 512×512 (Flux schnell default output)
+
+**File mới:** `backend/handler_ai_image.go`
+```go
+// handleGenerateImage: POST /api/admin/ai/generate-image
+// replicateClient: interface{} wrapper cho Replicate REST calls + polling
+// aiImageRateLimiter: map[adminEmail]rateWindow (in-memory)
+```
+
+**Graceful degradation:** Nếu `REPLICATE_API_KEY` không set → endpoint trả `503` với message rõ ràng. Backend khởi động bình thường — không fatal.
+
+#### CMS changes
+
+**Component mới:** `cms/components/AiImageButton.tsx`
+
+Props:
+```ts
+interface AiImageButtonProps {
+  onAssetCreated: (assetId: string) => void
+  disabled?: boolean         // true khi exercise chưa save (editingId = null)
+  existingAssetId?: string   // đổi label thành "✨ Tạo lại bằng AI"
+  initialPrompt?: string     // optional pre-fill
+}
+```
+
+State machine (internal):
+```
+idle → open → generating → preview → uploading → idle (success)
+                          ↘ error → open (retry, prompt preserved)
+          ↑
+          close (Hủy từ open)
+```
+
+UI behavior:
+- Nút `✨ Tạo bằng AI` kế `📁 Tải ảnh lên` trong cùng một `btn-row`
+- Click → `slideDown` panel 180ms `ease-out`; click lại → đóng về `idle`
+- `disabled=true` → `opacity:0.5`, `cursor:not-allowed`, `title="Lưu bài tập trước"`
+- Generating: cả hai nút upload + AI đều bị dim; progress bar indeterminate
+- Preview: thumbnail 120×80px + "✓ Dùng ảnh này" / "🔄 Thử lại" / "✕ Hủy"
+- Sau confirm: gọi `onAssetCreated(assetId)`, đóng panel về `idle`
+- Sau confirm: hiện pill `✨ AI generated` dưới ảnh (purely informational)
+- Textarea không submit khi nhấn Enter (xuống dòng bình thường)
+- Placeholder: `"e.g. A cozy Czech café with a couple having coffee, warm lighting"`
+- Hint: `"💡 Mô tả bằng tiếng Anh cho kết quả tốt hơn. Flux Schnell ~3–5s/ảnh."`
+- Rate limit error: `"Đã tạo 5 ảnh trong phút này. Thử lại sau."`
+- Respect `prefers-reduced-motion` — nếu bật, bỏ slideDown animation
+
+**Tích hợp 5 vị trí:**
+
+| Vị trí | File | Cách tích hợp |
+|--------|------|---------------|
+| Exercise context_image | `cms/components/exercise-form/index.tsx` ~L1020 | Thêm `<AiImageButton>` kế `<label>` upload hiện tại |
+| Vocab/Grammar option image | `cms/components/exercise-form/OptionRow.tsx` | Thêm `<AiImageButton>` kế input file |
+| Čtení 1 per-item image | `cms/components/exercise-form/CteniFields.tsx` | Thêm `<AiImageButton>` kế upload toggle |
+| Course banner | `cms/app/courses/page.tsx` | Thêm `<AiImageButton>` kế banner upload |
+| MockTest banner | `cms/app/mock-tests/page.tsx` | Thêm `<AiImageButton>` kế banner upload |
+
+**API route mới:** `cms/app/api/admin/ai/generate-image/route.ts`
+- Proxy đến backend `POST /api/admin/ai/generate-image` (cùng pattern các admin routes hiện có)
+- Thread cookie `admin_token` qua `getAdminToken(request)`
+
+#### Flutter changes
+
+**Không có.** Feature này hoàn toàn CMS-only — chỉ thay đổi cách admin tạo ảnh, không ảnh hưởng gì đến Flutter learner app.
+
+---
+
+### V15 Acceptance Criteria
+
+```
+AC-1: Admin nhấn "✨ Tạo bằng AI" → prompt panel xuất hiện (slideDown) trong ≤16ms
+AC-2: Submit prompt tiếng Anh → Flux trả ảnh trong ≤30s → thumbnail hiển thị
+AC-3: "Dùng ảnh này" → asset lưu vào store → preview xuất hiện trong form như upload thủ công
+AC-4: "Thử lại" → panel mở lại với prompt cũ còn nguyên
+AC-5: "Hủy" → panel đóng, không có asset nào được tạo
+AC-6: 6 lần generate/phút → lần 6 nhận error 429 với message rõ ràng
+AC-7: Nút bị dim + disabled khi exercise chưa có ID
+AC-8: REPLICATE_API_KEY không set → backend khởi động bình thường; endpoint trả 503
+AC-9: Timeout sau 30s → error panel + prompt cũ còn để retry
+AC-10: Component hoạt động đúng ở cả 5 placement
+AC-11: prefers-reduced-motion → không có slideDown animation
+```
+
+---
+
+### V15 Testing
+
+**Backend (`backend/handler_ai_image_test.go`):**
+```go
+TestHandleGenerateImage_MissingKey          // 503 khi REPLICATE_API_KEY empty
+TestHandleGenerateImage_PromptTooShort      // 400 khi prompt < 3 chars
+TestHandleGenerateImage_PromptTooLong       // 400 khi prompt > 500 chars
+TestHandleGenerateImage_RateLimit           // 429 sau 5 req trong cùng phút
+TestHandleGenerateImage_ReplicateTimeout    // 504 khi mock Replicate không respond trong 30s
+TestHandleGenerateImage_Success             // 200 + asset_id + preview_url với mock Replicate
+TestHandleGenerateImage_ReplicateFailed     // 503 khi Replicate trả status=failed
+TestAiImageRateLimiter_ResetsAfterMinute    // counter reset sau 60s
+```
+
+**CMS (Vitest — `cms/__tests__/AiImageButton.test.tsx`):**
+```ts
+renders AI button next to upload button
+disabled when no exerciseId — button has opacity style, cursor not-allowed
+clicking button opens prompt panel with slideDown
+clicking again closes panel (idle)
+generate button disabled when prompt empty
+onAssetCreated called with assetId after confirm
+retry preserves prompt text
+cancel from preview — no onAssetCreated called
+rate limit error message rendered
+```
+
+**Commands:** `make backend-build && make backend-test && make cms-lint && make cms-build && cd cms && npm test`
+
+---
+
+### V15 Boundaries
+
+**ALWAYS:**
+- `REPLICATE_API_KEY` chỉ ở backend env — không bao giờ expose ra CMS hay Flutter
+- Rate limit check trước khi gọi Replicate — không để admin accidentally spam
+- `asset_kind = "ai_generated"` để phân biệt với `"image"` và `"context_image"` upload thủ công
+- Validate prompt length trên cả CMS (disable button nếu rỗng) và backend (400 response)
+- Backend khởi động bình thường khi thiếu `REPLICATE_API_KEY` (không fatal exit)
+- Prompt textarea không submit khi Enter — chỉ "▶ Tạo" button là trigger
+
+**ASK FIRST:**
+- Thêm Flux.1-dev option (chất lượng cao hơn, chậm hơn, đắt hơn)
+- Lưu generation history vào DB
+- Auto-generate prompt từ exercise content (cần thêm LLM call)
+- Ảnh lớn hơn 512px
+- Thêm style preset (realistic / cartoon / illustration)
+- Bật AI image generation trong production (cần confirm `REPLICATE_API_KEY` + budget)
+
+**NEVER:**
+- Gọi Replicate trực tiếp từ CMS frontend (browser) — API key phải server-side
+- Dùng `asset_kind = "image"` hay `"context_image"` cho AI-generated assets — gây confusion với upload flow
+- Auto-upload mà không có bước confirm của admin
+- Thêm queue/worker cho generation — synchronous endpoint đủ với 30s timeout
+- Gọi Replicate endpoint khác ngoài `flux-schnell` trong V15
+
+### V15 Verification
+
+| Step | Lệnh | Manual check |
+|------|------|--------------|
+| AI-0 | `REPLICATE_API_KEY=test make backend-build` | Build pass |
+| AI-1 | `make backend-test` | `TestHandleGenerateImage_*` + `TestAiImageRateLimiter_*` pass |
+| AI-2 | `make cms-lint && make cms-build && cd cms && npm test` | AiImageButton tests pass |
+| AI-3 | Manual — không có key | Backend start bình thường; nhấn "✨ Tạo" → error "Chức năng chưa được cấu hình" |
+| AI-4 | Manual — có key | Nhập prompt → ~5s → thumbnail hiển thị → confirm → ảnh xuất hiện trong form |
+| AI-5 | Manual — 5 lần liên tiếp | Lần thứ 6 → rate limit error rõ ràng |
+| AI-6 | Manual — 5 placements | Nút AI hoạt động đúng ở exercise form, OptionRow, CteniFields, Course, MockTest |
+| CHECKPOINT | `make verify` | Full pass |
+
+---
+
 ## V14 — Interview Skill: ElevenLabs Conversational AI + Simli Avatar (2026-05-02)
 
 Idea doc: `docs/ideas/interview-skill.md`

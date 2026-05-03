@@ -1,5 +1,6 @@
 'use client';
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import AiImageButton from './AiImageButton';
 
 type Course = {
   id: string;
@@ -193,6 +194,18 @@ export function CourseDashboard() {
                         onChange={e => { const f = e.target.files?.[0]; if (f) void handleBannerUpload(c.id, f); e.target.value = ''; }}
                       />
                     </label>
+                    <AiImageButton
+                      onAssetCreated={async result => {
+                        await fetch('/api/admin/ai/set-banner', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ entity_type: 'course', entity_id: c.id, storage_key: result.storageKey }),
+                        });
+                        await load();
+                      }}
+                      disabled={false}
+                      existingAssetId={c.banner_image_id}
+                    />
                     {c.banner_image_id && (
                       <button type="button" onClick={() => void handleBannerDelete(c.id)} style={{ background: 'rgba(0,0,0,0.35)', color: '#fff', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>✕</button>
                     )}

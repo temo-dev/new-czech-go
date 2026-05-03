@@ -2690,3 +2690,237 @@ Manual E2E full avatar (iPhone thật):
 
 make verify
 ```
+
+---
+
+## V15 — AI Image Generation in CMS (2026-05-03)
+
+Spec: `SPEC.md § V15` · Idea: `docs/ideas/ai-image-generation.md` · Design: `docs/designs/ai-image-generation.html`
+
+### Mục tiêu
+
+Thêm nút **"✨ Tạo bằng AI"** kế nút upload ảnh ở 5 vị trí trong CMS. Admin nhập prompt → Flux.1-schnell (Replicate) → preview → confirm → asset upload vào store → `asset_id` gắn vào form.
+
+### Dependency graph
+
+```
+AI-1 (backend stub + route)
+  └── AI-2 (Replicate client + asset save)
+        └── AI-3 (rate limiter + tests)
+
+AI-4 (CMS component + proxy route)
+  └── AI-5 (integrate all 5 placements)
+
+AI-3 + AI-5 → AI-6 (checkpoint)
+
+AI-1 có thể chạy song song với AI-4.
+```
+
+---
+
+### AI-1 — Backend: struct field + route + stub
+
+**Files:** `backend/internal/httpapi/server.go`
+
+**Changes:**
+1. Thêm `replicateAPIKey string` vào `Server` struct (cùng pattern `elevenLabsAPIKey` dòng 32)
+2. Wire trong `NewServerWithAudio`: `replicateAPIKey: strings.TrimSpace(os.Getenv("REPLICATE_API_KEY"))`
+3. Register route: `s.mux.HandleFunc("/v1/admin/ai/generate-image", s.withRole("admin", s.handleAdminGenerateImage))`
+4. Stub handler `handleAdminGenerateImage` trong file mới `ai_image.go`:
+   - Method guard: chỉ `POST`
+   - Nếu `s.replicateAPIKey == ""` → `503 { "error": { "message": "AI image generation not configured (REPLICATE_API_KEY not set)" } }`
+   - Validate body: prompt min 3, max 500 chars → `400` nếu sai
+   - Placeholder: return `501 Not Implemented` (sẽ fill trong AI-2)
+
+**AC:**
+```
+make backend-build → pass
+POST /v1/admin/ai/generate-image khi không có key → 503 với message rõ ràng
+Backend khởi động bình thường khi thiếu REPLICATE_API_KEY
+```
+
+---
+
+### AI-2 — Backend: Replicate client + image download + asset save
+
+**File mới:** `backend/internal/httpapi/ai_image.go`
+
+**Implementation flow:**
+```
+1. POST api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions
+   Header: Authorization: Token {replicateAPIKey}
+   Body: { "input": { "prompt": string, "num_outputs": 1, "output_format": "jpeg" } }
+
+2. Poll GET /v1/predictions/{id} mỗi 500ms
+   Dừng khi status == "succeeded" | "failed" | context timeout (30s)
+
+3. Download image bytes từ output[0] URL
+
+4. Lưu vào asset store (reuse LocalUploadTargetProvider / S3 từ media_assets.go)
+   storageKey = "ai-generated/{adminEmail}/{assetID}.jpg"
+   asset_kind  = "ai_generated"
+
+5. Return { "data": { "asset_id": string, "preview_url": string } }
+```
+
+**Lưu ý thiết kế:**
+- Endpoint này KHÔNG nhận `entity_id` — CMS gắn `asset_id` vào entity sau khi có kết quả
+- Không cần DB row mới — asset lưu như upload thủ công, orphan nếu admin cancel sau confirm
+- `context.WithTimeout(30s)` bao toàn bộ Replicate flow
+- Lỗi Replicate `status == "failed"` → `503` + propagate error message nếu có
+
+**AC:**
+```
+make backend-build → pass
+POST với mock Replicate httptest server → trả asset_id + preview_url
+```
+
+---
+
+### AI-3 — Backend: Rate limiter + full test suite
+
+**Files:** `backend/internal/httpapi/ai_image.go` (rate limiter), `backend/internal/httpapi/ai_image_test.go`
+
+**Rate limiter struct:**
+```go
+type aiImageRateLimiter struct {
+    mu      sync.Mutex
+    windows map[string]rateWindow
+}
+type rateWindow struct {
+    count     int
+    windowEnd time.Time
+}
+// Allow(email string) bool — false nếu count >= 5 trong window hiện tại
+// Reset tự động khi windowEnd < time.Now()
+```
+
+Field trong `Server`: `aiImageRL *aiImageRateLimiter` — khởi tạo trong `NewServerWithAudio`.
+
+**8 test cases:**
+```go
+TestHandleGenerateImage_MissingKey          // 503
+TestHandleGenerateImage_PromptTooShort      // 400
+TestHandleGenerateImage_PromptTooLong       // 400
+TestHandleGenerateImage_RateLimit           // 429 sau lần thứ 6
+TestHandleGenerateImage_ReplicateTimeout    // 504 (mock server không respond)
+TestHandleGenerateImage_ReplicateFailed     // 503 (mock returns status=failed)
+TestHandleGenerateImage_Success             // 200 + asset_id + preview_url
+TestAiImageRateLimiter_ResetsAfterWindow    // counter reset sau window expired
+```
+
+Dùng `httptest.NewServer` mock Replicate (cùng pattern V14 ElevenLabs tests).
+
+**AC:**
+```
+make backend-test → 8 test cases pass
+Tổng backend tests ≥ 271 (263 + 8 mới)
+```
+
+---
+
+### AI-4 — CMS: proxy route + AiImageButton component + tests
+
+**Files mới:**
+- `cms/app/api/admin/ai/generate-image/route.ts`
+- `cms/components/AiImageButton.tsx`
+- `cms/__tests__/AiImageButton.test.tsx`
+
+**Proxy route** (cùng pattern `exercises/route.ts`):
+```ts
+export async function POST(request: NextRequest) {
+  const body = await request.text()
+  const response = await fetch(`${apiBaseUrl}/v1/admin/ai/generate-image`, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: {
+      Authorization: `Bearer ${getAdminToken(request)}`,
+      'Content-Type': 'application/json',
+    },
+    body,
+  })
+  return new Response(await response.text(), {
+    status: response.status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+```
+
+**AiImageButton state machine:**
+```
+idle → open → generating → preview → uploading → idle (success)
+                          ↘ error → open (prompt preserved)
+idle ← close (Hủy từ mọi state open)
+```
+
+Styling: inline styles dùng CSS vars (`var(--border)`, `var(--ink-4)`, etc.) — không import file CSS mới.
+Animation `slideDown`: `@keyframes` trong component style tag. Respect `prefers-reduced-motion`.
+Textarea không submit khi Enter — chỉ Generate button là trigger.
+
+**9 Vitest test cases:**
+```ts
+renders_ai_button
+disabled_when_no_exerciseId
+click_opens_prompt_panel
+click_again_closes_panel
+generate_disabled_when_prompt_empty
+onAssetCreated_called_after_confirm
+retry_preserves_prompt
+cancel_no_callback
+rate_limit_error_message_shown
+```
+
+**AC:**
+```
+make cms-lint → 0 TypeScript errors
+make cms-build → pass
+cd cms && npm test → 9 AiImageButton tests pass
+Tổng CMS tests ≥ 70 (61 + 9 mới)
+```
+
+---
+
+### AI-5 — Tích hợp 5 placements
+
+**Files thay đổi:**
+
+| File | Vị trí | Thay đổi |
+|------|--------|----------|
+| `exercise-form/index.tsx` | context_image ~L1024 | Bọc label+AiImageButton trong `div` flex-row |
+| `exercise-form/OptionRow.tsx` | imageAssetId field | Thêm `<AiImageButton>` kế file input |
+| `exercise-form/CteniFields.tsx` | cteni_1 image toggle | Thêm `<AiImageButton>` kế upload area |
+| `cms/app/courses/page.tsx` | banner upload | Thêm `<AiImageButton>` kế banner button |
+| `cms/app/mock-tests/page.tsx` | banner upload | Thêm `<AiImageButton>` kế banner button |
+
+**Rule:** `onAssetCreated` callback mỗi placement gọi đúng save/reload flow đã có — không thêm logic mới.
+
+**AC:**
+```
+make cms-lint → 0 errors
+make cms-build → pass
+Nút "✨ Tạo bằng AI" visible tại 5 vị trí trong browser
+```
+
+---
+
+### AI-6 — Checkpoint cuối
+
+```bash
+make backend-build && make backend-test   # ≥ 271 tests
+make cms-lint && make cms-build && cd cms && npm test  # ≥ 70 tests
+make flutter-analyze && make flutter-test  # 102 tests, không đổi
+make verify
+```
+
+**Manual checklist (browser):**
+1. Exercise form → section "🖼 Ảnh minh họa" → hai nút song song: "📁 Tải ảnh lên" + "✨ Tạo bằng AI"
+2. Chưa save → nút AI dim + disabled
+3. Sau save → click AI → panel slide xuống
+4. Nhập prompt → "▶ Tạo" → progress bar → thumbnail
+5. "Dùng ảnh này" → ảnh gắn vào form + pill "✨ AI generated"
+6. "🔄 Thử lại" → prompt còn nguyên
+7. "✕ Hủy" → panel đóng, không asset
+8. 6 lần liên tiếp → lần 6 nhận 429 message
+9. Course và MockTest banner → nút AI hoạt động
+
+**Note production:** Thêm `REPLICATE_API_KEY` vào `.env.ec2` trước deploy. Thiếu key → 503, không crash.

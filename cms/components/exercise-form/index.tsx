@@ -8,6 +8,8 @@ import { CteniFields } from './CteniFields';
 import { AnoNeFields } from './AnoNeFields';
 import { InterviewConversationFields } from './InterviewConversationFields';
 import { InterviewChoiceExplainFields } from './InterviewChoiceExplainFields';
+import AiImageButton from '../AiImageButton';
+import { type AiImageResult } from '../ai-image-utils';
 import { SpeakingFields } from './SpeakingFields';
 import { WritingFields } from './WritingFields';
 import { VocabGrammarFields } from './VocabGrammarFields';
@@ -258,6 +260,26 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
       await adminFetch(`/api/admin/exercises/${editingId}/assets/${existing.id}`, { method: 'DELETE' });
     }
     await handleAssetUpload(file, 'context_image');
+  }
+
+  async function handleAiContextImageCreated(result: AiImageResult) {
+    if (!editingId) return;
+    // Replace existing context_image if any.
+    const existing = currentAssets.find((a: PromptAsset) => a.asset_kind === 'context_image');
+    if (existing) {
+      await adminFetch(`/api/admin/exercises/${editingId}/assets/${existing.id}`, { method: 'DELETE' });
+    }
+    await adminFetch(`/api/admin/exercises/${editingId}/assets/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: result.assetId,
+        asset_kind: 'context_image',
+        storage_key: result.storageKey,
+        mime_type: 'image/jpeg',
+      }),
+    });
+    onSaved();
   }
 
   async function handleContextImageDelete() {
@@ -1003,10 +1025,15 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                             />
                             <div style={{ display: 'flex', gap: 8 }}>
                               <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: '1px dashed var(--border)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--ink-3)' }}>
-                                Đổi ảnh
+                                📁 Đổi ảnh
                                 <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
                                   onChange={e => { const f = e.target.files?.[0]; if (f) void handleContextImageUpload(f); e.target.value = ''; }} />
                               </label>
+                              <AiImageButton
+                                onAssetCreated={result => void handleAiContextImageCreated(result)}
+                                disabled={!editingId}
+                                existingAssetId={ctxAsset?.id}
+                              />
                               <button
                                 type="button"
                                 onClick={() => void handleContextImageDelete()}
@@ -1021,15 +1048,17 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                           !editingId ? (
                             <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-4)' }}>Lưu bài tập trước rồi upload ảnh.</p>
                           ) : (
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px dashed var(--border)', borderRadius: 10, padding: '12px 16px', cursor: 'pointer', background: 'var(--surface-alt)' }}>
-                              <span style={{ fontSize: 20 }}>🖼</span>
-                              <div>
-                                <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>+ Tải ảnh lên</p>
-                                <p style={{ margin: 0, fontSize: 11, color: 'var(--ink-4)' }}>JPEG / PNG / WebP, tối đa 5 MB</p>
-                              </div>
-                              <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
-                                onChange={e => { const f = e.target.files?.[0]; if (f) void handleContextImageUpload(f); e.target.value = ''; }} />
-                            </label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, gridTemplateRows: 'auto auto' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: '1px dashed var(--border)', borderRadius: 8, padding: '10px 12px', cursor: 'pointer', background: 'var(--surface-alt)', fontSize: 12, fontWeight: 600 }}>
+                                📁 Tải ảnh lên
+                                <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+                                  onChange={e => { const f = e.target.files?.[0]; if (f) void handleContextImageUpload(f); e.target.value = ''; }} />
+                              </label>
+                              <AiImageButton
+                                onAssetCreated={result => void handleAiContextImageCreated(result)}
+                                disabled={!editingId}
+                              />
+                            </div>
                           )
                         )}
                         {assetUploading && <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-4)' }}>Đang tải ảnh...</p>}

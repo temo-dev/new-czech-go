@@ -31,6 +31,8 @@ type Server struct {
 	voiceRegistry      *processing.VoiceRegistry
 	elevenLabsAPIKey   string // for interview session token creation
 	elevenLabsAgentID  string // pre-created agent in ElevenLabs dashboard
+	replicateAPIKey    string // for AI image generation via Flux
+	aiImageRL          *aiImageRateLimiter
 	mux                *http.ServeMux
 }
 
@@ -86,6 +88,8 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 		voiceRegistry:    voiceRegistry,
 		elevenLabsAPIKey:  strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")),
 		elevenLabsAgentID: strings.TrimSpace(os.Getenv("ELEVENLABS_AGENT_ID")),
+		replicateAPIKey:   strings.TrimSpace(os.Getenv("REPLICATE_API_KEY")),
+		aiImageRL:         newAiImageRateLimiter(),
 		mux:              http.NewServeMux(),
 	}
 	// Recover any jobs stuck in "running" from a previous server crash.
@@ -136,6 +140,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/vocabulary-items/", s.withRole("learner", s.handleVocabItemImageFile))
 	s.mux.HandleFunc("/v1/grammar-rules/", s.withRole("learner", s.handleGrammarRuleImageFile))
 	s.mux.HandleFunc("/v1/media/file", s.withRole("learner", s.handleMediaFile))
+	// V15: AI image generation
+	s.mux.HandleFunc("/v1/admin/ai/generate-image", s.withRole("admin", s.handleAdminGenerateImage))
+	s.mux.HandleFunc("/v1/admin/ai/set-banner", s.withRole("admin", s.handleAdminAiSetBanner))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
