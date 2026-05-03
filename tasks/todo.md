@@ -284,10 +284,10 @@ Plan chi tiết + AC đầy đủ trong `tasks/plan.md` (section V14).
 
 Spec: `SPEC.md § V15` · Plan chi tiết: `tasks/plan.md` (section V15) · Design: `docs/designs/ai-image-generation.html`
 
-- [ ] **AI-1** Backend: thêm `replicateAPIKey` vào `Server` struct + register route `/v1/admin/ai/generate-image` + stub handler (503 khi thiếu key, 400 khi prompt sai) trong `ai_image.go`
-- [ ] **AI-2** Backend: Replicate HTTP client + polling (500ms interval, 30s timeout) + image download + lưu asset store (`asset_kind="ai_generated"`) + hoàn thiện handler
-- [ ] **AI-3** Backend tests: `ai_image_test.go` — 8 test cases (missing key, prompt validation, rate limit, timeout, failed, success, rate window reset) · target ≥ 271 backend tests
-- [ ] **AI-4** CMS: proxy route `app/api/admin/ai/generate-image/route.ts` + `AiImageButton.tsx` component (6-state machine: idle→open→generating→preview→uploading→done/error) + 9 Vitest tests · target ≥ 70 CMS tests
-- [ ] **AI-5** Tích hợp 5 placements: `exercise-form/index.tsx` (context_image) + `OptionRow.tsx` + `CteniFields.tsx` + `courses/page.tsx` (banner) + `mock-tests/page.tsx` (banner)
+- [x] **AI-1** Backend: thêm `replicateAPIKey` vào `Server` struct + register route `/v1/admin/ai/generate-image` + stub handler (503 khi thiếu key, 400 khi prompt sai) trong `ai_image.go` (2026-05-03)
+- [x] **AI-2** Backend: Replicate HTTP client + polling (500ms interval, 30s timeout) + image download + lưu asset store + set-banner endpoint (2026-05-03)
+- [x] **AI-3** Backend tests: `ai_image_test.go` — 8 test cases + 2 rate limiter unit tests (2026-05-03)
+- [x] **AI-4** CMS: proxy routes + `AiImageButton.tsx` (6-state machine) + `ai-image-utils.ts` + 17 Vitest tests · 78 CMS tests total (2026-05-03)
+- [x] **AI-5** Tích hợp 4 placements: `exercise-form/index.tsx` (context_image) + `CteniFields.tsx` + `course-dashboard.tsx` (banner) + `mock-test-dashboard.tsx` (banner) (2026-05-03)
 
-**[CHECKPOINT AI-FINAL]** `make backend-test` ≥ 271 · `npm test` ≥ 70 · `make flutter-test` 102 · manual E2E 9-step checklist · `make verify`
+**[CHECKPOINT AI-FINAL]** Pending manual E2E — cần `REPLICATE_API_KEY` để test đầy đủ
