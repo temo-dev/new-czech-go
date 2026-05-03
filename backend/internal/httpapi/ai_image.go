@@ -230,7 +230,7 @@ func createReplicatePrediction(ctx context.Context, apiKey, prompt string) (stri
 		"input": map[string]any{
 			"prompt":        prompt,
 			"num_outputs":   1,
-			"output_format": "jpeg",
+			"output_format": "jpg",
 		},
 	})
 
