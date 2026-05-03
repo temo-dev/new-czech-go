@@ -282,7 +282,7 @@ Do not mix these in one change unless the human asks:
 If you notice adjacent cleanup, note it separately instead of silently expanding scope.
 
 ## Good Next Steps
-V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ V8 ✅ V9 ✅ V10 ✅ V11 ✅ V12 ✅ V13 ✅ V14 ✅ — tất cả planned slices hoàn thành.
+V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ V8 ✅ V9 ✅ V10 ✅ V11 ✅ V12 ✅ V13 ✅ V14 ✅ V15 ✅ — tất cả planned slices hoàn thành.
 Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 
 **V8 Schema Flatten — 2026-04-30:**
@@ -368,6 +368,15 @@ Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 - `SIMLI_API_KEY` + `SIMLI_FACE_ID` qua `--dart-define`; avatar disabled khi key trống
 - Specs: `SPEC.md` § V14, `docs/ideas/interview-skill.md`, `docs/designs/interview-skill.html`
 - Tests: 263 backend, 61 CMS Vitest, 102 Flutter
+
+**V15 AI Image Generation in CMS — 2026-05-03:**
+- Nút "✨ Tạo bằng AI" kế nút upload ảnh ở 4 vị trí: exercise context_image, cteni_1 per-item, Course banner, MockTest banner
+- Backend: `POST /v1/admin/ai/generate-image` (Replicate Flux.1-schnell, poll + download + lưu local) + `POST /v1/admin/ai/set-banner`; rate limit 5 req/phút per admin; `REPLICATE_API_KEY` env var
+- CMS: `AiImageButton.tsx` (6-state machine: idle→open→generating→preview→uploading→done/error); `ai-image-utils.ts` (validation + state logic); proxy routes `/api/admin/ai/generate-image` + `/api/admin/ai/set-banner`
+- Confirm flow: generate → preview (Replicate CDN URL) → "Dùng ảnh này" → `POST /assets` register → `onSaved()` reload
+- Image format: JPEG 512×512; output_format `"jpg"` (không phải `"jpeg"`); `docker-compose.yml` + `docker-compose.ec2.yml` đã thêm `REPLICATE_API_KEY`; DNS fix (`8.8.8.8`) cho Docker container
+- Specs: `SPEC.md` § V15, `docs/ideas/ai-image-generation.md`, `docs/designs/ai-image-generation.html`
+- Tests: backend +10 (rate limiter + mock Replicate), CMS +17 Vitest (ai-image-utils)
 
 **Remaining backlog (low priority):**
 1. Nhập nội dung mẫu qua CMS: ít nhất 1 exercise mỗi loại để test Flutter end-to-end (interview bao gồm)

@@ -269,7 +269,7 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
     if (existing) {
       await adminFetch(`/api/admin/exercises/${editingId}/assets/${existing.id}`, { method: 'DELETE' });
     }
-    await adminFetch(`/api/admin/exercises/${editingId}/assets/register`, {
+    await adminFetch(`/api/admin/exercises/${editingId}/assets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

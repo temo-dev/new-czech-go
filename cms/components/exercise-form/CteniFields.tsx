@@ -291,7 +291,7 @@ export function CteniFields({ exerciseType, initialData, onChange, exerciseId }:
                         <AiImageButton
                           onAssetCreated={async result => {
                             if (!exerciseId) return;
-                            await adminFetch(`/api/admin/exercises/${exerciseId}/assets/register`, {
+                            await adminFetch(`/api/admin/exercises/${exerciseId}/assets`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ id: result.assetId, asset_kind: 'image', storage_key: result.storageKey, mime_type: 'image/jpeg' }),
