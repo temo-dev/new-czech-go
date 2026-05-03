@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -8,24 +8,50 @@ import 'package:path_provider/path_provider.dart';
 /// Sprint 1: simple buffer → WAV → play (no streaming).
 /// Sprint 2: replaces with Simli sendAudioData() when avatar is added.
 class PcmAudioPlayer {
+  PcmAudioPlayer({int sampleRate = _defaultSampleRate})
+    : _sampleRate = sampleRate;
+
   final AudioPlayer _player = AudioPlayer();
   final List<int> _pcmBuffer = [];
   bool _playing = false;
+  bool _playAgainAfterCurrent = false;
+  bool _disposed = false;
+  int _sampleRate;
 
-  static const _sampleRate = 16000;
+  static const _defaultSampleRate = 16000;
   static const _channels = 1;
   static const _bitsPerSample = 16;
 
   /// Add a PCM16 chunk to the buffer.
   void addChunk(Uint8List chunk) {
+    if (_disposed) return;
     _pcmBuffer.addAll(chunk);
+  }
+
+  /// Updates the output sample rate using ElevenLabs metadata, e.g. "pcm_44100".
+  void setOutputAudioFormat(String? format) {
+    final sampleRate = sampleRateFromElevenLabsFormat(format);
+    if (sampleRate != null) {
+      _sampleRate = sampleRate;
+    }
   }
 
   /// Play and clear the current buffer. No-op if buffer is empty.
   Future<void> flushAndPlay() async {
     if (_pcmBuffer.isEmpty) return;
-    if (_playing) return; // don't interrupt ongoing playback
+    if (_playing) {
+      _playAgainAfterCurrent = true;
+      return;
+    }
 
+    while (_pcmBuffer.isNotEmpty && !_disposed) {
+      await _playCurrentBuffer();
+      if (!_playAgainAfterCurrent && _pcmBuffer.isEmpty) return;
+      _playAgainAfterCurrent = false;
+    }
+  }
+
+  Future<void> _playCurrentBuffer() async {
     final data = Uint8List.fromList(_pcmBuffer);
     _pcmBuffer.clear();
 
@@ -33,17 +59,20 @@ class PcmAudioPlayer {
     File? file;
     try {
       _playing = true;
-      final wavBytes = _buildWav(data);
+      final wavBytes = wavBytesForTesting(data, sampleRate: _sampleRate);
       final dir = await getTemporaryDirectory();
-      file = File('${dir.path}/interview_audio_${DateTime.now().millisecondsSinceEpoch}.wav');
+      file = File(
+        '${dir.path}/interview_audio_${DateTime.now().millisecondsSinceEpoch}.wav',
+      );
       await file.writeAsBytes(wavBytes);
       await _player.setFilePath(file.path);
       await _player.play();
       await _player.processingStateStream.firstWhere(
         (s) => s == ProcessingState.completed || s == ProcessingState.idle,
       );
-    } catch (_) {
+    } catch (err) {
       // Audio playback failure is non-fatal — conversation continues.
+      debugPrint('Interview audio playback failed: $err');
     } finally {
       _playing = false;
       if (file != null && file.existsSync()) file.deleteSync();
@@ -54,13 +83,29 @@ class PcmAudioPlayer {
   void clearBuffer() => _pcmBuffer.clear();
 
   Future<void> dispose() async {
+    _disposed = true;
+    _pcmBuffer.clear();
     await _player.dispose();
   }
 
-  static Uint8List _buildWav(Uint8List pcmData) {
+  @visibleForTesting
+  static int? sampleRateFromElevenLabsFormat(String? format) {
+    if (format == null) return null;
+    final normalized = format.trim().toLowerCase();
+    if (!normalized.startsWith('pcm_')) return null;
+    final parsed = int.tryParse(normalized.substring(4));
+    if (parsed == null || parsed <= 0) return null;
+    return parsed;
+  }
+
+  @visibleForTesting
+  static Uint8List wavBytesForTesting(
+    Uint8List pcmData, {
+    int sampleRate = _defaultSampleRate,
+  }) {
     final dataSize = pcmData.length;
     final chunkSize = 36 + dataSize;
-    final byteRate = _sampleRate * _channels * (_bitsPerSample ~/ 8);
+    final byteRate = sampleRate * _channels * (_bitsPerSample ~/ 8);
     final blockAlign = _channels * (_bitsPerSample ~/ 8);
 
     final header = ByteData(44);
@@ -70,8 +115,8 @@ class PcmAudioPlayer {
     header.setUint8(2, 0x46); // F
     header.setUint8(3, 0x46); // F
     header.setUint32(4, chunkSize, Endian.little);
-    header.setUint8(8, 0x57);  // W
-    header.setUint8(9, 0x41);  // A
+    header.setUint8(8, 0x57); // W
+    header.setUint8(9, 0x41); // A
     header.setUint8(10, 0x56); // V
     header.setUint8(11, 0x45); // E
     // fmt chunk
@@ -79,10 +124,10 @@ class PcmAudioPlayer {
     header.setUint8(13, 0x6D); // m
     header.setUint8(14, 0x74); // t
     header.setUint8(15, 0x20); // space
-    header.setUint32(16, 16, Endian.little);          // subchunk1 size
-    header.setUint16(20, 1, Endian.little);           // PCM format
+    header.setUint32(16, 16, Endian.little); // subchunk1 size
+    header.setUint16(20, 1, Endian.little); // PCM format
     header.setUint16(22, _channels, Endian.little);
-    header.setUint32(24, _sampleRate, Endian.little);
+    header.setUint32(24, sampleRate, Endian.little);
     header.setUint32(28, byteRate, Endian.little);
     header.setUint16(32, blockAlign, Endian.little);
     header.setUint16(34, _bitsPerSample, Endian.little);

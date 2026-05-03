@@ -22,6 +22,13 @@ func NewPostgresVocabularyStore(databaseURL string) (VocabularyStore, error) {
 		db.Close()
 		return nil, fmt.Errorf("ping vocab db: %w", err)
 	}
+	// Migration 017/018: vocabulary_sets schema flatten — drop skill_id FK+col, add module_id
+	db.ExecContext(ctx, `ALTER TABLE vocabulary_sets DROP CONSTRAINT IF EXISTS vocabulary_sets_skill_id_fkey`)
+	db.ExecContext(ctx, `ALTER TABLE vocabulary_sets DROP COLUMN IF EXISTS skill_id`)
+	if err := addColumnIfMissing(ctx, db, "vocabulary_sets", "module_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate vocabulary_sets module_id: %w", err)
+	}
 	// Migration 020: image_asset_id on vocabulary_items
 	if err := addColumnIfMissing(ctx, db, "vocabulary_items", "image_asset_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
 		db.Close()

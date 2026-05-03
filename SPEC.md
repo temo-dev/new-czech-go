@@ -798,3 +798,434 @@ ASK FIRST:
 | AN-6 | Manual (iOS sim) | poslech_6: audio play → chọn ANO/NE → submit → score hiển thị |
 | AN-7 | Manual (CMS) | Tạo cteni_6 → 3 statements → ANO/NE toggle → publish → hiện trong app |
 | CHECKPOINT | `make verify` | Full pass |
+
+---
+
+## V14 — Interview Skill: ElevenLabs Conversational AI + Simli Avatar (2026-05-02)
+
+Idea doc: `docs/ideas/interview-skill.md`
+Design: `docs/designs/interview-skill.html`
+
+### Objective
+
+Thêm `skill_kind = "interview"` — learner luyện nói tiếng Czech theo hội thoại real-time với avatar Czech examiner AI, thay vì luồng record → async transcribe → feedback hiện tại.
+
+Hai exercise types mới:
+
+| exercise_type | Mô tả | Scoring |
+|---|---|---|
+| `interview_conversation` | Hội thoại theo chủ đề, agent hỏi 5–8 câu | LLM post-session |
+| `interview_choice_explain` | Chọn 1/3–4 phương án → giải thích lý do | LLM post-session |
+
+Platform: Flutter iOS only. Entry point: `ModuleDetail` (cùng hàng với Nói/Nghe/Viết/Đọc).
+
+**Non-goals (V14):**
+- Multiple avatar faces / voice selection
+- Real-time scoring trong lúc hội thoại
+- MockTest integration (pool=exam) — deferred
+- Pronunciation breakdown per word
+
+### Kiến trúc quyết định (frozen)
+
+#### Ephemeral token flow (security)
+
+ElevenLabs API key **không bao giờ** nằm trong Flutter app. Pattern:
+
+```
+Flutter → POST /v1/interview-sessions/token
+            { exercise_id, attempt_id, selected_option? }
+                    ↓ learner auth check
+          Go → ElevenLabs REST API
+            POST /v1/convai/conversation/get_signed_url
+            với system_prompt đã inject {selected_option}
+                    ↓
+          Response: { signed_url, expires_in: 30s }
+                    ↓
+          Flutter → WebSocket thẳng tới ElevenLabs (signed_url)
+```
+
+Lý do: API key an toàn ở server, không có proxy latency (mỗi audio chunk không đi qua Go).
+
+#### ElevenLabs Conversational AI WebSocket (Dart)
+
+Không dùng `elevenlabs_flutter` package (chỉ là TTS wrapper). Viết custom Dart WebSocket client:
+
+```
+Dart WebSocket → wss://api.elevenlabs.io/v1/convai/conversation?signed_url=...
+  send: { type: "audio", audio: <base64 PCM16 chunk> }  (mic input)
+  recv: { type: "audio", audio: <base64 PCM16 chunk> }  (agent speech)
+  recv: { type: "transcript", message: { role, message } }  (accumulate)
+  recv: { type: "interruption" }  (agent bị ngắt)
+  recv: { type: "conversation_initiation_metadata" }  (ready signal)
+```
+
+Transcript tự accumulate từ `transcript` events — **không** lấy từ một endpoint cuối session.
+
+#### Simli avatar (Flutter)
+
+```dart
+// pubspec.yaml
+simli_client: ^1.0.1
+flutter_webrtc: ^0.9.x  // required by simli_client
+
+// Session screen
+SimliClient simliClient = SimliClient(
+  clientConfig: SimliClientConfig(
+    apiKey: '<SIMLI_API_KEY>',      // từ Flutter config / env
+    faceId: kSimliDefaultFaceId,   // hằng số, 1 face duy nhất
+    syncAudio: true,
+    handleSilence: true,
+    maxSessionLength: 900,          // 15 phút max
+  ),
+  log: Logger(),
+);
+
+// Pipe ElevenLabs PCM16 → Simli
+elevenLabsWsClient.onAudioChunk = (Uint8List pcm16) {
+  simliClient.sendAudioData(pcm16);
+};
+
+// Render
+RTCVideoView(simliClient.videoRenderer!, mirror: false)
+```
+
+**Sprint 0 blocker:** Verify `simli_client` v1.0.1 vẫn tương thích với Simli API hiện tại trước khi Sprint 1.
+
+#### Attempt flow (mới)
+
+```
+POST /v1/attempts  { exercise_id, skill_kind="interview" }
+→ POST /v1/interview-sessions/token  { exercise_id, attempt_id, selected_option? }
+   → Flutter WS → ElevenLabs (real-time conversation)
+→ Learner bấm "Kết thúc" hoặc max_turns đạt
+→ POST /v1/attempts/:id/submit-interview
+   { transcript: [{speaker, text, at_sec}], duration_sec }
+   → attempt status → scoring
+   → async: interview_scorer.go → LLM (Claude) → completed
+→ GET /:id poll → completed → ResultScreen
+```
+
+#### system_prompt template
+
+Admin nhập plain text. Biến duy nhất: `{selected_option}` (chỉ dùng trong `interview_choice_explain`).
+Backend inject server-side trước khi gọi ElevenLabs API để tạo signed URL.
+
+```go
+// Ví dụ injection:
+prompt := strings.ReplaceAll(exercise.SystemPrompt, "{selected_option}", req.SelectedOption)
+```
+
+### Detail Payloads (frozen)
+
+```json
+// interview_conversation — exercises.detail
+{
+  "topic": "Gia đình và bạn bè",
+  "tips": ["Trả lời câu hoàn chỉnh", "Dùng từ nối: protože, ale, a také"],
+  "system_prompt": "You are Jana Nováková, a Czech A2 examiner. Conduct a friendly interview about family and friends. Ask 5-8 natural questions at A2 level. Start with 'Dobrý den!' ...",
+  "max_turns": 8,
+  "show_transcript": true
+}
+
+// interview_choice_explain — exercises.detail
+{
+  "question": "Bạn muốn đi du lịch ở đâu?",
+  "options": [
+    { "id": "1", "label": "Praha", "image_asset_id": "..." },
+    { "id": "2", "label": "Krkonoše", "image_asset_id": "" },
+    { "id": "3", "label": "Brno", "image_asset_id": "" },
+    { "id": "4", "label": "Český Krumlov", "image_asset_id": "" }
+  ],
+  "system_prompt": "You are Jana Nováková. The learner chose {selected_option}. Ask 4-6 follow-up questions about why they chose it and what they would do there.",
+  "max_turns": 6,
+  "show_transcript": false
+}
+```
+
+Ghi chú:
+- `tips` optional (chỉ hiển thị trong IntroScreen, không gửi tới ElevenLabs)
+- `image_asset_id` optional — dùng `image_asset_id = ""` nếu không có ảnh (choice hiển thị text only)
+- `show_transcript`: nếu `true`, overlay phụ đề dưới avatar trong session; nếu `false`, không hiển thị
+
+### New Go Types (contracts/types.go)
+
+```go
+type InterviewConversationDetail struct {
+    Topic          string   `json:"topic"`
+    Tips           []string `json:"tips,omitempty"`
+    SystemPrompt   string   `json:"system_prompt"`
+    MaxTurns       int      `json:"max_turns"`
+    ShowTranscript bool     `json:"show_transcript"`
+}
+
+type InterviewChoiceExplainDetail struct {
+    Question       string            `json:"question"`
+    Options        []InterviewOption `json:"options"`
+    SystemPrompt   string            `json:"system_prompt"`
+    MaxTurns       int               `json:"max_turns"`
+    ShowTranscript bool              `json:"show_transcript"`
+}
+
+type InterviewOption struct {
+    ID           string `json:"id"`
+    Label        string `json:"label"`
+    ImageAssetID string `json:"image_asset_id,omitempty"`
+}
+
+type InterviewTokenRequest struct {
+    ExerciseID     string `json:"exercise_id"`
+    AttemptID      string `json:"attempt_id"`
+    SelectedOption string `json:"selected_option,omitempty"`
+}
+
+type InterviewTokenResponse struct {
+    SignedURL  string `json:"signed_url"`
+    ExpiresIn int    `json:"expires_in"`
+}
+
+type InterviewTranscriptTurn struct {
+    Speaker string `json:"speaker"` // "examiner" | "learner"
+    Text    string `json:"text"`
+    AtSec   int    `json:"at_sec"` // seconds from session start
+}
+
+type InterviewSubmitRequest struct {
+    Transcript  []InterviewTranscriptTurn `json:"transcript"`
+    DurationSec int                       `json:"duration_sec"`
+}
+```
+
+### New API Endpoints
+
+```
+POST /v1/interview-sessions/token          (withAuth — learner)
+  Request:  InterviewTokenRequest
+  Response: InterviewTokenResponse
+  Logic:
+    1. Load exercise by exercise_id
+    2. Check attempt exists + belongs to learner
+    3. Inject selected_option vào system_prompt nếu interview_choice_explain
+    4. Call ElevenLabs POST /v1/convai/conversation/get_signed_url
+    5. Return signed_url (expires ~30s — Flutter phải connect ngay)
+
+POST /v1/attempts/:id/submit-interview     (withAuth — learner)
+  Request:  InterviewSubmitRequest
+  Response: attempt object (status=scoring)
+  Logic:
+    1. Save transcript turns vào attempt.transcript_json
+    2. Save duration_sec vào attempt metadata
+    3. Launch goroutine: interview_scorer.go → LLM → mark completed
+```
+
+### Environment Variables mới
+
+| Var | Mô tả | Required |
+|---|---|---|
+| `ELEVENLABS_API_KEY` | ElevenLabs API key để tạo signed URL | Yes (nếu dùng interview) |
+| `SIMLI_API_KEY` | Simli API key — lưu ở Flutter config / build-time constant | Yes (nếu dùng avatar) |
+| `SIMLI_FACE_ID` | Face ID cố định (1 face duy nhất trong V14) | Yes (nếu dùng avatar) |
+
+**Lưu ý:** `SIMLI_API_KEY` và `SIMLI_FACE_ID` nằm trong Flutter app (không phải secret backend). Chấp nhận được vì Simli session cost per-minute, không phải per-call secret.
+
+### Project Structure mới
+
+```
+backend/
+  internal/
+    contracts/types.go                 -- thêm Interview* types
+    processing/
+      interview_scorer.go              -- NEW: LLM scoring post-session
+    httpapi/server.go                  -- thêm 2 routes interview
+
+cms/app/exercises/
+  exercise-utils.ts                    -- thêm interview_conversation, interview_choice_explain
+  components/exercise-form/
+    InterviewConversationFields.tsx    -- NEW
+    InterviewChoiceExplainFields.tsx   -- NEW
+    index.tsx                          -- wire 2 types mới
+
+flutter_app/
+  pubspec.yaml                         -- thêm simli_client, flutter_webrtc
+  lib/features/interview/
+    screens/
+      interview_list_screen.dart       -- NEW
+      interview_intro_screen.dart      -- NEW (shared Luồng A + B)
+      interview_session_screen.dart    -- NEW (core experience)
+      interview_result_screen.dart     -- NEW (reuse ResultCard pattern)
+    services/
+      elevenlabs_ws_client.dart        -- NEW: custom Dart WS client
+      simli_session_manager.dart       -- NEW: wraps simli_client lifecycle
+    widgets/
+      choice_option_grid.dart          -- NEW: 2×2 grid cho choice type
+      session_status_pill.dart         -- NEW: connecting/listening/speaking
+      mic_waveform_widget.dart         -- NEW: animated bars
+      avatar_video_container.dart      -- NEW: RTCVideoView wrapper
+  lib/features/home/screens/
+    module_detail_screen.dart          -- MODIFY: thêm interview skill card
+  lib/core/api/api_client.dart         -- thêm getInterviewToken(), submitInterview()
+  lib/models/models.dart               -- thêm InterviewOption, InterviewTranscriptTurn, etc.
+  lib/l10n/intl_vi.arb + intl_en.arb  -- thêm interview_* i18n keys
+```
+
+### interview_scorer.go — Scoring Logic
+
+Reuse `LLMFeedbackProvider` pattern. Claude nhận full transcript + exercise context:
+
+```
+Prompt inputs:
+  - exercise type + topic/question
+  - selected_option (nếu choice_explain)
+  - full transcript (speaker-labeled turns)
+  - duration_sec
+
+Claude output (via tool_use schema):
+  - overall readiness_level (weak/ok/strong)
+  - feedback_items (max 4 items với criterion + comment)
+  - vocabulary_score (0–10)
+  - grammar_score (0–10)
+  - fluency_score (0–10)
+  - model_answer_sample (optional: example of a good response)
+```
+
+Map `readiness_level` → `total_score` dùng `DEFAULT_MAX_POINTS` của exercise (hoặc 10 nếu không set).
+
+### CMS Changes
+
+**InterviewConversationFields.tsx fields:**
+- Tiêu đề `*`
+- Topic (hiển thị trong IntroScreen cho learner) `*`
+- Tips (repeater, optional, max 5)
+- System Prompt (textarea, `*`) + hint: "Agent dùng prompt này để dẫn dắt hội thoại Czech A2"
+- Max turns (number input, default 8, range 4–12)
+- Show transcript toggle (default on)
+
+**InterviewChoiceExplainFields.tsx fields:**
+- Tiêu đề `*`
+- Câu hỏi chính (hiển thị cho learner) `*`
+- Options repeater (3–4 items, mỗi item: label `*` + image upload optional)
+- System Prompt `*` + hint: "`{selected_option}` sẽ bị thay bằng lựa chọn thực tế của learner"
+- Max turns (number, default 6)
+- Show transcript toggle (default off)
+
+Validate:
+- Options: 3–4 items bắt buộc
+- System prompt phải không rỗng
+- `interview_choice_explain`: system_prompt nên chứa `{selected_option}` — warning (không block)
+
+### Flutter i18n Keys mới (prefix `interview_`)
+
+```
+interviewSkillLabel       = "Phỏng vấn AI"
+interviewSkillDesc        = "Hội thoại thực tế với examiner"
+interviewNewBadge         = "MỚI"
+interviewTopicLabel       = "Chủ đề hội thoại"
+interviewChoiceLabel      = "Chọn phương án"
+interviewChoiceInstruction = "Chọn 1 và giải thích lý do"
+interviewTipsTitle        = "Examiner sẽ hỏi về"
+interviewTipsHint         = "Mẹo luyện tập"
+interviewStartBtn         = "Bắt đầu phỏng vấn"
+interviewStartWithChoice  = "Bắt đầu với lựa chọn này"
+interviewSelectedLabel    = "Đã chọn:"
+interviewStatusConnecting = "Đang kết nối với examiner..."
+interviewStatusReady      = "Sẵn sàng"
+interviewStatusSpeaking   = "Examiner đang nói"
+interviewStatusListening  = "Đang lắng nghe bạn..."
+interviewEndBtn           = "Kết thúc"
+interviewEndConfirm       = "Bạn có muốn kết thúc phỏng vấn không?"
+interviewAnalyzing        = "Đang chấm điểm..."
+interviewResultTitle      = "Kết quả phỏng vấn"
+interviewTabFeedback      = "Nhận xét"
+interviewTabTranscript    = "Hội thoại"
+interviewExaminer         = "Examiner"
+interviewYou              = "Bạn"
+interviewConnectError     = "Không kết nối được, thử lại"
+interviewMicDenied        = "Cần quyền microphone"
+```
+
+### Testing Strategy
+
+**Sprint 0 (spike — không commit vào main):**
+```
+[ ] Test ElevenLabs ConvAI + Czech system prompt qua ElevenLabs dashboard web
+    → Verify agent nghe được, trả lời Czech đúng A2 level
+[ ] Build standalone Flutter app với simli_client
+    → Feed fake PCM16 silence → verify RTCVideoView renders on iPhone
+    → Feed real PCM16 audio → verify lip-sync visible
+[ ] Verify PCM16 16kHz mono = format ElevenLabs output và Simli input
+```
+
+Sprint 0 phải pass trước khi bắt đầu bất kỳ code production nào.
+
+**Backend:**
+```go
+// interview_scorer_test.go
+TestScoreInterviewSession_Conversation_Strong   // full transcript, fluent answers
+TestScoreInterviewSession_Conversation_Weak     // monosyllabic answers
+TestScoreInterviewSession_ChoiceExplain_Strong  // good explanation
+TestInjectSelectedOption_ReplacesPlaceholder    // "{selected_option}" injection
+TestInjectSelectedOption_NoPlaceholderOk        // no {selected_option} in prompt = ok
+```
+
+**CMS (Vitest):**
+```ts
+buildInterviewConversationPayload — valid payload
+buildInterviewConversationPayload — rejects 0 tips (ok, optional)
+buildInterviewChoiceExplainPayload — rejects <3 options
+buildInterviewChoiceExplainPayload — rejects >4 options
+formStateFromInterviewConversation — roundtrip
+formStateFromInterviewChoiceExplain — roundtrip
+```
+
+**Flutter:**
+```dart
+// interview tests
+interview_list_screen_test.dart — renders 2 exercise type groups
+interview_intro_conv_test.dart  — shows topic, tips, start button enabled
+interview_intro_choice_test.dart — start disabled until option selected; enables after tap
+interview_session_status_test.dart — StatusPill renders 4 states
+choice_option_grid_test.dart — tap selects, second tap on different = deselects first
+```
+
+**Commands:** `make backend-build && make backend-test && make cms-lint && make cms-build && make flutter-analyze && make flutter-test`
+
+### V14 Boundaries
+
+**ALWAYS:**
+- Sprint 0 spike phải pass TRƯỚC khi commit bất kỳ production code
+- ElevenLabs API key chỉ ở backend, không bao giờ trong Flutter app
+- Inject `{selected_option}` server-side trong `handleInterviewToken`, không ở CMS
+- `show_transcript` flag quyết định overlay display — không hardcode trong Flutter
+- Transcript accumulate client-side từ WebSocket `transcript` events — không gọi endpoint nào của ElevenLabs để lấy transcript sau session
+- `max_turns` là soft limit: Flutter end session khi đủ lượt, không cần ElevenLabs force-close
+- `interview_choice_explain` phải có 3–4 options, validate tại CMS trước submit
+- Mỗi route mới (`/v1/interview-sessions/token`, `/v1/attempts/:id/submit-interview`) phải có `withAuth`
+
+**ASK FIRST:**
+- Thêm multiple Simli face IDs trong CMS (avatar selection)
+- Thêm pronunciation scoring hoặc per-word feedback
+- MockTest integration — bài interview vào pool=exam
+- Thay đổi ElevenLabs ConvAI WebSocket message format (nếu API update)
+- Thêm mid-session coaching ("Bạn cần dùng thêm từ nối")
+- Real-time transcript streaming vào ResultScreen
+
+**NEVER:**
+- Gọi ElevenLabs Conversational AI trực tiếp từ Flutter với raw API key
+- Dùng `elevenlabs_flutter` package — nó là TTS wrapper, không phải ConvAI
+- Scoring trong real-time (mid-session) — complexity không tương xứng với giá trị V14
+- Store ElevenLabs conversation_id hay session metadata lâu dài trong DB — chỉ transcript quan trọng
+- Thêm SQS/queue cho interview scoring — goroutine pattern đủ cho V14
+- pool=exam cho interview exercises trong V14
+
+### V14 Verification
+
+| Step | Lệnh | Manual check |
+|---|---|---|
+| IV-0 | Spike (standalone app, không commit) | Simli avatar render trên iPhone; ElevenLabs Czech agent hoạt động |
+| IV-1 | `make backend-build && make backend-test` | `TestInjectSelectedOption_*` pass; `TestScoreInterviewSession_*` pass |
+| IV-2 | `make backend-build` | `POST /v1/interview-sessions/token` trả `signed_url`; `POST /v1/attempts/:id/submit-interview` → status=scoring |
+| IV-3 | `make cms-lint && make cms-build && cd cms && npm test` | Tạo interview_conversation và interview_choice_explain trong CMS → save → reload intact |
+| IV-4 | `make flutter-analyze && make flutter-test` | 0 warnings; choice grid + status pill tests pass |
+| IV-5 | Manual (iPhone) — Luồng A | ModuleDetail → Phỏng vấn → chọn hội thoại → Intro → Bắt đầu → session → Kết thúc → score |
+| IV-6 | Manual (iPhone) — Luồng B | Chọn phương án → chọn option → session (chip hiển thị) → Kết thúc → score |
+| IV-7 | Manual (iPhone) — Avatar | Simli RTCVideoView visible; lip-sync khi examiner nói; mic waveform khi learner nói |
+| CHECKPOINT | `make verify` | Full pass |

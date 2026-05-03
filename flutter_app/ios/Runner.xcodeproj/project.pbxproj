@@ -198,6 +198,7 @@
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				3170DB4443658AAAC7DA8CF0 /* [CP] Embed Pods Frameworks */,
+				D3AEE24AA03B66B1E219E04C /* [CP-User] Generate WebRTC dSYM for archive */,
 			);
 			buildRules = (
 			);
@@ -360,6 +361,16 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
+		};
+		D3AEE24AA03B66B1E219E04C /* [CP-User] Generate WebRTC dSYM for archive */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			name = "[CP-User] Generate WebRTC dSYM for archive";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\nif [ \"${ACTION:-}\" != \"install\" ] || [ \"${PLATFORM_NAME:-}\" != \"iphoneos\" ]; then\n  exit 0\nfi\n\nWEBRTC_BINARY=\"${PODS_ROOT}/WebRTC-SDK/WebRTC.xcframework/ios-arm64/WebRTC.framework/WebRTC\"\nWEBRTC_DSYM=\"${DWARF_DSYM_FOLDER_PATH}/WebRTC.framework.dSYM\"\n\nif [ ! -f \"$WEBRTC_BINARY\" ]; then\n  echo \"warning: WebRTC binary not found at $WEBRTC_BINARY\"\n  exit 0\nfi\n\nmkdir -p \"${DWARF_DSYM_FOLDER_PATH}\"\nrm -rf \"$WEBRTC_DSYM\"\nxcrun dsymutil \"$WEBRTC_BINARY\" -o \"$WEBRTC_DSYM\"\nxcrun dwarfdump --uuid \"$WEBRTC_DSYM\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

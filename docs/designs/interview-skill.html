@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Interview Skill — UI/UX Design</title>
+<style>
+  :root {
+    --orange: #FF6A14;
+    --orange-dim: rgba(255,106,20,0.15);
+    --cream: #FBF3E7;
+    --teal: #0F3D3A;
+    --teal-light: #1A5C58;
+    --teal-dim: rgba(15,61,58,0.08);
+    --white: #FFFFFF;
+    --grey-50: #F9F9F9;
+    --grey-100: #F0F0F0;
+    --grey-200: #E0E0E0;
+    --grey-400: #9E9E9E;
+    --grey-600: #616161;
+    --grey-900: #212121;
+    --green: #2E7D32;
+    --green-light: #E8F5E9;
+    --red: #C62828;
+    --red-light: #FFEBEE;
+    --amber: #F59E0B;
+    --amber-light: #FFFBEB;
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 16px;
+    --r-xl: 24px;
+    --r-full: 999px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.12);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.12);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.18);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #111827;
+    color: var(--grey-900);
+    min-height: 100vh;
+    padding: 48px 24px;
+  }
+
+  /* ── Layout ─────────────────────────────── */
+  .page-header {
+    text-align: center;
+    margin-bottom: 56px;
+  }
+  .page-header h1 {
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--white);
+    letter-spacing: -0.5px;
+  }
+  .page-header p {
+    margin-top: 10px;
+    font-size: 14px;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.6;
+  }
+  .badge {
+    display: inline-block;
+    margin-top: 12px;
+    background: var(--orange-dim);
+    color: var(--orange);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: var(--r-full);
+  }
+
+  .section {
+    max-width: 1200px;
+    margin: 0 auto 72px;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 12px;
+  }
+  .section-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--white);
+    margin-bottom: 6px;
+  }
+  .section-desc {
+    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 32px;
+    line-height: 1.6;
+  }
+  .screen-row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .screen-col {
+    flex: 1;
+    min-width: 260px;
+  }
+  .screen-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.4);
+    text-align: center;
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── iPhone Frame ─────────────────────────── */
+  .iphone {
+    width: 280px;
+    background: #000;
+    border-radius: 44px;
+    border: 3px solid #333;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6), inset 0 0 0 1px #444;
+    position: relative;
+    margin: 0 auto;
+  }
+  .iphone-notch {
+    width: 100%;
+    height: 36px;
+    background: #000;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 6px;
+    position: relative;
+    z-index: 10;
+  }
+  .iphone-notch::before {
+    content: '';
+    width: 110px;
+    height: 24px;
+    background: #000;
+    border-radius: 0 0 18px 18px;
+    position: absolute;
+    top: 0;
+  }
+  .iphone-screen {
+    background: var(--cream);
+    min-height: 520px;
+    position: relative;
+    overflow: hidden;
+  }
+  .iphone-home-bar {
+    height: 28px;
+    background: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .iphone-home-bar::after {
+    content: '';
+    width: 100px;
+    height: 4px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 2px;
+  }
+
+  /* ── App UI Components ─────────────────────── */
+  .app-nav {
+    padding: 12px 16px 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .back-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-full);
+    background: rgba(0,0,0,0.06);
+  }
+  .back-btn svg { width: 16px; height: 16px; stroke: var(--teal); fill: none; stroke-width: 2.5; }
+  .nav-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--teal);
+    flex: 1;
+  }
+
+  .app-body { padding: 0 16px 16px; }
+
+  /* Skill pill */
+  .skill-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: var(--r-full);
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+  .skill-pill.interview { background: var(--orange-dim); color: var(--orange); }
+  .skill-pill.noi { background: rgba(30,120,100,0.12); color: var(--teal-light); }
+
+  /* Exercise list item */
+  .ex-item {
+    background: var(--white);
+    border-radius: var(--r-lg);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    box-shadow: var(--shadow-sm);
+  }
+  .ex-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--r-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 18px;
+  }
+  .ex-icon.conv { background: var(--orange-dim); }
+  .ex-icon.choice { background: rgba(21,101,192,0.1); }
+  .ex-title { font-size: 13px; font-weight: 600; color: var(--teal); line-height: 1.3; }
+  .ex-sub { font-size: 11px; color: var(--grey-600); margin-top: 3px; }
+  .ex-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: var(--r-full);
+    margin-top: 5px;
+  }
+  .ex-badge.conv { background: var(--orange-dim); color: var(--orange); }
+  .ex-badge.choice { background: rgba(21,101,192,0.1); color: #1565C0; }
+
+  /* Group header */
+  .group-header {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--grey-600);
+    margin: 16px 0 8px;
+  }
+
+  /* Intro screen */
+  .intro-hero {
+    background: var(--teal);
+    margin: -1px -16px 16px;
+    padding: 20px 16px;
+    text-align: center;
+  }
+  .intro-avatar-placeholder {
+    width: 72px;
+    height: 72px;
+    border-radius: var(--r-full);
+    background: rgba(255,255,255,0.15);
+    margin: 0 auto 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+  }
+  .intro-topic-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 4px;
+  }
+  .intro-topic-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--white);
+    line-height: 1.3;
+  }
+
+  .tip-card {
+    background: var(--white);
+    border-radius: var(--r-md);
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    box-shadow: var(--shadow-sm);
+  }
+  .tip-card-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--teal);
+    margin-bottom: 6px;
+  }
+  .tip-item {
+    font-size: 11px;
+    color: var(--grey-600);
+    line-height: 1.5;
+    display: flex;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .tip-dot { color: var(--orange); font-weight: 700; flex-shrink: 0; }
+
+  /* Choice options */
+  .choice-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .choice-card {
+    background: var(--white);
+    border-radius: var(--r-md);
+    padding: 10px;
+    text-align: center;
+    border: 2px solid transparent;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.15s;
+  }
+  .choice-card.selected {
+    border-color: var(--orange);
+    background: var(--orange-dim);
+  }
+  .choice-img {
+    width: 100%;
+    aspect-ratio: 4/3;
+    background: var(--grey-100);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+  }
+  .choice-img.selected-bg { background: rgba(255,106,20,0.08); }
+  .choice-text { font-size: 11px; font-weight: 600; color: var(--teal); }
+  .choice-check {
+    width: 18px;
+    height: 18px;
+    border-radius: var(--r-full);
+    background: var(--orange);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 4px;
+  }
+
+  /* Primary button */
+  .btn-primary {
+    width: 100%;
+    padding: 14px;
+    background: var(--orange);
+    color: var(--white);
+    border: none;
+    border-radius: var(--r-lg);
+    font-size: 15px;
+    font-weight: 700;
+    text-align: center;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .btn-primary.disabled {
+    background: var(--grey-200);
+    color: var(--grey-400);
+  }
+  .btn-secondary {
+    width: 100%;
+    padding: 12px;
+    background: transparent;
+    color: var(--grey-600);
+    border: 1.5px solid var(--grey-200);
+    border-radius: var(--r-lg);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+
+  /* ── SESSION SCREEN (full dark immersive) ─── */
+  .session-screen {
+    background: #0A1628;
+    min-height: 520px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .session-avatar-area {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .session-avatar-bg {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    background: linear-gradient(180deg, #0d2137 0%, #071120 100%);
+  }
+  .session-avatar-video {
+    width: 180px;
+    height: 200px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #1a3a5c, #0d2137);
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .avatar-face {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .avatar-face-circle {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2a5080, #1a3560);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    border: 2px solid rgba(255,255,255,0.1);
+  }
+  .avatar-face-body {
+    width: 80px;
+    height: 50px;
+    background: linear-gradient(135deg, #1a3f6f, #112952);
+    border-radius: 16px 16px 0 0;
+    margin-top: -4px;
+  }
+  .avatar-label {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.6);
+    color: rgba(255,255,255,0.9);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: var(--r-full);
+    white-space: nowrap;
+    backdrop-filter: blur(8px);
+  }
+
+  /* Ripple ring around avatar when speaking */
+  .avatar-ring {
+    position: absolute;
+    width: 200px;
+    height: 220px;
+    border-radius: 24px;
+    border: 2px solid rgba(255,106,20,0.3);
+    animation: ringPulse 1.5s ease-in-out infinite;
+    z-index: 1;
+  }
+  .avatar-ring2 {
+    position: absolute;
+    width: 220px;
+    height: 240px;
+    border-radius: 28px;
+    border: 1.5px solid rgba(255,106,20,0.15);
+    animation: ringPulse 1.5s ease-in-out infinite 0.3s;
+    z-index: 1;
+  }
+  @keyframes ringPulse {
+    0% { opacity: 0.6; transform: scale(0.96); }
+    50% { opacity: 1; transform: scale(1.02); }
+    100% { opacity: 0.6; transform: scale(0.96); }
+  }
+
+  /* Status pill */
+  .session-status {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(8px);
+    padding: 5px 14px;
+    border-radius: var(--r-full);
+    z-index: 10;
+    white-space: nowrap;
+  }
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-dot.listening { background: #22C55E; animation: blink 1.2s ease-in-out infinite; }
+  .status-dot.speaking { background: var(--orange); }
+  .status-dot.connecting { background: var(--amber); animation: blink 0.8s ease-in-out infinite; }
+  .status-dot.ready { background: rgba(255,255,255,0.5); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .status-text { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.9); }
+
+  /* Selected choice chip (for choice+explain mode) */
+  .choice-chip {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: rgba(255,106,20,0.85);
+    backdrop-filter: blur(8px);
+    padding: 4px 10px;
+    border-radius: var(--r-full);
+    font-size: 10px;
+    font-weight: 700;
+    color: white;
+    z-index: 10;
+  }
+
+  /* Transcript overlay */
+  .session-transcript {
+    padding: 12px 14px 0;
+    background: rgba(0,0,0,0.3);
+    backdrop-filter: blur(4px);
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+  }
+  .transcript-text {
+    font-size: 12px;
+    color: rgba(255,255,255,0.85);
+    line-height: 1.5;
+    text-align: center;
+    width: 100%;
+  }
+  .transcript-speaker {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
+  }
+  .transcript-speaker.examiner { color: rgba(255,255,255,0.5); }
+  .transcript-speaker.learner { color: var(--orange); }
+
+  /* Session controls */
+  .session-controls {
+    padding: 14px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    background: #0A1628;
+  }
+  /* Mic waveform indicator */
+  .mic-visualizer {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 28px;
+  }
+  .mic-bar {
+    width: 3px;
+    border-radius: 2px;
+    background: var(--orange);
+  }
+  .mic-bar.b1 { height: 8px; }
+  .mic-bar.b2 { height: 18px; animation: wave 0.6s ease-in-out infinite; }
+  .mic-bar.b3 { height: 26px; animation: wave 0.6s ease-in-out infinite 0.1s; }
+  .mic-bar.b4 { height: 22px; animation: wave 0.6s ease-in-out infinite 0.2s; }
+  .mic-bar.b5 { height: 14px; animation: wave 0.6s ease-in-out infinite 0.15s; }
+  .mic-bar.b6 { height: 20px; animation: wave 0.6s ease-in-out infinite 0.05s; }
+  .mic-bar.b7 { height: 10px; }
+  .mic-bar.idle { background: rgba(255,255,255,0.2); animation: none; height: 10px; }
+  @keyframes wave { 0%,100%{transform:scaleY(0.5)} 50%{transform:scaleY(1)} }
+
+  .btn-end-session {
+    padding: 12px 32px;
+    background: rgba(198,40,40,0.85);
+    color: var(--white);
+    border: none;
+    border-radius: var(--r-full);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+  }
+  .session-timer {
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+  }
+
+  /* ── RESULT SCREEN ─────────────────────────── */
+  .result-hero {
+    background: var(--teal);
+    padding: 20px 16px 16px;
+    text-align: center;
+  }
+  .result-score-circle {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    border: 3px solid rgba(255,255,255,0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+  }
+  .result-score-num {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--white);
+    line-height: 1;
+  }
+  .result-score-label {
+    font-size: 9px;
+    color: rgba(255,255,255,0.5);
+    font-weight: 500;
+  }
+  .result-level-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    color: var(--white);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 14px;
+    border-radius: var(--r-full);
+    margin-top: 4px;
+  }
+
+  .tab-row {
+    display: flex;
+    border-bottom: 1.5px solid var(--grey-100);
+    background: var(--white);
+  }
+  .tab-item {
+    flex: 1;
+    padding: 10px 6px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--grey-400);
+    position: relative;
+  }
+  .tab-item.active {
+    color: var(--teal);
+  }
+  .tab-item.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1.5px;
+    left: 20%;
+    right: 20%;
+    height: 2.5px;
+    background: var(--orange);
+    border-radius: 2px;
+  }
+
+  .feedback-card {
+    background: var(--white);
+    border-radius: var(--r-md);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    box-shadow: var(--shadow-sm);
+  }
+  .feedback-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .feedback-label { font-size: 12px; font-weight: 600; color: var(--teal); }
+  .score-bar-bg {
+    height: 6px;
+    background: var(--grey-100);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .score-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--orange);
+  }
+  .feedback-comment {
+    font-size: 11px;
+    color: var(--grey-600);
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+
+  .transcript-turn {
+    margin-bottom: 10px;
+  }
+  .turn-who {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
+  }
+  .turn-who.examiner { color: var(--teal); }
+  .turn-who.learner { color: var(--orange); }
+  .turn-text {
+    font-size: 12px;
+    color: var(--grey-900);
+    line-height: 1.6;
+    padding: 8px 10px;
+    border-radius: var(--r-md);
+    background: var(--grey-50);
+  }
+  .turn-text.learner-bg { background: var(--orange-dim); }
+
+  /* ── BOTTOM NAV ─────────────────────────── */
+  .bottom-nav {
+    background: var(--white);
+    border-top: 1px solid var(--grey-100);
+    display: flex;
+    padding: 8px 0 4px;
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .nav-icon {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .nav-icon svg { width: 20px; height: 20px; stroke-width: 2; fill: none; }
+  .nav-icon svg.active { stroke: var(--teal); }
+  .nav-icon svg.inactive { stroke: var(--grey-400); }
+  .nav-text { font-size: 9px; font-weight: 600; }
+  .nav-text.active { color: var(--teal); }
+  .nav-text.inactive { color: var(--grey-400); }
+
+  /* ── USER FLOW DIAGRAM ──────────────────── */
+  .flow-diagram {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--r-xl);
+    padding: 32px;
+  }
+  .flow-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .flow-node {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: var(--r-md);
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--white);
+    white-space: nowrap;
+  }
+  .flow-node.highlight { background: var(--orange-dim); border-color: rgba(255,106,20,0.4); color: var(--orange); }
+  .flow-node.teal-node { background: rgba(15,61,58,0.5); border-color: rgba(26,92,88,0.5); color: #4ECDC4; }
+  .flow-arrow {
+    font-size: 14px;
+    color: rgba(255,255,255,0.3);
+    padding-top: 8px;
+    flex-shrink: 0;
+  }
+  .flow-branch {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin: 8px 0 8px 20px;
+  }
+  .flow-branch-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .flow-branch-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.5px;
+  }
+  .flow-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+    margin: 20px 0;
+  }
+
+  /* ── CMS FORM ──────────────────────────── */
+  .cms-screen {
+    background: var(--white);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    max-width: 600px;
+  }
+  .cms-header {
+    background: var(--teal);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .cms-header-title { font-size: 16px; font-weight: 700; color: var(--white); }
+  .cms-header-sub { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+  .cms-body { padding: 20px; }
+  .cms-field { margin-bottom: 16px; }
+  .cms-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--grey-900);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .cms-required { color: var(--red); }
+  .cms-input {
+    width: 100%;
+    border: 1.5px solid var(--grey-200);
+    border-radius: var(--r-md);
+    padding: 9px 12px;
+    font-size: 13px;
+    color: var(--grey-900);
+    background: var(--grey-50);
+  }
+  .cms-input.textarea { height: 80px; resize: vertical; font-family: inherit; }
+  .cms-hint { font-size: 11px; color: var(--grey-400); margin-top: 4px; line-height: 1.4; }
+  .cms-select {
+    width: 100%;
+    border: 1.5px solid var(--grey-200);
+    border-radius: var(--r-md);
+    padding: 9px 12px;
+    font-size: 13px;
+    color: var(--grey-900);
+    background: var(--grey-50);
+  }
+  .cms-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background: var(--grey-50);
+    border-radius: var(--r-md);
+    border: 1.5px solid var(--grey-200);
+  }
+  .cms-toggle-info {}
+  .cms-toggle-title { font-size: 13px; font-weight: 600; color: var(--grey-900); }
+  .cms-toggle-sub { font-size: 11px; color: var(--grey-400); margin-top: 2px; }
+  .toggle-track {
+    width: 42px;
+    height: 24px;
+    border-radius: 12px;
+    background: #22C55E;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .toggle-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle-track.off { background: var(--grey-200); }
+  .toggle-track.off .toggle-thumb { right: auto; left: 2px; }
+  .cms-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--teal);
+    margin: 20px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1.5px solid var(--grey-100);
+  }
+  .cms-option-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .cms-option-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--teal-dim);
+    color: var(--teal);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .cms-option-input {
+    flex: 1;
+    border: 1.5px solid var(--grey-200);
+    border-radius: var(--r-md);
+    padding: 7px 10px;
+    font-size: 12px;
+    background: var(--grey-50);
+  }
+  .cms-add-btn {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--teal);
+    background: var(--teal-dim);
+    border: none;
+    padding: 7px 14px;
+    border-radius: var(--r-md);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .cms-footer {
+    padding: 16px 20px;
+    background: var(--grey-50);
+    border-top: 1px solid var(--grey-100);
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+  .cms-btn-save {
+    padding: 9px 20px;
+    background: var(--teal);
+    color: white;
+    border: none;
+    border-radius: var(--r-md);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .cms-btn-cancel {
+    padding: 9px 16px;
+    background: transparent;
+    color: var(--grey-600);
+    border: 1.5px solid var(--grey-200);
+    border-radius: var(--r-md);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cms-info-box {
+    background: #EFF6FF;
+    border: 1.5px solid #BFDBFE;
+    border-radius: var(--r-md);
+    padding: 10px 12px;
+    font-size: 11px;
+    color: #1D4ED8;
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Interview Skill — UI/UX Design</h1>
+  <p>ElevenLabs Conversational AI + Simli avatar · Flutter iOS · skill_kind = "interview"</p>
+  <span class="badge">V14 Concept</span>
+</div>
+
+<!-- ── 1. USER FLOW ─────────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">01 · User Flow</div>
+  <div class="section-title">Hai luồng chính</div>
+  <div class="section-desc">Entry point từ ModuleDetail (cùng với Nói/Nghe/Viết/Đọc). Sau session: transcript → Go backend → Claude score.</div>
+
+  <div class="flow-diagram">
+    <!-- Shared entry -->
+    <div class="flow-row">
+      <div class="flow-node">ModuleDetail</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node highlight">Phỏng vấn skill card</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">InterviewListScreen</div>
+    </div>
+
+    <div class="flow-divider"></div>
+
+    <!-- Branch A -->
+    <div style="margin-bottom:6px">
+      <div class="flow-branch-label">LUỒNG A — HỘI THOẠI THEO CHỦ ĐỀ</div>
+    </div>
+    <div class="flow-row">
+      <div class="flow-node">Chọn bài "Gia đình"</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">IntroScreen (topic + tips)</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node highlight">[Bắt đầu]</div>
+    </div>
+    <div class="flow-row" style="margin-top:6px; padding-left:20px;">
+      <div class="flow-node teal-node">SessionScreen (avatar đang hỏi)</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">Learner trả lời (mic)</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">5–8 turns</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node highlight">[Kết thúc]</div>
+    </div>
+    <div class="flow-row" style="margin-top:6px; padding-left:20px;">
+      <div class="flow-node">AnalysisScreen</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">ResultScreen (score + feedback + transcript)</div>
+    </div>
+
+    <div class="flow-divider"></div>
+
+    <!-- Branch B -->
+    <div style="margin-bottom:6px">
+      <div class="flow-branch-label">LUỒNG B — CHỌN PHƯƠNG ÁN + GIẢI THÍCH</div>
+    </div>
+    <div class="flow-row">
+      <div class="flow-node">Chọn bài "Địa điểm du lịch"</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">IntroScreen (4 option cards)</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">Tap chọn 1 phương án</div>
+    </div>
+    <div class="flow-row" style="margin-top:6px; padding-left:20px;">
+      <div class="flow-node highlight">[Bắt đầu với lựa chọn này]</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node teal-node">SessionScreen (chip hiện lựa chọn)</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">Avatar hỏi "Tại sao bạn chọn X?"</div>
+    </div>
+    <div class="flow-row" style="margin-top:6px; padding-left:20px;">
+      <div class="flow-node">[Kết thúc]</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">Go backend: score explanation quality</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">ResultScreen</div>
+    </div>
+
+    <div class="flow-divider"></div>
+
+    <!-- Backend flow -->
+    <div style="margin-bottom:6px">
+      <div class="flow-branch-label">BACKEND — EPHEMERAL TOKEN FLOW</div>
+    </div>
+    <div class="flow-row">
+      <div class="flow-node">Flutter: POST /v1/interview-sessions/token</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node teal-node">Go: signed session URL từ ElevenLabs</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">Flutter: WS thẳng tới ElevenLabs</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 2. MODULE DETAIL + LIST ─────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">02 · Entry Point & Exercise List</div>
+  <div class="section-title">Từ ModuleDetail đến danh sách bài</div>
+  <div class="section-desc">Skill "Phỏng vấn" xuất hiện trong ModuleDetail cùng với Nói/Nghe/Viết/Đọc. InterviewListScreen nhóm bài theo exercise type.</div>
+
+  <div class="screen-row">
+    <!-- Module Detail (existing, showing interview card) -->
+    <div class="screen-col">
+      <div class="screen-label">ModuleDetail — interview skill card</div>
+      <div class="iphone">
+        <div class="iphone-notch"></div>
+        <div class="iphone-screen">
+          <div class="app-nav">
+            <div class="back-btn">
+              <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            </div>
+            <div class="nav-title">Chủ đề: Gia đình</div>
+          </div>
+          <div class="app-body">
+            <div style="font-size:11px;font-weight:700;color:var(--grey-600);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Kỹ năng luyện tập</div>
+
+            <!-- Existing skills -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+              <div style="background:var(--white);border-radius:var(--r-md);padding:12px 10px;text-align:center;box-shadow:var(--shadow-sm);">
+                <div style="font-size:22px;margin-bottom:4px;">🎤</div>
+                <div style="font-size:11px;font-weight:700;color:var(--teal);">Nói</div>
+                <div style="font-size:10px;color:var(--grey-400);margin-top:2px;">4 bài</div>
+              </div>
+              <div style="background:var(--white);border-radius:var(--r-md);padding:12px 10px;text-align:center;box-shadow:var(--shadow-sm);">
+                <div style="font-size:22px;margin-bottom:4px;">👂</div>
+                <div style="font-size:11px;font-weight:700;color:var(--teal);">Nghe</div>
+                <div style="font-size:10px;color:var(--grey-400);margin-top:2px;">6 bài</div>
+              </div>
+              <div style="background:var(--white);border-radius:var(--r-md);padding:12px 10px;text-align:center;box-shadow:var(--shadow-sm);">
+                <div style="font-size:22px;margin-bottom:4px;">📖</div>
+                <div style="font-size:11px;font-weight:700;color:var(--teal);">Đọc</div>
+                <div style="font-size:10px;color:var(--grey-400);margin-top:2px;">5 bài</div>
+              </div>
+              <div style="background:var(--white);border-radius:var(--r-md);padding:12px 10px;text-align:center;box-shadow:var(--shadow-sm);">
+                <div style="font-size:22px;margin-bottom:4px;">✏️</div>
+                <div style="font-size:11px;font-weight:700;color:var(--teal);">Viết</div>
+                <div style="font-size:10px;color:var(--grey-400);margin-top:2px;">2 bài</div>
+              </div>
+            </div>
+
+            <!-- Interview card — new, spans full width -->
+            <div style="background:linear-gradient(135deg,var(--teal),var(--teal-light));border-radius:var(--r-lg);padding:14px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-md);">
+              <div style="width:48px;height:48px;border-radius:var(--r-md);background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:24px;">🎙</div>
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:700;color:var(--white);">Phỏng vấn AI</div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:2px;">Hội thoại thực tế với examiner</div>
+                <div style="margin-top:6px;display:flex;gap:6px;">
+                  <span style="background:rgba(255,106,20,0.3);color:var(--orange);font-size:9px;font-weight:700;padding:2px 8px;border-radius:var(--r-full);">MỚI</span>
+                  <span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);font-size:9px;font-weight:600;padding:2px 8px;border-radius:var(--r-full);">3 bài</span>
+                </div>
+              </div>
+              <svg style="width:16px;height:16px;stroke:rgba(255,255,255,0.4);fill:none;stroke-width:2.5;" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
+        </div>
+        <div class="iphone-home-bar" style="background:var(--cream);"></div>
+      </div>
+    </div>
+
+    <!-- Interview List Screen -->
+    <div class="screen-col">
+      <div class="screen-label">InterviewListScreen</div>
+      <div class="iphone">
+        <div class="iphone-notch"></div>
+        <div class="iphone-screen">
+          <div style="background:var(--teal);padding:14px 16px 16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div class="back-btn" style="background:rgba(255,255,255,0.1);">
+                <svg viewBox="0 0 24 24" style="stroke:white;"><polyline points="15 18 9 12 15 6"/></svg>
+              </div>
+              <div style="font-size:15px;font-weight:700;color:var(--white);">Phỏng vấn AI</div>
+            </div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.6);line-height:1.4;">Luyện hội thoại thực tế với examiner Czech AI</div>
+          </div>
+
+          <div class="app-body" style="padding-top:14px;">
+            <div class="group-header">Hội thoại theo chủ đề</div>
+
+            <div class="ex-item">
+              <div class="ex-icon conv">💬</div>
+              <div style="flex:1;">
+                <div class="ex-title">Gia đình và bạn bè</div>
+                <div class="ex-sub">~5–8 câu hỏi · ~5 phút</div>
+                <span class="ex-badge conv">Hội thoại</span>
+              </div>
+              <svg style="width:14px;height:14px;stroke:var(--grey-400);fill:none;stroke-width:2.5;flex-shrink:0;margin-top:4px;" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+
+            <div class="ex-item">
+              <div class="ex-icon conv">🏠</div>
+              <div style="flex:1;">
+                <div class="ex-title">Nhà và cuộc sống hàng ngày</div>
+                <div class="ex-sub">~5–8 câu hỏi · ~5 phút</div>
+                <span class="ex-badge conv">Hội thoại</span>
+              </div>
+              <svg style="width:14px;height:14px;stroke:var(--grey-400);fill:none;stroke-width:2.5;flex-shrink:0;margin-top:4px;" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+
+            <div class="group-header" style="margin-top:8px;">Chọn phương án + giải thích</div>
+
+            <div class="ex-item">
+              <div class="ex-icon choice">🗺</div>
+              <div style="flex:1;">
+                <div class="ex-title">Chọn địa điểm du lịch</div>
+                <div class="ex-sub">4 phương án · giải thích lý do</div>
+                <span class="ex-badge choice">Chọn & giải thích</span>
+              </div>
+              <svg style="width:14px;height:14px;stroke:var(--grey-400);fill:none;stroke-width:2.5;flex-shrink:0;margin-top:4px;" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+          </div>
+        </div>
+        <div class="bottom-nav">
+          <div class="nav-item">
+            <div class="nav-icon"><svg viewBox="0 0 24 24" class="active"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+            <span class="nav-text active">Home</span>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon"><svg viewBox="0 0 24 24" class="inactive"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <span class="nav-text inactive">Lịch sử</span>
+          </div>
+        </div>
+        <div class="iphone-home-bar" style="background:var(--white);"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 3. INTRO SCREENS ──────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">03 · Intro Screens</div>
+  <div class="section-title">Chuẩn bị trước khi bắt đầu</div>
+  <div class="section-desc">Luồng A (Hội thoại): giới thiệu chủ đề + tips. Luồng B (Chọn phương án): chọn 1 trong N options trước khi conversation bắt đầu.</div>
+
+  <div class="screen-row">
+    <!-- Intro A: Conversation -->
+    <div class="screen-col">
+      <div class="screen-label">IntroScreen — Hội thoại theo chủ đề</div>
+      <div class="iphone">
+        <div class="iphone-notch"></div>
+        <div class="iphone-screen">
+          <div class="app-nav" style="position:absolute;top:0;left:0;right:0;z-index:5;">
+            <div class="back-btn" style="background:rgba(255,255,255,0.15);">
+              <svg viewBox="0 0 24 24" style="stroke:white;"><polyline points="15 18 9 12 15 6"/></svg>
+            </div>
+          </div>
+
+          <div class="intro-hero" style="padding-top:48px;">
+            <div class="intro-avatar-placeholder">👩‍💼</div>
+            <div class="intro-topic-label">Chủ đề hội thoại</div>
+            <div class="intro-topic-title">Gia đình và<br>bạn bè</div>
+            <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;">
+              <span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);font-size:10px;font-weight:600;padding:3px 10px;border-radius:var(--r-full);">~5 phút</span>
+              <span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);font-size:10px;font-weight:600;padding:3px 10px;border-radius:var(--r-full);">5–8 câu hỏi</span>
+            </div>
+          </div>
+
+          <div class="app-body" style="padding-top:14px;">
+            <div class="tip-card">
+              <div class="tip-card-title">Examiner sẽ hỏi về</div>
+              <div class="tip-item"><span class="tip-dot">·</span> Gia đình của bạn có bao nhiêu người?</div>
+              <div class="tip-item"><span class="tip-dot">·</span> Bạn làm gì vào cuối tuần với gia đình?</div>
+              <div class="tip-item"><span class="tip-dot">·</span> Bạn bè thân thiết nhất của bạn là ai?</div>
+            </div>
+
+            <div class="tip-card" style="background:var(--amber-light);border:1px solid rgba(245,158,11,0.2);">
+              <div class="tip-card-title" style="color:#92400E;">Mẹo luyện tập</div>
+              <div class="tip-item" style="color:#78350F;"><span class="tip-dot" style="color:#F59E0B;">·</span> Trả lời câu hoàn chỉnh, không chỉ vài từ</div>
+              <div class="tip-item" style="color:#78350F;"><span class="tip-dot" style="color:#F59E0B;">·</span> Dùng từ nối: protože, ale, a také...</div>
+            </div>
+
+            <div class="btn-primary">Bắt đầu phỏng vấn →</div>
+          </div>
+        </div>
+        <div class="iphone-home-bar" style="background:var(--cream);"></div>
+      </div>
+    </div>
+
+    <!-- Intro B: Choice + Explain -->
+    <div class="screen-col">
+      <div class="screen-label">IntroScreen — Chọn phương án</div>
+      <div class="iphone">
+        <div class="iphone-notch"></div>
+        <div class="iphone-screen">
+          <div class="app-nav" style="position:absolute;top:0;left:0;right:0;z-index:5;">
+            <div class="back-btn" style="background:rgba(255,255,255,0.15);">
+              <svg viewBox="0 0 24 24" style="stroke:white;"><polyline points="15 18 9 12 15 6"/></svg>
+            </div>
+          </div>
+
+          <div class="intro-hero" style="padding-top:48px;padding-bottom:14px;">
+            <div class="intro-topic-label">Chọn phương án + giải thích</div>
+            <div class="intro-topic-title">Bạn muốn đi du lịch<br>ở đâu?</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:6px;">Chọn 1 địa điểm và giải thích lý do</div>
+          </div>
+
+          <div class="app-body" style="padding-top:12px;">
+            <div class="choice-grid">
+              <div class="choice-card selected">
+                <div class="choice-img selected-bg">🏰</div>
+                <div class="choice-text" style="color:var(--orange);">Praha</div>
+                <div class="choice-check">
+                  <svg style="width:10px;height:10px;stroke:white;fill:none;stroke-width:3;" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              </div>
+              <div class="choice-card">
+                <div class="choice-img">🏔</div>
+                <div class="choice-text">Krkonoše</div>
+              </div>
+              <div class="choice-card">
+                <div class="choice-img">🌊</div>
+                <div class="choice-text">Brno</div>
+              </div>
+              <div class="choice-card">
+                <div class="choice-img">🌿</div>
+                <div class="choice-text">Český Krumlov</div>
+              </div>
+            </div>
+
+            <div style="font-size:11px;color:var(--grey-400);text-align:center;margin-bottom:8px;">Đã chọn: <strong style="color:var(--orange);">Praha</strong></div>
+
+            <div class="btn-primary">Bắt đầu với lựa chọn này →</div>
+            <div class="btn-secondary">Chọn lại</div>
+          </div>
+        </div>
+        <div class="iphone-home-bar" style="background:var(--cream);"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 4. SESSION SCREEN ──────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">04 · Session Screen (Màn hình chính)</div>
+  <div class="section-title">Avatar full-screen — 3 trạng thái</div>
+  <div class="section-desc">Avatar Simli full-screen tối. Status pill trên đỉnh. Transcript overlay tuỳ chỉnh trong CMS. Mic visualizer khi learner nói.</div>
+
+  <div class="screen-row">
+    <!-- State 1: Connecting -->
+    <div class="screen-col">
+      <div class="screen-label">Đang kết nối...</div>
+      <div class="iphone">
+        <div class="iphone-notch" style="background:#0A1628;"></div>
+        <div class="session-screen">
+          <div class="session-avatar-area">
+            <div class="session-avatar-bg"></div>
+            <div style="text-align:center;position:relative;z-index:2;">
+              <div style="width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.05);border:2px solid rgba(255,255,255,0.1);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
+                <div style="width:32px;height:32px;border-radius:50%;border:3px solid var(--orange);border-top-color:transparent;animation:spin 0.8s linear infinite;"></div>
+              </div>
+              <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.6);">Đang kết nối với examiner...</div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:6px;">Thường mất 2–4 giây</div>
+            </div>
+          </div>
+          <div class="session-controls">
+            <div class="session-timer">00:00</div>
+            <button class="btn-end-session" style="opacity:0.4;">Huỷ</button>
+          </div>
+        </div>
+        <div class="iphone-home-bar" style="background:#0A1628;"></div>
+      </div>
+    </div>
+
+    <!-- State 2: Avatar Speaking -->
+    <div class="screen-col">
+      <div class="screen-label">Avatar đang nói</div>
+      <div class="iphone">
+        <div class="iphone-notch" style="background:#0A1628;"></div>
+        <div class="session-screen">
+          <div class="session-avatar-area">
+            <div class="session-avatar-bg"></div>
+
+            <div class="session-status">
+              <div class="status-dot speaking"></div>
+              <div class="status-text">Examiner đang nói</div>
+            </div>
+
+            <div class="avatar-ring"></div>
+            <div class="avatar-ring2"></div>
+
+            <div class="session-avatar-video">
+              <div class="avatar-face">
+                <div class="avatar-face-circle">👩‍💼</div>
+                <div class="avatar-face-body"></div>
+              </div>
+              <div class="avatar-label">Jana Nováková · Examiner</div>
+            </div>
+          </div>
+
+          <div class="session-transcript">
+            <div>
+              <div class="transcript-speaker examiner">Examiner</div>
+              <div class="transcript-text">"Jak velká je vaše rodina? Máte sourozence?"</div>
+            </div>
+          </div>
+
+          <div class="session-controls">
+            <div class="session-timer">01:23</div>
+            <div class="mic-visualizer">
+              <div class="mic-bar b1 idle"></div>
+              <div class="mic-bar b2 idle"></div>
+              <div class="mic-bar b3 idle"></div>
+              <div class="mic-bar b4 idle"></div>
+              <div class="mic-bar b5 idle"></div>
+              <div class="mic-bar b6 idle"></div>
+              <div class="mic-bar b7 idle"></div>
+            </div>
+            <button class="btn-end-session">Kết thúc</button>
+          </div>
+        </div>
+        <div class="iphone-home-bar" style="background:#0A1628;"></div>
+      </div>
+    </div>
+
+    <!-- State 3: Learner Speaking -->
+    <div class="screen-col">
+      <div class="screen-label">Learner đang trả lời</div>
+      <div class="iphone">
+        <div class="iphone-notch" style="background:#0A1628;"></div>
+        <div class="session-screen">
+          <div class="session-avatar-area">
+            <div class="session-avatar-bg"></div>
+
+            <div class="session-status">
+              <div class="status-dot listening"></div>
+              <div class="status-text">Đang lắng nghe bạn...</div>
+            </div>
+
+            <!-- Choice chip (for choice+explain mode) -->
+            <div class="choice-chip">Praha ✓</div>
+
+            <div class="session-avatar-video" style="opacity:0.7;">
+              <div class="avatar-face">
+                <div class="avatar-face-circle">👩‍💼</div>
+                <div class="avatar-face-body"></div>
+              </div>
+              <div class="avatar-label">Jana Nováková · Examiner</div>
+            </div>
+          </div>
+
+          <div class="session-transcript">
+            <div>
+              <div class="transcript-speaker learner">Bạn</div>
+              <div class="transcript-text">"Mám dvě sestry a jednoho bratra..."</div>
+            </div>
+          </div>
+
+          <div class="session-controls">
+            <div class="session-timer">01:47</div>
+            <div class="mic-visualizer">
+              <div class="mic-bar b1"></div>
+              <div class="mic-bar b2"></div>
+              <div class="mic-bar b3"></div>
+              <div class="mic-bar b4"></div>
+              <div class="mic-bar b5"></div>
+              <div class="mic-bar b6"></div>
+              <div class="mic-bar b7"></div>
+            </div>
+            <button class="btn-end-session">Kết thúc</button>
+          </div>
+        </div>
+        <div class="iphone-home-bar" style="background:#0A1628;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 5. RESULT SCREEN ──────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">05 · Result Screen</div>
+  <div class="section-title">Kết quả sau session</div>
+  <div class="section-desc">3 tab: Nhận xét (score + AI feedback), Hội thoại (full transcript), Luyện lại.</div>
+
+  <div class="screen-row">
+    <!-- Result: Feedback tab -->
+    <div class="screen-col">
+      <div class="screen-label">Tab: Nhận xét</div>
+      <div class="iphone">
+        <div class="iphone-notch"></div>
+        <div class="iphone-screen">
+          <div class="result-hero">
+            <div class="result-score-circle">
+              <div class="result-score-num">78</div>
+              <div class="result-score-label">/ 100</div>
+            </div>
+            <div style="font-size:14px;font-weight:700;color:var(--white);margin-top:6px;">Gia đình và bạn bè</div>
+            <div class="result-level-badge">Khá · B1 sơ cấp</div>
+          </div>
+
+          <div class="tab-row">
+            <div class="tab-item active">Nhận xét</div>
+            <div class="tab-item">Hội thoại</div>
+          </div>
+
+          <div class="app-body" style="padding-top:12px;">
+            <div class="feedback-card">
+              <div class="feedback-row">
+                <div class="feedback-label">Từ vựng</div>
+                <div style="font-size:12px;font-weight:700;color:var(--teal);">8/10</div>
+              </div>
+              <div class="score-bar-bg"><div class="score-bar-fill" style="width:80%;"></div></div>
+              <div class="feedback-comment">Sử dụng tốt từ chỉ quan hệ gia đình. Thêm từ tính từ mô tả.</div>
+            </div>
+
+            <div class="feedback-card">
+              <div class="feedback-row">
+                <div class="feedback-label">Ngữ pháp</div>
+                <div style="font-size:12px;font-weight:700;color:var(--teal);">7/10</div>
+              </div>
+              <div class="score-bar-bg"><div class="score-bar-fill" style="width:70%;"></div></div>
+              <div class="feedback-comment">Chia động từ cơ bản đúng. Cần luyện cách 4 (accusative) hơn.</div>
+            </div>
+
+            <div class="feedback-card">
+              <div class="feedback-row">
+                <div class="feedback-label">Sự lưu loát</div>
+                <div style="font-size:12px;font-weight:700;color:var(--teal);">7.5/10</div>
+              </div>
+              <div class="score-bar-bg"><div class="score-bar-fill" style="width:75%;background:var(--teal-light);"></div></div>
+              <div class="feedback-comment">Câu trả lời đủ ý, có ngừng đôi chút. Tự nhiên hơn so với lần trước.</div>
+            </div>
+          </div>
+        </div>
+        <div class="iphone-home-bar" style="background:var(--cream);"></div>
+      </div>
+    </div>
+
+    <!-- Result: Transcript tab -->
+    <div class="screen-col">
+      <div class="screen-label">Tab: Hội thoại</div>
+      <div class="iphone">
+        <div class="iphone-notch"></div>
+        <div class="iphone-screen">
+          <div class="result-hero" style="padding-bottom:0;">
+            <div style="font-size:14px;font-weight:700;color:var(--white);">Gia đình và bạn bè</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px;">5 lượt · 3 phút 12 giây</div>
+          </div>
+
+          <div class="tab-row">
+            <div class="tab-item">Nhận xét</div>
+            <div class="tab-item active">Hội thoại</div>
+          </div>
+
+          <div class="app-body" style="padding-top:12px;">
+            <div class="transcript-turn">
+              <div class="turn-who examiner">Jana (Examiner)</div>
+              <div class="turn-text">Dobrý den! Jak se jmenujete a odkud jste?</div>
+            </div>
+            <div class="transcript-turn">
+              <div class="turn-who learner">Bạn</div>
+              <div class="turn-text learner-bg">Dobrý den. Jmenuji se Minh a jsem z Vietnamu.</div>
+            </div>
+            <div class="transcript-turn">
+              <div class="turn-who examiner">Jana (Examiner)</div>
+              <div class="turn-text">Jak velká je vaše rodina? Máte sourozence?</div>
+            </div>
+            <div class="transcript-turn">
+              <div class="turn-who learner">Bạn</div>
+              <div class="turn-text learner-bg">Mám dvě sestry a jednoho bratra. Moje rodina je velká.</div>
+            </div>
+          </div>
+        </div>
+        <div class="iphone-home-bar" style="background:var(--cream);"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 6. CMS FORM ─────────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">06 · CMS — Tạo Interview Exercise</div>
+  <div class="section-title">Form dành cho admin</div>
+  <div class="section-desc">Phần CMS trong slide-over panel. Admin chọn exercise type, nhập system prompt cho ElevenLabs agent, và bật/tắt transcript overlay.</div>
+
+  <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+    <!-- Form A: Conversation type -->
+    <div style="flex:1;min-width:280px;">
+      <div class="screen-label" style="color:rgba(255,255,255,0.4);font-size:11px;margin-bottom:10px;">Form — interview_conversation</div>
+      <div class="cms-screen">
+        <div class="cms-header">
+          <div>
+            <div class="cms-header-title">Tạo bài Phỏng vấn</div>
+            <div class="cms-header-sub">interview_conversation</div>
+          </div>
+        </div>
+        <div class="cms-body">
+          <div class="cms-info-box">
+            ElevenLabs agent sẽ dùng <strong>system_prompt</strong> để đóng vai examiner Czech và dẫn dắt hội thoại.
+          </div>
+
+          <div class="cms-field">
+            <div class="cms-label">Tiêu đề bài <span class="cms-required">*</span></div>
+            <input class="cms-input" type="text" value="Gia đình và bạn bè" readonly />
+          </div>
+
+          <div class="cms-field">
+            <div class="cms-label">Chủ đề (dùng trong tips cho learner) <span class="cms-required">*</span></div>
+            <input class="cms-input" type="text" value="Gia đình, anh chị em, sở thích gia đình" readonly />
+          </div>
+
+          <div class="cms-field">
+            <div class="cms-label">System Prompt cho ElevenLabs Agent <span class="cms-required">*</span></div>
+            <textarea class="cms-input textarea" readonly>You are Jana Nováková, a Czech language examiner for the A2 certification exam. Conduct a friendly conversational interview in Czech about family and friends. Ask 5-8 natural questions. Start with "Dobrý den!" and introduce yourself. Keep questions simple and appropriate for A2 level. If the learner makes errors, continue naturally without correcting.</textarea>
+            <div class="cms-hint">Agent sẽ dùng prompt này để dẫn dắt toàn bộ conversation.</div>
+          </div>
+
+          <div class="cms-field">
+            <div class="cms-label">Số lượt tối đa (max_turns)</div>
+            <input class="cms-input" type="number" value="8" readonly style="width:80px;" />
+            <div class="cms-hint">Session kết thúc khi đủ số lượt hoặc learner bấm "Kết thúc".</div>
+          </div>
+
+          <div class="cms-section-title">Tuỳ chọn hiển thị</div>
+
+          <div class="cms-toggle-row">
+            <div class="cms-toggle-info">
+              <div class="cms-toggle-title">Hiển thị transcript realtime</div>
+              <div class="cms-toggle-sub">Phụ đề dưới avatar trong lúc nói</div>
+            </div>
+            <div class="toggle-track"><div class="toggle-thumb"></div></div>
+          </div>
+        </div>
+        <div class="cms-footer">
+          <button class="cms-btn-cancel">Huỷ</button>
+          <button class="cms-btn-save">Lưu bài</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Form B: Choice type -->
+    <div style="flex:1;min-width:280px;">
+      <div class="screen-label" style="color:rgba(255,255,255,0.4);font-size:11px;margin-bottom:10px;">Form — interview_choice_explain</div>
+      <div class="cms-screen">
+        <div class="cms-header">
+          <div>
+            <div class="cms-header-title">Tạo bài Phỏng vấn</div>
+            <div class="cms-header-sub">interview_choice_explain</div>
+          </div>
+        </div>
+        <div class="cms-body">
+          <div class="cms-field">
+            <div class="cms-label">Tiêu đề bài <span class="cms-required">*</span></div>
+            <input class="cms-input" type="text" value="Chọn địa điểm du lịch" readonly />
+          </div>
+
+          <div class="cms-field">
+            <div class="cms-label">Câu hỏi chính hiển thị cho learner <span class="cms-required">*</span></div>
+            <input class="cms-input" type="text" value="Bạn muốn đi du lịch ở đâu?" readonly />
+          </div>
+
+          <div class="cms-section-title">Các phương án (3–4 options)</div>
+
+          <div class="cms-option-row">
+            <div class="cms-option-num">1</div>
+            <input class="cms-option-input" value="Praha" readonly />
+            <div style="font-size:11px;color:var(--grey-400);">+ ảnh</div>
+          </div>
+          <div class="cms-option-row">
+            <div class="cms-option-num">2</div>
+            <input class="cms-option-input" value="Krkonoše" readonly />
+            <div style="font-size:11px;color:var(--grey-400);">+ ảnh</div>
+          </div>
+          <div class="cms-option-row">
+            <div class="cms-option-num">3</div>
+            <input class="cms-option-input" value="Brno" readonly />
+            <div style="font-size:11px;color:var(--grey-400);">+ ảnh</div>
+          </div>
+          <div class="cms-option-row">
+            <div class="cms-option-num">4</div>
+            <input class="cms-option-input" value="Český Krumlov" readonly />
+            <div style="font-size:11px;color:var(--grey-400);">+ ảnh</div>
+          </div>
+
+          <button class="cms-add-btn" style="margin-top:6px;">+ Thêm phương án</button>
+
+          <div class="cms-section-title">System Prompt <span class="cms-required">*</span></div>
+          <textarea class="cms-input textarea" readonly>You are Jana Nováková, a Czech examiner. The learner has chosen {selected_option} as their preferred travel destination. Start by acknowledging their choice in Czech, then ask 4-6 follow-up questions: why they chose it, what they would do there, who they would go with, etc. Keep it conversational and A2-appropriate.</textarea>
+          <div class="cms-hint" style="margin-top:4px;">{selected_option} sẽ được thay bằng lựa chọn thực tế của learner.</div>
+
+          <div class="cms-section-title">Tuỳ chọn hiển thị</div>
+          <div class="cms-toggle-row">
+            <div class="cms-toggle-info">
+              <div class="cms-toggle-title">Hiển thị transcript realtime</div>
+              <div class="cms-toggle-sub">Phụ đề dưới avatar trong lúc nói</div>
+            </div>
+            <div class="toggle-track off"><div class="toggle-thumb"></div></div>
+          </div>
+        </div>
+        <div class="cms-footer">
+          <button class="cms-btn-cancel">Huỷ</button>
+          <button class="cms-btn-save">Lưu bài</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 7. STATES & ANNOTATIONS ─────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">07 · States & Annotations</div>
+  <div class="section-title">Các trạng thái và ghi chú kỹ thuật</div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">
+
+    <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:var(--r-lg);padding:20px;">
+      <div style="font-size:13px;font-weight:700;color:var(--orange);margin-bottom:12px;">Session Status States</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:var(--amber);flex-shrink:0;animation:blink 0.8s ease-in-out infinite;"></div>
+          <div><div style="font-size:12px;font-weight:600;color:white;">Đang kết nối</div><div style="font-size:11px;color:rgba(255,255,255,0.4);">Lấy ephemeral token + WS handshake</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.4);flex-shrink:0;"></div>
+          <div><div style="font-size:12px;font-weight:600;color:white;">Sẵn sàng</div><div style="font-size:11px;color:rgba(255,255,255,0.4);">Connected, avatar idle</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:var(--orange);flex-shrink:0;"></div>
+          <div><div style="font-size:12px;font-weight:600;color:white;">Examiner đang nói</div><div style="font-size:11px;color:rgba(255,255,255,0.4);">Simli audio → avatar lip-sync + ring pulse</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:#22C55E;flex-shrink:0;animation:blink 1.2s ease-in-out infinite;"></div>
+          <div><div style="font-size:12px;font-weight:600;color:white;">Đang lắng nghe</div><div style="font-size:11px;color:rgba(255,255,255,0.4);">Mic active → waveform bars animate</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:var(--r-lg);padding:20px;">
+      <div style="font-size:13px;font-weight:700;color:var(--orange);margin-bottom:12px;">Transcript Toggle (CMS-controlled)</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.6);line-height:1.7;">
+        <div style="margin-bottom:8px;"><strong style="color:white;">show_transcript = true</strong><br>Overlay hiện cuối session screen. Max 2 dòng, auto-clear sau 4s. Speaker label trên (Examiner / Bạn). Font 12px white 85% opacity.</div>
+        <div><strong style="color:white;">show_transcript = false</strong><br>Overlay ẩn hoàn toàn. Screen chỉ có avatar + status pill + controls. Tập trung vào hội thoại thuần.</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:var(--r-lg);padding:20px;">
+      <div style="font-size:13px;font-weight:700;color:var(--orange);margin-bottom:12px;">Accessibility & Touch</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.6);line-height:1.7;">
+        <div style="margin-bottom:6px;">· "Kết thúc" button: min 44×44pt, center-bottom, safe area aware</div>
+        <div style="margin-bottom:6px;">· Choice cards: min 44×44pt tap target, selected state có border + bg change</div>
+        <div style="margin-bottom:6px;">· VoiceOver label cho status pill: "Trạng thái: examiner đang nói"</div>
+        <div>· "Kết thúc" → confirmation dialog trước khi end session sớm</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:var(--r-lg);padding:20px;">
+      <div style="font-size:13px;font-weight:700;color:var(--orange);margin-bottom:12px;">Error States</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.6);line-height:1.7;">
+        <div style="margin-bottom:6px;">· Token request fail → toast "Không kết nối được, thử lại" + retry button</div>
+        <div style="margin-bottom:6px;">· WS disconnect mid-session → auto-reconnect 3 lần, sau đó end session và offer save transcript</div>
+        <div style="margin-bottom:6px;">· Scoring timeout (>2 min) → hiển thị transcript bất kể score</div>
+        <div>· Mic permission denied → alert với link vào Settings</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+</style>
+
+</body>
+</html>

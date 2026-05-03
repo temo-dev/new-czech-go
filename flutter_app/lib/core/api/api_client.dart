@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../voice/voice_option.dart';
 
 const _kDefaultBaseUrl = String.fromEnvironment(
@@ -57,9 +59,10 @@ class ApiClient {
     String moduleId, {
     String? skillKind,
   }) async {
-    final path = skillKind != null
-        ? '/v1/modules/$moduleId/exercises?skill_kind=$skillKind'
-        : '/v1/modules/$moduleId/exercises';
+    final path =
+        skillKind != null
+            ? '/v1/modules/$moduleId/exercises?skill_kind=$skillKind'
+            : '/v1/modules/$moduleId/exercises';
     final payload = await _authed('GET', path);
     return payload['data'] as List<dynamic>? ?? const [];
   }
@@ -218,7 +221,11 @@ class ApiClient {
     if (selectedOption != null && selectedOption.isNotEmpty) {
       body['selected_option'] = selectedOption;
     }
-    final payload = await _authed('POST', '/v1/interview-sessions/token', body: body);
+    final payload = await _authed(
+      'POST',
+      '/v1/interview-sessions/token',
+      body: body,
+    );
     return payload['data'] as Map<String, dynamic>;
   }
 
@@ -230,15 +237,23 @@ class ApiClient {
     required List<Map<String, dynamic>> turns,
     required int durationSec,
   }) async {
-    final payload = await _authed(
-      'POST',
-      '/v1/attempts/$attemptId/submit-interview',
-      body: {
-        'transcript': turns,
-        'duration_sec': durationSec,
-      },
+    final path = '/v1/attempts/$attemptId/submit-interview';
+    debugPrint(
+      'ApiClient submitInterview POST $baseUrl$path turns=${turns.length} duration=$durationSec',
     );
-    return payload['data'] as Map<String, dynamic>;
+    try {
+      final payload = await _authed(
+        'POST',
+        path,
+        body: {'transcript': turns, 'duration_sec': durationSec},
+      );
+      debugPrint('ApiClient submitInterview accepted attempt=$attemptId');
+      return payload['data'] as Map<String, dynamic>;
+    } catch (err, stack) {
+      debugPrint('ApiClient submitInterview failed: $err');
+      debugPrintStack(stackTrace: stack);
+      rethrow;
+    }
   }
 
   /// Returns configured TTS voice list from GET /v1/voices.
@@ -273,9 +288,10 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> createMockExam({String? mockTestId}) async {
-    final body = mockTestId != null && mockTestId.isNotEmpty
-        ? {'mock_test_id': mockTestId}
-        : <String, dynamic>{};
+    final body =
+        mockTestId != null && mockTestId.isNotEmpty
+            ? {'mock_test_id': mockTestId}
+            : <String, dynamic>{};
     final payload = await _authed('POST', '/v1/mock-exams', body: body);
     return payload['data'] as Map<String, dynamic>;
   }
@@ -313,8 +329,10 @@ class ApiClient {
   }
 
   Future<AudioStreamInfo> getAttemptReviewAudioUrl(String attemptId) async {
-    final payload =
-        await _authed('GET', '/v1/attempts/$attemptId/review/audio/url');
+    final payload = await _authed(
+      'GET',
+      '/v1/attempts/$attemptId/review/audio/url',
+    );
     return AudioStreamInfo.fromJson(payload['data'] as Map<String, dynamic>);
   }
 
@@ -325,9 +343,9 @@ class ApiClient {
   /// Constructs URL for a vocabulary/grammar media file using its storage key.
   /// Used by QuizcardWidget to load flashcard images.
   Uri mediaUri(String storageKey) {
-    return Uri.parse('$baseUrl/v1/media/file').replace(
-      queryParameters: {'key': storageKey},
-    );
+    return Uri.parse(
+      '$baseUrl/v1/media/file',
+    ).replace(queryParameters: {'key': storageKey});
   }
 
   Future<Map<String, dynamic>> _authed(
@@ -357,10 +375,15 @@ class ApiClient {
     try {
       final uri = Uri.parse('$baseUrl$path');
       final request = await client.openUrl(method, uri);
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      request.headers.set(
+        HttpHeaders.contentTypeHeader,
+        'application/json; charset=utf-8',
+      );
       headers?.forEach(request.headers.set);
       if (body != null) {
-        request.write(jsonEncode(body));
+        final bytes = utf8.encode(jsonEncode(body));
+        request.contentLength = bytes.length;
+        request.add(bytes);
       }
       final response = await request.close();
       final text = await response.transform(utf8.decoder).join();
@@ -423,9 +446,10 @@ class AudioStreamInfo {
     return AudioStreamInfo(
       url: Uri.parse(json['url'] as String),
       mimeType: (json['mime_type'] as String?) ?? '',
-      expiresAt: expiresRaw == null || expiresRaw.isEmpty
-          ? DateTime.now().add(const Duration(minutes: 10))
-          : DateTime.parse(expiresRaw),
+      expiresAt:
+          expiresRaw == null || expiresRaw.isEmpty
+              ? DateTime.now().add(const Duration(minutes: 10))
+              : DateTime.parse(expiresRaw),
     );
   }
 

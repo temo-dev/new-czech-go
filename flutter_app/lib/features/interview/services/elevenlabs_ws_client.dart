@@ -34,9 +34,16 @@ class ElevenLabsWsClient {
   /// Fired when ElevenLabs interrupts the agent mid-speech.
   VoidCallback? onInterruption;
 
+  /// Fired when ElevenLabs reports that the current agent response is complete.
+  VoidCallback? onAgentResponseComplete;
+
+  /// Fired with metadata such as audio formats once a conversation starts.
+  void Function({String? agentOutputAudioFormat, String? userInputAudioFormat})?
+  onMetadata;
+
   // ── Test injection ────────────────────────────────────────────────────────
 
-  /// If set, [sendAudioChunk] writes to this sink instead of the real WS.
+  /// If set, outbound messages write to this sink instead of the real WS.
   /// @visibleForTesting
   void Function(String msg)? testSendSink;
 
@@ -72,20 +79,28 @@ class ElevenLabsWsClient {
 
   /// Sends a PCM16 audio chunk from the microphone to the agent.
   void sendAudioChunk(Uint8List pcm16) {
-    final msg = jsonEncode({'user_audio_chunk': base64Encode(pcm16)});
-    if (testSendSink != null) {
-      testSendSink!(msg);
-      return;
-    }
-    _ws?.add(msg);
+    _sendJson({'user_audio_chunk': base64Encode(pcm16)});
   }
 
   /// Closes the WebSocket connection.
-  Future<void> disconnect() async {
+  Future<void> disconnect({
+    Duration timeout = const Duration(seconds: 2),
+  }) async {
     _disposed = true;
-    await _sub?.cancel();
-    await _ws?.close();
+    final sub = _sub;
+    _sub = null;
+    final ws = _ws;
     _ws = null;
+    try {
+      await sub?.cancel().timeout(timeout);
+    } catch (_) {
+      // Cleanup is best-effort; callers should not get stuck ending a session.
+    }
+    try {
+      await ws?.close().timeout(timeout);
+    } catch (_) {
+      // The remote service may not complete the close handshake promptly.
+    }
   }
 
   // ── Internal ──────────────────────────────────────────────────────────────
@@ -101,6 +116,7 @@ class ElevenLabsWsClient {
         onError: _onNetworkError,
         cancelOnError: false,
       );
+      _sendInitMessage();
     } catch (e) {
       _onNetworkError(e);
     }
@@ -110,20 +126,41 @@ class ElevenLabsWsClient {
   /// after session init (so learner doesn't have to speak first).
   String? firstMessage;
 
-  void _sendInitMessage() {
+  @visibleForTesting
+  Map<String, dynamic> buildConversationInitiationMessage() {
     final prompt = systemPrompt;
-    // Only send if we have a system_prompt to override.
-    // Avoid sending language or other overrides that might interfere with
-    // dashboard-configured voice/first_message settings.
-    if (prompt == null || prompt.isEmpty) return;
-    _ws?.add(jsonEncode({
+    final first = firstMessage;
+    final agent = <String, dynamic>{};
+
+    // Omit empty fields: ElevenLabs rejects override fields that are not
+    // enabled in the agent security settings.
+    if (prompt != null && prompt.trim().isNotEmpty) {
+      agent['prompt'] = {'prompt': prompt.trim()};
+    }
+    if (first != null && first.trim().isNotEmpty) {
+      agent['first_message'] = first.trim();
+    }
+
+    final message = <String, dynamic>{
       'type': 'conversation_initiation_client_data',
-      'conversation_config_override': {
-        'agent': {
-          'prompt': {'prompt': prompt},
-        },
-      },
-    }));
+    };
+    if (agent.isNotEmpty) {
+      message['conversation_config_override'] = {'agent': agent};
+    }
+    return message;
+  }
+
+  void _sendJson(Map<String, dynamic> msg) {
+    final encoded = jsonEncode(msg);
+    if (testSendSink != null) {
+      testSendSink!(encoded);
+      return;
+    }
+    _ws?.add(encoded);
+  }
+
+  void _sendInitMessage() {
+    _sendJson(buildConversationInitiationMessage());
   }
 
   void _onData(dynamic raw) {
@@ -173,8 +210,14 @@ class ElevenLabsWsClient {
     final type = msg['type'] as String?;
     switch (type) {
       case 'conversation_initiation_metadata':
-        // Send override AFTER receiving metadata (listener is attached, no race).
-        _sendInitMessage();
+        final event =
+            msg['conversation_initiation_metadata_event']
+                as Map<String, dynamic>?;
+        onMetadata?.call(
+          agentOutputAudioFormat:
+              event?['agent_output_audio_format'] as String?,
+          userInputAudioFormat: event?['user_input_audio_format'] as String?,
+        );
         onReady?.call();
 
       case 'audio':
@@ -205,18 +248,23 @@ class ElevenLabsWsClient {
         final text = event?['agent_response'] as String? ?? '';
         if (text.isNotEmpty) onTranscript?.call('examiner', text);
 
-      // Format v2: {"type":"user_transcript","user_transcript_event":{"user_transcript":"..."}}
+      // Format v2: {"type":"user_transcript","user_transcription_event":{"user_transcript":"..."}}
       case 'user_transcript':
-        final event = msg['user_transcript_event'] as Map<String, dynamic>?;
+        final event =
+            (msg['user_transcription_event'] ?? msg['user_transcript_event'])
+                as Map<String, dynamic>?;
         final text = event?['user_transcript'] as String? ?? '';
         if (text.isNotEmpty) onTranscript?.call('learner', text);
+
+      case 'agent_response_complete':
+        onAgentResponseComplete?.call();
 
       // Ping — must respond with pong or ElevenLabs closes the connection.
       case 'ping':
         final event = msg['ping_event'] as Map<String, dynamic>?;
         final eventId = event?['event_id'];
         if (eventId != null) {
-          _ws?.add(jsonEncode({'type': 'pong', 'event_id': eventId}));
+          _sendJson({'type': 'pong', 'event_id': eventId});
         }
 
       case 'interruption':

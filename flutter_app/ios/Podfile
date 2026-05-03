@@ -1,4 +1,4 @@
-# flutter_webrtc (required by simli_client) needs iOS 13.0+
+# flutter_webrtc needs iOS 13.0+
 platform :ios, '13.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
@@ -29,6 +29,31 @@ flutter_ios_podfile_setup
 
 target 'Runner' do
   use_frameworks!
+
+  script_phase(
+    :name => 'Generate WebRTC dSYM for archive',
+    :execution_position => :after_compile,
+    :script => <<-'SCRIPT'
+set -euo pipefail
+
+if [ "${ACTION:-}" != "install" ] || [ "${PLATFORM_NAME:-}" != "iphoneos" ]; then
+  exit 0
+fi
+
+WEBRTC_BINARY="${PODS_ROOT}/WebRTC-SDK/WebRTC.xcframework/ios-arm64/WebRTC.framework/WebRTC"
+WEBRTC_DSYM="${DWARF_DSYM_FOLDER_PATH}/WebRTC.framework.dSYM"
+
+if [ ! -f "$WEBRTC_BINARY" ]; then
+  echo "warning: WebRTC binary not found at $WEBRTC_BINARY"
+  exit 0
+fi
+
+mkdir -p "${DWARF_DSYM_FOLDER_PATH}"
+rm -rf "$WEBRTC_DSYM"
+xcrun dsymutil "$WEBRTC_BINARY" -o "$WEBRTC_DSYM"
+xcrun dwarfdump --uuid "$WEBRTC_DSYM"
+SCRIPT
+  )
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
