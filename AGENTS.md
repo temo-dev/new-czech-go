@@ -123,6 +123,7 @@ The implemented V1 foundation currently includes:
     - `ProcessWritingAttempt` goroutine: thêm `defer recover()` để FailAttempt nếu panic; bỏ duplicate `ValidateWritingSubmission` call trong goroutine
     - `handleSubmitText`: thêm `http.MaxBytesReader(64KB)` + max 500 words trong `ValidateWritingSubmission` ngăn OOM và LLM credit abuse
     - **Diff highlight trong repair tab**: `_DiffTextBlock` widget dùng `RichText`/`TextSpan` — `deleted`+`replaced` → đỏ, `inserted`+`replaced` → xanh, `unchanged` → plain; fallback về plain text khi `diff_chunks` rỗng
+    - **Czech character encoding fix (2026-05-03)**: `api_client.dart` `_request()` đổi từ `utf8.encode` + `request.add(bytes)` sang `request.write(jsonEncode(body))` — Dart `_IOSinkImpl` init với `latin1` encoding; `write()` đọc `charset=utf-8` từ Content-Type header và dùng UTF-8 thay vì latin1, tránh `ArgumentError` khi submit Czech text có ký tự > U+00FF (č, ž, ě, ř, …)
 
 - **V3 Listening (poslech) — 2026-04-27, bug fix 2026-04-29:**
   - exercise types: `poslech_1-5` (5 dạng nghe khác nhau, tổng 25đ)

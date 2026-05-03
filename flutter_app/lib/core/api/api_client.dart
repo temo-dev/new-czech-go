@@ -381,9 +381,11 @@ class ApiClient {
       );
       headers?.forEach(request.headers.set);
       if (body != null) {
-        final bytes = utf8.encode(jsonEncode(body));
-        request.contentLength = bytes.length;
-        request.add(bytes);
+        // Use write() so Dart picks up charset=utf-8 from Content-Type and
+        // encodes with UTF-8 rather than the default latin1 IOSink encoding.
+        // This prevents ArgumentError for Czech characters (č, ž, etc.)
+        // whose code points exceed the latin1 range (>U+00FF).
+        request.write(jsonEncode(body));
       }
       final response = await request.close();
       final text = await response.transform(utf8.decoder).join();

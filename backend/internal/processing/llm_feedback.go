@@ -22,11 +22,16 @@ const (
 
 type LLMFeedbackProvider interface {
 	GenerateFeedback(exercise contracts.Exercise, transcript contracts.Transcript, reliability transcriptReliability, locale string) (contracts.AttemptFeedback, error)
+	GenerateInterviewFeedback(turns []contracts.InterviewTranscriptTurn, exerciseType, topic string, durationSec int, locale string) (contracts.AttemptFeedback, error)
 }
 
 type DevLLMFeedbackProvider struct{}
 
 func (DevLLMFeedbackProvider) GenerateFeedback(_ contracts.Exercise, _ contracts.Transcript, _ transcriptReliability, _ string) (contracts.AttemptFeedback, error) {
+	return contracts.AttemptFeedback{}, fmt.Errorf("llm feedback disabled: dev provider")
+}
+
+func (DevLLMFeedbackProvider) GenerateInterviewFeedback(_ []contracts.InterviewTranscriptTurn, _, _ string, _ int, _ string) (contracts.AttemptFeedback, error) {
 	return contracts.AttemptFeedback{}, fmt.Errorf("llm feedback disabled: dev provider")
 }
 
@@ -99,63 +104,81 @@ type llmFeedbackJSON struct {
 	SampleAnswer   string   `json:"sample_answer"`
 }
 
-func (c *ClaudeLLMFeedbackProvider) GenerateFeedback(exercise contracts.Exercise, transcript contracts.Transcript, reliability transcriptReliability, locale string) (contracts.AttemptFeedback, error) {
-	systemPrompt := FeedbackSystemPrompt(locale)
-	userPrompt := buildLLMUserPrompt(exercise, transcript, reliability, locale)
-
+// callClaude sends a system+user prompt to Claude and parses the JSON feedback response.
+func (c *ClaudeLLMFeedbackProvider) callClaude(systemPrompt, userPrompt string) (llmFeedbackJSON, error) {
 	reqBody := claudeMessageRequest{
 		Model:     c.model,
 		MaxTokens: 2048,
 		System:    systemPrompt,
-		Messages: []claudeMessage{
-			{Role: "user", Content: userPrompt},
-		},
+		Messages:  []claudeMessage{{Role: "user", Content: userPrompt}},
 	}
 	payload, err := json.Marshal(reqBody)
 	if err != nil {
-		return contracts.AttemptFeedback{}, fmt.Errorf("marshal claude request: %w", err)
+		return llmFeedbackJSON{}, fmt.Errorf("marshal claude request: %w", err)
 	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), llmRequestTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, claudeAPIEndpoint, bytes.NewReader(payload))
 	if err != nil {
-		return contracts.AttemptFeedback{}, fmt.Errorf("build claude request: %w", err)
+		return llmFeedbackJSON{}, fmt.Errorf("build claude request: %w", err)
 	}
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("x-api-key", c.apiKey)
 	req.Header.Set("anthropic-version", claudeAPIVersion)
-
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return contracts.AttemptFeedback{}, fmt.Errorf("call claude: %w", err)
+		return llmFeedbackJSON{}, fmt.Errorf("call claude: %w", err)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return contracts.AttemptFeedback{}, fmt.Errorf("read claude response: %w", err)
+		return llmFeedbackJSON{}, fmt.Errorf("read claude response: %w", err)
 	}
 	if resp.StatusCode >= 400 {
-		return contracts.AttemptFeedback{}, fmt.Errorf("claude api status %d: %s", resp.StatusCode, string(body))
+		return llmFeedbackJSON{}, fmt.Errorf("claude api status %d: %s", resp.StatusCode, string(body))
 	}
-
 	var parsed claudeMessageResponse
 	if err := json.Unmarshal(body, &parsed); err != nil {
-		return contracts.AttemptFeedback{}, fmt.Errorf("unmarshal claude response: %w", err)
+		return llmFeedbackJSON{}, fmt.Errorf("unmarshal claude response: %w", err)
 	}
 	if parsed.Error != nil {
-		return contracts.AttemptFeedback{}, fmt.Errorf("claude api error %s: %s", parsed.Error.Type, parsed.Error.Message)
+		return llmFeedbackJSON{}, fmt.Errorf("claude api error %s: %s", parsed.Error.Type, parsed.Error.Message)
 	}
 	if len(parsed.Content) == 0 || parsed.Content[0].Text == "" {
-		return contracts.AttemptFeedback{}, fmt.Errorf("claude response empty")
+		return llmFeedbackJSON{}, fmt.Errorf("claude response empty")
 	}
-
 	raw := extractJSONBlock(parsed.Content[0].Text)
 	var fb llmFeedbackJSON
 	if err := json.Unmarshal([]byte(raw), &fb); err != nil {
-		return contracts.AttemptFeedback{}, fmt.Errorf("parse feedback json: %w; body=%s", err, raw)
+		return llmFeedbackJSON{}, fmt.Errorf("parse feedback json: %w; body=%s", err, raw)
 	}
+	return fb, nil
+}
 
+func (c *ClaudeLLMFeedbackProvider) GenerateFeedback(exercise contracts.Exercise, transcript contracts.Transcript, reliability transcriptReliability, locale string) (contracts.AttemptFeedback, error) {
+	fb, err := c.callClaude(FeedbackSystemPrompt(locale), buildLLMUserPrompt(exercise, transcript, reliability, locale))
+	if err != nil {
+		return contracts.AttemptFeedback{}, err
+	}
+	return contracts.AttemptFeedback{
+		ReadinessLevel: normalizeReadinessLevel(fb.ReadinessLevel),
+		OverallSummary: strings.TrimSpace(fb.OverallSummary),
+		Strengths:      sanitizeStringList(fb.Strengths),
+		Improvements:   sanitizeStringList(fb.Improvements),
+		RetryAdvice:    sanitizeStringList(fb.RetryAdvice),
+		SampleAnswer:   strings.TrimSpace(fb.SampleAnswer),
+	}, nil
+}
+
+func (c *ClaudeLLMFeedbackProvider) GenerateInterviewFeedback(turns []contracts.InterviewTranscriptTurn, exerciseType, topic string, durationSec int, locale string) (contracts.AttemptFeedback, error) {
+	internal := make([]interviewTurn, len(turns))
+	for i, t := range turns {
+		internal[i] = interviewTurn{Speaker: t.Speaker, Text: t.Text, AtSec: t.AtSec}
+	}
+	fb, err := c.callClaude(interviewSystemPrompt(locale), buildInterviewUserPrompt(exerciseType, topic, internal, durationSec))
+	if err != nil {
+		return contracts.AttemptFeedback{}, err
+	}
 	return contracts.AttemptFeedback{
 		ReadinessLevel: normalizeReadinessLevel(fb.ReadinessLevel),
 		OverallSummary: strings.TrimSpace(fb.OverallSummary),

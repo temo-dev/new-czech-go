@@ -45,21 +45,26 @@ func buildInterviewTranscriptText(turns []interviewTurn) string {
 }
 
 // interviewSystemPrompt returns the system prompt for interview scoring.
+// readiness_level values match normalizeReadinessLevel: not_ready/almost_ready/ready_for_mock/exam_ready.
 func interviewSystemPrompt(locale string) string {
 	lang := "Vietnamese"
 	if locale == contracts.LocaleEN {
 		lang = "English"
 	}
 	return fmt.Sprintf(
-		"You are an expert Czech A2 language coach for learners preparing for the Czech \"trvaly pobyt A2\" oral exam. "+
-			"You will receive a transcript of a practice interview. "+
-			"Evaluate the LEARNER's responses only (not the examiner's questions). "+
-			"Score vocabulary, grammar, and fluency each from 0 to 10. "+
-			"Assign overall readiness_level: \"weak\" (0-4), \"ok\" (5-7), or \"strong\" (8-10). "+
-			"CRITICAL: Write overall_summary, strengths, improvements, retry_advice entirely in %s. "+
+		"You are an expert Czech A2 language coach evaluating a practice interview session for the Czech \"trvaly pobyt A2\" oral exam. "+
+			"You will receive a multi-turn conversation transcript between a Czech examiner and a learner. "+
+			"Evaluate the LEARNER's responses ONLY — ignore examiner turns. "+
+			"Assess: vocabulary range (A2-appropriate words), grammar accuracy (case endings, verb conjugation, tense), conversational fluency (natural responses, cohesion). "+
+			"CRITICAL LANGUAGE RULE: overall_summary, strengths, improvements, retry_advice MUST be written entirely in %s. "+
 			"Only sample_answer may contain Czech. "+
-			"Address the learner directly (you/your / bạn/của bạn).",
-		lang,
+			"Address the learner directly (you/your / bạn/của bạn). "+
+			"readiness_level MUST be one of: not_ready, almost_ready, ready_for_mock, exam_ready. "+
+			"strengths, improvements, retry_advice: arrays of 1-3 concise %s strings (one idea per string, under 200 characters each). "+
+			"overall_summary: one concise paragraph under 400 characters. "+
+			"sample_answer: one or two natural Czech sentences demonstrating a better version of a key learner response. "+
+			`Return ONLY valid JSON. Output schema: {"readiness_level":"...","overall_summary":"...","strengths":["..."],"improvements":["..."],"retry_advice":["..."],"sample_answer":"..."}`,
+		lang, lang,
 	)
 }
 
@@ -135,9 +140,17 @@ func (p *Processor) ProcessInterviewAttempt(attemptID string, turns []contracts.
 		IsSynthetic: true,
 	}
 
-	feedback, ok := p.buildFeedbackWithLLM(attemptID, exercise, transcript, reliabilityUsable, locale)
-	if !ok {
-		log.Printf("interview attempt %s: LLM feedback failed, using fallback", attemptID)
+	topic := interviewTopicFromExercise(exercise)
+	var feedback contracts.AttemptFeedback
+	if p.llmProvider != nil {
+		fb, err := p.llmProvider.GenerateInterviewFeedback(turns, exercise.ExerciseType, topic, durationSec, locale)
+		if err != nil {
+			log.Printf("interview attempt %s: LLM feedback failed, using fallback: %v", attemptID, err)
+			feedback = interviewFallbackFeedback()
+		} else {
+			feedback = fb
+		}
+	} else {
 		feedback = interviewFallbackFeedback()
 	}
 
