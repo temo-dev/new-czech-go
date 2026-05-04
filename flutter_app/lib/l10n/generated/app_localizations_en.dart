@@ -1059,4 +1059,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get interviewVocabHints => 'Vocab hints';
+
+  @override
+  String get interviewPttIdleHint => 'Tap to start speaking';
+
+  @override
+  String get interviewPttSendHint => 'Recording · Tap to send';
 }

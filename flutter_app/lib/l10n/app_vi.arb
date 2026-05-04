@@ -473,5 +473,7 @@
     "interviewMicDenied": "Cần quyền microphone",
     "interviewPromptLabel": "Đề bài",
     "interviewTapToView": "Tap để xem đề bài",
-    "interviewVocabHints": "Gợi ý từ"
+    "interviewVocabHints": "Gợi ý từ",
+    "interviewPttIdleHint": "Tap để bắt đầu nói",
+    "interviewPttSendHint": "Đang ghi · Tap để gửi"
 }

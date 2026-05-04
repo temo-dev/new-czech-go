@@ -1059,4 +1059,10 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get interviewVocabHints => 'Gợi ý từ';
+
+  @override
+  String get interviewPttIdleHint => 'Tap để bắt đầu nói';
+
+  @override
+  String get interviewPttSendHint => 'Đang ghi · Tap để gửi';
 }

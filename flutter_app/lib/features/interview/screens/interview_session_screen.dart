@@ -14,7 +14,6 @@ import '../services/pcm_audio_player.dart';
 import '../services/simli_config.dart';
 import '../services/simli_session_manager.dart';
 import '../widgets/avatar_video_container.dart';
-import '../widgets/mic_waveform_widget.dart';
 import '../widgets/prompt_card.dart';
 import '../widgets/session_status_pill.dart';
 import 'interview_result_screen.dart';
@@ -103,6 +102,9 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   // apologises for a missing self-introduction.
   bool _conversationStarted = false;
   Timer? _firstTurnSafetyTimer;
+
+  // V16 push-to-talk: mic is OFF until the learner taps the mic button.
+  bool _micActive = false;
 
   @override
   void initState() {
@@ -441,7 +443,22 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     });
   }
 
-  Future<void> _startMic() async {
+  /// V16 push-to-talk: tapping the mic button starts streaming PCM chunks
+  /// from the recorder to the ElevenLabs WS. Tapping again stops the stream
+  /// and lets server VAD finalise the turn (~700ms silence endpointing).
+  /// The mic is never on while the examiner speaks, eliminating echo loops.
+  Future<void> _toggleMic() async {
+    if (!_conversationStarted || _ending || !mounted) return;
+    if (_state == InterviewSessionState.speaking) return;
+    if (_micActive) {
+      await _stopMicStreaming();
+    } else {
+      await _startMicStreaming();
+    }
+  }
+
+  Future<void> _startMicStreaming() async {
+    if (_micActive) return;
     if (!await _recorder.hasPermission()) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -460,12 +477,37 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       ),
     );
     _micSub = stream.listen((chunk) {
-      if (_ending) return;
+      if (_ending || !_micActive) return;
       _wsClient.sendAudioChunk(Uint8List.fromList(chunk));
-      if (mounted && _state == InterviewSessionState.ready) {
-        setState(() => _state = InterviewSessionState.listening);
-      }
     });
+    if (!mounted) return;
+    debugPrint('Interview PTT: mic ON');
+    setState(() {
+      _micActive = true;
+      _state = InterviewSessionState.listening;
+    });
+  }
+
+  Future<void> _stopMicStreaming() async {
+    if (!_micActive) return;
+    if (mounted) {
+      setState(() => _micActive = false);
+    } else {
+      _micActive = false;
+    }
+    debugPrint('Interview PTT: mic OFF (server VAD finalises turn)');
+    final sub = _micSub;
+    _micSub = null;
+    try {
+      await sub?.cancel().timeout(const Duration(seconds: 1));
+    } catch (err) {
+      debugPrint('PTT mic sub cancel timeout: $err');
+    }
+    try {
+      await _recorder.stop().timeout(const Duration(seconds: 2));
+    } catch (err) {
+      debugPrint('PTT recorder stop timeout: $err');
+    }
   }
 
   Future<void> _endSession() async {
@@ -567,16 +609,18 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     return RegExp(r'\p{L}|\p{N}', unicode: true).hasMatch(t);
   }
 
-  /// V16: gate mic + session timer until the examiner has finished their
-  /// first turn. Subsequent calls are no-ops. Cancels the safety timer.
+  /// V16: gate the mic button + session timer until the examiner has finished
+  /// their first turn. Subsequent calls are no-ops. Cancels the safety timer.
+  /// Mic is NOT auto-started — learner taps the mic button (push-to-talk).
   void _startConversation() {
     if (_conversationStarted || !mounted) return;
-    _conversationStarted = true;
     _firstTurnSafetyTimer?.cancel();
     _firstTurnSafetyTimer = null;
-    _sessionStartSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    debugPrint('Interview conversation started — mic on, timer reset');
-    _startMic();
+    setState(() {
+      _conversationStarted = true;
+      _sessionStartSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    });
+    debugPrint('Interview conversation started — mic button enabled, timer reset');
   }
 
   String? _choiceTitle() {
@@ -596,6 +640,15 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     return null;
   }
 
+  String _pttHint(AppLocalizations l) {
+    if (!_conversationStarted) return l.interviewStatusConnecting;
+    if (_state == InterviewSessionState.speaking) {
+      return l.interviewStatusSpeaking;
+    }
+    if (_micActive) return l.interviewPttSendHint;
+    return l.interviewPttIdleHint;
+  }
+
   String _timerText() {
     if (!_conversationStarted) return '00:00';
     final elapsed =
@@ -609,7 +662,6 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final showTranscript = widget.detail.interviewShowTranscript;
-    final isListening = _state == InterviewSessionState.listening;
     final bottomSafe = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
@@ -776,7 +828,7 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
                   colors: [Color(0x0006111F), Color(0xF006111F)],
                 ),
               ),
-              padding: EdgeInsets.fromLTRB(24, 34, 24, bottomSafe + 16),
+              padding: EdgeInsets.fromLTRB(24, 28, 24, bottomSafe + 16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -784,41 +836,41 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
                     _timerText(),
                     style: const TextStyle(color: Colors.white30, fontSize: 12),
                   ),
+                  const SizedBox(height: 14),
+                  _PttMicButton(
+                    enabled: _conversationStarted &&
+                        !_ending &&
+                        _state != InterviewSessionState.speaking,
+                    active: _micActive,
+                    onTap: _toggleMic,
+                  ),
                   const SizedBox(height: 8),
-                  MicWaveformWidget(isActive: isListening),
-                  const SizedBox(height: 12),
-                  FilledButton(
+                  Text(
+                    _pttHint(l),
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  const SizedBox(height: 14),
+                  TextButton.icon(
                     onPressed: _ending ? null : _endSession,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xD4C62828),
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(178, 54),
-                      shape: const StadiumBorder(),
-                    ),
-                    child:
-                        _ending
-                            ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                            : Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.call_end, size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  l.interviewEndBtn,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
+                    icon: _ending
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white70,
                             ),
+                          )
+                        : const Icon(Icons.call_end_rounded,
+                            size: 18, color: Colors.white70),
+                    label: Text(
+                      l.interviewEndBtn,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -993,6 +1045,127 @@ class _PrepareStepRow extends StatelessWidget {
           ),
           Icon(icon, size: 18, color: color),
         ],
+      ),
+    );
+  }
+}
+
+/// V16 push-to-talk mic button. Disabled while the examiner is speaking
+/// or the conversation has not yet started. Pulses red when actively
+/// recording.
+class _PttMicButton extends StatefulWidget {
+  const _PttMicButton({
+    required this.enabled,
+    required this.active,
+    required this.onTap,
+  });
+
+  final bool enabled;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  State<_PttMicButton> createState() => _PttMicButtonState();
+}
+
+class _PttMicButtonState extends State<_PttMicButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    );
+    if (widget.active) _pulse.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PttMicButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !_pulse.isAnimating) {
+      _pulse.repeat();
+    } else if (!widget.active && _pulse.isAnimating) {
+      _pulse.stop();
+      _pulse.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fill = widget.active
+        ? const Color(0xFFE2530A)
+        : widget.enabled
+            ? AppColors.primary
+            : Colors.white24;
+    final glow = widget.active
+        ? const Color(0xFFE2530A)
+        : widget.enabled
+            ? AppColors.primary
+            : Colors.transparent;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.enabled ? widget.onTap : null,
+      child: Semantics(
+        button: true,
+        enabled: widget.enabled,
+        label: widget.active ? 'Mic recording' : 'Tap to speak',
+        child: SizedBox(
+          width: 96,
+          height: 96,
+          child: AnimatedBuilder(
+            animation: _pulse,
+            builder: (context, _) {
+              final t = _pulse.value;
+              final ring = widget.active ? 8 + 12 * (1 - t) : 0.0;
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  if (widget.active)
+                    Container(
+                      width: 96 + ring * 2,
+                      height: 96 + ring * 2,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: glow.withValues(alpha: 0.25 * (1 - t)),
+                      ),
+                    ),
+                  Container(
+                    width: 84,
+                    height: 84,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: fill,
+                      boxShadow: widget.enabled
+                          ? [
+                              BoxShadow(
+                                color: glow.withValues(alpha: 0.45),
+                                blurRadius: 18,
+                                spreadRadius: 1,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Icon(
+                      widget.active ? Icons.send_rounded : Icons.mic_rounded,
+                      color: Colors.white,
+                      size: 36,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }

@@ -2026,6 +2026,18 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Gợi ý từ'**
   String get interviewVocabHints;
+
+  /// No description provided for @interviewPttIdleHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tap để bắt đầu nói'**
+  String get interviewPttIdleHint;
+
+  /// No description provided for @interviewPttSendHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang ghi · Tap để gửi'**
+  String get interviewPttSendHint;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

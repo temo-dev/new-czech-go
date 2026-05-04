@@ -428,5 +428,7 @@
     "interviewMicDenied": "Microphone permission required",
     "interviewPromptLabel": "Task",
     "interviewTapToView": "Tap to view task",
-    "interviewVocabHints": "Vocab hints"
+    "interviewVocabHints": "Vocab hints",
+    "interviewPttIdleHint": "Tap to start speaking",
+    "interviewPttSendHint": "Recording · Tap to send"
 }
