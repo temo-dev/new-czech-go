@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Interview First-Turn Fix · UI/UX</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --babbel-orange:#FF6A14;
+  --cream:#FBF3E7;
+  --teal:#0F3D3A;
+  --teal-2:#14524E;
+  --ink:#1B1B1B;
+  --ink-2:#2E2E2E;
+  --muted:#7C7C7C;
+  --line:rgba(15,61,58,.12);
+  --bg:#F4ECDD;
+  --night:#0A1628;
+  --night-2:#06111F;
+  --green:#16A34A;
+  --red:#C62828;
+  --warn:#D97706;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
+.page{max-width:1280px;margin:0 auto;padding:48px 32px 96px}
+h1{font-family:'Fraunces',serif;font-weight:700;font-size:48px;letter-spacing:-1px;margin-bottom:8px}
+h2{font-family:'Fraunces',serif;font-weight:700;font-size:28px;margin:48px 0 20px;color:var(--teal)}
+h3{font-size:16px;font-weight:700;margin:0 0 8px}
+.subtitle{color:var(--muted);font-size:18px;margin-bottom:32px}
+.section{background:#fff;border-radius:24px;padding:32px;margin-bottom:24px;border:1px solid var(--line);box-shadow:0 8px 32px rgba(15,61,58,.04)}
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:16px}
+.row.two{grid-template-columns:repeat(2,1fr)}
+.frame{position:relative;width:100%;aspect-ratio:9/19.5;background:var(--night);border-radius:38px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.18);border:6px solid #1A1A1A}
+.notch{position:absolute;top:8px;left:50%;transform:translateX(-50%);width:96px;height:24px;background:#000;border-radius:14px;z-index:50}
+.frame-label{font-size:13px;font-weight:600;color:var(--muted);margin-top:14px;text-align:center}
+.frame-label b{color:var(--teal);display:block;font-size:14px;margin-bottom:2px}
+
+/* Phone shared */
+.statusbar{position:absolute;top:0;left:0;right:0;height:44px;display:flex;align-items:center;justify-content:space-between;padding:14px 28px 0;font-size:11px;color:#fff;font-weight:600;z-index:40}
+.avatar-bg{position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 35%,#1d3354 0%,#0A1628 60%,#06111F 100%)}
+.avatar-face{position:absolute;top:18%;left:50%;transform:translateX(-50%);width:62%;aspect-ratio:1;border-radius:50%;background:linear-gradient(160deg,#fcd5b1 0%,#e8b489 100%);box-shadow:inset -20px -20px 60px rgba(0,0,0,.18)}
+.avatar-face::before,.avatar-face::after{content:'';position:absolute;width:8%;height:8%;background:#1B1B1B;border-radius:50%;top:42%}
+.avatar-face::before{left:30%}
+.avatar-face::after{right:30%}
+.avatar-face .mouth{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);width:24%;height:4%;background:#7a3030;border-radius:0 0 50% 50%}
+.gradient-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.4) 0%,rgba(0,0,0,0) 28%,rgba(0,0,0,0) 60%,rgba(6,17,31,.95) 100%);z-index:10}
+
+/* Status pill */
+.pill{position:absolute;top:64px;left:50%;transform:translateX(-50%);padding:8px 14px;background:rgba(0,0,0,.45);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.16);border-radius:999px;color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;gap:8px;z-index:30}
+.dot{width:8px;height:8px;border-radius:50%;background:#fff}
+.dot.live{background:#ef4444;box-shadow:0 0 0 0 rgba(239,68,68,.5);animation:pulse 1.4s infinite}
+.dot.listen{background:#FF6A14}
+.dot.speak{background:#16A34A}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}70%{box-shadow:0 0 0 10px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
+
+/* Option chip */
+.option-chip{position:absolute;top:62px;right:14px;padding:6px 12px;background:rgba(255,106,20,.95);color:#fff;font-size:11px;font-weight:700;border-radius:999px;z-index:30;display:flex;align-items:center;gap:4px}
+
+/* Prompt card — BOTTOM position above controls */
+.prompt-card{position:absolute;bottom:140px;left:14px;right:14px;background:rgba(255,255,255,.96);backdrop-filter:blur(20px);border-radius:18px;padding:14px 16px;box-shadow:0 -4px 28px rgba(0,0,0,.35);z-index:28;border:1px solid rgba(255,106,20,.25)}
+.prompt-card.expanded{padding:18px}
+.prompt-card .head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.prompt-card .label{font-size:9px;font-weight:800;color:var(--babbel-orange);letter-spacing:1px;text-transform:uppercase}
+.prompt-card .icon{width:20px;height:20px;display:flex;align-items:center;justify-content:center;color:var(--teal);font-size:13px}
+.prompt-card .title{font-family:'Fraunces',serif;font-weight:700;font-size:14px;color:var(--teal);margin-bottom:4px;line-height:1.3}
+.prompt-card .body{font-size:12px;color:var(--ink-2);line-height:1.5}
+.prompt-card.collapsed .body{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.prompt-card .extra{margin-top:10px;padding-top:10px;border-top:1px dashed rgba(15,61,58,.18);font-size:11px;color:var(--muted)}
+
+/* Mini prompt — BOTTOM position */
+.prompt-mini{position:absolute;bottom:148px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.94);backdrop-filter:blur(14px);border-radius:999px;padding:9px 16px;box-shadow:0 4px 18px rgba(0,0,0,.28);z-index:28;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--teal)}
+.prompt-mini .ic{width:16px;height:16px;background:var(--babbel-orange);border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px}
+
+/* Transcript overlay — moved up to make room for prompt card */
+.transcript{position:absolute;left:14px;right:14px;bottom:300px;background:rgba(0,0,0,.55);backdrop-filter:blur(12px);border-radius:14px;padding:12px 14px;color:#fff;z-index:20}
+.transcript .who{font-size:9px;font-weight:800;letter-spacing:1px;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:4px}
+.transcript .who.you{color:var(--babbel-orange)}
+.transcript .text{font-size:13px;line-height:1.45}
+
+/* Controls */
+.controls{position:absolute;bottom:0;left:0;right:0;padding:32px 24px 28px;background:linear-gradient(180deg,rgba(6,17,31,0) 0%,rgba(6,17,31,.95) 60%,#06111F 100%);text-align:center;z-index:30}
+.timer{font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;font-variant-numeric:tabular-nums}
+.waveform{display:flex;align-items:center;justify-content:center;gap:3px;height:28px;margin-bottom:14px}
+.waveform span{width:3px;background:var(--babbel-orange);border-radius:2px;animation:wave 1s infinite ease-in-out}
+.waveform span:nth-child(1){height:30%;animation-delay:0s}
+.waveform span:nth-child(2){height:60%;animation-delay:.1s}
+.waveform span:nth-child(3){height:90%;animation-delay:.2s}
+.waveform span:nth-child(4){height:50%;animation-delay:.3s}
+.waveform span:nth-child(5){height:70%;animation-delay:.4s}
+.waveform span:nth-child(6){height:40%;animation-delay:.5s}
+.waveform span:nth-child(7){height:65%;animation-delay:.6s}
+@keyframes wave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+.end-btn{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:#C62828;color:#fff;border-radius:999px;font-weight:700;font-size:15px;border:none}
+
+/* Intro screen */
+.intro-content{position:absolute;inset:0;background:var(--cream);padding:60px 22px 32px;display:flex;flex-direction:column}
+.intro-back{font-size:20px;color:var(--teal);margin-bottom:12px}
+.intro-eyebrow{font-size:10px;font-weight:800;letter-spacing:1.5px;color:var(--babbel-orange);text-transform:uppercase;margin-bottom:6px}
+.intro-title{font-family:'Fraunces',serif;font-weight:700;font-size:24px;color:var(--teal);line-height:1.25;margin-bottom:14px}
+.intro-meta{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.intro-meta span{font-size:10px;font-weight:600;padding:4px 10px;background:rgba(15,61,58,.08);border-radius:999px;color:var(--teal)}
+.intro-card{background:#fff;border-radius:18px;padding:16px;margin-bottom:12px;border:1px solid var(--line)}
+.intro-card-label{font-size:9px;font-weight:800;letter-spacing:1px;color:var(--babbel-orange);text-transform:uppercase;margin-bottom:8px}
+.intro-card-body{font-size:13px;color:var(--ink-2);line-height:1.55}
+.intro-options{display:grid;gap:8px;margin-bottom:14px}
+.intro-opt{padding:12px 14px;border:2px solid var(--line);border-radius:14px;font-size:13px;display:flex;align-items:center;gap:10px;background:#fff}
+.intro-opt.sel{border-color:var(--babbel-orange);background:#FFF6EE}
+.intro-opt b{width:24px;height:24px;border-radius:50%;background:var(--babbel-orange);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
+.intro-opt.sel b{background:var(--babbel-orange)}
+.intro-opt:not(.sel) b{background:rgba(15,61,58,.1);color:var(--teal)}
+.intro-cta{margin-top:auto;padding:16px 18px;background:var(--babbel-orange);color:#fff;border-radius:18px;text-align:center;font-weight:800;font-size:15px}
+.intro-helper{font-size:11px;color:var(--muted);text-align:center;margin-top:10px}
+
+/* Flow diagram */
+.flow{display:flex;flex-direction:column;gap:14px;margin-top:24px}
+.flow-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;align-items:stretch}
+.flow-step{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;position:relative;transition:transform .2s}
+.flow-step .num{position:absolute;top:-10px;left:14px;width:24px;height:24px;background:var(--babbel-orange);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
+.flow-step h4{font-size:13px;font-weight:700;color:var(--teal);margin-top:8px;margin-bottom:6px}
+.flow-step p{font-size:11px;color:var(--muted);line-height:1.4}
+.flow-step.fix{border-color:var(--babbel-orange);background:#FFF6EE}
+.flow-step.fix h4{color:var(--babbel-orange)}
+
+/* Token */
+.tokens{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+.token{padding:14px;border-radius:14px;border:1px solid var(--line);background:#fff}
+.token .swatch{width:100%;height:48px;border-radius:8px;margin-bottom:10px;border:1px solid var(--line)}
+.token .name{font-size:11px;font-weight:700;color:var(--teal)}
+.token .hex{font-size:10px;color:var(--muted);font-family:'Inter',monospace}
+
+/* Bug timeline */
+.timeline{margin-top:16px;background:var(--night);color:#fff;padding:24px;border-radius:18px;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.7}
+.timeline .ts{color:#94A3B8}
+.timeline .ok{color:#22C55E}
+.timeline .bad{color:#EF4444}
+.timeline .warn{color:#FBBF24}
+.timeline .arrow{color:#64748B}
+
+/* States table */
+.states{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+.state-card{padding:16px;border-radius:14px;border:1px solid var(--line);background:#fff}
+.state-card .badge{font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:6px;display:inline-block;margin-bottom:8px}
+.state-card.connecting .badge{background:rgba(217,119,6,.12);color:var(--warn)}
+.state-card.ready .badge{background:rgba(15,61,58,.12);color:var(--teal)}
+.state-card.speak .badge{background:rgba(22,163,74,.12);color:var(--green)}
+.state-card.listen .badge{background:rgba(255,106,20,.12);color:var(--babbel-orange)}
+.state-card h4{font-size:14px;color:var(--teal);margin-bottom:6px}
+.state-card p{font-size:11px;color:var(--muted)}
+
+/* List */
+ul.bullet{list-style:none}
+ul.bullet li{padding:8px 0 8px 22px;position:relative;font-size:13px;color:var(--ink-2);line-height:1.55;border-bottom:1px dashed var(--line)}
+ul.bullet li:last-child{border:none}
+ul.bullet li::before{content:'';position:absolute;left:0;top:14px;width:8px;height:8px;background:var(--babbel-orange);border-radius:50%}
+
+.note{padding:14px 16px;background:#FFF6EE;border-left:3px solid var(--babbel-orange);border-radius:0 12px 12px 0;font-size:13px;color:var(--ink-2);margin-top:14px}
+.note b{color:var(--babbel-orange)}
+
+@media (max-width:900px){
+  .row,.row.two,.tokens,.flow-row,.states{grid-template-columns:1fr 1fr}
+}
+@media (max-width:600px){
+  .row,.row.two,.tokens,.flow-row,.states{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Interview · First-Turn Fix + Prompt-on-Screen</h1>
+  <p class="subtitle">Sửa bug miss audio đầu khi Simli avatar bật + UX hiển thị đề bài trong session để learner phản xạ tốt hơn.</p>
+
+  <!-- BUG TIMELINE -->
+  <div class="section">
+    <h2>Phân tích bug</h2>
+    <p>Race window giữa <code>START</code> WS message (set <code>_connected=true</code>) và first video frame (set <code>_videoReady=true</code>). Audio chunks từ ElevenLabs đến trong window này được route vào Simli WS nhưng WebRTC audio track chưa fully attached → drop silent.</p>
+    <div class="timeline">
+<span class="ts">T+0ms</span>      <span class="arrow">→</span> Simli <code>start()</code> · createPeerConnection · ICE gathering<br>
+<span class="ts">T+820ms</span>    <span class="arrow">→</span> WS connect · <span class="ok">START</span> message received<br>
+<span class="ts">T+820ms</span>    <span class="arrow">→</span> <code>_markConnected()</code> · <span class="ok">isConnected = true</span><br>
+<span class="ts">T+830ms</span>    <span class="arrow">→</span> <code>waitUntilVideoReady()</code> resolves <span class="warn">(early — only checks _connected)</span><br>
+<span class="ts">T+850ms</span>    <span class="arrow">→</span> ElevenLabs WS connect · <code>conversation_initiation_metadata</code><br>
+<span class="ts">T+870ms</span>    <span class="arrow">→</span> ElevenLabs <span class="ok">audio chunk #1</span> arrives<br>
+<span class="ts">T+870ms</span>    <span class="arrow">→</span> Check <code>_simli?.isConnected == true</code> → route to Simli<br>
+<span class="ts">T+870ms</span>    <span class="arrow">→</span> <code>_simli.sendAudio(chunk)</code> <span class="bad">✗ WebRTC audio track NOT attached → DROP</span><br>
+<span class="ts">T+1240ms</span>   <span class="arrow">→</span> First video frame rendered · <span class="ok">_markVideoReady()</span><br>
+<span class="ts">T+1240ms</span>   <span class="arrow">→</span> Audio track attached · subsequent chunks play <span class="ok">✓</span><br>
+<span class="ts">T+1240ms</span>   <span class="arrow">→</span> Learner đã miss <span class="bad">~370ms first message audio</span>
+    </div>
+    <div class="note"><b>FIX:</b> gate trên <code>isVideoReady</code>, buffer chunks vào queue khi chưa ready, flush khi sẵn sàng. Fallback timeout 1500ms → flush local <code>PcmAudioPlayer</code>.</div>
+  </div>
+
+  <!-- USER FLOW -->
+  <div class="section">
+    <h2>User Flow</h2>
+    <div class="flow">
+      <div class="flow-row">
+        <div class="flow-step"><div class="num">1</div><h4>Pick Interview</h4><p>List exercises (skill_kind=interview) trong module</p></div>
+        <div class="flow-step"><div class="num">2</div><h4>Intro Screen</h4><p>Đề bài + chọn option (nếu choice_explain)</p></div>
+        <div class="flow-step fix"><div class="num">3</div><h4>Prepare Avatar</h4><p>Simli start → ICE → first frame ready (gate)</p></div>
+        <div class="flow-step fix"><div class="num">4</div><h4>Open ElevenLabs</h4><p>WS connect → buffer chunks tới khi avatar ready</p></div>
+        <div class="flow-step"><div class="num">5</div><h4>Session Live</h4><p>Prompt card top + avatar + transcript + mic</p></div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-step"><div class="num">6</div><h4>Examiner Speak</h4><p>First message phát đầy đủ — không miss</p></div>
+        <div class="flow-step"><div class="num">7</div><h4>Learner Reply</h4><p>Nhìn prompt card khi cần ôn lại đề</p></div>
+        <div class="flow-step"><div class="num">8</div><h4>Multi-turn</h4><p>Card auto-collapse 8s · pulse khi câu mới</p></div>
+        <div class="flow-step"><div class="num">9</div><h4>End Session</h4><p>Submit transcript → backend score</p></div>
+        <div class="flow-step"><div class="num">10</div><h4>Result</h4><p>Score + transcript + feedback</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESIGN SYSTEM -->
+  <div class="section">
+    <h2>Design Tokens</h2>
+    <div class="tokens">
+      <div class="token"><div class="swatch" style="background:#FF6A14"></div><div class="name">Babbel Orange</div><div class="hex">#FF6A14 · primary</div></div>
+      <div class="token"><div class="swatch" style="background:#0F3D3A"></div><div class="name">Teal Deep</div><div class="hex">#0F3D3A · text</div></div>
+      <div class="token"><div class="swatch" style="background:#FBF3E7"></div><div class="name">Cream</div><div class="hex">#FBF3E7 · surface</div></div>
+      <div class="token"><div class="swatch" style="background:#0A1628"></div><div class="name">Night Avatar</div><div class="hex">#0A1628 · session bg</div></div>
+    </div>
+    <p style="margin-top:14px;font-size:13px;color:var(--muted)"><b style="color:var(--teal)">Type:</b> Inter (UI), Fraunces (titles) · giữ nguyên hệ thống V2 đã có. Prompt card dùng Fraunces 14px cho title, Inter 12px cho body.</p>
+  </div>
+
+  <!-- SESSION STATES -->
+  <div class="section">
+    <h2>Session States</h2>
+    <div class="states">
+      <div class="state-card connecting"><div class="badge">Connecting</div><h4>Đang kết nối</h4><p>Simli loading + ElevenLabs connect. Spinner full-screen.</p></div>
+      <div class="state-card ready"><div class="badge">Ready</div><h4>Sẵn sàng</h4><p>Avatar idle, mic OFF, chờ first message từ examiner.</p></div>
+      <div class="state-card speak"><div class="badge">Speaking</div><h4>Examiner nói</h4><p>Avatar lip-sync, mic vẫn ON (cho phép ngắt lời).</p></div>
+      <div class="state-card listen"><div class="badge">Listening</div><h4>Learner nói</h4><p>Waveform animated, prompt card có thể tap mở rộng.</p></div>
+    </div>
+  </div>
+
+  <!-- MOCKUPS -->
+  <h2>Mockups</h2>
+  <div class="row">
+
+    <!-- INTRO -->
+    <div>
+      <div class="frame">
+        <div class="notch"></div>
+        <div class="intro-content">
+          <div class="intro-back">←</div>
+          <div class="intro-eyebrow">Phỏng vấn · A2</div>
+          <div class="intro-title">Mô tả công việc bạn muốn làm ở Cộng hòa Séc</div>
+          <div class="intro-meta">
+            <span>10 phút</span><span>3 lượt nói</span><span>20 điểm</span>
+          </div>
+          <div class="intro-card">
+            <div class="intro-card-label">Đề bài</div>
+            <div class="intro-card-body">Bạn đang tham gia phỏng vấn xin giấy phép cư trú dài hạn. Hãy chọn 1 nghề và mô tả công việc, kinh nghiệm, lý do muốn làm ở Séc.</div>
+          </div>
+          <div class="intro-options">
+            <div class="intro-opt"><b>A</b>Đầu bếp</div>
+            <div class="intro-opt sel"><b>B</b>Y tá</div>
+            <div class="intro-opt"><b>C</b>Lập trình viên</div>
+          </div>
+          <div class="intro-cta">Bắt đầu phỏng vấn</div>
+          <div class="intro-helper">Bạn sẽ nhìn thấy đề bài trong suốt session</div>
+        </div>
+      </div>
+      <div class="frame-label"><b>① Intro</b>Chọn option · xem đề full</div>
+    </div>
+
+    <!-- SESSION EXPANDED -->
+    <div>
+      <div class="frame">
+        <div class="avatar-bg"></div>
+        <div class="avatar-face"><div class="mouth"></div></div>
+        <div class="gradient-overlay"></div>
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><span>•••• 5G</span></div>
+        <div class="pill"><span class="dot speak"></span>Đang nghe examiner</div>
+        <div class="option-chip">B ✓</div>
+
+        <div class="prompt-card expanded">
+          <div class="head">
+            <div class="label">Đề bài</div>
+            <div class="icon">▼</div>
+          </div>
+          <div class="title">Mô tả công việc y tá</div>
+          <div class="body">Hãy nói về kinh nghiệm, công việc thường ngày, và lý do bạn muốn làm y tá ở Séc. Dùng từ vựng nghề nghiệp + thì hiện tại.</div>
+          <div class="extra">💡 Gợi ý từ: nemocnice · pacient · směna · pomáhat lidem</div>
+        </div>
+
+        <div class="transcript">
+          <div class="who">Examiner</div>
+          <div class="text">Dobrý den! Můžete mi říct, jakou práci chcete dělat v České republice?</div>
+        </div>
+
+        <div class="controls">
+          <div class="timer">02:14</div>
+          <div class="waveform"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <button class="end-btn">📞 Kết thúc</button>
+        </div>
+      </div>
+      <div class="frame-label"><b>② Session — Prompt mở rộng</b>Default khi mới vào · 8s rồi auto-collapse</div>
+    </div>
+
+    <!-- SESSION COLLAPSED -->
+    <div>
+      <div class="frame">
+        <div class="avatar-bg"></div>
+        <div class="avatar-face"><div class="mouth"></div></div>
+        <div class="gradient-overlay"></div>
+        <div class="notch"></div>
+        <div class="statusbar"><span>9:41</span><span>•••• 5G</span></div>
+        <div class="pill"><span class="dot listen"></span>Đang nghe bạn nói</div>
+        <div class="option-chip">B ✓</div>
+
+        <div class="prompt-mini">
+          <div class="ic">!</div>
+          <span>Đề bài · tap để xem</span>
+        </div>
+
+        <div class="transcript">
+          <div class="who you">Bạn</div>
+          <div class="text">Pracuju jako zdravotní sestra v nemocnici už pět let...</div>
+        </div>
+
+        <div class="controls">
+          <div class="timer">03:42</div>
+          <div class="waveform"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <button class="end-btn">📞 Kết thúc</button>
+        </div>
+      </div>
+      <div class="frame-label"><b>③ Session — Prompt thu gọn</b>Sau 8s · không che mặt examiner</div>
+    </div>
+
+  </div>
+
+  <!-- FIX DIAGRAM -->
+  <div class="section">
+    <h2>Logic fix · sequence sau khi sửa</h2>
+    <div class="timeline">
+<span class="ts">T+0ms</span>      <span class="arrow">→</span> Simli <code>start()</code><br>
+<span class="ts">T+820ms</span>    <span class="arrow">→</span> WS <span class="ok">START</span> · <code>_connected=true</code> <span class="warn">(không gate ở đây nữa)</span><br>
+<span class="ts">T+850ms</span>    <span class="arrow">→</span> ElevenLabs metadata · <code>onReady</code> · <code>_startMic()</code><br>
+<span class="ts">T+870ms</span>    <span class="arrow">→</span> Audio chunk #1 arrives<br>
+<span class="ts">T+870ms</span>    <span class="arrow">→</span> <code>isVideoReady=false</code> → <span class="ok">push to _pendingAgentChunks queue</span><br>
+<span class="ts">T+910ms</span>    <span class="arrow">→</span> Chunk #2 → queue (size=2)<br>
+<span class="ts">T+1100ms</span>   <span class="arrow">→</span> Chunk #5 → queue (size=5)<br>
+<span class="ts">T+1240ms</span>   <span class="arrow">→</span> First frame · <span class="ok">_markVideoReady() · isVideoReady=true</span><br>
+<span class="ts">T+1240ms</span>   <span class="arrow">→</span> <span class="ok">Flush queue → _simli.sendAudio() x5</span><br>
+<span class="ts">T+1245ms</span>   <span class="arrow">→</span> Subsequent chunks route directly<br>
+<span class="ts">T+1280ms</span>   <span class="arrow">→</span> Audio playback start <span class="ok">✓ — first message intact</span><br><br>
+<span class="ts">FALLBACK</span>   <span class="arrow">→</span> If <code>!isVideoReady</code> after 1500ms <span class="arrow">→</span> flush queue to <span class="ok">PcmAudioPlayer (local)</span><br>
+<span class="ts"></span>            <span class="arrow">→</span> Set <code>_useSimliAudio=false</code> → continue audio-only mode
+    </div>
+  </div>
+
+  <!-- INTERACTION RULES -->
+  <div class="section">
+    <h2>Interaction rules · prompt card</h2>
+    <ul class="bullet">
+      <li><b>Default state</b>: card mở rộng (expanded) trong 8s đầu mỗi session để learner đọc đề.</li>
+      <li><b>Auto-collapse</b>: sau 8s không tap → smooth animation về mini-pill (200ms ease-out, scale + opacity).</li>
+      <li><b>Pulse on new question</b>: khi <code>onAgentResponseComplete</code> fire (examiner kết thúc câu hỏi mới) → pulse subtle 1.5s (scale 1 → 1.04 → 1) báo hiệu "có câu mới, tap để đọc đề".</li>
+      <li><b>Tap behavior</b>: tap mini-pill → expand full · tap header expanded → collapse. Animation 200ms.</li>
+      <li><b>Position</b>: bottom — đặt trên controls bar (timer + waveform + End). Tránh che mặt examiner. Transcript overlay đẩy lên trên.</li>
+      <li><b>Choice variant</b>: card body chỉ hiện <em>nội dung option đã chọn</em> (title + content), <strong>không</strong> list 3 options. Selected option chip vẫn ở top-right.</li>
+      <li><b>Reduced motion</b>: nếu OS setting bật → bỏ pulse, expand/collapse instant.</li>
+      <li><b>Touch target</b>: cả card là touch zone, min height 44pt khi collapsed.</li>
+    </ul>
+  </div>
+
+  <!-- ACCESSIBILITY -->
+  <div class="section">
+    <h2>Accessibility · pre-delivery checklist</h2>
+    <ul class="bullet">
+      <li>Prompt card text contrast ≥4.5:1 · cream bg #FBF3E7 + ink #1B1B1B = 13.8:1 ✓</li>
+      <li>Status pill background opacity 0.45 + backdrop-blur → contrast over avatar ≥4.5:1 verified</li>
+      <li>End button label "Kết thúc" + icon · không icon-only · accessibilityLabel set</li>
+      <li>Mini-pill có aria-label "Xem đề bài" · screen reader announces khi pulse</li>
+      <li>Touch target tối thiểu 44×44pt cho mini-pill, end button (54pt), waveform area</li>
+      <li>Dynamic Type: prompt card body font-size hỗ trợ scale lên 1.3x không truncate</li>
+      <li>Reduced motion: tắt waveform animation + pulse + expand/collapse animation</li>
+      <li>Safe area: prompt card top = safe-area-top + 64px (dưới status pill); controls bottom = safe-area-bottom + 16px</li>
+      <li>Avatar không phải nguồn thông tin duy nhất · prompt + transcript đảm bảo accessible</li>
+    </ul>
+  </div>
+
+  <!-- IMPLEMENTATION NOTES -->
+  <div class="section">
+    <h2>Implementation summary</h2>
+    <div class="row two">
+      <div>
+        <h3 style="color:var(--teal);margin-bottom:10px">🐛 Bug fix (Direction A + C)</h3>
+        <ul class="bullet">
+          <li><code>interview_session_screen.dart</code>: thêm <code>List&lt;Uint8List&gt; _pendingAgentChunks</code></li>
+          <li>Đổi gate <code>_simli?.isConnected</code> → <code>_simli?.isVideoReady</code> trong <code>shouldPlayInterviewAudioLocally</code></li>
+          <li>Khi chunk đến và <code>!isVideoReady</code>: <code>_pendingAgentChunks.add(chunk)</code></li>
+          <li>Subscribe <code>simli.onVideoReady</code> → flush queue đồng loạt vào <code>_simli.sendAudio()</code></li>
+          <li>Timer fallback 1500ms: nếu vẫn không ready → flush vào <code>_audioPlayer.addChunk()</code> + set <code>_useSimliAudio=false</code></li>
+          <li><code>SimliSessionManager</code>: optional <code>setInputAudioFormat(String?)</code> để Simli match ElevenLabs sample rate</li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="color:var(--babbel-orange);margin-bottom:10px">✨ Prompt card UX</h3>
+        <ul class="bullet">
+          <li><code>ExerciseDetail.interviewDisplayPrompt</code> field mới (Flutter contract)</li>
+          <li>Backend: optional <code>display_prompt</code> trong <code>InterviewConversationDetail</code> + <code>InterviewChoiceExplainDetail</code></li>
+          <li>CMS form: textarea "Hiển thị cho học viên" trong <code>InterviewConversationFields.tsx</code> + <code>InterviewChoiceExplainFields.tsx</code></li>
+          <li><code>_PromptCard</code> widget: <code>AnimatedContainer</code> · expanded ⇄ mini · 200ms ease-out</li>
+          <li>Auto-collapse Timer 8s · reset on tap</li>
+          <li>Listen <code>onAgentResponseComplete</code> → trigger pulse animation (skip lần đầu)</li>
+          <li>i18n keys mới: <code>interviewPromptLabel</code>, <code>interviewTapToView</code>, <code>interviewVocabHints</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -305,6 +305,11 @@ type InterviewConversationDetail struct {
 	SystemPrompt   string   `json:"system_prompt"`
 	MaxTurns       int      `json:"max_turns"`
 	ShowTranscript bool     `json:"show_transcript"`
+
+	// V16 — learner-facing prompt (computed server-side from SystemPrompt) and
+	// audio-buffer fallback timeout used by Flutter to gate Simli audio routing.
+	DisplayPrompt        string `json:"display_prompt,omitempty"`
+	AudioBufferTimeoutMs int    `json:"audio_buffer_timeout_ms,omitempty"`
 }
 
 // InterviewChoiceExplainDetail is the detail payload for interview_choice_explain exercises.
@@ -316,6 +321,10 @@ type InterviewChoiceExplainDetail struct {
 	SystemPrompt   string            `json:"system_prompt"`
 	MaxTurns       int               `json:"max_turns"`
 	ShowTranscript bool              `json:"show_transcript"`
+
+	// V16 — see InterviewConversationDetail above.
+	DisplayPrompt        string `json:"display_prompt,omitempty"`
+	AudioBufferTimeoutMs int    `json:"audio_buffer_timeout_ms,omitempty"`
 }
 
 // InterviewOption is one selectable choice in an interview_choice_explain exercise.

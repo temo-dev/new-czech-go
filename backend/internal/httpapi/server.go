@@ -34,6 +34,7 @@ type Server struct {
 	elevenLabsVoiceIDC  string // ELEVENLABS_VOICE_ID_C — voice override for interviews
 	replicateAPIKey    string // for AI image generation via Flux
 	aiImageRL          *aiImageRateLimiter
+	interviewPreviewRL *interviewPreviewLimiter
 	mux                *http.ServeMux
 }
 
@@ -91,8 +92,9 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 		elevenLabsAgentID:  strings.TrimSpace(os.Getenv("ELEVENLABS_AGENT_ID")),
 		elevenLabsVoiceIDC: strings.TrimSpace(os.Getenv("ELEVENLABS_VOICE_ID_C")),
 		replicateAPIKey:   strings.TrimSpace(os.Getenv("REPLICATE_API_KEY")),
-		aiImageRL:         newAiImageRateLimiter(),
-		mux:              http.NewServeMux(),
+		aiImageRL:          newAiImageRateLimiter(),
+		interviewPreviewRL: newInterviewPreviewLimiter(),
+		mux:                http.NewServeMux(),
 	}
 	// Recover any jobs stuck in "running" from a previous server crash.
 	repo.MarkAllRunningJobsFailed("Server restarted while generation was running")
@@ -145,6 +147,8 @@ func (s *Server) routes() {
 	// V15: AI image generation
 	s.mux.HandleFunc("/v1/admin/ai/generate-image", s.withRole("admin", s.handleAdminGenerateImage))
 	s.mux.HandleFunc("/v1/admin/ai/set-banner", s.withRole("admin", s.handleAdminAiSetBanner))
+	// V16: interview prompt preview
+	s.mux.HandleFunc("/v1/admin/interview/preview-prompt", s.withRole("admin", s.handleAdminInterviewPreviewPrompt))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -394,6 +398,9 @@ func (s *Server) handleExercise(w http.ResponseWriter, r *http.Request, _ contra
 	if !ok {
 		writeNotFound(w)
 		return
+	}
+	if exercise.SkillKind == "interview" {
+		exercise.Detail = processing.EnrichInterviewDetail(exercise.Detail)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": exercise, "meta": map[string]any{}})
 }
