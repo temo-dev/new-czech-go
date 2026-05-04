@@ -400,6 +400,7 @@ class SimliSessionManager {
     final answerCompleter = Completer<void>();
     _webSocketSubscription = _webSocket!.listen(
       (message) async {
+        if (_disposed) return;
         if (message is List<int>) return;
 
         final text = message.toString();
@@ -439,6 +440,7 @@ class SimliSessionManager {
         }
       },
       onError: (Object err) {
+        if (_disposed) return;
         if (!answerCompleter.isCompleted) {
           answerCompleter.completeError(err);
         }
@@ -463,12 +465,20 @@ class SimliSessionManager {
 
   void sendAudio(Uint8List pcm16) {
     if (!_connected || _disposed || _webSocket == null) return;
-    _webSocket!.add(pcm16);
+    try {
+      _webSocket!.add(pcm16);
+    } catch (err) {
+      if (!_disposed) _fail('WebSocket send failed: $err');
+    }
   }
 
   void clearBuffer() {
     if (_disposed || _webSocket == null) return;
-    _webSocket!.add('SKIP');
+    try {
+      _webSocket!.add('SKIP');
+    } catch (err) {
+      debugPrint('Simli SKIP ignored: $err');
+    }
   }
 
   Future<void> dispose({bool notify = true}) async {
@@ -485,10 +495,16 @@ class SimliSessionManager {
     } catch (err) {
       debugPrint('Simli DONE ignored: $err');
     }
-    await _webSocketSubscription?.cancel();
+    try {
+      await _webSocketSubscription?.cancel().timeout(
+        const Duration(seconds: 2),
+      );
+    } catch (err) {
+      debugPrint('Simli websocket subscription cancel ignored: $err');
+    }
     _webSocketSubscription = null;
     try {
-      await _webSocket?.close();
+      await _webSocket?.close().timeout(const Duration(seconds: 2));
     } catch (err) {
       debugPrint('Simli websocket close ignored: $err');
     }

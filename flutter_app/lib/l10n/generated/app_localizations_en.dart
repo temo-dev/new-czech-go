@@ -1022,6 +1022,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get interviewStatusListening => 'Listening to you...';
 
   @override
+  String get interviewStatusThinking => 'Waiting for examiner...';
+
+  @override
   String get interviewEndBtn => 'End';
 
   @override

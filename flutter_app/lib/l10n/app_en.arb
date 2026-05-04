@@ -416,6 +416,7 @@
     "interviewStatusReady": "Ready",
     "interviewStatusSpeaking": "Examiner is speaking",
     "interviewStatusListening": "Listening to you...",
+    "interviewStatusThinking": "Waiting for examiner...",
     "interviewEndBtn": "End",
     "interviewEndConfirm": "Do you want to end the interview?",
     "interviewAnalyzing": "Scoring...",

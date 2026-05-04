@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:audio_session/audio_session.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:record/record.dart';
 
@@ -29,6 +29,41 @@ bool shouldPlayInterviewAudioLocally({
   required bool simliVideoReady,
 }) {
   return !(useSimliAudio && simliVideoReady);
+}
+
+@visibleForTesting
+const Duration interviewMicPrerollDuration = Duration(milliseconds: 550);
+
+@visibleForTesting
+const Duration interviewAgentWaitTimeout = Duration(seconds: 8);
+
+@visibleForTesting
+const int interviewMinMicPrerollBytes = 1600;
+
+@visibleForTesting
+bool canStartInterviewMic({
+  required bool conversationStarted,
+  required bool ending,
+  required bool micActive,
+  required bool micTransitioning,
+  required bool waitingForAgentAfterUserTurn,
+  required InterviewSessionState state,
+}) {
+  return conversationStarted &&
+      !ending &&
+      !micActive &&
+      !micTransitioning &&
+      !waitingForAgentAfterUserTurn &&
+      state == InterviewSessionState.ready;
+}
+
+@visibleForTesting
+bool shouldReleaseInterviewMicPreroll({
+  required Duration elapsed,
+  required int capturedBytes,
+}) {
+  return elapsed >= interviewMicPrerollDuration &&
+      capturedBytes >= interviewMinMicPrerollBytes;
 }
 
 class InterviewSessionScreen extends StatefulWidget {
@@ -105,6 +140,14 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
 
   // V16 push-to-talk: mic is OFF until the learner taps the mic button.
   bool _micActive = false;
+  bool _micTransitioning = false;
+  bool _waitingForAgentAfterUserTurn = false;
+  bool _micPrerollReleased = false;
+  DateTime? _micStartedAt;
+  int _micBytesCaptured = 0;
+  final List<Uint8List> _pendingMicChunks = [];
+  Timer? _micPrerollTimer;
+  Timer? _agentWaitTimer;
 
   // V16: agent silence detector. ElevenLabs occasionally fails to fire
   // agent_response_complete, leaving _state stuck on speaking and the PTT
@@ -129,7 +172,10 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     _audioBufferTimeoutTimer?.cancel();
     _firstTurnSafetyTimer?.cancel();
     _agentSilenceTimer?.cancel();
+    _micPrerollTimer?.cancel();
+    _agentWaitTimer?.cancel();
     _pendingAgentChunks.clear();
+    _pendingMicChunks.clear();
     _wsClient.disconnect();
     _audioPlayer.dispose();
     _recorder.dispose();
@@ -189,13 +235,16 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
         Timer(const Duration(seconds: 3), () {
           if (!mounted || _ending || _conversationStarted) return;
           if (_firstAgentChunkSeen) return;
-          debugPrint('Agent silent 3s after metadata — enabling mic so learner can speak first');
+          debugPrint(
+            'Agent silent 3s after metadata — enabling mic so learner can speak first',
+          );
           _advancePrepareStep(4);
           _startConversation();
         });
       };
       _wsClient.onAudioChunk = (Uint8List chunk) {
         if (!mounted || _ending) return;
+        _markAgentTurnStarted();
         if (!_firstAgentChunkSeen) {
           _firstAgentChunkSeen = true;
           _advancePrepareStep(4);
@@ -264,10 +313,15 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
           debugPrint('Interview dropping empty learner turn: ${text.trim()}');
           return;
         }
-        final atSec = _conversationStarted
-            ? (DateTime.now().millisecondsSinceEpoch ~/ 1000) - _sessionStartSec
-            : 0;
+        final atSec =
+            _conversationStarted
+                ? (DateTime.now().millisecondsSinceEpoch ~/ 1000) -
+                    _sessionStartSec
+                : 0;
         setState(() {
+          if (speaker == 'examiner') {
+            _markAgentTurnStarted(updateState: false);
+          }
           _turns.add(
             InterviewTranscriptTurn(speaker: speaker, text: text, atSec: atSec),
           );
@@ -275,6 +329,8 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
           _lastSpeakerIsExaminer = speaker == 'examiner';
           if (speaker == 'examiner') {
             _state = InterviewSessionState.speaking;
+          } else if (_waitingForAgentAfterUserTurn) {
+            _state = InterviewSessionState.thinking;
           } else {
             _state = InterviewSessionState.listening;
           }
@@ -314,7 +370,9 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
         _startConversation();
       };
       _wsClient.onDisconnected = () {
-        if (mounted) setState(() => _state = InterviewSessionState.connecting);
+        if (mounted && !_ending) {
+          setState(() => _state = InterviewSessionState.connecting);
+        }
       };
       _wsClient.onError = (err) {
         if (!mounted) return;
@@ -384,6 +442,10 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     };
     simli.onSpeakingChanged = (isSpeaking) {
       if (!mounted || _disposing || _ending || !_useSimliAudio) return;
+      if (_waitingForAgentAfterUserTurn && !isSpeaking) {
+        return;
+      }
+      if (isSpeaking) _markAgentTurnStarted();
       // Simli SPEAK/SILENT is the most accurate signal for "is the avatar
       // currently producing audio". With PTT, ready = waiting for the
       // learner to tap; listening = mic actively recording. Don't override
@@ -393,9 +455,10 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       _agentSilenceTimer?.cancel();
       _agentSilenceTimer = null;
       setState(() {
-        _state = isSpeaking
-            ? InterviewSessionState.speaking
-            : InterviewSessionState.ready;
+        _state =
+            isSpeaking
+                ? InterviewSessionState.speaking
+                : InterviewSessionState.ready;
       });
       if (!isSpeaking) {
         // Simli finished playing — treat the same as agent_response_complete:
@@ -461,7 +524,9 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
 
   void _flushPendingChunksToSimli() {
     if (_pendingAgentChunks.isEmpty) return;
-    debugPrint('Flushing ${_pendingAgentChunks.length} buffered chunk(s) to Simli');
+    debugPrint(
+      'Flushing ${_pendingAgentChunks.length} buffered chunk(s) to Simli',
+    );
     for (final chunk in _pendingAgentChunks) {
       _simli?.sendAudio(chunk);
     }
@@ -472,7 +537,9 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   /// — drop into local PCM playback so the learner still hears the agent.
   void _fallbackToLocalAudio() {
     if (!mounted || _videoReadyFired) return;
-    debugPrint('Audio buffer timeout — falling back to local audio (${_pendingAgentChunks.length} buffered chunks)');
+    debugPrint(
+      'Audio buffer timeout — falling back to local audio (${_pendingAgentChunks.length} buffered chunks)',
+    );
     setState(() {
       _useSimliAudio = false;
     });
@@ -490,7 +557,13 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     _agentAudioFlushTimer = Timer(delay, () async {
       await _audioPlayer.flushAndPlay();
       if (!mounted || _ending) return;
-      setState(() => _state = InterviewSessionState.listening);
+      setState(
+        () =>
+            _state =
+                _micActive
+                    ? InterviewSessionState.listening
+                    : InterviewSessionState.ready,
+      );
     });
   }
 
@@ -500,18 +573,27 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   /// The mic is never on while the examiner speaks, eliminating echo loops.
   Future<void> _toggleMic() async {
     if (!_conversationStarted || _ending || !mounted) return;
-    if (_state == InterviewSessionState.speaking) return;
+    if (_micTransitioning) return;
     if (_micActive) {
       await _stopMicStreaming();
-    } else {
+    } else if (canStartInterviewMic(
+      conversationStarted: _conversationStarted,
+      ending: _ending,
+      micActive: _micActive,
+      micTransitioning: _micTransitioning,
+      waitingForAgentAfterUserTurn: _waitingForAgentAfterUserTurn,
+      state: _state,
+    )) {
       await _startMicStreaming();
     }
   }
 
   Future<void> _startMicStreaming() async {
     if (_micActive) return;
+    if (mounted) setState(() => _micTransitioning = true);
     if (!await _recorder.hasPermission()) {
       if (mounted) {
+        setState(() => _micTransitioning = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(AppLocalizations.of(context).interviewMicDenied),
@@ -520,39 +602,78 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       }
       return;
     }
-    final stream = await _recorder.startStream(
-      const RecordConfig(
-        encoder: AudioEncoder.pcm16bits,
-        sampleRate: 16000,
-        numChannels: 1,
-      ),
-    );
-    _micSub = stream.listen((chunk) {
-      if (_ending || !_micActive) return;
-      _wsClient.sendAudioChunk(Uint8List.fromList(chunk));
-    });
-    if (!mounted) return;
-    debugPrint('Interview PTT: mic ON');
-    setState(() {
-      _micActive = true;
-      _state = InterviewSessionState.listening;
-    });
+    try {
+      _pendingMicChunks.clear();
+      _micBytesCaptured = 0;
+      _micPrerollReleased = false;
+      _micStartedAt = DateTime.now();
+      final stream = await _recorder.startStream(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+      );
+      _micSub = stream.listen((chunk) {
+        if (_ending || !_micActive) return;
+        _handleMicChunk(Uint8List.fromList(chunk));
+      });
+      _micPrerollTimer = Timer(
+        interviewMicPrerollDuration,
+        _releaseMicPrerollIfReady,
+      );
+      if (!mounted) return;
+      debugPrint('Interview PTT: mic ON');
+      setState(() {
+        _micActive = true;
+        _micTransitioning = false;
+        _state = InterviewSessionState.listening;
+      });
+    } catch (err) {
+      debugPrint('Interview PTT start failed: $err');
+      if (mounted) setState(() => _micTransitioning = false);
+    }
   }
 
-  Future<void> _stopMicStreaming() async {
+  Future<void> _stopMicStreaming({bool waitForAgent = true}) async {
     if (!_micActive) return;
+    final startedAt = _micStartedAt;
+    final elapsed =
+        startedAt == null
+            ? Duration.zero
+            : DateTime.now().difference(startedAt);
+    final released = _micPrerollReleased;
     if (mounted) {
       setState(() {
+        _micTransitioning = true;
         _micActive = false;
-        // Drop back to ready while waiting for the examiner to respond.
-        if (_state == InterviewSessionState.listening) {
+        if (waitForAgent && released) {
+          _waitingForAgentAfterUserTurn = true;
+          _state = InterviewSessionState.thinking;
+        } else if (_state == InterviewSessionState.listening ||
+            _state == InterviewSessionState.thinking) {
           _state = InterviewSessionState.ready;
         }
       });
     } else {
       _micActive = false;
     }
-    debugPrint('Interview PTT: mic OFF (server VAD finalises turn)');
+    _micPrerollTimer?.cancel();
+    _micPrerollTimer = null;
+    if (!released) {
+      debugPrint(
+        'Interview PTT: short tap discarded '
+        'elapsedMs=${elapsed.inMilliseconds} bytes=$_micBytesCaptured',
+      );
+      _pendingMicChunks.clear();
+    } else {
+      _releaseMicPrerollIfReady(force: true);
+      debugPrint(
+        'Interview PTT: mic OFF (waiting for examiner response) '
+        'elapsedMs=${elapsed.inMilliseconds} bytes=$_micBytesCaptured',
+      );
+      if (waitForAgent) _scheduleAgentWaitTimeout();
+    }
     final sub = _micSub;
     _micSub = null;
     try {
@@ -565,6 +686,10 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     } catch (err) {
       debugPrint('PTT recorder stop timeout: $err');
     }
+    _micStartedAt = null;
+    _micBytesCaptured = 0;
+    _micPrerollReleased = false;
+    if (mounted) setState(() => _micTransitioning = false);
   }
 
   Future<void> _endSession() async {
@@ -578,15 +703,19 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       _useSimliAudio = false;
     });
     debugPrint('Interview end requested for attempt ${widget.attemptId}');
+    _agentWaitTimer?.cancel();
+    _micPrerollTimer?.cancel();
     _agentAudioFlushTimer?.cancel();
     _audioPlayer.clearBuffer();
     _disposeSimliAfterFrame(simli);
     unawaited(_stopRealtimeSession());
 
     try {
-      final durationSec = _conversationStarted
-          ? (DateTime.now().millisecondsSinceEpoch ~/ 1000) - _sessionStartSec
-          : 0;
+      final durationSec =
+          _conversationStarted
+              ? (DateTime.now().millisecondsSinceEpoch ~/ 1000) -
+                  _sessionStartSec
+              : 0;
       final turns = _turns.map((t) => t.toJson()).toList();
       debugPrint(
         'Interview submit started for attempt ${widget.attemptId} turns=${turns.length}',
@@ -626,17 +755,23 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   }
 
   Future<void> _stopRealtimeSession() async {
-    final micSub = _micSub;
-    _micSub = null;
-    try {
-      await micSub?.cancel().timeout(const Duration(seconds: 1));
-    } catch (err) {
-      debugPrint('Interview mic stream cancel timed out: $err');
-    }
-    try {
-      await _recorder.stop().timeout(const Duration(seconds: 2));
-    } catch (err) {
-      debugPrint('Interview recorder stop failed or timed out: $err');
+    _agentWaitTimer?.cancel();
+    _micPrerollTimer?.cancel();
+    if (_micActive) {
+      await _stopMicStreaming(waitForAgent: false);
+    } else {
+      final micSub = _micSub;
+      _micSub = null;
+      try {
+        await micSub?.cancel().timeout(const Duration(seconds: 1));
+      } catch (err) {
+        debugPrint('Interview mic stream cancel timed out: $err');
+      }
+      try {
+        await _recorder.stop().timeout(const Duration(seconds: 2));
+      } catch (err) {
+        debugPrint('Interview recorder stop failed or timed out: $err');
+      }
     }
     await _wsClient.disconnect(timeout: const Duration(seconds: 2));
   }
@@ -668,6 +803,72 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     _promptCardKey.currentState?.onAgentResponseComplete();
   }
 
+  void _handleMicChunk(Uint8List chunk) {
+    _micBytesCaptured += chunk.length;
+    if (!_micPrerollReleased) {
+      _pendingMicChunks.add(chunk);
+      _releaseMicPrerollIfReady();
+      return;
+    }
+    _wsClient.sendAudioChunk(chunk);
+  }
+
+  void _releaseMicPrerollIfReady({bool force = false}) {
+    if (!_micActive && !force) return;
+    if (_micPrerollReleased && _pendingMicChunks.isEmpty) return;
+    final startedAt = _micStartedAt;
+    final elapsed =
+        startedAt == null
+            ? Duration.zero
+            : DateTime.now().difference(startedAt);
+    if (!force &&
+        !shouldReleaseInterviewMicPreroll(
+          elapsed: elapsed,
+          capturedBytes: _micBytesCaptured,
+        )) {
+      return;
+    }
+    _micPrerollReleased = true;
+    _micPrerollTimer?.cancel();
+    _micPrerollTimer = null;
+    for (final chunk in _pendingMicChunks) {
+      _wsClient.sendAudioChunk(chunk);
+    }
+    if (_pendingMicChunks.isNotEmpty) {
+      debugPrint(
+        'Interview PTT: released preroll chunks=${_pendingMicChunks.length} '
+        'elapsedMs=${elapsed.inMilliseconds}',
+      );
+    }
+    _pendingMicChunks.clear();
+  }
+
+  void _scheduleAgentWaitTimeout() {
+    _agentWaitTimer?.cancel();
+    _agentWaitTimer = Timer(interviewAgentWaitTimeout, () {
+      if (!mounted || _ending || !_waitingForAgentAfterUserTurn) return;
+      debugPrint(
+        'Interview PTT: no examiner response after user turn — mic re-enabled',
+      );
+      setState(() {
+        _waitingForAgentAfterUserTurn = false;
+        if (!_micActive && _state == InterviewSessionState.thinking) {
+          _state = InterviewSessionState.ready;
+        }
+      });
+    });
+  }
+
+  void _markAgentTurnStarted({bool updateState = true}) {
+    _agentWaitTimer?.cancel();
+    _agentWaitTimer = null;
+    if (!_waitingForAgentAfterUserTurn) return;
+    _waitingForAgentAfterUserTurn = false;
+    if (updateState && mounted && !_micActive) {
+      setState(() => _state = InterviewSessionState.speaking);
+    }
+  }
+
   /// V16: returns true if the transcript text contains at least one
   /// alphanumeric character. Used to filter out ElevenLabs placeholder
   /// turns ("...", "  ", ".") that come from echo/noise.
@@ -695,7 +896,9 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
         _state = InterviewSessionState.ready;
       }
     });
-    debugPrint('Interview conversation started — mic button enabled, timer reset');
+    debugPrint(
+      'Interview conversation started — mic button enabled, timer reset',
+    );
   }
 
   String? _choiceTitle() {
@@ -717,6 +920,7 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
 
   String _pttHint(AppLocalizations l) {
     if (!_conversationStarted) return l.interviewStatusConnecting;
+    if (_waitingForAgentAfterUserTurn) return l.interviewStatusThinking;
     if (_state == InterviewSessionState.speaking && !_micActive) {
       return l.interviewStatusSpeaking;
     }
@@ -854,9 +1058,10 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _TranscriptBubble(
-                        speakerLabel: _lastSpeakerIsExaminer
-                            ? l.interviewExaminer
-                            : l.interviewYou,
+                        speakerLabel:
+                            _lastSpeakerIsExaminer
+                                ? l.interviewExaminer
+                                : l.interviewYou,
                         speakerIsExaminer: _lastSpeakerIsExaminer,
                         text: _lastTranscriptText!,
                       ),
@@ -873,16 +1078,21 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
                     ),
                   Text(
                     _timerText(),
-                    style: const TextStyle(
-                      color: Colors.white30,
-                      fontSize: 12,
-                    ),
+                    style: const TextStyle(color: Colors.white30, fontSize: 12),
                   ),
                   const SizedBox(height: 10),
                   _PttMicButton(
-                    enabled: _conversationStarted &&
-                        !_ending &&
-                        _state != InterviewSessionState.speaking,
+                    enabled:
+                        _micActive ||
+                        canStartInterviewMic(
+                          conversationStarted: _conversationStarted,
+                          ending: _ending,
+                          micActive: _micActive,
+                          micTransitioning: _micTransitioning,
+                          waitingForAgentAfterUserTurn:
+                              _waitingForAgentAfterUserTurn,
+                          state: _state,
+                        ),
                     active: _micActive,
                     onTap: _toggleMic,
                   ),
@@ -894,17 +1104,21 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
                   const SizedBox(height: 8),
                   TextButton.icon(
                     onPressed: _ending ? null : _endSession,
-                    icon: _ending
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
+                    icon:
+                        _ending
+                            ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white70,
+                              ),
+                            )
+                            : const Icon(
+                              Icons.call_end_rounded,
+                              size: 18,
                               color: Colors.white70,
                             ),
-                          )
-                        : const Icon(Icons.call_end_rounded,
-                            size: 18, color: Colors.white70),
                     label: Text(
                       l.interviewEndBtn,
                       style: const TextStyle(
@@ -918,7 +1132,6 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
               ),
             ),
           ),
-
         ],
       ),
     );
@@ -964,57 +1177,55 @@ class _PreparingOverlay extends StatelessWidget {
               children: [
                 const SizedBox(height: 16),
                 Center(
-                child: Container(
-                  width: 96,
-                  height: 96,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.16),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: SizedBox(
-                      width: 56,
-                      height: 56,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation(
-                          AppColors.primary,
+                  child: Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.16),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: SizedBox(
+                        width: 56,
+                        height: 56,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation(AppColors.primary),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 22),
-              const Text(
-                'Đang chuẩn bị buổi phỏng vấn',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+                const SizedBox(height: 22),
+                const Text(
+                  'Đang chuẩn bị buổi phỏng vấn',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Mất khoảng 3 giây',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white54, fontSize: 13),
-              ),
-              const SizedBox(height: 28),
-              for (var i = 0; i < steps.length; i++)
-                _PrepareStepRow(
-                  label: steps[i].$1,
-                  icon: steps[i].$2,
-                  state: _stepStateAt(i),
+                const SizedBox(height: 6),
+                const Text(
+                  'Mất khoảng 3 giây',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white54, fontSize: 13),
                 ),
-              const SizedBox(height: 24),
-              const Text(
-                'Tip: nói rõ, nhìn vào camera khi giám khảo hỏi.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white38, fontSize: 12),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 28),
+                for (var i = 0; i < steps.length; i++)
+                  _PrepareStepRow(
+                    label: steps[i].$1,
+                    icon: steps[i].$2,
+                    state: _stepStateAt(i),
+                  ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Tip: nói rõ, nhìn vào camera khi giám khảo hỏi.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white38, fontSize: 12),
+                ),
+                const SizedBox(height: 12),
               ],
             ),
           ),
@@ -1049,9 +1260,10 @@ class _PrepareStepRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDone = state == _StepState.done;
     final isActive = state == _StepState.active;
-    final color = isDone
-        ? AppColors.success
-        : isActive
+    final color =
+        isDone
+            ? AppColors.success
+            : isActive
             ? AppColors.primary
             : Colors.white24;
     final textColor = isDone || isActive ? Colors.white : Colors.white54;
@@ -1063,20 +1275,23 @@ class _PrepareStepRow extends StatelessWidget {
           SizedBox(
             width: 22,
             height: 22,
-            child: isActive
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(AppColors.primary),
+            child:
+                isActive
+                    ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                      ),
+                    )
+                    : Icon(
+                      isDone
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked,
+                      size: 22,
+                      color: color,
                     ),
-                  )
-                : Icon(
-                    isDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
-                    size: 22,
-                    color: color,
-                  ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1147,14 +1362,16 @@ class _PttMicButtonState extends State<_PttMicButton>
 
   @override
   Widget build(BuildContext context) {
-    final fill = widget.active
-        ? const Color(0xFFE2530A)
-        : widget.enabled
+    final fill =
+        widget.active
+            ? const Color(0xFFE2530A)
+            : widget.enabled
             ? AppColors.primary
             : Colors.white24;
-    final glow = widget.active
-        ? const Color(0xFFE2530A)
-        : widget.enabled
+    final glow =
+        widget.active
+            ? const Color(0xFFE2530A)
+            : widget.enabled
             ? AppColors.primary
             : Colors.transparent;
 
@@ -1191,15 +1408,16 @@ class _PttMicButtonState extends State<_PttMicButton>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: fill,
-                      boxShadow: widget.enabled
-                          ? [
-                              BoxShadow(
-                                color: glow.withValues(alpha: 0.45),
-                                blurRadius: 18,
-                                spreadRadius: 1,
-                              ),
-                            ]
-                          : null,
+                      boxShadow:
+                          widget.enabled
+                              ? [
+                                BoxShadow(
+                                  color: glow.withValues(alpha: 0.45),
+                                  blurRadius: 18,
+                                  spreadRadius: 1,
+                                ),
+                              ]
+                              : null,
                     ),
                     child: Icon(
                       widget.active ? Icons.send_rounded : Icons.mic_rounded,
@@ -1234,7 +1452,8 @@ class _TranscriptBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Align(
-      alignment: speakerIsExaminer ? Alignment.centerLeft : Alignment.centerRight,
+      alignment:
+          speakerIsExaminer ? Alignment.centerLeft : Alignment.centerRight,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.85,

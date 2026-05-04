@@ -220,6 +220,17 @@ void main() {
       expect(decoded['user_audio_chunk'], equals(base64Encode(audio)));
     });
 
+    test('sendAudioChunk is ignored after disconnect', () async {
+      final client = ElevenLabsWsClient();
+      final List<String> sent = [];
+      client.testSendSink = (msg) => sent.add(msg);
+
+      await client.disconnect();
+      client.sendAudioChunk(Uint8List.fromList([10, 20, 30]));
+
+      expect(sent, isEmpty);
+    });
+
     test('transcript accumulation preserves order', () {
       final client = ElevenLabsWsClient();
       final turns = <(String, String)>[];

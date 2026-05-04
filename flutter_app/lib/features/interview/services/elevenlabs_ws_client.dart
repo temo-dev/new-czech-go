@@ -165,12 +165,17 @@ class ElevenLabsWsClient {
   }
 
   void _sendJson(Map<String, dynamic> msg) {
+    if (_disposed) return;
     final encoded = jsonEncode(msg);
     if (testSendSink != null) {
       testSendSink!(encoded);
       return;
     }
-    _ws?.add(encoded);
+    try {
+      _ws?.add(encoded);
+    } catch (err) {
+      _onNetworkError(err);
+    }
   }
 
   void _sendInitMessage() {

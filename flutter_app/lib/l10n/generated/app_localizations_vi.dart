@@ -1022,6 +1022,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get interviewStatusListening => 'Đang lắng nghe bạn...';
 
   @override
+  String get interviewStatusThinking => 'Đang chờ examiner...';
+
+  @override
   String get interviewEndBtn => 'Kết thúc';
 
   @override

@@ -461,6 +461,7 @@
     "interviewStatusReady": "Sẵn sàng",
     "interviewStatusSpeaking": "Examiner đang nói",
     "interviewStatusListening": "Đang lắng nghe bạn...",
+    "interviewStatusThinking": "Đang chờ examiner...",
     "interviewEndBtn": "Kết thúc",
     "interviewEndConfirm": "Bạn có muốn kết thúc phỏng vấn không?",
     "interviewAnalyzing": "Đang chấm điểm...",

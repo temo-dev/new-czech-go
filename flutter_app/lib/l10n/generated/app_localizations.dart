@@ -1949,6 +1949,12 @@ abstract class AppLocalizations {
   /// **'Đang lắng nghe bạn...'**
   String get interviewStatusListening;
 
+  /// No description provided for @interviewStatusThinking.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang chờ examiner...'**
+  String get interviewStatusThinking;
+
   /// No description provided for @interviewEndBtn.
   ///
   /// In vi, this message translates to:

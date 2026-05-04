@@ -148,6 +148,59 @@ void main() {
       );
     });
 
+    test('mic start is blocked while waiting for examiner turn', () {
+      expect(
+        canStartInterviewMic(
+          conversationStarted: true,
+          ending: false,
+          micActive: false,
+          micTransitioning: false,
+          waitingForAgentAfterUserTurn: true,
+          state: InterviewSessionState.thinking,
+        ),
+        isFalse,
+      );
+      expect(
+        canStartInterviewMic(
+          conversationStarted: true,
+          ending: false,
+          micActive: false,
+          micTransitioning: false,
+          waitingForAgentAfterUserTurn: false,
+          state: InterviewSessionState.ready,
+        ),
+        isTrue,
+      );
+      expect(
+        canStartInterviewMic(
+          conversationStarted: true,
+          ending: false,
+          micActive: false,
+          micTransitioning: false,
+          waitingForAgentAfterUserTurn: false,
+          state: InterviewSessionState.connecting,
+        ),
+        isFalse,
+      );
+    });
+
+    test('mic preroll waits before streaming short taps', () {
+      expect(
+        shouldReleaseInterviewMicPreroll(
+          elapsed: const Duration(milliseconds: 250),
+          capturedBytes: 32000,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldReleaseInterviewMicPreroll(
+          elapsed: interviewMicPrerollDuration,
+          capturedBytes: interviewMinMicPrerollBytes,
+        ),
+        isTrue,
+      );
+    });
+
     testWidgets('end button submits immediately without confirmation dialog', (
       tester,
     ) async {
