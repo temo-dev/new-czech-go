@@ -208,14 +208,17 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
           );
         }
         setState(() => _state = InterviewSessionState.speaking);
-        // Reset agent silence timer on every audio chunk. If chunks stop for
-        // 1.5s, treat the agent as finished even if agent_response_complete
-        // never arrives.
-        _agentSilenceTimer?.cancel();
-        _agentSilenceTimer = Timer(
-          const Duration(milliseconds: 1500),
-          _onAgentSilenceTimeout,
-        );
+        // Reset agent silence timer on every audio chunk. Only used when
+        // Simli is unavailable (Simli's SPEAK/SILENT WS messages are the
+        // authoritative signal otherwise). 2500ms accommodates pauses
+        // between sentences within the same agent turn.
+        if (!_useSimliAudio) {
+          _agentSilenceTimer?.cancel();
+          _agentSilenceTimer = Timer(
+            const Duration(milliseconds: 2500),
+            _onAgentSilenceTimeout,
+          );
+        }
 
         if (!_useSimliAudio) {
           _audioPlayer.addChunk(chunk);
@@ -296,12 +299,12 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
         if (!_useSimliAudio) {
           _scheduleAgentAudioFlush(delay: const Duration(milliseconds: 120));
         }
-        // V16: force visual state to "ready" so the PTT mic button enables.
-        // Simli's onSpeakingChanged is best-effort and can stick on
-        // "speaking" if a SILENT message is dropped. With PTT, "ready"
-        // means the learner can tap mic — "listening" is reserved for
-        // when the mic is actively recording.
-        if (!_micActive) {
+        // V16: force visual state to "ready" only on the local-audio path.
+        // When Simli is active, its SPEAK/SILENT WS messages are the
+        // authoritative "is the avatar talking" signal — flipping state
+        // here would be premature because Simli still has buffered audio
+        // to play out after the EL agent_response_complete event fires.
+        if (!_useSimliAudio && !_micActive) {
           setState(() => _state = InterviewSessionState.ready);
         }
         _promptCardKey.currentState?.onAgentResponseComplete();
@@ -381,12 +384,26 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     };
     simli.onSpeakingChanged = (isSpeaking) {
       if (!mounted || _disposing || _ending || !_useSimliAudio) return;
+      // Simli SPEAK/SILENT is the most accurate signal for "is the avatar
+      // currently producing audio". With PTT, ready = waiting for the
+      // learner to tap; listening = mic actively recording. Don't override
+      // the visual state while the learner is recording.
+      if (_micActive) return;
+      // Cancel the local silence detector — Simli's signal is authoritative.
+      _agentSilenceTimer?.cancel();
+      _agentSilenceTimer = null;
       setState(() {
-        _state =
-            isSpeaking
-                ? InterviewSessionState.speaking
-                : InterviewSessionState.listening;
+        _state = isSpeaking
+            ? InterviewSessionState.speaking
+            : InterviewSessionState.ready;
       });
+      if (!isSpeaking) {
+        // Simli finished playing — treat the same as agent_response_complete:
+        // unblock the conversation start path and pulse the prompt card on
+        // subsequent turns.
+        _startConversation();
+        _promptCardKey.currentState?.onAgentResponseComplete();
+      }
     };
     simli.onFailed = (err) {
       debugPrint('Simli failed: $err');
