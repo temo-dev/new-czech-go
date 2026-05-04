@@ -732,12 +732,13 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
             ),
 
           // ── Transcript overlay ────────────────────────────────────────
-          // V16: lifted above the prompt card so both can coexist.
+          // V16: stacked above the prompt card; prompt card sits above the
+          // PTT controls bar (~240px tall with the mic button + end link).
           if (showTranscript && _lastTranscriptText != null)
             Positioned(
               left: 16,
               right: 16,
-              bottom: bottomSafe + 280,
+              bottom: bottomSafe + 380,
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
@@ -781,13 +782,14 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
             ),
 
           // ── Prompt card (V16) ────────────────────────────────────────
-          // Sits above the controls so the learner can glance at the task
-          // while speaking. Hidden when display_prompt is empty.
+          // Sits above the controls bar so the learner can glance at the task
+          // while speaking. The PTT controls bar is ~240px tall (mic button
+          // 96px + hint + end link), so we offset 250 to clear it.
           if (widget.detail.interviewDisplayPrompt.trim().isNotEmpty)
             Positioned(
               left: 14,
               right: 14,
-              bottom: bottomSafe + 140,
+              bottom: bottomSafe + 250,
               child: InterviewPromptCard(
                 key: _promptCardKey,
                 body: widget.detail.interviewDisplayPrompt,
@@ -810,7 +812,7 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
               child: _PreparingOverlay(
                 step: _prepareStep,
                 useSimli: _useSimliAudio || _simli != null,
-                bottomReserved: bottomSafe + 160,
+                bottomReserved: bottomSafe + 260,
               ),
             ),
           ),
@@ -914,12 +916,14 @@ class _PreparingOverlay extends StatelessWidget {
         bottom: false,
         child: Padding(
           padding: EdgeInsets.fromLTRB(28, 24, 28, bottomReserved),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Spacer(),
-              Center(
+          child: SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 16),
+                Center(
                 child: Container(
                   width: 96,
                   height: 96,
@@ -964,13 +968,15 @@ class _PreparingOverlay extends StatelessWidget {
                   icon: steps[i].$2,
                   state: _stepStateAt(i),
                 ),
-              const Spacer(),
+              const SizedBox(height: 24),
               const Text(
                 'Tip: nói rõ, nhìn vào camera khi giám khảo hỏi.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white38, fontSize: 12),
               ),
-            ],
+              const SizedBox(height: 12),
+              ],
+            ),
           ),
         ),
       ),
