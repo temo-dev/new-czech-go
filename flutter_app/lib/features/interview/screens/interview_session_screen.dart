@@ -225,6 +225,14 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       };
       _wsClient.onTranscript = (speaker, text) {
         if (!mounted || _ending) return;
+        // V16: drop empty / placeholder learner turns (e.g. "...", whitespace).
+        // ElevenLabs occasionally registers a learner turn from echo/noise
+        // with no transcribable content; surfacing these confuses the
+        // examiner and clutters the result screen.
+        if (speaker == 'learner' && !_isMeaningfulTranscript(text)) {
+          debugPrint('Interview dropping empty learner turn: ${text.trim()}');
+          return;
+        }
         final atSec = _conversationStarted
             ? (DateTime.now().millisecondsSinceEpoch ~/ 1000) - _sessionStartSec
             : 0;
@@ -380,6 +388,11 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
 
   Future<void> _configureDuplexAudioSession() async {
     final session = await AudioSession.instance;
+    // V16: AVAudioSessionMode.videoChat enables iOS hardware acoustic echo
+    // cancellation (AEC) + noise suppression. With spokenAudio (the previous
+    // value) the mic picked up the speaker's playback of the examiner voice,
+    // ElevenLabs VAD registered a fake learner turn, and the examiner then
+    // apologised that it could not understand the learner.
     await session.configure(
       const AudioSessionConfiguration.speech().copyWith(
         avAudioSessionCategory: AVAudioSessionCategory.playAndRecord,
@@ -387,7 +400,7 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
             AVAudioSessionCategoryOptions.defaultToSpeaker |
             AVAudioSessionCategoryOptions.allowBluetooth |
             AVAudioSessionCategoryOptions.allowBluetoothA2dp,
-        avAudioSessionMode: AVAudioSessionMode.spokenAudio,
+        avAudioSessionMode: AVAudioSessionMode.videoChat,
       ),
     );
     await session.setActive(true);
@@ -543,6 +556,15 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   void _advancePrepareStep(int step) {
     if (!mounted || step <= _prepareStep) return;
     setState(() => _prepareStep = step);
+  }
+
+  /// V16: returns true if the transcript text contains at least one
+  /// alphanumeric character. Used to filter out ElevenLabs placeholder
+  /// turns ("...", "  ", ".") that come from echo/noise.
+  static bool _isMeaningfulTranscript(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return false;
+    return RegExp(r'\p{L}|\p{N}', unicode: true).hasMatch(t);
   }
 
   /// V16: gate mic + session timer until the examiner has finished their
