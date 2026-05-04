@@ -106,6 +106,12 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   // V16 push-to-talk: mic is OFF until the learner taps the mic button.
   bool _micActive = false;
 
+  // V16: agent silence detector. ElevenLabs occasionally fails to fire
+  // agent_response_complete, leaving _state stuck on speaking and the PTT
+  // mic button disabled. We treat 1500ms of no audio chunks as "agent
+  // finished" and flip state to ready locally.
+  Timer? _agentSilenceTimer;
+
   @override
   void initState() {
     super.initState();
@@ -122,6 +128,7 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     _agentAudioFlushTimer?.cancel();
     _audioBufferTimeoutTimer?.cancel();
     _firstTurnSafetyTimer?.cancel();
+    _agentSilenceTimer?.cancel();
     _pendingAgentChunks.clear();
     _wsClient.disconnect();
     _audioPlayer.dispose();
@@ -176,12 +183,23 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
         _audioPlayer.setOutputAudioFormat(agentOutputAudioFormat);
         _simli?.setInputAudioFormat(agentOutputAudioFormat);
         _advancePrepareStep(3);
+        // Safety: if the agent never sends audio (e.g. firstMessage override
+        // is rejected by Security settings), unblock the mic after 3s so the
+        // learner can speak first instead of waiting indefinitely.
+        Timer(const Duration(seconds: 3), () {
+          if (!mounted || _ending || _conversationStarted) return;
+          if (_firstAgentChunkSeen) return;
+          debugPrint('Agent silent 3s after metadata — enabling mic so learner can speak first');
+          _advancePrepareStep(4);
+          _startConversation();
+        });
       };
       _wsClient.onAudioChunk = (Uint8List chunk) {
         if (!mounted || _ending) return;
         if (!_firstAgentChunkSeen) {
           _firstAgentChunkSeen = true;
           _advancePrepareStep(4);
+          debugPrint('Interview first agent audio chunk received');
           // Safety net: if agent_response_complete never fires (network glitch
           // or short greeting), unblock mic 10s after the first audio chunk.
           _firstTurnSafetyTimer = Timer(
@@ -190,6 +208,14 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
           );
         }
         setState(() => _state = InterviewSessionState.speaking);
+        // Reset agent silence timer on every audio chunk. If chunks stop for
+        // 1.5s, treat the agent as finished even if agent_response_complete
+        // never arrives.
+        _agentSilenceTimer?.cancel();
+        _agentSilenceTimer = Timer(
+          const Duration(milliseconds: 1500),
+          _onAgentSilenceTimeout,
+        );
 
         if (!_useSimliAudio) {
           _audioPlayer.addChunk(chunk);
@@ -614,6 +640,17 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     setState(() => _prepareStep = step);
   }
 
+  /// V16: fires 1.5s after the most recent agent audio chunk. Acts as a
+  /// safety net when ElevenLabs drops or never sends agent_response_complete.
+  void _onAgentSilenceTimeout() {
+    if (!mounted || _ending || _micActive) return;
+    if (_state != InterviewSessionState.speaking) return;
+    debugPrint('Agent silence detected — forcing state to ready');
+    setState(() => _state = InterviewSessionState.ready);
+    _startConversation();
+    _promptCardKey.currentState?.onAgentResponseComplete();
+  }
+
   /// V16: returns true if the transcript text contains at least one
   /// alphanumeric character. Used to filter out ElevenLabs placeholder
   /// turns ("...", "  ", ".") that come from echo/noise.
@@ -633,6 +670,13 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     setState(() {
       _conversationStarted = true;
       _sessionStartSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      // Flip the visual state so the mic button enables — if we were called
+      // from the safety timer (because agent_response_complete never came),
+      // _state would otherwise still be "speaking" from the first audio
+      // chunk and the mic would stay disabled.
+      if (_state == InterviewSessionState.speaking && !_micActive) {
+        _state = InterviewSessionState.ready;
+      }
     });
     debugPrint('Interview conversation started — mic button enabled, timer reset');
   }
