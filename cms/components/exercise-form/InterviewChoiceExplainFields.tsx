@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react';
 import {
   buildInterviewChoiceExplainPayload,
+  clampAudioBufferTimeoutMs,
   formStateFromInterviewChoiceExplain,
   type InterviewOptionRow,
   type InterviewChoiceExplainFormState,
 } from '../exercise-utils';
+import { PromptPreview } from '../PromptPreview';
 
 type Props = {
   initialData: Record<string, unknown>;
@@ -113,8 +115,8 @@ export function InterviewChoiceExplainFields({ initialData, onChange, editingId 
           </span>
         )}
 
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div>
             <span style={labelStyle}>Số lượt tối đa (max_turns)</span>
             <input
               style={{ ...inputStyle, width: 80 }}
@@ -123,6 +125,21 @@ export function InterviewChoiceExplainFields({ initialData, onChange, editingId 
               max={10}
               value={state.maxTurns}
               onChange={(e) => emit({ ...state, maxTurns: Number(e.target.value) })}
+            />
+          </div>
+          <div>
+            <span style={labelStyle}>Audio buffer timeout (ms)</span>
+            <input
+              style={{ ...inputStyle, width: 100 }}
+              type="number"
+              min={500}
+              max={5000}
+              step={100}
+              value={state.audioBufferTimeoutMs}
+              onChange={(e) => emit({
+                ...state,
+                audioBufferTimeoutMs: clampAudioBufferTimeoutMs(e.target.value),
+              })}
             />
           </div>
           <div>
@@ -137,6 +154,11 @@ export function InterviewChoiceExplainFields({ initialData, onChange, editingId 
             </label>
           </div>
         </div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+          V16: thời gian buffer audio đầu khi Simli avatar chưa render frame đầu (range 500-5000ms, mặc định 1500).
+        </div>
+
+        <PromptPreview systemPrompt={state.systemPrompt} />
       </div>
 
       {/* Options (3–4) */}

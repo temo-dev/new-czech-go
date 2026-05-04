@@ -908,6 +908,7 @@ export type InterviewConversationFormState = {
   systemPrompt: string;
   maxTurns: number;
   showTranscript: boolean;
+  audioBufferTimeoutMs?: number; // V16 — defaults to 1500 when omitted
 };
 
 export type InterviewChoiceExplainFormState = {
@@ -916,7 +917,18 @@ export type InterviewChoiceExplainFormState = {
   systemPrompt: string;
   maxTurns: number;
   showTranscript: boolean;
+  audioBufferTimeoutMs?: number; // V16 — defaults to 1500 when omitted
 };
+
+// V16: keep the form value aligned with the backend clamp [500, 5000];
+// 0/missing snaps to the 1500ms default.
+export function clampAudioBufferTimeoutMs(raw: unknown): number {
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 1500;
+  if (n < 500) return 500;
+  if (n > 5000) return 5000;
+  return Math.round(n);
+}
 
 export function buildInterviewConversationPayload(
   form: InterviewConversationFormState,
@@ -930,6 +942,7 @@ export function buildInterviewConversationPayload(
     system_prompt: form.systemPrompt,
     max_turns: form.maxTurns,
     show_transcript: form.showTranscript,
+    audio_buffer_timeout_ms: clampAudioBufferTimeoutMs(form.audioBufferTimeoutMs),
   };
 }
 
@@ -955,6 +968,7 @@ export function buildInterviewChoiceExplainPayload(
     system_prompt: form.systemPrompt,
     max_turns: form.maxTurns,
     show_transcript: form.showTranscript,
+    audio_buffer_timeout_ms: clampAudioBufferTimeoutMs(form.audioBufferTimeoutMs),
   };
 }
 
@@ -967,6 +981,7 @@ export function formStateFromInterviewConversation(
     systemPrompt: String(detail.system_prompt ?? ''),
     maxTurns: typeof detail.max_turns === 'number' ? detail.max_turns : 8,
     showTranscript: detail.show_transcript === true,
+    audioBufferTimeoutMs: clampAudioBufferTimeoutMs(detail.audio_buffer_timeout_ms),
   };
 }
 
@@ -986,6 +1001,7 @@ export function formStateFromInterviewChoiceExplain(
     systemPrompt: String(detail.system_prompt ?? ''),
     maxTurns: typeof detail.max_turns === 'number' ? detail.max_turns : 6,
     showTranscript: detail.show_transcript === true,
+    audioBufferTimeoutMs: clampAudioBufferTimeoutMs(detail.audio_buffer_timeout_ms),
   };
 }
 

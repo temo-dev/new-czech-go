@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react';
 import {
   buildInterviewConversationPayload,
+  clampAudioBufferTimeoutMs,
   formStateFromInterviewConversation,
   type InterviewConversationFormState,
 } from '../exercise-utils';
+import { PromptPreview } from '../PromptPreview';
 
 type Props = {
   initialData: Record<string, unknown>;
@@ -32,6 +34,8 @@ function initState(detail: Record<string, unknown>): InterviewConversationFormSt
   const s = formStateFromInterviewConversation(detail);
   return s.topic ? s : { ...s, maxTurns: s.maxTurns || 8, showTranscript: s.showTranscript ?? true };
 }
+
+const audioTimeoutHint = 'V16: thời gian buffer chunk audio đầu khi Simli avatar chưa render frame đầu (range 500-5000ms, mặc định 1500). Tăng nếu device chậm.';
 
 export function InterviewConversationFields({ initialData, onChange, editingId }: Props) {
   const [state, setState] = useState(() => initState(initialData));
@@ -91,8 +95,8 @@ export function InterviewConversationFields({ initialData, onChange, editingId }
           <span style={{ fontSize: 12, color: '#e53e3e' }}>System prompt là bắt buộc.</span>
         )}
 
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div>
             <span style={labelStyle}>Số lượt tối đa (max_turns)</span>
             <input
               style={{ ...inputStyle, width: 80 }}
@@ -101,6 +105,21 @@ export function InterviewConversationFields({ initialData, onChange, editingId }
               max={12}
               value={state.maxTurns}
               onChange={(e) => emit({ ...state, maxTurns: Number(e.target.value) })}
+            />
+          </div>
+          <div>
+            <span style={labelStyle}>Audio buffer timeout (ms)</span>
+            <input
+              style={{ ...inputStyle, width: 100 }}
+              type="number"
+              min={500}
+              max={5000}
+              step={100}
+              value={state.audioBufferTimeoutMs}
+              onChange={(e) => emit({
+                ...state,
+                audioBufferTimeoutMs: clampAudioBufferTimeoutMs(e.target.value),
+              })}
             />
           </div>
           <div>
@@ -115,6 +134,9 @@ export function InterviewConversationFields({ initialData, onChange, editingId }
             </label>
           </div>
         </div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{audioTimeoutHint}</div>
+
+        <PromptPreview systemPrompt={state.systemPrompt} />
       </div>
 
       {/* Tips (optional) */}
