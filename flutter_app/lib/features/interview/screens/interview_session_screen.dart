@@ -91,6 +91,12 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   int _turnChunksBuffered = 0;
   int _turnIndex = 0;
 
+  // V16: progress through the 4 setup steps surfaced in the preparing overlay.
+  // 0=initial, 1=session+token, 2=avatar ready, 3=examiner ready,
+  // 4=first audio (overlay fades out).
+  int _prepareStep = 0;
+  bool _firstAgentChunkSeen = false;
+
   @override
   void initState() {
     super.initState();
@@ -129,12 +135,16 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       final voiceId = tokenData['voice_id'] as String? ?? '';
       if (signedUrl.isEmpty || !mounted) return;
 
+      _advancePrepareStep(1);
       await _configureDuplexAudioSession();
 
       // 2. Wait for Simli before opening ElevenLabs so the first examiner
       // message starts only after the avatar video/audio path is ready.
       _useSimliAudio = await _startSimliIfAvailable();
       if (!mounted || _disposing) return;
+      // If Simli is disabled, the avatar step is implicitly satisfied so the
+      // overlay still moves forward.
+      if (!_useSimliAudio) _advancePrepareStep(2);
 
       // 3. Wire WS callbacks
       _wsClient.onReady = () {
@@ -153,9 +163,14 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
         final _ = userInputAudioFormat;
         _audioPlayer.setOutputAudioFormat(agentOutputAudioFormat);
         _simli?.setInputAudioFormat(agentOutputAudioFormat);
+        _advancePrepareStep(3);
       };
       _wsClient.onAudioChunk = (Uint8List chunk) {
         if (!mounted || _ending) return;
+        if (!_firstAgentChunkSeen) {
+          _firstAgentChunkSeen = true;
+          _advancePrepareStep(4);
+        }
         setState(() => _state = InterviewSessionState.speaking);
 
         if (!_useSimliAudio) {
@@ -288,6 +303,7 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       _audioBufferTimeoutTimer = null;
       _flushPendingChunksToSimli();
       setState(() => _simliConnected = true);
+      _advancePrepareStep(2);
     };
     simli.onDisconnected = () {
       debugPrint('Simli disconnected');
@@ -502,6 +518,11 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     });
   }
 
+  void _advancePrepareStep(int step) {
+    if (!mounted || step <= _prepareStep) return;
+    setState(() => _prepareStep = step);
+  }
+
   String? _choiceTitle() {
     final selected = widget.selectedOption;
     if (selected == null || selected.isEmpty) return null;
@@ -666,6 +687,25 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
               ),
             ),
 
+          // ── Preparing overlay (V16) ──────────────────────────────────
+          // Sits BELOW the controls bar so the learner can cancel via the
+          // End button while waiting. IgnorePointer once the first audio
+          // chunk arrives — at that point we want the live transcript +
+          // status pill back without blocking taps.
+          IgnorePointer(
+            ignoring: _prepareStep >= 4,
+            child: AnimatedOpacity(
+              opacity: _prepareStep >= 4 ? 0 : 1,
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOut,
+              child: _PreparingOverlay(
+                step: _prepareStep,
+                useSimli: _useSimliAudio || _simli != null,
+                bottomReserved: bottomSafe + 160,
+              ),
+            ),
+          ),
+
           // ── Controls ─────────────────────────────────────────────────
           Positioned(
             bottom: 0,
@@ -727,6 +767,174 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
               ),
             ),
           ),
+
+        ],
+      ),
+    );
+  }
+}
+
+/// V16 preparing overlay shown while Simli + ElevenLabs handshake. Fades out
+/// once [step] reaches 4 (first agent audio chunk received).
+class _PreparingOverlay extends StatelessWidget {
+  const _PreparingOverlay({
+    required this.step,
+    required this.useSimli,
+    required this.bottomReserved,
+  });
+
+  final int step;
+  final bool useSimli;
+  final double bottomReserved;
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = <(String, IconData)>[
+      ('Khởi tạo phiên phỏng vấn', Icons.power_settings_new_rounded),
+      if (useSimli)
+        ('Kết nối với avatar', Icons.face_retouching_natural_rounded)
+      else
+        ('Chuẩn bị âm thanh', Icons.graphic_eq_rounded),
+      ('Đang gọi giám khảo', Icons.support_agent_rounded),
+      ('Sẵn sàng nói chuyện', Icons.check_circle_rounded),
+    ];
+
+    return Container(
+      color: const Color(0xFF06111F),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(28, 24, 28, bottomReserved),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Spacer(),
+              Center(
+                child: Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: SizedBox(
+                      width: 56,
+                      height: 56,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation(
+                          AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 22),
+              const Text(
+                'Đang chuẩn bị buổi phỏng vấn',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Mất khoảng 3 giây',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white54, fontSize: 13),
+              ),
+              const SizedBox(height: 28),
+              for (var i = 0; i < steps.length; i++)
+                _PrepareStepRow(
+                  label: steps[i].$1,
+                  icon: steps[i].$2,
+                  state: _stepStateAt(i),
+                ),
+              const Spacer(),
+              const Text(
+                'Tip: nói rõ, nhìn vào camera khi giám khảo hỏi.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white38, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // [step] = number of completed steps. Row at [index] is done when its
+  // index sits below [step], active when it equals [step].
+  _StepState _stepStateAt(int index) {
+    if (step > index) return _StepState.done;
+    if (step == index) return _StepState.active;
+    return _StepState.pending;
+  }
+}
+
+enum _StepState { pending, active, done }
+
+class _PrepareStepRow extends StatelessWidget {
+  const _PrepareStepRow({
+    required this.label,
+    required this.icon,
+    required this.state,
+  });
+
+  final String label;
+  final IconData icon;
+  final _StepState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDone = state == _StepState.done;
+    final isActive = state == _StepState.active;
+    final color = isDone
+        ? AppColors.success
+        : isActive
+            ? AppColors.primary
+            : Colors.white24;
+    final textColor = isDone || isActive ? Colors.white : Colors.white54;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 22,
+            height: 22,
+            child: isActive
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                    ),
+                  )
+                : Icon(
+                    isDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+                    size: 22,
+                    color: color,
+                  ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 14,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ),
+          Icon(icon, size: 18, color: color),
         ],
       ),
     );
