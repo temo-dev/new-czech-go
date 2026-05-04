@@ -110,34 +110,42 @@ class AvatarVideoContainer extends StatelessWidget {
   Widget _buildFullBleedVideoView(RTCVideoRenderer renderer) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final maxByWidth = constraints.maxWidth * 0.94;
-        final maxByHeight = constraints.maxHeight * 0.62;
+        // V16: enlarge the avatar card so it fills the available space
+        // between the top status pill and the bottom panel. The previous
+        // 0.62 / 520 caps left a barren strip above the avatar.
+        final maxByWidth = constraints.maxWidth * 0.96;
+        final maxByHeight = constraints.maxHeight * 0.78;
         final maxExtent = math.min(maxByWidth, maxByHeight);
         final minExtent = math.min(
           math.min(constraints.maxWidth, constraints.maxHeight),
           280.0,
         );
-        final extent = math.max(minExtent, math.min(maxExtent, 520.0));
+        final extent = math.max(minExtent, math.min(maxExtent, 640.0));
 
-        return Center(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: const Color(0xFF06101D),
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x66000000),
-                  blurRadius: 44,
-                  offset: Offset(0, 18),
-                ),
-              ],
-            ),
-            child: SizedBox.square(
-              dimension: extent,
-              child: _buildVideoView(
-                renderer,
+        return Padding(
+          padding: const EdgeInsets.only(top: 56),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0xFF06101D),
                 borderRadius: BorderRadius.circular(28),
-                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x66000000),
+                    blurRadius: 44,
+                    offset: Offset(0, 18),
+                  ),
+                ],
+              ),
+              child: SizedBox.square(
+                dimension: extent,
+                child: _buildVideoView(
+                  renderer,
+                  borderRadius: BorderRadius.circular(28),
+                  objectFit:
+                      RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                ),
               ),
             ),
           ),

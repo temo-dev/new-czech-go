@@ -270,6 +270,14 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
         if (!_useSimliAudio) {
           _scheduleAgentAudioFlush(delay: const Duration(milliseconds: 120));
         }
+        // V16: force visual state to "ready" so the PTT mic button enables.
+        // Simli's onSpeakingChanged is best-effort and can stick on
+        // "speaking" if a SILENT message is dropped. With PTT, "ready"
+        // means the learner can tap mic — "listening" is reserved for
+        // when the mic is actively recording.
+        if (!_micActive) {
+          setState(() => _state = InterviewSessionState.ready);
+        }
         _promptCardKey.currentState?.onAgentResponseComplete();
         // Open the mic and start the timer once the examiner finishes their
         // first turn — mic before this point captures noise that ElevenLabs
@@ -491,7 +499,13 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   Future<void> _stopMicStreaming() async {
     if (!_micActive) return;
     if (mounted) {
-      setState(() => _micActive = false);
+      setState(() {
+        _micActive = false;
+        // Drop back to ready while waiting for the examiner to respond.
+        if (_state == InterviewSessionState.listening) {
+          _state = InterviewSessionState.ready;
+        }
+      });
     } else {
       _micActive = false;
     }
@@ -642,7 +656,7 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
 
   String _pttHint(AppLocalizations l) {
     if (!_conversationStarted) return l.interviewStatusConnecting;
-    if (_state == InterviewSessionState.speaking) {
+    if (_state == InterviewSessionState.speaking && !_micActive) {
       return l.interviewStatusSpeaking;
     }
     if (_micActive) return l.interviewPttSendHint;
