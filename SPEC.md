@@ -1430,3 +1430,83 @@ choice_option_grid_test.dart — tap selects, second tap on different = deselect
 | IV-6 | Manual (iPhone) — Luồng B | Chọn phương án → chọn option → session (chip hiển thị) → Kết thúc → score |
 | IV-7 | Manual (iPhone) — Avatar | Simli RTCVideoView visible; lip-sync khi examiner nói; mic waveform khi learner nói |
 | CHECKPOINT | `make verify` | Full pass |
+
+
+---
+
+## V16 — Interview First-Turn Fix + Push-to-Talk + UX Polish (2026-05-04)
+
+Sửa bug examiner mất audio đầu phiên Simli + nâng UX hội thoại + chuyển sang push-to-talk.
+
+### Scope
+
+| Slice | Mô tả |
+|---|---|
+| Audio gate fix | Buffer agent chunks tới khi Simli `onVideoReady` (first-frame) thay `isConnected` (WS START); fallback timer flush local PCM khi quá `audio_buffer_timeout_ms` |
+| Display prompt | Backend derive `display_prompt` từ `system_prompt` (strip "You are…", extract ÚKOL/TASK block); admin nhập timeout trong CMS; preview real-time |
+| Prompt card UI | Card đáy + auto-collapse 8s + pulse animation khi `agent_response_complete`; choice variant hiện option đã chọn |
+| Preparing overlay | 4-step checklist (init → avatar → examiner → ready) thay cho black screen |
+| Audio session | `AVAudioSessionMode.videoChat` để bật iOS hardware AEC (echo cancel + noise suppress) |
+| Push-to-talk | Mic button toggle (idle gray / orange enabled / red pulse recording / send icon); state authoritative từ Simli SPEAK/SILENT WS messages; 8s agent-wait timeout sau user turn; 550ms preroll buffer + 1600 byte minimum trước khi flush |
+| Result CTA | Sticky "Hoàn thành" / "Finish" button → `Navigator.popUntil(home)` |
+
+### Decisions (frozen)
+
+1. `display_prompt` = derived from `system_prompt`, không thêm DB column
+2. Prompt card position bottom (gần controls bar), expanded 8s mặc định
+3. Choice variant chỉ hiện option đã chọn (id + label), không list 3 options
+4. `audio_buffer_timeout_ms` config qua CMS — range [500, 5000], default 1500
+5. Mic = push-to-talk, không server VAD always-on
+6. Simli SPEAK/SILENT là authoritative signal cho `_state`; EL `agent_response_complete` chỉ dùng cho local-only path
+7. Filter empty learner turns (Unicode `\p{L}|\p{N}` regex) — drop "..."/whitespace
+
+### Touched files
+
+- Backend: `processing/interview_prompt.go` (new), `contracts/types.go`, `httpapi/server.go`, `httpapi/interview_preview.go` (new), `httpapi/v16_interview*_test.go` (new)
+- Flutter: `models/models.dart`, `features/interview/screens/interview_session_screen.dart`, `features/interview/services/{simli_session_manager,pcm_audio_player,elevenlabs_ws_client}.dart`, `features/interview/widgets/{prompt_card,session_status_pill,avatar_video_container}.dart`, `lib/l10n/app_{vi,en}.arb`, tests
+- CMS: `components/exercise-form/InterviewConversationFields.tsx`, `InterviewChoiceExplainFields.tsx`, `components/PromptPreview.tsx` (new), `components/exercise-utils.ts`, `app/api/admin/interview/preview-prompt/route.ts` (new), `__tests__/interview-fields-v16.test.ts` (new)
+- Docs: `docs/ideas/interview-first-turn-fix.md`, `docs/specs/interview-first-turn-fix.md`, `docs/plans/interview-first-turn-fix-plan.md`, `docs/designs/interview-first-turn-fix.html`
+
+### V16 New i18n keys
+
+| Key | VI | EN |
+|---|---|---|
+| `interviewPromptLabel` | Đề bài | Task |
+| `interviewTapToView` | Tap để xem đề bài | Tap to view task |
+| `interviewVocabHints` | Gợi ý từ | Vocab hints |
+| `interviewPttIdleHint` | Tap để bắt đầu nói | Tap to start speaking |
+| `interviewPttSendHint` | Đang ghi · Tap để gửi | Recording · Tap to send |
+| `interviewFinishBtn` | Hoàn thành | Finish |
+
+### Required ElevenLabs agent settings
+
+Agent dashboard → Security:
+- ✅ Allow client override system_prompt
+- ✅ Allow client override first_message
+- ✅ Allow client override TTS voice
+
+Nếu không bật `first_message` override → agent không nói câu chào → 3s metadata-fallback enable mic để learner nói trước.
+
+### Avoid in V16
+
+- ❌ Mute mic global (regression interruption capability — handled by PTT)
+- ❌ Server-side `display_prompt` storage (luôn derive)
+- ❌ Hardcode `audio_buffer_timeout_ms` (admin config)
+- ❌ Bypass admin auth cho preview endpoint
+- ❌ Drop EL `agent_response_complete` event handler (vẫn cần cho local-only path)
+
+### V16 Verification
+
+| Step | Lệnh | Manual check |
+|---|---|---|
+| BE-1 | `make backend-test` | 297 tests pass — `TestDerivePromptForLearner_*`, `TestExerciseGet_*`, `TestInterviewPreviewPrompt_*` |
+| FE-1 | `make flutter-analyze && make flutter-test` | 137 tests pass — `interview_prompt_derive_test`, `prompt_card_test`, `interview_session_widgets_test` |
+| CMS-1 | `make cms-lint && cd cms && npm test && make cms-build` | 92 Vitest pass — `interview-fields-v16` clamp + payload + parser |
+| MAN-1 | iPhone Simli ON + ElevenLabs first_message enabled | 5 sessions liên tiếp · 0 lần miss audio đầu · examiner phát đầy đủ câu chào |
+| MAN-2 | iPhone với `SIMLI_API_KEY` empty | Regression: audio đầy đủ qua local PcmAudioPlayer |
+| MAN-3 | Network Link Conditioner "3G slow" | Fallback timer fire (`debugPrint`); audio vẫn nghe được |
+| MAN-4 | Tap mic khi examiner nói | Mic disabled (gray) — không tap được |
+| MAN-5 | Tap mic khi examiner xong (Simli SILENT) | Mic enable orange → tap → red pulse → speak → tap send |
+| MAN-6 | Result screen | Nút "Hoàn thành" cam ở bottom; tap → quay home |
+| MAN-7 | Echo test | Speakerphone iPhone — không có turn rỗng "..." trong transcript |
+| CHECKPOINT | `make verify` | Full pass |

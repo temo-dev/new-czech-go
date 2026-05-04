@@ -291,3 +291,60 @@ Spec: `SPEC.md § V15` · Plan chi tiết: `tasks/plan.md` (section V15) · Desi
 - [x] **AI-5** Tích hợp 4 placements: `exercise-form/index.tsx` (context_image) + `CteniFields.tsx` + `course-dashboard.tsx` (banner) + `mock-test-dashboard.tsx` (banner) (2026-05-03)
 
 **[CHECKPOINT AI-FINAL]** Pending manual E2E — cần `REPLICATE_API_KEY` để test đầy đủ
+
+## V16 — Interview First-Turn Fix + Push-to-Talk + UX Polish
+
+Spec: `SPEC.md § V16` · Detail: `docs/specs/interview-first-turn-fix.md` · Plan: `docs/plans/interview-first-turn-fix-plan.md` · Design: `docs/designs/interview-first-turn-fix.html`
+
+### Phase 1 — Backend foundation
+
+- [x] **V16-1** `processing/interview_prompt.go` — `DerivePromptForLearner` + `ClampAudioBufferTimeoutMs` + `EnrichInterviewDetail`; 13 unit tests (2026-05-04)
+- [x] **V16-2** Contracts: `InterviewConversationDetail` + `InterviewChoiceExplainDetail` thêm `DisplayPrompt` + `AudioBufferTimeoutMs` (omitempty) (2026-05-04)
+- [x] **V16-3** `httpapi/server.go` `handleExercise`: enrich interview detail trên GET; 5 integration tests (display_prompt + clamp low/high/default + non-interview untouched) (2026-05-04)
+- [x] **V16-4** `httpapi/interview_preview.go` (new): `POST /v1/admin/interview/preview-prompt`; rate limit 30/phút/admin; 5 tests (auth required, derives, empty, invalid JSON, rate limit) (2026-05-04)
+
+**[CHECKPOINT V16-PHASE-1]** ✅ 297 backend tests pass · build clean · commit `24297a7`
+
+### Phase 2 — Flutter audio fix (CRITICAL bug)
+
+- [x] **V16-5** `models/models.dart`: `ExerciseDetail.interviewDisplayPrompt` + `interviewAudioBufferTimeoutMs` (clamp 500-5000, default 1500); 6 parse tests (2026-05-04)
+- [x] **V16-6** `simli_session_manager.dart`: `setInputAudioFormat` no-op stub cho future-proofing (2026-05-04)
+- [x] **V16-7** `interview_session_screen.dart`: queue `_pendingAgentChunks`, gate `simliVideoReady`, flush on `onVideoReady`; existing widget test pass (2026-05-04)
+- [x] **V16-8** Fallback `_audioBufferTimeoutTimer` (config từ exercise) → flush local PCM khi Simli không ready trong timeout (2026-05-04)
+
+**[CHECKPOINT V16-PHASE-2]** ✅ commit `4323060` · device smoke 5 sessions Simli ON · 0 lần miss audio đầu
+
+### Phase 3 — Flutter UI prompt card
+
+- [x] **V16-9** `widgets/prompt_card.dart`: `InterviewPromptCard` widget — expanded ↔ mini pill, auto-collapse 8s, 8 widget tests (2026-05-04)
+- [x] **V16-10** Pulse animation 1.5s (scale 1.0→1.04→1.0); skip lần đầu; respect `MediaQuery.disableAnimations` (2026-05-04)
+- [x] **V16-11** Mount `InterviewPromptCard` vào `interview_session_screen.dart` bottom panel; choice variant fill `selectedOption.id — label` (2026-05-04)
+- [x] **V16-12** I18n VI+EN: `interviewPromptLabel`, `interviewTapToView`, `interviewVocabHints` (2026-05-04)
+
+**[CHECKPOINT V16-PHASE-3]** ✅ commit `f2fc475` · 134 Flutter tests pass
+
+### Phase 4 — CMS
+
+- [x] **V16-13** `InterviewConversationFields.tsx` + `InterviewChoiceExplainFields.tsx`: `<NumberInput>` audio buffer timeout (range 500-5000, default 1500); `clampAudioBufferTimeoutMs` helper; 14 Vitest tests (2026-05-04)
+- [x] **V16-14** `PromptPreview.tsx` (new) debounce 400ms + AbortController + idle/loading/error/ready states; proxy route `/api/admin/interview/preview-prompt` (2026-05-04)
+
+**[CHECKPOINT V16-PHASE-4]** ✅ commit `2de70a9` · 92 Vitest pass · ESLint clean · build success
+
+### Phase 5 — UX Polish (post-smoke fixes)
+
+- [x] **V16-15** Preparing overlay 4-step checklist (`_PreparingOverlay` widget) thay black screen; fade-out smooth khi step 4 (2026-05-04)
+- [x] **V16-16** Defer `_startMic` + `_sessionStartSec` đến `agent_response_complete` lần đầu; safety timer 10s từ first audio chunk; transcript `atSec=0` + duration=0 fallback khi `!_conversationStarted` (2026-05-04)
+- [x] **V16-17** iOS AEC: `AVAudioSessionMode.spokenAudio` → `videoChat` (eliminates loa-vọng-mic echo); `_isMeaningfulTranscript` regex Unicode-aware drop empty learner turn (2026-05-04)
+- [x] **V16-18** Audio routing diagnostics: per-turn counter log; `PcmAudioPlayer.flushAndPlay` log; metadata/interruption events log (2026-05-04)
+- [x] **V16-19** Push-to-talk: replace always-on mic + waveform với `_PttMicButton` toggle (idle gray / orange enabled / red pulse + send icon recording); 8s `_agentWaitTimer`; 550ms preroll + 1600 byte minimum buffer; `canStartInterviewMic` + `shouldReleaseInterviewMicPreroll` pure helpers (2026-05-04)
+- [x] **V16-20** Layout unified bottom panel single Column (transcript L/R + prompt card + timer + mic + hint + end); avatar full-bleed cap 78%/640px Cover fit (2026-05-04)
+- [x] **V16-21** Result screen sticky "Hoàn thành" CTA → `Navigator.popUntil(home)`; i18n key `interviewFinishBtn` (2026-05-04)
+- [x] **V16-22** Simli SPEAK/SILENT làm authoritative state signal; silence detector 2.5s chỉ cho local-only path; `_startConversation` flip state speaking→ready; metadata 3s fallback enable mic (firstMessage rejected scenario) (2026-05-04)
+
+**[CHECKPOINT V16-FINAL]** ⏳ Pending manual smoke device — verify:
+- 5 sessions liên tiếp Simli ON · 0 miss audio đầu
+- Mic disabled khi avatar còn phát audio
+- Mic enabled đúng moment Simli SILENT
+- Không có turn rỗng "..." trong transcript
+- "Hoàn thành" CTA quay về home
+

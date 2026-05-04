@@ -282,8 +282,26 @@ Do not mix these in one change unless the human asks:
 If you notice adjacent cleanup, note it separately instead of silently expanding scope.
 
 ## Good Next Steps
-V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ V8 ✅ V9 ✅ V10 ✅ V11 ✅ V12 ✅ V13 ✅ V14 ✅ V15 ✅ — tất cả planned slices hoàn thành.
+V2 ✅ V3 ✅ V4 ✅ V5 ✅ V6 ✅ V7 ✅ V8 ✅ V9 ✅ V10 ✅ V11 ✅ V12 ✅ V13 ✅ V14 ✅ V15 ✅ V16 ✅ — tất cả planned slices hoàn thành.
 Xem `tasks/todo.md` để theo dõi backlog chi tiết.
+
+**V16 Interview First-Turn Fix + Push-to-Talk + UX Polish — 2026-05-04:**
+- **Audio gate fix**: gate routing chunks Simli theo `onVideoReady` (first frame) thay `isConnected` (WS START); buffer pending chunks, flush khi ready, fallback timer (`audio_buffer_timeout_ms`, default 1500ms, range 500–5000) → `PcmAudioPlayer` local
+- **Display prompt** derive server-side từ `system_prompt` (strip "You are…", extract ÚKOL/TASK block, drop `{selected_option}` placeholder); contract trên `InterviewConversationDetail` + `InterviewChoiceExplainDetail` thêm 2 field optional `display_prompt` + `audio_buffer_timeout_ms`; helper `processing.DerivePromptForLearner` + `processing.EnrichInterviewDetail`
+- **Admin preview endpoint**: `POST /v1/admin/interview/preview-prompt` (rate limit 30/phút/admin); CMS `PromptPreview` component debounce 400ms render real-time
+- **Prompt card**: `InterviewPromptCard` widget bottom panel, expanded mặc định 8s → mini pill, pulse 1.5s khi `agent_response_complete` (skip lần đầu); choice variant hiện `selectedOption.id — label`
+- **Preparing overlay**: 4 step checklist (Khởi tạo → Avatar → Examiner → Sẵn sàng) thay black screen, fade-out khi step 4
+- **iOS AEC**: `AVAudioSessionMode.videoChat` (echo cancel + noise suppress) thay `spokenAudio` — eliminates loa-vọng-mic gây empty learner turn
+- **Push-to-talk mic**: tap toggle thay always-on VAD; `_PttMicButton` widget (idle gray / orange enabled / red pulse + send icon recording); state authoritative từ Simli SPEAK/SILENT WS messages — mic disable khi avatar còn phát audio; 8s `_agentWaitTimer` sau user turn; 550ms preroll buffer + 1600 byte minimum trước khi flush sang ElevenLabs; `canStartInterviewMic` + `shouldReleaseInterviewMicPreroll` pure helpers cho test
+- **Empty turn filter**: `_isMeaningfulTranscript` regex `\p{L}|\p{N}` Unicode-aware drop "..." / whitespace turn rỗng từ ElevenLabs VAD false positive
+- **Defensive state**: `_startConversation` flip `_state` speaking→ready để mic enable kể cả safety timer fire không qua `agent_response_complete`; metadata + 3s no audio fallback enable mic cho learner nói trước (firstMessage rejected scenario)
+- **Result screen**: sticky CTA "Hoàn thành" / "Finish" → `Navigator.popUntil(home)`
+- **Layout unified**: bottom panel single Column (transcript bubble L/R-aligned + prompt card + timer + mic + hint + end link) — không còn Positioned magic offsets chồng chéo; avatar full-bleed cap 78%/640px Cover fit
+- **Audio diagnostics**: per-turn counter log `Interview turn=N audio chunks: simli=X local=Y buffered=Z useSimliAudio=A videoReady=B`; `PcmAudioPlayer.flushAndPlay` log sample rate + bytes + duration
+- I18n VI+EN: 6 keys mới (`interviewPromptLabel`, `interviewTapToView`, `interviewVocabHints`, `interviewPttIdleHint`, `interviewPttSendHint`, `interviewFinishBtn`)
+- **ElevenLabs agent settings required**: bật "Allow client override system_prompt", "first_message", "TTS voice" trong Security; nếu thiếu first_message override → 3s fallback enable mic
+- Specs: `docs/specs/interview-first-turn-fix.md`, idea: `docs/ideas/interview-first-turn-fix.md`, plan: `docs/plans/interview-first-turn-fix-plan.md`, design: `docs/designs/interview-first-turn-fix.html`
+- Tests: 297 backend (Go), 137 Flutter, 92 CMS Vitest
 
 **V8 Schema Flatten — 2026-04-30:**
 - Bảng `skills` đã xóa (migration 017–019)
@@ -366,6 +384,7 @@ Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 - Security: API key server-side only, Flutter nhận ephemeral signed URL từ backend
 - iOS: deployment target 13.0 (flutter_webrtc requirement); camera + mic permissions
 - `SIMLI_API_KEY` + `SIMLI_FACE_ID` qua `--dart-define`; avatar disabled khi key trống
+- `ELEVENLABS_VOICE_ID_C` env var: khi set, backend trả `voice_id` trong `InterviewTokenResponse`; Flutter inject vào `conversation_config_override.tts.voice_id` — **yêu cầu** bật "Allow client to override TTS voice" trong ElevenLabs agent Security settings, nếu không WS bị reject và learner thấy lỗi kết nối
 - Specs: `SPEC.md` § V14, `docs/ideas/interview-skill.md`, `docs/designs/interview-skill.html`
 - Tests: 263 backend, 61 CMS Vitest, 102 Flutter
 
