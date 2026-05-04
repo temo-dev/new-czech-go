@@ -152,7 +152,7 @@ func TestAdminCreateExercise_InterviewChoiceExplain_4Options_Valid(t *testing.T)
 	}
 }
 
-func TestAdminCreateExercise_InterviewChoiceExplain_TooFewOptions_Rejected(t *testing.T) {
+func TestAdminCreateExercise_InterviewChoiceExplain_OneOption_Valid(t *testing.T) {
 	repo := store.NewMemoryStore()
 	server := httptest.NewServer(NewServer(repo, nil, nil))
 	defer server.Close()
@@ -160,19 +160,40 @@ func TestAdminCreateExercise_InterviewChoiceExplain_TooFewOptions_Rejected(t *te
 	status, resp := postJSONAllowErrorWithToken(t, server, "/v1/admin/exercises", "dev-admin-token", map[string]any{
 		"module_id":     "module-interview-1",
 		"exercise_type": "interview_choice_explain",
-		"title":         "Too few",
+		"title":         "One option",
 		"detail": map[string]any{
-			"question":      "Kde bydlíte?",
+			"question":      "Jaké boty chcete?",
 			"system_prompt": "You are Jana.",
+			"max_turns":     2,
 			"options": []map[string]any{
-				{"id": "1", "label": "Praha"},
-				{"id": "2", "label": "Brno"},
+				{"id": "1", "label": "Bílé boty"},
 			},
 		},
 	})
 
+	if status != 201 {
+		t.Fatalf("expected 201 for one option, got %d; resp: %v", status, resp)
+	}
+}
+
+func TestAdminCreateExercise_InterviewChoiceExplain_NoOptions_Rejected(t *testing.T) {
+	repo := store.NewMemoryStore()
+	server := httptest.NewServer(NewServer(repo, nil, nil))
+	defer server.Close()
+
+	status, resp := postJSONAllowErrorWithToken(t, server, "/v1/admin/exercises", "dev-admin-token", map[string]any{
+		"module_id":     "module-interview-1",
+		"exercise_type": "interview_choice_explain",
+		"title":         "No options",
+		"detail": map[string]any{
+			"question":      "Kde bydlíte?",
+			"system_prompt": "You are Jana.",
+			"options":       []map[string]any{},
+		},
+	})
+
 	if status != 400 {
-		t.Fatalf("expected 400 for too few options, got %d; resp: %v", status, resp)
+		t.Fatalf("expected 400 for no options, got %d; resp: %v", status, resp)
 	}
 }
 

@@ -398,9 +398,9 @@ describe('buildInterviewConversationPayload', () => {
 
 describe('buildInterviewChoiceExplainPayload', () => {
   const threeOptions = [
-    { id: '1', label: 'Praha', imageAssetId: '' },
-    { id: '2', label: 'Brno', imageAssetId: '' },
-    { id: '3', label: 'Ostrava', imageAssetId: '' },
+    { id: '1', label: 'Praha', imageAssetId: '', tips: [] },
+    { id: '2', label: 'Brno', imageAssetId: '', tips: [] },
+    { id: '3', label: 'Ostrava', imageAssetId: '', tips: [] },
   ];
 
   it('builds valid payload with 3 options', () => {
@@ -416,26 +416,35 @@ describe('buildInterviewChoiceExplainPayload', () => {
     expect(payload.system_prompt).toContain('{selected_option}');
   });
 
-  it('throws for fewer than 3 options', () => {
+  it('builds valid payload with 1 option', () => {
+    const payload = buildInterviewChoiceExplainPayload({
+      question: 'Jaké boty chcete?',
+      options: [{ id: '1', label: 'Bílé boty', imageAssetId: '', tips: [] }],
+      systemPrompt: 'You are Jana. The learner chose {selected_option}.',
+      maxTurns: 2,
+      showTranscript: false,
+    });
+    expect((payload.options as unknown[]).length).toBe(1);
+    expect(payload.max_turns).toBe(2);
+  });
+
+  it('throws for no options', () => {
     expect(() =>
       buildInterviewChoiceExplainPayload({
         question: 'Q',
-        options: [
-          { id: '1', label: 'A', imageAssetId: '' },
-          { id: '2', label: 'B', imageAssetId: '' },
-        ],
+        options: [],
         systemPrompt: 'You are Jana.',
         maxTurns: 6,
         showTranscript: false,
       }),
-    ).toThrow('3');
+    ).toThrow('1');
   });
 
   it('throws for more than 4 options', () => {
     expect(() =>
       buildInterviewChoiceExplainPayload({
         question: 'Q',
-        options: Array(5).fill({ id: '1', label: 'X', imageAssetId: '' }),
+        options: Array(5).fill({ id: '1', label: 'X', imageAssetId: '', tips: [] }),
         systemPrompt: 'You are Jana.',
         maxTurns: 6,
         showTranscript: false,
@@ -459,9 +468,9 @@ describe('buildInterviewChoiceExplainPayload', () => {
     const original = {
       question: 'Kde bydlíte?',
       options: [
-        { id: '1', label: 'Praha', imageAssetId: 'img-1' },
-        { id: '2', label: 'Brno', imageAssetId: '' },
-        { id: '3', label: 'Ostrava', imageAssetId: '' },
+        { id: '1', label: 'Praha', imageAssetId: 'img-1', tips: ['památky', 'doprava'] },
+        { id: '2', label: 'Brno', imageAssetId: '', tips: [] },
+        { id: '3', label: 'Ostrava', imageAssetId: '', tips: [] },
       ],
       systemPrompt: 'You are Jana. The learner chose {selected_option}.',
       maxTurns: 5,
@@ -472,7 +481,27 @@ describe('buildInterviewChoiceExplainPayload', () => {
     expect(restored.question).toBe('Kde bydlíte?');
     expect(restored.options[0].label).toBe('Praha');
     expect(restored.options[0].imageAssetId).toBe('img-1');
+    expect(restored.options[0].tips).toEqual(['památky', 'doprava']);
     expect(restored.options.length).toBe(3);
     expect(restored.showTranscript).toBe(true);
+  });
+
+  it('trims and drops blank learner tips per option', () => {
+    const payload = buildInterviewChoiceExplainPayload({
+      question: 'Jaké boty chcete?',
+      options: [
+        { id: '1', label: 'Bílé boty', imageAssetId: '', tips: [' velikost ', '', 'barva'] },
+        { id: '2', label: 'Černé boty', imageAssetId: '', tips: [] },
+        { id: '3', label: 'Modré boty', imageAssetId: '', tips: [' cena '] },
+      ],
+      systemPrompt: 'You are Jana. The learner chose {selected_option}.',
+      maxTurns: 6,
+      showTranscript: false,
+    });
+
+    const options = payload.options as Array<{ tips: string[] }>;
+    expect(options[0].tips).toEqual(['velikost', 'barva']);
+    expect(options[1].tips).toEqual([]);
+    expect(options[2].tips).toEqual(['cena']);
   });
 });

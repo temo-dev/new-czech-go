@@ -688,6 +688,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileVoicePreviewError => 'Could not preview this voice';
 
   @override
+  String get profileInterviewSection => 'Interview';
+
+  @override
+  String get profileInterviewAvatarTitle => 'Use Simli avatar';
+
+  @override
+  String get profileInterviewAvatarDescription => 'Turn this off for faster sound wave replies. Turn it on when you want avatar practice.';
+
+  @override
+  String get profileInterviewVolumeTitle => 'Examiner volume';
+
+  @override
+  String get profileInterviewVolumeDescription => 'Only applies when sound wave mode is used.';
+
+  @override
+  String profileInterviewVolumeValue(int percent) {
+    return '$percent%';
+  }
+
+  @override
   String get submitAnswersCta => 'Submit answers';
 
   @override

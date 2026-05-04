@@ -29,9 +29,9 @@ type Server struct {
 	audioGenerator     processing.ExerciseAudioGenerator
 	contentGenerator   processing.ContentGenerator
 	voiceRegistry      *processing.VoiceRegistry
-	elevenLabsAPIKey    string // for interview session token creation
-	elevenLabsAgentID   string // pre-created agent in ElevenLabs dashboard
-	elevenLabsVoiceIDC  string // ELEVENLABS_VOICE_ID_C — voice override for interviews
+	elevenLabsAPIKey   string // for interview session token creation
+	elevenLabsAgentID  string // pre-created agent in ElevenLabs dashboard
+	elevenLabsVoiceIDC string // ELEVENLABS_VOICE_ID_C — voice override for interviews
 	replicateAPIKey    string // for AI image generation via Flux
 	aiImageRL          *aiImageRateLimiter
 	interviewPreviewRL *interviewPreviewLimiter
@@ -80,18 +80,18 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 	voiceRegistry := processing.NewVoiceRegistry(processor.TTSProvider())
 	processor.WithVoiceRegistry(voiceRegistry)
 	s := &Server{
-		repo:             repo,
-		processor:        processor,
-		uploadProvider:   uploadProvider,
-		audioURLProvider: audioURLProvider,
-		audioSignSecret:  audioSignSecret,
-		audioGenerator:   audioGen,
-		contentGenerator: contentGen,
-		voiceRegistry:    voiceRegistry,
+		repo:               repo,
+		processor:          processor,
+		uploadProvider:     uploadProvider,
+		audioURLProvider:   audioURLProvider,
+		audioSignSecret:    audioSignSecret,
+		audioGenerator:     audioGen,
+		contentGenerator:   contentGen,
+		voiceRegistry:      voiceRegistry,
 		elevenLabsAPIKey:   strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")),
 		elevenLabsAgentID:  strings.TrimSpace(os.Getenv("ELEVENLABS_AGENT_ID")),
 		elevenLabsVoiceIDC: strings.TrimSpace(os.Getenv("ELEVENLABS_VOICE_ID_C")),
-		replicateAPIKey:   strings.TrimSpace(os.Getenv("REPLICATE_API_KEY")),
+		replicateAPIKey:    strings.TrimSpace(os.Getenv("REPLICATE_API_KEY")),
 		aiImageRL:          newAiImageRateLimiter(),
 		interviewPreviewRL: newInterviewPreviewLimiter(),
 		mux:                http.NewServeMux(),
@@ -177,8 +177,9 @@ func (s *Server) handleVoices(w http.ResponseWriter, r *http.Request) {
 const voicePreviewPhrase = "Dobrý den, jsem připraven pomoci vám s učením češtiny."
 
 // handleVoicePreview dispatches /v1/voices/:id/preview routes.
-//   GET /v1/voices/:id/preview       — returns JSON with audio URL
-//   GET /v1/voices/:id/preview/audio — streams audio bytes (no auth)
+//
+//	GET /v1/voices/:id/preview       — returns JSON with audio URL
+//	GET /v1/voices/:id/preview/audio — streams audio bytes (no auth)
 func (s *Server) handleVoicePreview(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeMethodNotAllowed(w)
@@ -1756,8 +1757,8 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 				writeError(w, http.StatusBadRequest, "validation_error", "system_prompt is required for interview_choice_explain.", false)
 				return
 			}
-			if len(detail.Options) < 3 || len(detail.Options) > 4 {
-				writeError(w, http.StatusBadRequest, "validation_error", "interview_choice_explain requires 3 or 4 options.", false)
+			if len(detail.Options) < 1 || len(detail.Options) > 4 {
+				writeError(w, http.StatusBadRequest, "validation_error", "interview_choice_explain requires 1 to 4 options.", false)
 				return
 			}
 			exercise.Detail = detail
@@ -2490,4 +2491,3 @@ func (s *Server) handleAdminModuleByID(w http.ResponseWriter, r *http.Request, _
 }
 
 // ── Admin: Skills ─────────────────────────────────────────────────────────────
-

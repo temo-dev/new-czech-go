@@ -489,7 +489,8 @@ class ExerciseDetail {
   final int interviewAudioBufferTimeoutMs;
 
   bool get isInterviewConversation => exerciseType == 'interview_conversation';
-  bool get isInterviewChoiceExplain => exerciseType == 'interview_choice_explain';
+  bool get isInterviewChoiceExplain =>
+      exerciseType == 'interview_choice_explain';
   bool get isInterview => exerciseType.startsWith('interview_');
 
   bool get isPsani1 => exerciseType == 'psani_1_formular';
@@ -652,28 +653,36 @@ class ExerciseDetail {
       choiceWordStem: detail['stem'] as String? ?? '',
       choiceWordExplanation: detail['explanation'] as String? ?? '',
       choiceWordGrammarNote: detail['grammar_note'] as String? ?? '',
-      correctAnswers: (detail['correct_answers'] as Map<String, dynamic>? ?? const {})
+      correctAnswers: (detail['correct_answers'] as Map<String, dynamic>? ??
+              const {})
           .map((k, v) => MapEntry(k, v.toString())),
       // V13: ano/ne
       anoNePassage: detail['passage'] as String? ?? '',
-      anoNeStatements: (detail['statements'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(AnoNeStatementView.fromJson)
-          .toList(),
+      anoNeStatements:
+          (detail['statements'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(AnoNeStatementView.fromJson)
+              .toList(),
       // V14: interview
       interviewTopic: detail['topic'] as String? ?? '',
-      interviewTips: (detail['tips'] as List<dynamic>? ?? const []).map((e) => e.toString()).toList(),
+      interviewTips:
+          (detail['tips'] as List<dynamic>? ?? const [])
+              .map((e) => e.toString())
+              .toList(),
       interviewSystemPrompt: detail['system_prompt'] as String? ?? '',
       interviewMaxTurns: (detail['max_turns'] as num?)?.toInt() ?? 8,
       interviewShowTranscript: detail['show_transcript'] as bool? ?? false,
       interviewQuestion: detail['question'] as String? ?? '',
-      interviewOptions: (detail['options'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(InterviewOptionView.fromJson)
-          .toList(),
+      interviewOptions:
+          (detail['options'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(InterviewOptionView.fromJson)
+              .toList(),
       // V16
       interviewDisplayPrompt: detail['display_prompt'] as String? ?? '',
-      interviewAudioBufferTimeoutMs: _clampAudioBufferTimeout(detail['audio_buffer_timeout_ms']),
+      interviewAudioBufferTimeoutMs: _clampAudioBufferTimeout(
+        detail['audio_buffer_timeout_ms'],
+      ),
     );
   }
 }
@@ -707,17 +716,23 @@ class InterviewOptionView {
     required this.id,
     required this.label,
     this.imageAssetId = '',
+    this.tips = const [],
   });
 
   final String id;
   final String label;
   final String imageAssetId;
+  final List<String> tips;
 
   factory InterviewOptionView.fromJson(Map<String, dynamic> json) {
     return InterviewOptionView(
       id: json['id'] as String? ?? '',
       label: json['label'] as String? ?? '',
       imageAssetId: json['image_asset_id'] as String? ?? '',
+      tips:
+          (json['tips'] as List<dynamic>? ?? const [])
+              .map((item) => item.toString())
+              .toList(),
     );
   }
 }
@@ -735,10 +750,10 @@ class InterviewTranscriptTurn {
   final int atSec;
 
   Map<String, dynamic> toJson() => {
-        'speaker': speaker,
-        'text': text,
-        'at_sec': atSec,
-      };
+    'speaker': speaker,
+    'text': text,
+    'at_sec': atSec,
+  };
 }
 
 // V14: Signed session URL returned by POST /v1/interview-sessions/token.
@@ -874,8 +889,10 @@ class PoslechOptionView {
   final String key;
   final String text;
   final String label;
-  final String assetId;        // existing ImageOption asset (e.g. uploaded image for послech options)
-  final String imageAssetId;   // V11: MultipleChoiceOption.image_asset_id (vocabulary image)
+  final String
+  assetId; // existing ImageOption asset (e.g. uploaded image for послech options)
+  final String
+  imageAssetId; // V11: MultipleChoiceOption.image_asset_id (vocabulary image)
 
   factory PoslechOptionView.fromJson(Map<String, dynamic> json) {
     return PoslechOptionView(

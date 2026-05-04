@@ -41,6 +41,10 @@ class ElevenLabsWsClient {
   void Function({String? agentOutputAudioFormat, String? userInputAudioFormat})?
   onMetadata;
 
+  /// Fired when ElevenLabs reports a Voice Activity Detection confidence
+  /// score for the incoming user audio stream.
+  void Function(double score)? onVadScore;
+
   // ── Test injection ────────────────────────────────────────────────────────
 
   /// If set, outbound messages write to this sink instead of the real WS.
@@ -71,6 +75,12 @@ class ElevenLabsWsClient {
     Duration(seconds: 4),
   ];
 
+  @visibleForTesting
+  static const int pcm16InputSampleRate = 16000;
+
+  @visibleForTesting
+  static const int pcm16BytesPerSample = 2;
+
   // ── Public API ────────────────────────────────────────────────────────────
 
   /// Opens a WebSocket connection to the ElevenLabs Conversational AI.
@@ -85,6 +95,39 @@ class ElevenLabsWsClient {
   /// Sends a PCM16 audio chunk from the microphone to the agent.
   void sendAudioChunk(Uint8List pcm16) {
     _sendJson({'user_audio_chunk': base64Encode(pcm16)});
+  }
+
+  /// Sends a short PCM16 silence tail to let server-side VAD endpoint the
+  /// learner turn after push-to-talk stops.
+  void sendSilence({
+    Duration duration = const Duration(milliseconds: 1200),
+    Duration chunkDuration = const Duration(milliseconds: 100),
+  }) {
+    if (duration <= Duration.zero || chunkDuration <= Duration.zero) return;
+
+    var remainingMicros = duration.inMicroseconds;
+    final chunkMicros = chunkDuration.inMicroseconds;
+    while (remainingMicros > 0) {
+      final currentMicros =
+          remainingMicros < chunkMicros ? remainingMicros : chunkMicros;
+      final byteLength = pcm16SilenceByteLength(
+        Duration(microseconds: currentMicros),
+      );
+      if (byteLength > 0) {
+        sendAudioChunk(Uint8List(byteLength));
+      }
+      remainingMicros -= currentMicros;
+    }
+  }
+
+  static int pcm16SilenceByteLength(Duration duration) {
+    if (duration <= Duration.zero) return 0;
+    final samples =
+        (pcm16InputSampleRate *
+                duration.inMicroseconds /
+                Duration.microsecondsPerSecond)
+            .round();
+    return samples * pcm16BytesPerSample;
   }
 
   /// Closes the WebSocket connection.
@@ -274,6 +317,11 @@ class ElevenLabsWsClient {
                 as Map<String, dynamic>?;
         final text = event?['user_transcript'] as String? ?? '';
         if (text.isNotEmpty) onTranscript?.call('learner', text);
+
+      case 'vad_score':
+        final event = msg['vad_score_event'] as Map<String, dynamic>?;
+        final score = (event?['vad_score'] as num?)?.toDouble();
+        if (score != null) onVadScore?.call(score);
 
       case 'agent_response_complete':
         onAgentResponseComplete?.call();

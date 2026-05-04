@@ -131,7 +131,7 @@ export const exerciseTypeOptions: Array<{ value: ExerciseType; label: string; hi
   { value: 'fill_blank',     label: 'Điền từ',   hint: 'Câu với ___ — điền từ thích hợp.' },
   { value: 'choice_word',    label: 'Chọn từ',   hint: 'Câu + 4 lựa chọn A-D — chọn từ đúng.' },
   { value: 'interview_conversation',   label: 'Hội thoại theo chủ đề',      hint: 'Hội thoại real-time với avatar Czech examiner AI. Admin nhập system_prompt và chủ đề.' },
-  { value: 'interview_choice_explain', label: 'Chọn phương án + giải thích', hint: 'Learner chọn 1 trong 3–4 phương án, rồi hội thoại giải thích lý do với examiner AI.' },
+  { value: 'interview_choice_explain', label: 'Chọn phương án + giải thích', hint: 'Learner chọn 1 trong 1–4 phương án, rồi hội thoại giải thích lý do với examiner AI.' },
 ];
 
 export const SKILL_KIND_EXERCISE_TYPES: Record<string, ExerciseType[]> = {
@@ -900,6 +900,7 @@ export type InterviewOptionRow = {
   id: string;
   label: string;
   imageAssetId: string;
+  tips: string[];
 };
 
 export type InterviewConversationFormState = {
@@ -952,8 +953,8 @@ export function buildInterviewChoiceExplainPayload(
   if (!form.systemPrompt.trim()) {
     throw new Error('system_prompt is required for interview_choice_explain');
   }
-  if (form.options.length < 3) {
-    throw new Error(`interview_choice_explain requires at least 3 options, got ${form.options.length}`);
+  if (form.options.length < 1) {
+    throw new Error(`interview_choice_explain requires at least 1 option, got ${form.options.length}`);
   }
   if (form.options.length > 4) {
     throw new Error(`interview_choice_explain requires at most 4 options, got ${form.options.length}`);
@@ -964,6 +965,7 @@ export function buildInterviewChoiceExplainPayload(
       id: o.id,
       label: o.label,
       image_asset_id: o.imageAssetId,
+      tips: o.tips.map((t) => t.trim()).filter(Boolean).slice(0, 5),
     })),
     system_prompt: form.systemPrompt,
     max_turns: form.maxTurns,
@@ -997,6 +999,7 @@ export function formStateFromInterviewChoiceExplain(
       id: String(o.id ?? ''),
       label: String(o.label ?? ''),
       imageAssetId: String(o.image_asset_id ?? ''),
+      tips: Array.isArray(o.tips) ? (o.tips as unknown[]).map(String).slice(0, 5) : [],
     })),
     systemPrompt: String(detail.system_prompt ?? ''),
     maxTurns: typeof detail.max_turns === 'number' ? detail.max_turns : 6,

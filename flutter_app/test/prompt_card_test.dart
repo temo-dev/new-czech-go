@@ -19,9 +19,9 @@ Widget _wrap(Widget child, {bool reduceMotion = false}) {
 void main() {
   group('InterviewPromptCard', () {
     testWidgets('mounts expanded with body text visible', (tester) async {
-      await tester.pumpWidget(_wrap(const InterviewPromptCard(
-        body: 'Mô tả công việc bạn muốn làm.',
-      )));
+      await tester.pumpWidget(
+        _wrap(const InterviewPromptCard(body: 'Mô tả công việc bạn muốn làm.')),
+      );
       await tester.pump();
 
       expect(find.text('Mô tả công việc bạn muốn làm.'), findsOneWidget);
@@ -36,11 +36,17 @@ void main() {
       expect(find.byType(Material), findsOneWidget); // Scaffold material
     });
 
-    testWidgets('auto-collapses to mini pill after autoCollapseAfter', (tester) async {
-      await tester.pumpWidget(_wrap(const InterviewPromptCard(
-        body: 'Task body',
-        autoCollapseAfter: Duration(milliseconds: 100),
-      )));
+    testWidgets('auto-collapses to mini pill after autoCollapseAfter', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const InterviewPromptCard(
+            body: 'Task body',
+            autoCollapseAfter: Duration(milliseconds: 100),
+          ),
+        ),
+      );
       await tester.pump();
       expect(find.text('Task body'), findsOneWidget);
 
@@ -51,10 +57,14 @@ void main() {
     });
 
     testWidgets('tap mini pill restores expanded state', (tester) async {
-      await tester.pumpWidget(_wrap(const InterviewPromptCard(
-        body: 'Task body',
-        autoCollapseAfter: Duration(milliseconds: 50),
-      )));
+      await tester.pumpWidget(
+        _wrap(
+          const InterviewPromptCard(
+            body: 'Task body',
+            autoCollapseAfter: Duration(milliseconds: 50),
+          ),
+        ),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 80));
       await tester.pump(const Duration(milliseconds: 250));
@@ -66,12 +76,18 @@ void main() {
       expect(find.text('Task body'), findsOneWidget);
     });
 
-    testWidgets('shows choiceTitle and choiceContent when provided', (tester) async {
-      await tester.pumpWidget(_wrap(const InterviewPromptCard(
-        body: 'Generic body should not appear',
-        choiceTitle: 'B — Y tá',
-        choiceContent: 'Mô tả công việc y tá ở Séc.',
-      )));
+    testWidgets('shows choiceTitle and choiceContent when provided', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const InterviewPromptCard(
+            body: 'Generic body should not appear',
+            choiceTitle: 'B — Y tá',
+            choiceContent: 'Mô tả công việc y tá ở Séc.',
+          ),
+        ),
+      );
       await tester.pump();
 
       expect(find.text('B — Y tá'), findsOneWidget);
@@ -79,12 +95,41 @@ void main() {
       expect(find.text('Generic body should not appear'), findsNothing);
     });
 
-    testWidgets('first onAgentResponseComplete is silent (no pulse)', (tester) async {
+    testWidgets('shows learner tips in the expanded task card', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const InterviewPromptCard(
+            body: 'Jste v obchodě s obuví.',
+            tips: ['Velikosti bot', 'barva', 'cena'],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Jste v obchodě s obuví.'), findsOneWidget);
+      expect(find.text('Mẹo luyện tập'), findsOneWidget);
+      expect(find.text('Velikosti bot'), findsOneWidget);
+      expect(find.text('barva'), findsOneWidget);
+      expect(find.text('cena'), findsOneWidget);
+    });
+
+    testWidgets('mounts when only learner tips are present', (tester) async {
+      await tester.pumpWidget(
+        _wrap(const InterviewPromptCard(body: '', tips: ['vlastní otázka'])),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('ĐỀ BÀI'), findsOneWidget);
+      expect(find.text('vlastní otázka'), findsOneWidget);
+    });
+
+    testWidgets('first onAgentResponseComplete is silent (no pulse)', (
+      tester,
+    ) async {
       final key = GlobalKey<InterviewPromptCardState>();
-      await tester.pumpWidget(_wrap(InterviewPromptCard(
-        key: key,
-        body: 'Task',
-      )));
+      await tester.pumpWidget(
+        _wrap(InterviewPromptCard(key: key, body: 'Task')),
+      );
       await tester.pump();
 
       key.currentState!.onAgentResponseComplete();
@@ -94,12 +139,13 @@ void main() {
       expect(tester.hasRunningAnimations, isFalse);
     });
 
-    testWidgets('second onAgentResponseComplete triggers pulse animation', (tester) async {
+    testWidgets('second onAgentResponseComplete triggers pulse animation', (
+      tester,
+    ) async {
       final key = GlobalKey<InterviewPromptCardState>();
-      await tester.pumpWidget(_wrap(InterviewPromptCard(
-        key: key,
-        body: 'Task',
-      )));
+      await tester.pumpWidget(
+        _wrap(InterviewPromptCard(key: key, body: 'Task')),
+      );
       await tester.pump();
 
       key.currentState!.onAgentResponseComplete(); // skipped
@@ -110,12 +156,13 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('reduced motion disables pulse and switcher animation', (tester) async {
+    testWidgets('reduced motion disables pulse and switcher animation', (
+      tester,
+    ) async {
       final key = GlobalKey<InterviewPromptCardState>();
-      await tester.pumpWidget(_wrap(
-        InterviewPromptCard(key: key, body: 'Task'),
-        reduceMotion: true,
-      ));
+      await tester.pumpWidget(
+        _wrap(InterviewPromptCard(key: key, body: 'Task'), reduceMotion: true),
+      );
       await tester.pump();
 
       key.currentState!.onAgentResponseComplete();

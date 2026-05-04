@@ -123,7 +123,7 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026).
 
 **Interview (interview) — V14:**
 - `interview_conversation` — Hội thoại thực tế với avatar Czech examiner AI (ElevenLabs ConvAI + Simli). Admin cung cấp topic, system_prompt, max_turns. Chấm điểm LLM post-session.
-- `interview_choice_explain` — Learner chọn 1 trong 3–4 phương án, sau đó hội thoại giải thích lý do. Admin cung cấp question, options (text/ảnh), system_prompt với `{selected_option}` placeholder.
+- `interview_choice_explain` — Learner chọn 1 trong 1–4 phương án, sau đó hội thoại giải thích lý do. Admin cung cấp question, options (text/ảnh + optional `tips` riêng từng phương án), system_prompt với `{selected_option}` placeholder.
 
 **SkillKind → valid ExerciseType mapping:**
 ```

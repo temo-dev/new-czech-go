@@ -287,21 +287,24 @@ Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 
 **V16 Interview First-Turn Fix + Push-to-Talk + UX Polish — 2026-05-04:**
 - **Audio gate fix**: gate routing chunks Simli theo `onVideoReady` (first frame) thay `isConnected` (WS START); buffer pending chunks, flush khi ready, fallback timer (`audio_buffer_timeout_ms`, default 1500ms, range 500–5000) → `PcmAudioPlayer` local
+- **Simli opt-in + sound-wave default**: learner bật/tắt avatar trong Profile (`InterviewPreferenceService.avatarEnabled`, default `false`). Khi tắt, app dùng sound wave + local `PcmAudioPlayer`, bỏ độ trễ Simli SPEAK 11–15s đã thấy trong log.
+- **Local examiner volume**: Profile có slider `Âm lượng giám khảo` 100–180% (`localAudioVolume`, default 135%); `PcmAudioPlayer` apply PCM16 gain có clipping an toàn và log `gain=...`.
 - **Display prompt** derive server-side từ `system_prompt` (strip "You are…", extract ÚKOL/TASK block, drop `{selected_option}` placeholder); contract trên `InterviewConversationDetail` + `InterviewChoiceExplainDetail` thêm 2 field optional `display_prompt` + `audio_buffer_timeout_ms`; helper `processing.DerivePromptForLearner` + `processing.EnrichInterviewDetail`
 - **Admin preview endpoint**: `POST /v1/admin/interview/preview-prompt` (rate limit 30/phút/admin); CMS `PromptPreview` component debounce 400ms render real-time
 - **Prompt card**: `InterviewPromptCard` widget bottom panel, expanded mặc định 8s → mini pill, pulse 1.5s khi `agent_response_complete` (skip lần đầu); choice variant hiện `selectedOption.id — label`
 - **Preparing overlay**: 4 step checklist (Khởi tạo → Avatar → Examiner → Sẵn sàng) thay black screen, fade-out khi step 4
-- **iOS AEC**: `AVAudioSessionMode.videoChat` (echo cancel + noise suppress) thay `spokenAudio` — eliminates loa-vọng-mic gây empty learner turn
-- **Push-to-talk mic**: tap toggle thay always-on VAD; `_PttMicButton` widget (idle gray / orange enabled / red pulse + send icon recording); state authoritative từ Simli SPEAK/SILENT WS messages — mic disable khi avatar còn phát audio; 8s `_agentWaitTimer` sau user turn; 550ms preroll buffer + 1600 byte minimum trước khi flush sang ElevenLabs; `canStartInterviewMic` + `shouldReleaseInterviewMicPreroll` pure helpers cho test
+- **iOS audio session switching**: Simli duplex dùng `playAndRecord + videoChat`; sound-wave PTT mic dùng `playAndRecord + measurement` để tránh AEC/noise gate làm ElevenLabs không detect speech; `record` không tự quản lý lại iOS audio session trong interview; sound-wave examiner playback chuyển về `AudioSessionConfiguration.speech()` trước mỗi lượt để tránh iOS ducking/attenuation làm turn sau nhỏ tiếng dần.
+- **Local playback turn gate**: local sound-wave mode chờ `PcmAudioPlayer.flushAndPlay()` phát xong mới enable mic; audio chunks tự flush để giảm latency nhưng chỉ `agent_response_complete` hoặc silence timeout mới mở mic lại; local flush defer khi mic đang active/transition để tránh iOS `AVAudioSession` `!pri`; `PcmAudioPlayer` serialize drain bằng `_flushFuture`, không bỏ audio khi `agent_response_complete` và silence timer cùng fire.
+- **Push-to-talk mic**: tap toggle thay always-on VAD; `_PttMicButton` widget (idle gray / orange enabled / red pulse + send icon recording); state authoritative từ Simli SPEAK/SILENT WS messages — mic disable khi avatar còn phát audio; 12s `_agentWaitTimer` sau user turn; 550ms preroll buffer + 1600 byte minimum trước khi flush sang ElevenLabs; sound-wave mode apply fixed outbound PCM gain `2.4x` với clipping an toàn để ElevenLabs VAD bắt giọng nhỏ tốt hơn; `canStartInterviewMic` + `shouldReleaseInterviewMicPreroll` pure helpers cho test
 - **Empty turn filter**: `_isMeaningfulTranscript` regex `\p{L}|\p{N}` Unicode-aware drop "..." / whitespace turn rỗng từ ElevenLabs VAD false positive
 - **Defensive state**: `_startConversation` flip `_state` speaking→ready để mic enable kể cả safety timer fire không qua `agent_response_complete`; metadata + 3s no audio fallback enable mic cho learner nói trước (firstMessage rejected scenario)
 - **Result screen**: sticky CTA "Hoàn thành" / "Finish" → `Navigator.popUntil(home)`
-- **Layout unified**: bottom panel single Column (transcript bubble L/R-aligned + prompt card + timer + mic + hint + end link) — không còn Positioned magic offsets chồng chéo; avatar full-bleed cap 78%/640px Cover fit
-- **Audio diagnostics**: per-turn counter log `Interview turn=N audio chunks: simli=X local=Y buffered=Z useSimliAudio=A videoReady=B`; `PcmAudioPlayer.flushAndPlay` log sample rate + bytes + duration
-- I18n VI+EN: 6 keys mới (`interviewPromptLabel`, `interviewTapToView`, `interviewVocabHints`, `interviewPttIdleHint`, `interviewPttSendHint`, `interviewFinishBtn`)
+- **Responsive layout**: bottom panel có scroll lane riêng cho transcript + prompt card, control lane cố định cho timer/mic/end; compact height dùng prompt max-height, mic/sound-wave/status pill co lại; widget test 360×640 bắt overflow.
+- **Audio diagnostics**: per-turn counter log `Interview turn=N audio chunks: simli=X local=Y buffered=Z useSimliAudio=A videoReady=B`; mic logs tách `rawPeak`/`sentPeak` + `micGain`; ElevenLabs `vad_score` max log trong lúc chờ examiner; `PcmAudioPlayer.flushAndPlay` log sample rate + gain + bytes + duration
+- I18n VI+EN: 6 interview keys (`interviewPromptLabel`, `interviewTapToView`, `interviewVocabHints`, `interviewPttIdleHint`, `interviewPttSendHint`, `interviewFinishBtn`) + 5 Profile interview keys (`profileInterviewSection`, `profileInterviewAvatarTitle`, `profileInterviewAvatarDescription`, `profileInterviewVolumeTitle`, `profileInterviewVolumeDescription` + value formatter)
 - **ElevenLabs agent settings required**: bật "Allow client override system_prompt", "first_message", "TTS voice" trong Security; nếu thiếu first_message override → 3s fallback enable mic
 - Specs: `docs/specs/interview-first-turn-fix.md`, idea: `docs/ideas/interview-first-turn-fix.md`, plan: `docs/plans/interview-first-turn-fix-plan.md`, design: `docs/designs/interview-first-turn-fix.html`
-- Tests: 297 backend (Go), 137 Flutter, 92 CMS Vitest
+- Tests: 298 backend (Go), 159 Flutter, 95 CMS Vitest
 
 **V8 Schema Flatten — 2026-04-30:**
 - Bảng `skills` đã xóa (migration 017–019)
@@ -378,7 +381,7 @@ Xem `tasks/todo.md` để theo dõi backlog chi tiết.
 **V14 Interview Skill — 2026-05-02:**
 - `skill_kind = "interview"`, 2 exercise types: `interview_conversation` + `interview_choice_explain`
 - Backend: `POST /v1/interview-sessions/token` (ephemeral ElevenLabs signed URL, inject `{selected_option}`); `POST /v1/attempts/:id/submit-interview`; `interview_scorer.go` (LLM post-session)
-- CMS: `InterviewConversationFields.tsx` + `InterviewChoiceExplainFields.tsx` với `system_prompt`, `max_turns`, `show_transcript` toggle
+- CMS: `InterviewConversationFields.tsx` + `InterviewChoiceExplainFields.tsx` với `system_prompt`, `max_turns`, `show_transcript` toggle; `interview_choice_explain.options[].tips` cho gợi ý learner riêng từng phương án
 - Flutter: `ElevenLabsWsClient` (custom Dart WS, PCM16 streaming); `SimliSessionManager` (wraps `simli_client`); `InterviewListScreen` → `InterviewIntroScreen` → `InterviewSessionScreen` → `InterviewResultScreen`
 - Audio: PCM16 buffer → WAV → `just_audio` playback (Sprint 1); pipe to `simliClient.sendAudioData()` for avatar lip-sync (Sprint 2)
 - Security: API key server-side only, Flutter nhận ephemeral signed URL từ backend

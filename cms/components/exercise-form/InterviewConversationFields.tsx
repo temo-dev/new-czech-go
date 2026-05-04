@@ -101,7 +101,7 @@ export function InterviewConversationFields({ initialData, onChange, editingId }
             <input
               style={{ ...inputStyle, width: 80 }}
               type="number"
-              min={4}
+              min={2}
               max={12}
               value={state.maxTurns}
               onChange={(e) => emit({ ...state, maxTurns: Number(e.target.value) })}

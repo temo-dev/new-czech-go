@@ -9,13 +9,14 @@ import 'package:flutter_app/models/models.dart';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 Widget _wrap(Widget child) => MaterialApp(
-      locale: const Locale('vi'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: child,
-    );
+  locale: const Locale('vi'),
+  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  supportedLocales: AppLocalizations.supportedLocales,
+  home: child,
+);
 
-ExerciseDetail _convDetail({List<String> tips = const []}) => ExerciseDetail.fromJson({
+ExerciseDetail _convDetail({List<String> tips = const []}) =>
+    ExerciseDetail.fromJson({
       'id': 'ex-conv-1',
       'title': 'Gia đình và bạn bè',
       'exercise_type': 'interview_conversation',
@@ -30,22 +31,27 @@ ExerciseDetail _convDetail({List<String> tips = const []}) => ExerciseDetail.fro
     });
 
 ExerciseDetail _choiceDetail() => ExerciseDetail.fromJson({
-      'id': 'ex-choice-1',
-      'title': 'Chọn địa điểm du lịch',
-      'exercise_type': 'interview_choice_explain',
-      'learner_instruction': '',
-      'detail': {
-        'question': 'Bạn muốn đi du lịch ở đâu?',
-        'system_prompt': 'You are Jana. The learner chose {selected_option}.',
-        'max_turns': 6,
-        'show_transcript': false,
-        'options': [
-          {'id': '1', 'label': 'Praha', 'image_asset_id': ''},
-          {'id': '2', 'label': 'Brno', 'image_asset_id': ''},
-          {'id': '3', 'label': 'Ostrava', 'image_asset_id': ''},
-        ],
+  'id': 'ex-choice-1',
+  'title': 'Chọn địa điểm du lịch',
+  'exercise_type': 'interview_choice_explain',
+  'learner_instruction': '',
+  'detail': {
+    'question': 'Bạn muốn đi du lịch ở đâu?',
+    'system_prompt': 'You are Jana. The learner chose {selected_option}.',
+    'max_turns': 6,
+    'show_transcript': false,
+    'options': [
+      {'id': '1', 'label': 'Praha', 'image_asset_id': ''},
+      {
+        'id': '2',
+        'label': 'Brno',
+        'image_asset_id': '',
+        'tips': ['Velikosti bot', 'barva'],
       },
-    });
+      {'id': '3', 'label': 'Ostrava', 'image_asset_id': ''},
+    ],
+  },
+});
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -53,23 +59,33 @@ void main() {
   group('InterviewIntroScreen — conversation type', () {
     testWidgets('shows topic title', (tester) async {
       final detail = _convDetail();
-      await tester.pumpWidget(_wrap(InterviewIntroScreen.withDetail(
-        detail: detail,
-        client: ApiClient(),
-        moduleId: 'mod-1',
-      )));
+      await tester.pumpWidget(
+        _wrap(
+          InterviewIntroScreen.withDetail(
+            detail: detail,
+            client: ApiClient(),
+            moduleId: 'mod-1',
+          ),
+        ),
+      );
       await tester.pump();
 
       expect(find.textContaining('Gia đình'), findsWidgets);
     });
 
-    testWidgets('start button is enabled immediately (no selection required)', (tester) async {
+    testWidgets('start button is enabled immediately (no selection required)', (
+      tester,
+    ) async {
       final detail = _convDetail();
-      await tester.pumpWidget(_wrap(InterviewIntroScreen.withDetail(
-        detail: detail,
-        client: ApiClient(),
-        moduleId: 'mod-1',
-      )));
+      await tester.pumpWidget(
+        _wrap(
+          InterviewIntroScreen.withDetail(
+            detail: detail,
+            client: ApiClient(),
+            moduleId: 'mod-1',
+          ),
+        ),
+      );
       await tester.pump();
 
       // Find "Bắt đầu phỏng vấn" button — should be enabled
@@ -79,18 +95,24 @@ void main() {
       // Button should be enabled (its ancestor ElevatedButton/GestureDetector
       // should not be disabled). Check via finding the widget with non-null onPressed.
       final button = tester.widget<FilledButton>(
-        find.ancestor(of: startFinder, matching: find.byType(FilledButton)).first,
+        find
+            .ancestor(of: startFinder, matching: find.byType(FilledButton))
+            .first,
       );
       expect(button.onPressed, isNotNull);
     });
 
     testWidgets('shows tips when provided', (tester) async {
       final detail = _convDetail(tips: ['Trả lời đầy đủ', 'Dùng từ nối']);
-      await tester.pumpWidget(_wrap(InterviewIntroScreen.withDetail(
-        detail: detail,
-        client: ApiClient(),
-        moduleId: 'mod-1',
-      )));
+      await tester.pumpWidget(
+        _wrap(
+          InterviewIntroScreen.withDetail(
+            detail: detail,
+            client: ApiClient(),
+            moduleId: 'mod-1',
+          ),
+        ),
+      );
       await tester.pump();
 
       expect(find.textContaining('Trả lời đầy đủ'), findsOneWidget);
@@ -98,31 +120,43 @@ void main() {
   });
 
   group('InterviewIntroScreen — choice_explain type', () {
-    testWidgets('start button is disabled before any option selected', (tester) async {
+    testWidgets('start button is disabled before any option selected', (
+      tester,
+    ) async {
       final detail = _choiceDetail();
-      await tester.pumpWidget(_wrap(InterviewIntroScreen.withDetail(
-        detail: detail,
-        client: ApiClient(),
-        moduleId: 'mod-1',
-      )));
+      await tester.pumpWidget(
+        _wrap(
+          InterviewIntroScreen.withDetail(
+            detail: detail,
+            client: ApiClient(),
+            moduleId: 'mod-1',
+          ),
+        ),
+      );
       await tester.pump();
 
       final startFinder = find.text('Bắt đầu với lựa chọn này');
       expect(startFinder, findsOneWidget);
 
       final button = tester.widget<FilledButton>(
-        find.ancestor(of: startFinder, matching: find.byType(FilledButton)).first,
+        find
+            .ancestor(of: startFinder, matching: find.byType(FilledButton))
+            .first,
       );
       expect(button.onPressed, isNull);
     });
 
     testWidgets('tapping option enables start button', (tester) async {
       final detail = _choiceDetail();
-      await tester.pumpWidget(_wrap(InterviewIntroScreen.withDetail(
-        detail: detail,
-        client: ApiClient(),
-        moduleId: 'mod-1',
-      )));
+      await tester.pumpWidget(
+        _wrap(
+          InterviewIntroScreen.withDetail(
+            detail: detail,
+            client: ApiClient(),
+            moduleId: 'mod-1',
+          ),
+        ),
+      );
       await tester.pump();
 
       // Tap first option
@@ -131,18 +165,24 @@ void main() {
 
       final startFinder = find.text('Bắt đầu với lựa chọn này');
       final button = tester.widget<FilledButton>(
-        find.ancestor(of: startFinder, matching: find.byType(FilledButton)).first,
+        find
+            .ancestor(of: startFinder, matching: find.byType(FilledButton))
+            .first,
       );
       expect(button.onPressed, isNotNull);
     });
 
     testWidgets('all 3 options are shown', (tester) async {
       final detail = _choiceDetail();
-      await tester.pumpWidget(_wrap(InterviewIntroScreen.withDetail(
-        detail: detail,
-        client: ApiClient(),
-        moduleId: 'mod-1',
-      )));
+      await tester.pumpWidget(
+        _wrap(
+          InterviewIntroScreen.withDetail(
+            detail: detail,
+            client: ApiClient(),
+            moduleId: 'mod-1',
+          ),
+        ),
+      );
       await tester.pump();
 
       expect(find.text('Praha'), findsOneWidget);
@@ -150,13 +190,41 @@ void main() {
       expect(find.text('Ostrava'), findsOneWidget);
     });
 
-    testWidgets('reset button clears selection and disables start', (tester) async {
+    testWidgets('shows learner tips for the selected option', (tester) async {
       final detail = _choiceDetail();
-      await tester.pumpWidget(_wrap(InterviewIntroScreen.withDetail(
-        detail: detail,
-        client: ApiClient(),
-        moduleId: 'mod-1',
-      )));
+      await tester.pumpWidget(
+        _wrap(
+          InterviewIntroScreen.withDetail(
+            detail: detail,
+            client: ApiClient(),
+            moduleId: 'mod-1',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Velikosti bot'), findsNothing);
+
+      await tester.tap(find.text('Brno'));
+      await tester.pump();
+
+      expect(find.text('Velikosti bot'), findsOneWidget);
+      expect(find.text('barva'), findsOneWidget);
+    });
+
+    testWidgets('reset button clears selection and disables start', (
+      tester,
+    ) async {
+      final detail = _choiceDetail();
+      await tester.pumpWidget(
+        _wrap(
+          InterviewIntroScreen.withDetail(
+            detail: detail,
+            client: ApiClient(),
+            moduleId: 'mod-1',
+          ),
+        ),
+      );
       await tester.pump();
 
       // Select Praha
@@ -166,9 +234,16 @@ void main() {
       // Verify start is enabled
       final startFinder = find.text('Bắt đầu với lựa chọn này');
       expect(
-        tester.widget<FilledButton>(
-          find.ancestor(of: startFinder, matching: find.byType(FilledButton)).first,
-        ).onPressed,
+        tester
+            .widget<FilledButton>(
+              find
+                  .ancestor(
+                    of: startFinder,
+                    matching: find.byType(FilledButton),
+                  )
+                  .first,
+            )
+            .onPressed,
         isNotNull,
       );
 
@@ -178,9 +253,16 @@ void main() {
 
       // Start should be disabled again
       expect(
-        tester.widget<FilledButton>(
-          find.ancestor(of: startFinder, matching: find.byType(FilledButton)).first,
-        ).onPressed,
+        tester
+            .widget<FilledButton>(
+              find
+                  .ancestor(
+                    of: startFinder,
+                    matching: find.byType(FilledButton),
+                  )
+                  .first,
+            )
+            .onPressed,
         isNull,
       );
     });

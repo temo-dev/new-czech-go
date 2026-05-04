@@ -25,8 +25,8 @@ class InterviewIntroScreen extends StatefulWidget {
     required ExerciseDetail detail,
     required this.client,
     required this.moduleId,
-  })  : _preloadedDetail = detail,
-        exerciseId = detail.id;
+  }) : _preloadedDetail = detail,
+       exerciseId = detail.id;
 
   final String exerciseId;
   final ApiClient client;
@@ -54,7 +54,10 @@ class _InterviewIntroScreenState extends State<InterviewIntroScreen> {
   }
 
   Future<void> _loadDetail() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final raw = await widget.client.getExercise(widget.exerciseId);
       if (!mounted) return;
@@ -64,7 +67,10 @@ class _InterviewIntroScreenState extends State<InterviewIntroScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _loading = false; _error = e.toString(); });
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
     }
   }
 
@@ -72,7 +78,9 @@ class _InterviewIntroScreenState extends State<InterviewIntroScreen> {
   Widget build(BuildContext context) {
     // ignore: unnecessary_non_null_assertion
     final l = AppLocalizations.of(context);
-    if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     if (_error != null) {
       return Scaffold(
         body: Center(
@@ -80,17 +88,16 @@ class _InterviewIntroScreenState extends State<InterviewIntroScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(_error!),
-              FilledButton(onPressed: _loadDetail, child: const Text('Thử lại')),
+              FilledButton(
+                onPressed: _loadDetail,
+                child: const Text('Thử lại'),
+              ),
             ],
           ),
         ),
       );
     }
-    return _InterviewIntroBody(
-      detail: _detail!,
-      client: widget.client,
-      l: l,
-    );
+    return _InterviewIntroBody(detail: _detail!, client: widget.client, l: l);
   }
 }
 
@@ -125,13 +132,14 @@ class _InterviewIntroBodyState extends State<_InterviewIntroBody> {
       if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => InterviewSessionScreen(
-            client: widget.client,
-            exerciseId: detail.id,
-            attemptId: attemptId,
-            detail: detail,
-            selectedOption: _selectedOptionLabel,
-          ),
+          builder:
+              (_) => InterviewSessionScreen(
+                client: widget.client,
+                exerciseId: detail.id,
+                attemptId: attemptId,
+                detail: detail,
+                selectedOption: _selectedOptionLabel,
+              ),
         ),
       );
     } catch (_) {
@@ -145,6 +153,13 @@ class _InterviewIntroBodyState extends State<_InterviewIntroBody> {
     final l = widget.l;
     final isChoice = detail.isInterviewChoiceExplain;
     final canStart = !isChoice || _selectedOptionLabel != null;
+    final selectedChoiceTips =
+        isChoice
+            ? interviewPromptTipsForLearner(
+              detail,
+              selectedOption: _selectedOptionLabel,
+            )
+            : const <String>[];
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -152,8 +167,10 @@ class _InterviewIntroBodyState extends State<_InterviewIntroBody> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: EdgeInsets.fromLTRB(
-            AppSpacing.pagePaddingH(context), AppSpacing.x2,
-            AppSpacing.pagePaddingH(context), AppSpacing.x3,
+            AppSpacing.pagePaddingH(context),
+            AppSpacing.x2,
+            AppSpacing.pagePaddingH(context),
+            AppSpacing.x3,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -161,12 +178,29 @@ class _InterviewIntroBodyState extends State<_InterviewIntroBody> {
               if (isChoice && _selectedOptionLabel != null)
                 Row(
                   children: [
-                    Text('${l.interviewSelectedLabel} ', style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant)),
-                    Text(_selectedOptionLabel!, style: AppTypography.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
+                    Text(
+                      '${l.interviewSelectedLabel} ',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                    Text(
+                      _selectedOptionLabel!,
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const Spacer(),
                     TextButton(
-                      onPressed: () => setState(() => _selectedOptionLabel = null),
-                      child: Text('Chọn lại', style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant)),
+                      onPressed:
+                          () => setState(() => _selectedOptionLabel = null),
+                      child: Text(
+                        'Chọn lại',
+                        style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -176,14 +210,29 @@ class _InterviewIntroBodyState extends State<_InterviewIntroBody> {
                   minimumSize: const Size.fromHeight(50),
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.onPrimary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: _starting
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text(
-                        isChoice ? l.interviewStartWithChoice : l.interviewStartBtn,
-                        style: AppTypography.bodyMedium.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.w700),
-                      ),
+                child:
+                    _starting
+                        ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                        : Text(
+                          isChoice
+                              ? l.interviewStartWithChoice
+                              : l.interviewStartBtn,
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.onPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
               ),
             ],
           ),
@@ -203,18 +252,32 @@ class _InterviewIntroBodyState extends State<_InterviewIntroBody> {
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.fromLTRB(
-                AppSpacing.pagePaddingH(context), AppSpacing.x4,
-                AppSpacing.pagePaddingH(context), AppSpacing.x8,
+                AppSpacing.pagePaddingH(context),
+                AppSpacing.x4,
+                AppSpacing.pagePaddingH(context),
+                AppSpacing.x8,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (isChoice)
-                    _ChoiceOptionGrid(
-                      options: detail.interviewOptions,
-                      selected: _selectedOptionLabel,
-                      onSelect: (label) => setState(() => _selectedOptionLabel = label),
-                      l: l,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _ChoiceOptionGrid(
+                          options: detail.interviewOptions,
+                          selected: _selectedOptionLabel,
+                          onSelect:
+                              (label) =>
+                                  setState(() => _selectedOptionLabel = label),
+                          l: l,
+                        ),
+                        if (_selectedOptionLabel != null &&
+                            selectedChoiceTips.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.x3),
+                          _TipsCard(tips: selectedChoiceTips, l: l),
+                        ],
+                      ],
                     )
                   else ...[
                     if (detail.interviewTips.isNotEmpty) ...[
@@ -250,12 +313,22 @@ class _HeroSection extends StatelessWidget {
         children: [
           Text(
             isChoice ? l.interviewChoiceLabel : l.interviewTopicLabel,
-            style: AppTypography.labelSmall.copyWith(color: AppColors.onSecondary.withAlpha(160), letterSpacing: 1),
+            style: AppTypography.labelSmall.copyWith(
+              color: AppColors.onSecondary.withAlpha(160),
+              letterSpacing: 1,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
-            isChoice ? (detail.interviewQuestion.isNotEmpty ? detail.interviewQuestion : detail.title) : detail.title,
-            style: AppTypography.titleLarge.copyWith(color: AppColors.onSecondary, fontWeight: FontWeight.w700),
+            isChoice
+                ? (detail.interviewQuestion.isNotEmpty
+                    ? detail.interviewQuestion
+                    : detail.title)
+                : detail.title,
+            style: AppTypography.titleLarge.copyWith(
+              color: AppColors.onSecondary,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -280,18 +353,31 @@ class _TipsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l.interviewTipsTitle, style: AppTypography.labelMedium.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: AppSpacing.x2),
-          ...tips.map((tip) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('· ', style: AppTypography.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
-                Expanded(child: Text(tip, style: AppTypography.bodySmall)),
-              ],
+          Text(
+            l.interviewTipsTitle,
+            style: AppTypography.labelMedium.copyWith(
+              fontWeight: FontWeight.w700,
             ),
-          )),
+          ),
+          const SizedBox(height: AppSpacing.x2),
+          ...tips.map(
+            (tip) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '· ',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Expanded(child: Text(tip, style: AppTypography.bodySmall)),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -317,7 +403,12 @@ class _ChoiceOptionGrid extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l.interviewChoiceInstruction, style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant)),
+        Text(
+          l.interviewChoiceInstruction,
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.onSurfaceVariant,
+          ),
+        ),
         const SizedBox(height: AppSpacing.x3),
         GridView.count(
           shrinkWrap: true,
@@ -326,39 +417,53 @@ class _ChoiceOptionGrid extends StatelessWidget {
           crossAxisSpacing: AppSpacing.x2,
           mainAxisSpacing: AppSpacing.x2,
           childAspectRatio: 1.2,
-          children: options.map((opt) {
-            final isSelected = selected == opt.label;
-            return GestureDetector(
-              onTap: () => onSelect(opt.label),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primaryContainer : AppColors.surfaceContainerLowest,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected ? AppColors.primary : AppColors.outlineVariant,
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (isSelected)
-                      const Icon(Icons.check_circle, color: AppColors.primary, size: 20),
-                    const SizedBox(height: 4),
-                    Text(
-                      opt.label,
-                      style: AppTypography.bodyMedium.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: isSelected ? AppColors.onPrimaryContainer : AppColors.onSurface,
+          children:
+              options.map((opt) {
+                final isSelected = selected == opt.label;
+                return GestureDetector(
+                  onTap: () => onSelect(opt.label),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    decoration: BoxDecoration(
+                      color:
+                          isSelected
+                              ? AppColors.primaryContainer
+                              : AppColors.surfaceContainerLowest,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color:
+                            isSelected
+                                ? AppColors.primary
+                                : AppColors.outlineVariant,
+                        width: isSelected ? 2 : 1,
                       ),
-                      textAlign: TextAlign.center,
                     ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (isSelected)
+                          const Icon(
+                            Icons.check_circle,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                        const SizedBox(height: 4),
+                        Text(
+                          opt.label,
+                          style: AppTypography.bodyMedium.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color:
+                                isSelected
+                                    ? AppColors.onPrimaryContainer
+                                    : AppColors.onSurface,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
         ),
         // Selected label + reset row is now in bottomNavigationBar for
         // test reliability (always visible, never scrolls off-screen).

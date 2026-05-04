@@ -8,20 +8,22 @@
 
 ## 1. Objective
 
-Loại bỏ bug **miss audio examiner đầu session** khi Simli avatar bật + nâng cấp UX để learner thấy đề bài trong suốt session.
+Loại bỏ bug **miss audio examiner đầu session** khi Simli avatar bật + nâng cấp UX để learner thấy đề bài trong suốt session. Post-smoke update: Simli avatar là opt-in trong Profile; mặc định dùng sound-wave local audio vì log thực tế cho thấy ElevenLabs trả audio nhanh hơn nhiều so với Simli `SPEAK`.
 
 ### Target users
 Học viên Việt đang luyện phỏng vấn A2 Czech (skill_kind = `interview`).
 
 ### Success criteria
 - 5 sessions liên tiếp với Simli ON (`SIMLI_API_KEY` set) → 0 lần miss audio đầu
-- 1 session Simli OFF (`SIMLI_API_KEY` empty) → behavior không đổi (regression-free)
+- 1 session Simli OFF hoặc learner tắt avatar → sound-wave mode phát đủ examiner audio, mic chỉ enable sau khi playback local kết thúc
 - Learner có thể tap card đề bài bất cứ lúc nào để xem lại đề khi đang nói
 - Network slow simulator → fallback timeout flush local audio trong ≤2000ms
+- Profile volume 100–180% chỉ boost examiner playback local; sound-wave mic send gain là fixed internal boost cho ElevenLabs VAD, không điều khiển bằng Profile
+- Compact iPhone screen (vd. 360×640 / Facebook in-app browser) không overflow, không chồng prompt lên mic/end controls
 
 ### Non-goals
 - Không thay ElevenLabs / Simli
-- Không redesign avatar layout
+- Không redesign toàn bộ learner app ngoài màn interview/session profile cần thiết
 - Không thêm transcript scroll/replay trong session
 - Không thêm DB column mới
 
@@ -96,6 +98,51 @@ Mount card EXPANDED
     └── Tap header → State: MINI_PILL
 ```
 
+### 3.4 Learner preferences: Simli opt-in + sound wave default
+
+`InterviewPreferenceService` lưu 2 preference bằng `SharedPreferences`:
+
+| Pref | Default | Range | Tác dụng |
+|---|---:|---:|---|
+| `avatarEnabled` | `false` | boolean | `true` mới khởi động Simli nếu `SIMLI_API_KEY` có; `false` dùng sound-wave mode |
+| `localAudioVolume` | `1.35` | `1.0..1.8` | PCM16 gain cho examiner playback local; clamp + clipping để tránh overflow mẫu âm |
+
+Rationale:
+- Log đo được: ElevenLabs `first_agent_audio` thường 1–4s, nhưng Simli `SPEAK` có thể 11–15s. Default sound wave cho trải nghiệm mượt hơn.
+- Simli vẫn giữ lại cho learner muốn luyện cảm giác nhìn examiner.
+- Volume slider nằm ở Profile vì đây là user preference, không phải exercise config.
+
+### 3.5 Sound-wave audio session + turn gate
+
+Sound-wave mode phải tách rõ 2 pha:
+
+```
+Examiner local playback:
+  configure AudioSessionConfiguration.speech()  // playback + spokenAudio
+  await PcmAudioPlayer.flushAndPlay()
+  enable mic after playback completes
+
+Learner PTT recording:
+  configure playAndRecord + measurement    // sound-wave mode
+  configure playAndRecord + videoChat      // Simli duplex mode
+  keep record from taking over AVAudioSession
+  boost sound-wave outbound PCM16 2.4x with clipping
+  record PCM16 and send to ElevenLabs
+  after stop, switch back to playback before examiner response
+```
+
+`PcmAudioPlayer.flushAndPlay()` serialize bằng `_flushFuture`: nếu silence timer và `agent_response_complete` cùng gọi flush thì caller sau chờ cùng future, không return sớm và không enable mic trước khi audio phát xong.
+
+Local sound-wave chunk flush can run before a turn is complete to keep latency low, but it must not set the session back to `ready`. Only `agent_response_complete` or the agent-silence timeout may complete the local turn. If a flush timer fires while the learner mic is active or transitioning, the flush is deferred instead of reconfiguring `AVAudioSession`; this avoids iOS `!pri` errors from switching to playback while the recorder still owns priority.
+
+### 3.6 Responsive session layout
+
+Bottom panel chia thành 2 lane:
+- Scroll lane: transcript bubble + prompt card. Prompt card có `maxExpandedHeight`; nội dung dài scroll trong card.
+- Fixed controls lane: timer + PTT mic + hint + end link. Lane này không bị prompt card đẩy mất chỗ.
+
+Compact height (`<760px`) dùng sound-wave/mic nhỏ hơn, side padding nhỏ hơn, status pill ellipsis, và widget test 360×640 để bắt overflow.
+
 ---
 
 ## 4. Backend Changes
@@ -158,20 +205,22 @@ type InterviewConversationDetail struct {
 }
 
 type InterviewChoiceExplainDetail struct {
-    SystemPrompt   string                 `json:"system_prompt"`
-    Options        []InterviewChoiceOption `json:"options"`
-    MaxTurns       int                    `json:"max_turns,omitempty"`
-    ShowTranscript bool                   `json:"show_transcript,omitempty"`
+    Question       string            `json:"question"`
+    Options        []InterviewOption `json:"options"` // 1-4 required
+    SystemPrompt   string            `json:"system_prompt"`
+    MaxTurns       int               `json:"max_turns,omitempty"`
+    ShowTranscript bool              `json:"show_transcript,omitempty"`
 
     // V16 additions
     DisplayPrompt          string `json:"display_prompt,omitempty"`
     AudioBufferTimeoutMs   int    `json:"audio_buffer_timeout_ms,omitempty"`
 }
 
-type InterviewChoiceOption struct {
-    Key     string `json:"key"`     // "A" / "B" / "C"
-    Title   string `json:"title"`   // "Đầu bếp"
-    Content string `json:"content"` // body shown in prompt card body when selected
+type InterviewOption struct {
+    ID           string   `json:"id"`
+    Label        string   `json:"label"`
+    ImageAssetID string   `json:"image_asset_id,omitempty"`
+    Tips         []string `json:"tips,omitempty"` // option-specific learner hints, max 5 in CMS
 }
 ```
 
@@ -235,6 +284,26 @@ void setInputAudioFormat(String? format) {
 final List<Uint8List> _pendingAgentChunks = [];
 Timer? _audioBufferTimeoutTimer;
 bool _videoReadyFired = false;
+```
+
+**Session startup preferences:**
+```dart
+final avatarEnabled = await InterviewPreferenceService.readAvatarEnabled();
+final localAudioVolume = await InterviewPreferenceService.readLocalAudioVolume();
+_audioPlayer.setVolumeGain(localAudioVolume);
+
+final startSimli = shouldStartSimliAvatar(
+  learnerEnabled: avatarEnabled,
+  apiKeyConfigured: SimliConfig.apiKey.isNotEmpty,
+);
+
+if (startSimli) {
+  await _configureDuplexAudioSession();
+  _useSimliAudio = await _startSimliIfAvailable();
+} else {
+  await _configureExaminerPlaybackAudioSession();
+  _useSimliAudio = false;
+}
 ```
 
 **Modified `shouldPlayInterviewAudioLocally`** (top-level helper):
@@ -376,22 +445,40 @@ class InterviewPromptCardState extends State<InterviewPromptCard>
 ```
 
 Mount trong `interview_session_screen.dart`:
-- Position: `Positioned(bottom: bottomSafe + 140, left: 14, right: 14, ...)` — trên controls bar
+- Position: trong bottom panel responsive. Transcript + prompt nằm trong scroll lane; timer/mic/end link nằm trong fixed controls lane.
 - Pass `widget.detail.interviewDisplayPrompt` vào `body`
 - Choice variant: pass `selectedOption` + look up trong `widget.detail.interviewChoiceOptions` để fill `choiceTitle` + `choiceContent`
 - Hook `_wsClient.onAgentResponseComplete` → call `_promptCardKey.currentState?.onAgentResponseComplete()`
+- Pass `maxExpandedHeight` trên compact screens để nội dung dài scroll trong card thay vì chồng lên controls
 
-### 5.5 `l10n/app_vi.arb` + `app_en.arb`
+### 5.5 `core/interview/interview_preference_service.dart` + Profile
 
-```json
-{
-  "interviewPromptLabel": "Đề bài",
-  "interviewTapToView": "Tap để xem đề bài",
-  "interviewVocabHints": "Gợi ý từ"
-}
-```
+New service:
+- `avatarEnabled` default `false`
+- `localAudioVolume` default `1.35`, clamp `1.0..1.8`
+- static one-shot readers for `InterviewSessionScreen` startup
 
-EN tương ứng: "Task", "Tap to view task", "Vocab hints".
+Profile section:
+- Switch: `Dùng avatar Simli`
+- Slider: `Âm lượng giám khảo` 100–180%, applies only to sound-wave mode
+
+### 5.6 `l10n/app_vi.arb` + `app_en.arb`
+
+Interview session keys:
+- `interviewPromptLabel`
+- `interviewTapToView`
+- `interviewVocabHints`
+- `interviewPttIdleHint`
+- `interviewPttSendHint`
+- `interviewFinishBtn`
+
+Profile interview keys:
+- `profileInterviewSection`
+- `profileInterviewAvatarTitle`
+- `profileInterviewAvatarDescription`
+- `profileInterviewVolumeTitle`
+- `profileInterviewVolumeDescription`
+- `profileInterviewVolumeValue`
 
 ---
 
@@ -450,19 +537,29 @@ backend/
 
 flutter_app/lib/
 ├── models/models.dart                    # +interviewDisplayPrompt, +interviewAudioBufferTimeoutMs
+├── core/interview/
+│   └── interview_preference_service.dart # NEW · Simli opt-in + local volume preference
+├── features/profile/screens/
+│   └── profile_screen.dart               # +Interview settings section
 ├── features/interview/
 │   ├── services/
-│   │   ├── elevenlabs_ws_client.dart     # (no change)
+│   │   ├── elevenlabs_ws_client.dart     # transcript/audio event hardening
+│   │   ├── pcm_audio_player.dart         # local gain + serialized drain
 │   │   └── simli_session_manager.dart    # +setInputAudioFormat method
 │   ├── screens/
-│   │   └── interview_session_screen.dart # queue + gate + fallback + prompt mount
+│   │   └── interview_session_screen.dart # queue + gate + fallback + PTT + responsive layout
 │   └── widgets/
-│       └── prompt_card.dart              # NEW · expanded ⇄ mini · pulse
-├── l10n/app_vi.arb                       # +3 keys
-└── l10n/app_en.arb                       # +3 keys
+│       ├── avatar_video_container.dart   # sound wave compact sizing
+│       ├── prompt_card.dart              # NEW · expanded ⇄ mini · pulse · max height
+│       └── session_status_pill.dart      # compact ellipsis
+├── l10n/app_vi.arb                       # +interview + profile keys
+└── l10n/app_en.arb                       # +interview + profile keys
 
 flutter_app/test/
 ├── interview_session_audio_gate_test.dart  # NEW · queue/flush/fallback widget test
+├── interview_session_widgets_test.dart     # PTT helpers + compact 360×640 layout
+├── interview_preference_service_test.dart  # Profile prefs clamp/defaults
+├── profile_screen_test.dart                # Simli switch + volume slider
 ├── prompt_card_test.dart                   # NEW · collapse/expand/pulse
 └── interview_prompt_derive_test.dart       # NEW · model parsing
 
@@ -500,12 +597,18 @@ Response detail bổ sung 2 field (computed/optional):
     "system_prompt": "You are an examiner...\n\nÚKOL: Mô tả công việc...",
     "max_turns": 6,
     "show_transcript": true,
-    "options": [...],
+    "options": [
+      { "id": "1", "label": "Bílé boty", "tips": ["velikost", "barva", "cena"] },
+      { "id": "2", "label": "Černé boty", "tips": ["materiál", "vlastní otázka"] },
+      { "id": "3", "label": "Modré boty" }
+    ],
     "display_prompt": "Mô tả công việc bạn muốn làm ở Cộng hòa Séc...",
     "audio_buffer_timeout_ms": 1500
   }
 }
 ```
+
+`options[].tips` là optional và chỉ dùng ở learner UI: CMS cho nhập tối đa 5 gợi ý riêng từng phương án; Flutter hiển thị sau khi learner chọn option và trong prompt card của session. Không gửi các tips này sang ElevenLabs.
 
 ### 8.2 `POST /v1/admin/interview/preview-prompt`
 
@@ -551,6 +654,13 @@ Theo project conventions (xem `AGENTS.md`):
   - Flush on ready: queue size 5 → fire `onVideoReady` → `_simli.sendAudio` called 5 times
   - Fallback: queue size 3 → wait 1500ms (override với fake clock 600ms) → assert `_audioPlayer.addChunk` called + `_useSimliAudio == false`
   - Local path: Simli OFF → chunks đi thẳng vào `_audioPlayer`, không buffer
+- `interview_session_widgets_test.dart`:
+  - PTT helper gates mic while waiting/auto-ending
+  - VAD trailing silence chunk pacing
+  - Compact 360×640 layout keeps mic/end visible and no overflow
+- `interview_preference_service_test.dart`: avatar default false, local volume default 1.35, clamp 1.0–1.8
+- `profile_screen_test.dart`: toggles Simli avatar preference; volume slider persists value
+- `pcm_audio_player_test.dart`: PCM16 gain + clipping, sample rate parse, gain clamp
 - `prompt_card_test.dart`:
   - Mount → expanded
   - Wait 8s (fake timer) → mini pill
@@ -566,8 +676,10 @@ Theo project conventions (xem `AGENTS.md`):
 
 ### Manual smoke
 - 5 sessions liên tiếp Simli ON · không miss audio đầu (record video)
-- 1 session Simli OFF (`SIMLI_API_KEY` empty) — full first message audible
+- 1 session Simli OFF by learner preference — sound wave default; full first message audible
+- Volume slider 180% — examiner volume louder and stable across turn 1..N; log shows `gain=1.80`
 - 1 session với Network Link Conditioner "3G slow" — verify fallback fires + still hear audio
+- Compact screen / Facebook in-app browser — prompt scrolls, timer/mic/end never overlap
 - iOS reduced-motion ON — prompt card animation tắt
 - Dynamic Type 1.3x — prompt card không truncate
 
@@ -586,8 +698,13 @@ make verify
 
 ### Always Do
 - Buffer chunks instead of dropping when Simli not ready
+- Keep Simli avatar learner opt-in; sound wave is the default interview path
+- Keep local playback locked until `PcmAudioPlayer.flushAndPlay()` completes
+- Switch iOS audio session between duplex recording and local examiner playback in sound-wave mode
+- Preserve the configured iOS audio session when `record` starts, and log raw/sent mic peaks plus ElevenLabs `vad_score` max
+- Do not let local chunk flush unlock the mic; defer playback config while mic/recorder is active
 - Default timeout = 1500ms khi admin không nhập
-- I18n parity VI=EN cho 3 keys mới
+- I18n parity VI=EN cho interview + profile keys
 - `flutter analyze` + `go test` + `cms-lint` pass trước khi commit
 
 ### Ask First
@@ -598,6 +715,8 @@ make verify
 ### Never
 - ❌ Mute mic để fix audio drop (root cause khác — sẽ regression cho learner ngắt lời)
 - ❌ Đổi ElevenLabs SDK / Simli SDK
+- ❌ Auto-enable Simli chỉ vì `SIMLI_API_KEY` tồn tại
+- ❌ Dùng Profile volume để boost learner mic PCM (volume preference chỉ áp dụng playback local; mic send gain là fixed internal VAD aid)
 - ❌ Hardcode timeout fallback (phải đọc từ exercise detail)
 - ❌ Lưu prompt derived vào DB (luôn compute từ system_prompt)
 - ❌ Block first-message replay nếu Simli failed (luôn fallback local audio)
@@ -624,7 +743,7 @@ Slice 3 (flutter UI):
 9. Mount card trong session screen với position bottom
 10. Hook `onAgentResponseComplete` → pulse
 11. Choice variant: option title + content trong card body
-12. I18n 3 keys
+12. I18n interview session keys + Profile interview preference keys
 
 Slice 4 (CMS):
 13. Timeout input + validation
@@ -637,11 +756,19 @@ Slice 5 (verify):
 18. Update `tasks/todo.md` mark V16 complete
 19. Append summary block § V16 vào root `SPEC.md` + `CLAUDE.md`/`AGENTS.md`
 
+Slice 6 (post-smoke tuning):
+20. Simli opt-in preference + sound-wave default
+21. Local examiner volume slider + PCM gain
+22. Local playback completion gate + audio session switching
+23. Responsive compact session layout + 360×640 widget test
+24. Sound-wave mic send gain + VAD diagnostics after device logs showed low `rawPeak` and empty learner transcript
+25. Local playback race fix after device log showed iOS `!pri`: defer playback configure while mic active/transition and only open mic on agent complete/silence timeout
+
 ---
 
 ## 13. Open Items After Ship
 
-- Vocab hint per task (gợi ý từ vựng dưới body card) — backlog, không trong V16
+- Per-tip translations/examples/media — backlog; basic learner tips now render in the session prompt card
 - Per-exercise voice override (đã có ở V14 ELEVENLABS_VOICE_ID_C global)
 - Telemetry: log `audio_buffer_timeout_fired` count để admin biết tỷ lệ fallback
 - Localized `display_prompt` per learner locale — hiện tại 1 prompt cho mọi locale
@@ -655,9 +782,14 @@ Slice 5 (verify):
 - [ ] `audio_buffer_timeout_ms` clamp test pass
 - [ ] Audio gate widget test: queue/flush/fallback all green
 - [ ] Prompt card test: collapse/expand/pulse green
+- [ ] Compact 360×640 layout test pass
+- [ ] Profile preference tests pass
 - [ ] CMS Vitest: timeout + preview pass
 - [ ] Manual: 5 Simli ON sessions · 0 miss
-- [ ] Manual: Simli OFF regression check pass
+- [ ] Manual: Simli OFF/default sound-wave regression check pass
+- [ ] Manual: local volume stable across repeated turns
+- [ ] Manual: sound-wave PTT logs `sentPeak > rawPeak`, `vadMax` useful, and learner transcript is not `...`
+- [ ] Manual: no `OSStatus error 561017449` / `!pri` when learner taps mic quickly after examiner audio
 - [ ] Manual: Slow network fallback fires
 - [ ] `make verify` green
 - [ ] Root `SPEC.md` § V16 added

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/interview/interview_preference_service.dart';
 import '../../../core/locale/locale_scope.dart';
 import '../../../core/locale/supported_locales.dart';
 import '../../../core/theme/app_colors.dart';
@@ -17,10 +18,12 @@ class ProfileScreen extends StatelessWidget {
     super.key,
     required this.client,
     required this.voiceService,
+    required this.interviewService,
   });
 
   final ApiClient client;
   final VoicePreferenceService voiceService;
+  final InterviewPreferenceService interviewService;
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +41,10 @@ class ProfileScreen extends StatelessWidget {
         const SizedBox(height: AppSpacing.x5),
         _VoicePickerSection(client: client, voiceService: voiceService),
         const SizedBox(height: AppSpacing.x5),
+        _SectionLabel(l.profileInterviewSection),
+        const SizedBox(height: AppSpacing.x2),
+        _InterviewSettingsCard(interviewService: interviewService),
+        const SizedBox(height: AppSpacing.x5),
         _SectionLabel(l.profileAboutSection),
         const SizedBox(height: AppSpacing.x2),
         _AboutCard(l: l),
@@ -48,14 +55,172 @@ class ProfileScreen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Interview preferences
+// ---------------------------------------------------------------------------
+
+class _InterviewSettingsCard extends StatefulWidget {
+  const _InterviewSettingsCard({required this.interviewService});
+
+  final InterviewPreferenceService interviewService;
+
+  @override
+  State<_InterviewSettingsCard> createState() => _InterviewSettingsCardState();
+}
+
+class _InterviewSettingsCardState extends State<_InterviewSettingsCard> {
+  late bool _avatarEnabled;
+  late double _localAudioVolume;
+
+  @override
+  void initState() {
+    super.initState();
+    _avatarEnabled = widget.interviewService.avatarEnabled;
+    _localAudioVolume = widget.interviewService.localAudioVolume;
+  }
+
+  Future<void> _setAvatarEnabled(bool enabled) async {
+    await widget.interviewService.setAvatarEnabled(enabled);
+    if (mounted) setState(() => _avatarEnabled = enabled);
+  }
+
+  Future<void> _setLocalAudioVolume(double volume) async {
+    final normalized = InterviewPreferenceService.normalizeLocalAudioVolume(
+      volume,
+    );
+    setState(() => _localAudioVolume = normalized);
+    await widget.interviewService.setLocalAudioVolume(normalized);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: AppRadius.mdAll,
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          SwitchListTile.adaptive(
+            value: _avatarEnabled,
+            onChanged: _setAvatarEnabled,
+            activeColor: AppColors.primary,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.x4,
+              vertical: AppSpacing.x1,
+            ),
+            secondary: Icon(
+              _avatarEnabled
+                  ? Icons.face_retouching_natural_rounded
+                  : Icons.graphic_eq_rounded,
+              color:
+                  _avatarEnabled
+                      ? AppColors.primary
+                      : AppColors.onSurfaceVariant,
+            ),
+            title: Text(
+              l.profileInterviewAvatarTitle,
+              style: AppTypography.bodyMedium.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.onSurface,
+              ),
+            ),
+            subtitle: Text(
+              l.profileInterviewAvatarDescription,
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+          ),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: AppColors.outlineVariant.withValues(alpha: 0.5),
+            indent: AppSpacing.x4,
+            endIndent: AppSpacing.x4,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.x4,
+              AppSpacing.x3,
+              AppSpacing.x4,
+              AppSpacing.x3,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.volume_up_rounded,
+                  size: 22,
+                  color: AppColors.onSurfaceVariant,
+                ),
+                const SizedBox(width: AppSpacing.x3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              l.profileInterviewVolumeTitle,
+                              style: AppTypography.bodyMedium.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.onSurface,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            l.profileInterviewVolumeValue(
+                              (_localAudioVolume * 100).round(),
+                            ),
+                            style: AppTypography.labelSmall.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.x1),
+                      Text(
+                        l.profileInterviewVolumeDescription,
+                        style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                      ),
+                      Slider(
+                        value: _localAudioVolume,
+                        min: InterviewPreferenceService.minLocalAudioVolume,
+                        max: InterviewPreferenceService.maxLocalAudioVolume,
+                        divisions: 4,
+                        label: l.profileInterviewVolumeValue(
+                          (_localAudioVolume * 100).round(),
+                        ),
+                        activeColor: AppColors.primary,
+                        inactiveColor: AppColors.outlineVariant,
+                        onChanged: _setLocalAudioVolume,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Voice picker
 // ---------------------------------------------------------------------------
 
 class _VoicePickerSection extends StatefulWidget {
-  const _VoicePickerSection({
-    required this.client,
-    required this.voiceService,
-  });
+  const _VoicePickerSection({required this.client, required this.voiceService});
 
   final ApiClient client;
   final VoicePreferenceService voiceService;
@@ -108,7 +273,9 @@ class _VoicePickerSectionState extends State<_VoicePickerSection> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(AppLocalizations.of(context).profileVoicePreviewError),
+            content: Text(
+              AppLocalizations.of(context).profileVoicePreviewError,
+            ),
           ),
         );
       }
@@ -129,7 +296,13 @@ class _VoicePickerSectionState extends State<_VoicePickerSection> {
         children: [
           _SectionLabel(l.profileVoiceSection),
           const SizedBox(height: AppSpacing.x2),
-          const Center(child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+          const Center(
+            child: SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
         ],
       );
     }
@@ -192,10 +365,12 @@ class _VoiceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final genderLabel = voice.gender == 'female' ? l.profileVoiceFemale : l.profileVoiceMale;
-    final providerLabel = voice.provider == 'aws_polly'
-        ? l.profileVoiceProviderPolly
-        : l.profileVoiceProviderElevenLabs;
+    final genderLabel =
+        voice.gender == 'female' ? l.profileVoiceFemale : l.profileVoiceMale;
+    final providerLabel =
+        voice.provider == 'aws_polly'
+            ? l.profileVoiceProviderPolly
+            : l.profileVoiceProviderElevenLabs;
 
     return InkWell(
       onTap: onTap,
@@ -205,17 +380,20 @@ class _VoiceCard extends StatelessWidget {
           horizontal: AppSpacing.x4,
           vertical: AppSpacing.x3,
         ),
-        decoration: selected
-            ? BoxDecoration(
-                borderRadius: AppRadius.mdAll,
-                border: Border.all(color: AppColors.primary, width: 1.5),
-              )
-            : null,
+        decoration:
+            selected
+                ? BoxDecoration(
+                  borderRadius: AppRadius.mdAll,
+                  border: Border.all(color: AppColors.primary, width: 1.5),
+                )
+                : null,
         child: Row(
           children: [
             // Voice icon by gender
             Icon(
-              voice.gender == 'female' ? Icons.record_voice_over_rounded : Icons.mic_rounded,
+              voice.gender == 'female'
+                  ? Icons.record_voice_over_rounded
+                  : Icons.mic_rounded,
               size: 20,
               color: selected ? AppColors.primary : AppColors.onSurfaceVariant,
             ),
@@ -245,25 +423,35 @@ class _VoiceCard extends StatelessWidget {
             TextButton(
               onPressed: playing ? null : onPreview,
               style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3, vertical: AppSpacing.x1),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.x3,
+                  vertical: AppSpacing.x1,
+                ),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: playing
-                  ? const SizedBox(
-                      height: 14,
-                      width: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(
-                      l.profileVoicePreview,
-                      style: AppTypography.labelSmall.copyWith(color: AppColors.primary),
-                    ),
+              child:
+                  playing
+                      ? const SizedBox(
+                        height: 14,
+                        width: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                      : Text(
+                        l.profileVoicePreview,
+                        style: AppTypography.labelSmall.copyWith(
+                          color: AppColors.primary,
+                        ),
+                      ),
             ),
             const SizedBox(width: AppSpacing.x1),
             // Selected check
             if (selected)
-              const Icon(Icons.check_rounded, size: 20, color: AppColors.primary)
+              const Icon(
+                Icons.check_rounded,
+                size: 20,
+                color: AppColors.primary,
+              )
             else
               const SizedBox(width: 20),
           ],
@@ -289,19 +477,23 @@ class _Avatar extends StatelessWidget {
             color: AppColors.primaryContainer,
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.person, size: 40, color: AppColors.onPrimaryContainer),
+          child: const Icon(
+            Icons.person,
+            size: 40,
+            color: AppColors.onPrimaryContainer,
+          ),
         ),
         const SizedBox(height: AppSpacing.x3),
         Text(
           'Học viên',
-          style: AppTypography.titleLarge.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+          style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: AppSpacing.x1),
         Text(
           'learner@example.com',
-          style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
+          style: AppTypography.bodySmall.copyWith(
+            color: AppColors.onSurfaceVariant,
+          ),
         ),
       ],
     );
@@ -392,7 +584,11 @@ class _LangOption extends StatelessWidget {
             ),
             const Spacer(),
             if (selected)
-              const Icon(Icons.check_rounded, size: 20, color: AppColors.primary),
+              const Icon(
+                Icons.check_rounded,
+                size: 20,
+                color: AppColors.primary,
+              ),
           ],
         ),
       ),
@@ -425,7 +621,11 @@ class _AboutCard extends StatelessWidget {
                   color: AppColors.primary,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.school_rounded, size: 22, color: AppColors.onPrimary),
+                child: const Icon(
+                  Icons.school_rounded,
+                  size: 22,
+                  color: AppColors.onPrimary,
+                ),
               ),
               const SizedBox(width: AppSpacing.x3),
               Expanded(
@@ -434,7 +634,9 @@ class _AboutCard extends StatelessWidget {
                   children: [
                     Text(
                       l.profileAppName,
-                      style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w700),
+                      style: AppTypography.titleSmall.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     Text(
                       l.profileVersion('1.0.0'),

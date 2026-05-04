@@ -688,6 +688,26 @@ class AppLocalizationsVi extends AppLocalizations {
   String get profileVoicePreviewError => 'Không thể phát thử giọng này';
 
   @override
+  String get profileInterviewSection => 'Phỏng vấn';
+
+  @override
+  String get profileInterviewAvatarTitle => 'Dùng avatar Simli';
+
+  @override
+  String get profileInterviewAvatarDescription => 'Tắt để phản hồi nhanh bằng sound wave. Bật khi muốn luyện với avatar.';
+
+  @override
+  String get profileInterviewVolumeTitle => 'Âm lượng giám khảo';
+
+  @override
+  String get profileInterviewVolumeDescription => 'Chỉ áp dụng khi dùng sound wave.';
+
+  @override
+  String profileInterviewVolumeValue(int percent) {
+    return '$percent%';
+  }
+
+  @override
   String get submitAnswersCta => 'Nộp đáp án';
 
   @override

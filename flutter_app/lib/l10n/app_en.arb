@@ -267,6 +267,15 @@
     "profileVoiceProviderPolly": "AWS Polly",
     "profileVoiceProviderElevenLabs": "ElevenLabs",
     "profileVoicePreviewError": "Could not preview this voice",
+    "profileInterviewSection": "Interview",
+    "profileInterviewAvatarTitle": "Use Simli avatar",
+    "profileInterviewAvatarDescription": "Turn this off for faster sound wave replies. Turn it on when you want avatar practice.",
+    "profileInterviewVolumeTitle": "Examiner volume",
+    "profileInterviewVolumeDescription": "Only applies when sound wave mode is used.",
+    "profileInterviewVolumeValue": "{percent}%",
+    "@profileInterviewVolumeValue": {
+        "placeholders": { "percent": { "type": "int" } }
+    },
 
     "submitAnswersCta": "Submit answers",
     "submitWritingCta": "Submit",

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/api/api_client.dart';
+import 'core/interview/interview_preference_service.dart';
 import 'core/locale/locale_provider.dart';
 import 'core/locale/locale_scope.dart';
 import 'core/voice/voice_preference_service.dart';
@@ -38,19 +39,20 @@ class MluveniSprintApp extends StatelessWidget {
       notifier: localeProvider,
       child: AnimatedBuilder(
         animation: localeProvider,
-        builder: (context, _) => MaterialApp(
-          title: 'A2 Mluveni Sprint',
-          theme: AppTheme.light,
-          home: const LearnerShell(),
-          locale: Locale(localeProvider.code),
-          supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-        ),
+        builder:
+            (context, _) => MaterialApp(
+              title: 'A2 Mluveni Sprint',
+              theme: AppTheme.light,
+              home: const LearnerShell(),
+              locale: Locale(localeProvider.code),
+              supportedLocales: AppLocalizations.supportedLocales,
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+            ),
       ),
     );
   }
@@ -66,6 +68,7 @@ class LearnerShell extends StatefulWidget {
 class _LearnerShellState extends State<LearnerShell> {
   final ApiClient _client = ApiClient();
   VoicePreferenceService? _voiceService;
+  InterviewPreferenceService? _interviewService;
   bool _loading = true;
   String? _error;
   List<AttemptResult> _recentAttempts = const [];
@@ -84,14 +87,15 @@ class _LearnerShellState extends State<LearnerShell> {
     });
     try {
       _voiceService ??= await VoicePreferenceService.create();
-      await _client.login(
-        email: 'learner@example.com',
-        password: 'demo123',
-      );
+      _interviewService ??= await InterviewPreferenceService.create();
+      await _client.login(email: 'learner@example.com', password: 'demo123');
       final attemptsPayload = await _client.getAttempts();
-      final recentAttempts = attemptsPayload
-          .map((item) => AttemptResult.fromJson(item as Map<String, dynamic>))
-          .toList();
+      final recentAttempts =
+          attemptsPayload
+              .map(
+                (item) => AttemptResult.fromJson(item as Map<String, dynamic>),
+              )
+              .toList();
 
       setState(() {
         _recentAttempts = recentAttempts;
@@ -108,9 +112,13 @@ class _LearnerShellState extends State<LearnerShell> {
       final payload = await _client.getAttempts();
       if (!mounted) return;
       setState(() {
-        _recentAttempts = payload
-            .map((item) => AttemptResult.fromJson(item as Map<String, dynamic>))
-            .toList();
+        _recentAttempts =
+            payload
+                .map(
+                  (item) =>
+                      AttemptResult.fromJson(item as Map<String, dynamic>),
+                )
+                .toList();
       });
     } catch (_) {
       // Keep shell usable if refresh fails.
@@ -118,31 +126,53 @@ class _LearnerShellState extends State<LearnerShell> {
   }
 
   Future<void> _openAttemptExercise(
-      BuildContext context, AttemptResult attempt) async {
+    BuildContext context,
+    AttemptResult attempt,
+  ) async {
     final navigator = Navigator.of(context);
-    final detail =
-        ExerciseDetail.fromJson(await _client.getExercise(attempt.exerciseId));
+    final detail = ExerciseDetail.fromJson(
+      await _client.getExercise(attempt.exerciseId),
+    );
     if (!mounted) return;
     if (detail.isCteni) {
-      await navigator.push(MaterialPageRoute(
-        builder: (_) => ReadingExerciseScreen(client: _client, detail: detail),
-      ));
+      await navigator.push(
+        MaterialPageRoute(
+          builder:
+              (_) => ReadingExerciseScreen(client: _client, detail: detail),
+        ),
+      );
     } else if (detail.isPoslech) {
-      await navigator.push(MaterialPageRoute(
-        builder: (_) => ListeningExerciseScreen(client: _client, detail: detail),
-      ));
+      await navigator.push(
+        MaterialPageRoute(
+          builder:
+              (_) => ListeningExerciseScreen(client: _client, detail: detail),
+        ),
+      );
     } else if (detail.isPsani1 || detail.isPsani2) {
-      await navigator.push(MaterialPageRoute(
-        builder: (_) => WritingExerciseScreen(client: _client, detail: detail),
-      ));
+      await navigator.push(
+        MaterialPageRoute(
+          builder:
+              (_) => WritingExerciseScreen(client: _client, detail: detail),
+        ),
+      );
     } else if (detail.isVocabGrammar) {
-      await navigator.push(MaterialPageRoute(
-        builder: (_) => VocabGrammarExerciseScreen(client: _client, detail: detail),
-      ));
+      await navigator.push(
+        MaterialPageRoute(
+          builder:
+              (_) =>
+                  VocabGrammarExerciseScreen(client: _client, detail: detail),
+        ),
+      );
     } else {
-      await navigator.push(MaterialPageRoute(
-        builder: (_) => exercise_feature.ExerciseScreen(client: _client, detail: detail),
-      ));
+      await navigator.push(
+        MaterialPageRoute(
+          builder:
+              (_) => exercise_feature.ExerciseScreen(
+                client: _client,
+                detail: detail,
+              ),
+        ),
+      );
     }
     await _loadRecentAttempts();
   }
@@ -162,10 +192,7 @@ class _LearnerShellState extends State<LearnerShell> {
             children: [
               Text(_error!, textAlign: TextAlign.center),
               const SizedBox(height: 12),
-              FilledButton(
-                onPressed: _bootstrap,
-                child: Text(l.retry),
-              ),
+              FilledButton(onPressed: _bootstrap, child: Text(l.retry)),
             ],
           ),
         ),
@@ -182,40 +209,42 @@ class _LearnerShellState extends State<LearnerShell> {
       body = ProfileScreen(
         client: _client,
         voiceService: _voiceService!,
+        interviewService: _interviewService!,
       );
     } else {
       body = CourseListScreen(client: _client);
     }
     return Scaffold(
       body: SafeArea(child: body),
-      bottomNavigationBar: (_loading || _error != null)
-          ? null
-          : AppBottomNav(
-              selectedIndex: _tabIndex,
-              onSelected: (i) => setState(() => _tabIndex = i),
-              items: [
-                AppBottomNavItem(
-                  icon: Icons.home_outlined,
-                  selectedIcon: Icons.home_rounded,
-                  label: l.bottomNavHome,
-                ),
-                AppBottomNavItem(
-                  icon: Icons.history_outlined,
-                  selectedIcon: Icons.history_rounded,
-                  label: l.bottomNavHistory,
-                ),
-                AppBottomNavItem(
-                  icon: Icons.assignment_outlined,
-                  selectedIcon: Icons.assignment_rounded,
-                  label: l.bottomNavTests,
-                ),
-                AppBottomNavItem(
-                  icon: Icons.person_outline_rounded,
-                  selectedIcon: Icons.person_rounded,
-                  label: l.bottomNavProfile,
-                ),
-              ],
-            ),
+      bottomNavigationBar:
+          (_loading || _error != null)
+              ? null
+              : AppBottomNav(
+                selectedIndex: _tabIndex,
+                onSelected: (i) => setState(() => _tabIndex = i),
+                items: [
+                  AppBottomNavItem(
+                    icon: Icons.home_outlined,
+                    selectedIcon: Icons.home_rounded,
+                    label: l.bottomNavHome,
+                  ),
+                  AppBottomNavItem(
+                    icon: Icons.history_outlined,
+                    selectedIcon: Icons.history_rounded,
+                    label: l.bottomNavHistory,
+                  ),
+                  AppBottomNavItem(
+                    icon: Icons.assignment_outlined,
+                    selectedIcon: Icons.assignment_rounded,
+                    label: l.bottomNavTests,
+                  ),
+                  AppBottomNavItem(
+                    icon: Icons.person_outline_rounded,
+                    selectedIcon: Icons.person_rounded,
+                    label: l.bottomNavProfile,
+                  ),
+                ],
+              ),
     );
   }
 }

@@ -87,9 +87,9 @@ describe('buildInterviewChoiceExplainPayload (V16)', () => {
     const payload = buildInterviewChoiceExplainPayload({
       question: 'Pick one',
       options: [
-        { id: '1', label: 'A', imageAssetId: '' },
-        { id: '2', label: 'B', imageAssetId: '' },
-        { id: '3', label: 'C', imageAssetId: '' },
+        { id: '1', label: 'A', imageAssetId: '', tips: [] },
+        { id: '2', label: 'B', imageAssetId: '', tips: [] },
+        { id: '3', label: 'C', imageAssetId: '', tips: [] },
       ],
       systemPrompt: 'Examiner.',
       maxTurns: 6,
@@ -122,5 +122,20 @@ describe('formStateFromInterviewChoiceExplain (V16)', () => {
       audio_buffer_timeout_ms: 100,
     });
     expect(s.audioBufferTimeoutMs).toBe(500);
+  });
+
+  it('reads learner tips for each choice option', () => {
+    const s = formStateFromInterviewChoiceExplain({
+      question: 'Vyberte boty',
+      system_prompt: 'x',
+      options: [
+        { id: '1', label: 'Bílé boty', tips: ['velikost', 'barva'] },
+        { id: '2', label: 'Černé boty', tips: [] },
+        { id: '3', label: 'Modré boty' },
+      ],
+    });
+    expect(s.options[0].tips).toEqual(['velikost', 'barva']);
+    expect(s.options[1].tips).toEqual([]);
+    expect(s.options[2].tips).toEqual([]);
   });
 });

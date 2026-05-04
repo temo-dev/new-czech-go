@@ -40,7 +40,7 @@ Mic (PCM16) → ElevenLabs ConvAI WebSocket
 - Go backend nhận transcript, Claude đánh giá theo rubric A2
 
 ### 2. Chọn phương án + giải thích (Choice & Explain)
-- Admin tạo 3–4 options (text hoặc ảnh) + system prompt
+- Admin tạo 1–4 options (text hoặc ảnh) + system prompt
 - Ví dụ: 3 ảnh địa điểm, learner chọn nơi muốn đến và giải thích
 - UI hiện options trước khi bắt đầu conversation
 - ElevenLabs agent hỏi tiếp: "Tại sao bạn chọn X? Bạn sẽ làm gì ở đó?"

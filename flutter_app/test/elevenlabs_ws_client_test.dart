@@ -166,6 +166,21 @@ void main() {
       },
     );
 
+    test('vad_score event fires onVadScore with numeric score', () {
+      final client = ElevenLabsWsClient();
+      double? score;
+      client.onVadScore = (value) => score = value;
+
+      client.handleRawMessage(
+        jsonEncode({
+          'type': 'vad_score',
+          'vad_score_event': {'vad_score': 0.87},
+        }),
+      );
+
+      expect(score, 0.87);
+    });
+
     test('agent_response_complete fires callback', () {
       final client = ElevenLabsWsClient();
       var called = false;
@@ -218,6 +233,33 @@ void main() {
       expect(sent.length, equals(1));
       final decoded = jsonDecode(sent.first) as Map<String, dynamic>;
       expect(decoded['user_audio_chunk'], equals(base64Encode(audio)));
+    });
+
+    test('sendSilence sends zero PCM16 user_audio_chunk messages', () {
+      final client = ElevenLabsWsClient();
+      final List<String> sent = [];
+      client.testSendSink = (msg) => sent.add(msg);
+
+      client.sendSilence(
+        duration: const Duration(milliseconds: 250),
+        chunkDuration: const Duration(milliseconds: 100),
+      );
+
+      expect(sent.length, equals(3));
+      var totalBytes = 0;
+      for (final msg in sent) {
+        final decoded = jsonDecode(msg) as Map<String, dynamic>;
+        final b64 = decoded['user_audio_chunk'] as String;
+        final bytes = base64Decode(b64);
+        totalBytes += bytes.length;
+        expect(bytes.every((byte) => byte == 0), isTrue);
+      }
+      expect(
+        totalBytes,
+        ElevenLabsWsClient.pcm16SilenceByteLength(
+          const Duration(milliseconds: 250),
+        ),
+      );
     });
 
     test('sendAudioChunk is ignored after disconnect', () async {

@@ -334,17 +334,32 @@ Spec: `SPEC.md § V16` · Detail: `docs/specs/interview-first-turn-fix.md` · Pl
 
 - [x] **V16-15** Preparing overlay 4-step checklist (`_PreparingOverlay` widget) thay black screen; fade-out smooth khi step 4 (2026-05-04)
 - [x] **V16-16** Defer `_startMic` + `_sessionStartSec` đến `agent_response_complete` lần đầu; safety timer 10s từ first audio chunk; transcript `atSec=0` + duration=0 fallback khi `!_conversationStarted` (2026-05-04)
-- [x] **V16-17** iOS AEC: `AVAudioSessionMode.spokenAudio` → `videoChat` (eliminates loa-vọng-mic echo); `_isMeaningfulTranscript` regex Unicode-aware drop empty learner turn (2026-05-04)
+- [x] **V16-17** iOS AEC for duplex recording: `AVAudioSessionMode.spokenAudio` → `videoChat` khi mic/Simli active (eliminates loa-vọng-mic echo); `_isMeaningfulTranscript` regex Unicode-aware drop empty learner turn (2026-05-04)
 - [x] **V16-18** Audio routing diagnostics: per-turn counter log; `PcmAudioPlayer.flushAndPlay` log; metadata/interruption events log (2026-05-04)
-- [x] **V16-19** Push-to-talk: replace always-on mic + waveform với `_PttMicButton` toggle (idle gray / orange enabled / red pulse + send icon recording); 8s `_agentWaitTimer`; 550ms preroll + 1600 byte minimum buffer; `canStartInterviewMic` + `shouldReleaseInterviewMicPreroll` pure helpers (2026-05-04)
+- [x] **V16-19** Push-to-talk: replace always-on mic + waveform với `_PttMicButton` toggle (idle gray / orange enabled / red pulse + send icon recording); 12s `_agentWaitTimer`; 550ms preroll + 1600 byte minimum buffer; `canStartInterviewMic` + `shouldReleaseInterviewMicPreroll` pure helpers (2026-05-04)
 - [x] **V16-20** Layout unified bottom panel single Column (transcript L/R + prompt card + timer + mic + hint + end); avatar full-bleed cap 78%/640px Cover fit (2026-05-04)
 - [x] **V16-21** Result screen sticky "Hoàn thành" CTA → `Navigator.popUntil(home)`; i18n key `interviewFinishBtn` (2026-05-04)
 - [x] **V16-22** Simli SPEAK/SILENT làm authoritative state signal; silence detector 2.5s chỉ cho local-only path; `_startConversation` flip state speaking→ready; metadata 3s fallback enable mic (firstMessage rejected scenario) (2026-05-04)
 
-**[CHECKPOINT V16-FINAL]** ⏳ Pending manual smoke device — verify:
+### Phase 6 — Post-smoke tuning: sound wave default + compact UI
+
+- [x] **V16-23** Simli opt-in trong Profile: `InterviewPreferenceService.avatarEnabled` default `false`; sound-wave mode là default; Profile switch `Dùng avatar Simli`; 2 preference tests + profile widget test (2026-05-04)
+- [x] **V16-24** Local examiner volume: Profile slider 100–180%, default 135%; `PcmAudioPlayer` apply PCM16 gain + clipping; log `Interview local audio gain` và `PcmAudioPlayer.flushAndPlay gain=...`; helper tests (2026-05-04)
+- [x] **V16-25** Sound-wave audio stability: local playback chuyển sang `AudioSessionConfiguration.speech()` trước examiner playback; sound-wave PTT mic dùng `playAndRecord + measurement`, Simli duplex vẫn dùng `playAndRecord + videoChat`; `flushAndPlay()` serialize drain bằng `_flushFuture`; mic chỉ enable sau playback local xong (2026-05-04)
+- [x] **V16-26** Responsive compact interview UI: bottom panel tách scroll lane (transcript + prompt) và fixed controls lane (timer + mic + end); prompt card max-height + internal scroll; compact mic/sound-wave/status pill; 360×640 widget test no-overflow (2026-05-04)
+- [x] **V16-27** Agent wait timeout tune: `_agentWaitTimer` 8s → 12s để giảm false timeout khi ElevenLabs transcript/audio chậm nhưng vẫn còn phản hồi (2026-05-04)
+- [x] **V16-28** `interview_choice_explain.options[].tips`: CMS cho nhập tối đa 5 gợi ý learner riêng từng phương án; Flutter Intro/session prompt ưu tiên tips của option đã chọn, fallback `detail.tips`; CMS + Flutter tests (2026-05-04)
+- [x] **V16-29** CMS/backend interview authoring bounds: `max_turns` input min 2; `interview_choice_explain` options min 1, max 4; backend accepts 1 option and rejects 0/5; CMS/backend tests updated (2026-05-04)
+- [x] **V16-30** Sound-wave PTT no-response fix: tách mic capture khỏi `videoChat` AEC, dùng `playAndRecord + measurement` khi Simli OFF; thêm `micPeak`/chunk diagnostics để phát hiện silent mic path (2026-05-04)
+- [x] **V16-31** Sound-wave low-mic/VAD fix: không cho `record` ghi đè iOS audio session; boost outbound PCM16 `2.4x` có clipping; log `rawPeak`/`sentPeak` + ElevenLabs `vad_score` max để debug transcript rỗng `...` (2026-05-04)
+- [x] **V16-32** Local playback race fix: chunk flush không tự unlock mic; chỉ `agent_response_complete`/silence timeout mới complete local turn; defer playback configure khi mic active/transition để tránh iOS `!pri` (`OSStatus 561017449`) (2026-05-04)
+
+**[CHECKPOINT V16-FINAL]** ⏳ Pending manual smoke device; automated latest: `make flutter-analyze` ✅, `make flutter-test` ✅ 159 tests, `cd cms && npm test` ✅ 95 tests, `go test ./...` ✅ 298 tests, `git diff --check` ✅. Manual verify:
 - 5 sessions liên tiếp Simli ON · 0 miss audio đầu
 - Mic disabled khi avatar còn phát audio
 - Mic enabled đúng moment Simli SILENT
 - Không có turn rỗng "..." trong transcript
 - "Hoàn thành" CTA quay về home
-
+- Sound-wave default session: first audio audible, repeated turns do not get quieter
+- Profile volume 180%: examiner louder but not distorted
+- Compact/Facebook in-app browser: prompt scrolls, mic/end controls remain visible

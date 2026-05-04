@@ -317,7 +317,7 @@ type InterviewConversationDetail struct {
 // before creating the ElevenLabs signed session URL.
 type InterviewChoiceExplainDetail struct {
 	Question       string            `json:"question"`
-	Options        []InterviewOption `json:"options"` // 3–4 required
+	Options        []InterviewOption `json:"options"` // 1–4 required
 	SystemPrompt   string            `json:"system_prompt"`
 	MaxTurns       int               `json:"max_turns"`
 	ShowTranscript bool              `json:"show_transcript"`
@@ -329,9 +329,10 @@ type InterviewChoiceExplainDetail struct {
 
 // InterviewOption is one selectable choice in an interview_choice_explain exercise.
 type InterviewOption struct {
-	ID           string `json:"id"`
-	Label        string `json:"label"`
-	ImageAssetID string `json:"image_asset_id,omitempty"`
+	ID           string   `json:"id"`
+	Label        string   `json:"label"`
+	ImageAssetID string   `json:"image_asset_id,omitempty"`
+	Tips         []string `json:"tips,omitempty"`
 }
 
 // InterviewTokenRequest is the body for POST /v1/interview-sessions/token.
@@ -578,7 +579,6 @@ type MockExamSession struct {
 	OverallSummary        string                `json:"overall_summary,omitempty"`
 	Sections              []MockExamSessionItem `json:"sections"`
 }
-
 
 type MockExamSessionItem struct {
 	SequenceNo   int    `json:"sequence_no"`

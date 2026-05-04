@@ -78,5 +78,27 @@ void main() {
 
       expect(find.byType(AvatarVideoContainer), findsOneWidget);
     });
+
+    testWidgets('renders sound wave when avatar is disabled', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const SizedBox(
+            width: 390,
+            height: 844,
+            child: AvatarVideoContainer(
+              videoRenderer: null,
+              isConnected: false,
+              isSpeaking: true,
+              useAvatar: false,
+              fullBleed: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(AvatarVideoContainer), findsOneWidget);
+      expect(find.text('Audio mode'), findsOneWidget);
+    });
   });
 }

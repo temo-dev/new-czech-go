@@ -30,17 +30,22 @@ const inputStyle: React.CSSProperties = {
 const txStyle: React.CSSProperties = {
   ...inputStyle, height: 120, resize: 'vertical' as const,
 };
+const optionCardStyle: React.CSSProperties = {
+  border: '1px solid var(--border)', borderRadius: 10, padding: 12,
+  display: 'grid', gap: 10, background: 'var(--surface)',
+};
 
 const MAX_OPTIONS = 4;
-const MIN_OPTIONS = 3;
+const MIN_OPTIONS = 1;
+const MAX_TIPS = 5;
 
 function emptyOption(i: number): InterviewOptionRow {
-  return { id: String(i + 1), label: '', imageAssetId: '' };
+  return { id: String(i + 1), label: '', imageAssetId: '', tips: [] };
 }
 
 function initState(detail: Record<string, unknown>): InterviewChoiceExplainFormState {
   const s = formStateFromInterviewChoiceExplain(detail);
-  // Ensure at least 3 options on first open
+  // Ensure at least 1 option on first open
   if (s.options.length < MIN_OPTIONS) {
     const padded = [...s.options];
     while (padded.length < MIN_OPTIONS) padded.push(emptyOption(padded.length));
@@ -64,8 +69,34 @@ export function InterviewChoiceExplainFields({ initialData, onChange, editingId 
     }
   }
 
-  function updateOption(i: number, field: keyof InterviewOptionRow, value: string) {
+  function updateOption(i: number, field: 'id' | 'label' | 'imageAssetId', value: string) {
     const options = state.options.map((o, idx) => idx === i ? { ...o, [field]: value } : o);
+    emit({ ...state, options });
+  }
+
+  function updateOptionTip(optionIndex: number, tipIndex: number, value: string) {
+    const options = state.options.map((o, idx) => {
+      if (idx !== optionIndex) return o;
+      const tips = [...o.tips];
+      tips[tipIndex] = value;
+      return { ...o, tips };
+    });
+    emit({ ...state, options });
+  }
+
+  function addOptionTip(optionIndex: number) {
+    const options = state.options.map((o, idx) => {
+      if (idx !== optionIndex || o.tips.length >= MAX_TIPS) return o;
+      return { ...o, tips: [...o.tips, ''] };
+    });
+    emit({ ...state, options });
+  }
+
+  function removeOptionTip(optionIndex: number, tipIndex: number) {
+    const options = state.options.map((o, idx) => {
+      if (idx !== optionIndex) return o;
+      return { ...o, tips: o.tips.filter((_, i) => i !== tipIndex) };
+    });
     emit({ ...state, options });
   }
 
@@ -121,7 +152,7 @@ export function InterviewChoiceExplainFields({ initialData, onChange, editingId 
             <input
               style={{ ...inputStyle, width: 80 }}
               type="number"
-              min={4}
+              min={2}
               max={10}
               value={state.maxTurns}
               onChange={(e) => emit({ ...state, maxTurns: Number(e.target.value) })}
@@ -161,7 +192,7 @@ export function InterviewChoiceExplainFields({ initialData, onChange, editingId 
         <PromptPreview systemPrompt={state.systemPrompt} />
       </div>
 
-      {/* Options (3–4) */}
+      {/* Options (1–4) */}
       <div style={sectionStyle}>
         <span style={labelStyle}>
           Các phương án ({MIN_OPTIONS}–{MAX_OPTIONS} phương án) *
@@ -170,29 +201,66 @@ export function InterviewChoiceExplainFields({ initialData, onChange, editingId 
           <span style={{ fontSize: 12, color: '#e53e3e' }}>Cần ít nhất {MIN_OPTIONS} phương án.</span>
         )}
         {state.options.map((opt, i) => (
-          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <div style={{
-              width: 24, height: 24, borderRadius: '50%', background: 'var(--teal-dim)',
-              color: 'var(--teal)', fontSize: 11, fontWeight: 700,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-            }}>
-              {i + 1}
+          <div key={i} style={optionCardStyle}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{
+                width: 24, height: 24, borderRadius: '50%', background: 'var(--teal-dim)',
+                color: 'var(--teal)', fontSize: 11, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                {i + 1}
+              </div>
+              <input
+                style={{ ...inputStyle, flex: 1 }}
+                value={opt.label}
+                onChange={(e) => updateOption(i, 'label', e.target.value)}
+                placeholder={`Phương án ${i + 1} (vd: Praha)`}
+              />
+              {state.options.length > MIN_OPTIONS && (
+                <button
+                  type="button"
+                  onClick={() => removeOption(i)}
+                  style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer', fontSize: 12 }}
+                >
+                  Xóa
+                </button>
+              )}
             </div>
-            <input
-              style={{ ...inputStyle, flex: 1 }}
-              value={opt.label}
-              onChange={(e) => updateOption(i, 'label', e.target.value)}
-              placeholder={`Phương án ${i + 1} (vd: Praha)`}
-            />
-            {state.options.length > MIN_OPTIONS && (
-              <button
-                type="button"
-                onClick={() => removeOption(i)}
-                style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer', fontSize: 12 }}
-              >
-                Xóa
-              </button>
-            )}
+
+            <div style={{ display: 'grid', gap: 8, paddingLeft: 32 }}>
+              <div>
+                <div style={labelStyle}>Gợi ý cho learner của phương án này</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+                  Hiển thị sau khi learner chọn phương án; tối đa {MAX_TIPS} gợi ý.
+                </div>
+              </div>
+              {opt.tips.map((tip, tipIndex) => (
+                <div key={tipIndex} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    style={{ ...inputStyle, flex: 1 }}
+                    value={tip}
+                    onChange={(e) => updateOptionTip(i, tipIndex, e.target.value)}
+                    placeholder={`Gợi ý ${tipIndex + 1}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeOptionTip(i, tipIndex)}
+                    style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer', fontSize: 12 }}
+                  >
+                    Xóa
+                  </button>
+                </div>
+              ))}
+              {opt.tips.length < MAX_TIPS && (
+                <button
+                  type="button"
+                  onClick={() => addOptionTip(i)}
+                  style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--teal)', background: 'var(--teal-dim)', justifySelf: 'start' }}
+                >
+                  + Thêm gợi ý
+                </button>
+              )}
+            </div>
           </div>
         ))}
         {state.options.length < MAX_OPTIONS && (

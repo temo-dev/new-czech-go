@@ -158,7 +158,8 @@ Respond only in Czech.
 |---|---|---|
 | Tiêu đề | `Chọn địa điểm du lịch` | ✓ |
 | Câu hỏi chính | `Bạn muốn đi du lịch ở đâu?` | ✓ |
-| Các phương án | 3–4 options (tên + ảnh tùy chọn) | ✓ (3 min) |
+| Các phương án | 1–4 options (tên + ảnh tùy chọn) | ✓ (1 min) |
+| Gợi ý theo phương án | Mỗi option có tối đa 5 gợi ý, chỉ hiện sau khi learner chọn phương án đó | |
 | System Prompt | Phải chứa `{selected_option}` | ✓ |
 | Max turns | `5` – `6` | |
 

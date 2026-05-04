@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -13,10 +14,10 @@ class PcmAudioPlayer {
 
   final AudioPlayer _player = AudioPlayer();
   final List<int> _pcmBuffer = [];
-  bool _playing = false;
-  bool _playAgainAfterCurrent = false;
   bool _disposed = false;
   int _sampleRate;
+  double _volumeGain = 1.0;
+  Future<void>? _flushFuture;
 
   static const _defaultSampleRate = 16000;
   static const _channels = 1;
@@ -36,27 +37,44 @@ class PcmAudioPlayer {
     }
   }
 
+  void setVolumeGain(double gain) {
+    _volumeGain = normalizeVolumeGain(gain);
+  }
+
   /// Play and clear the current buffer. No-op if buffer is empty.
+  ///
+  /// Calls made while playback is already in progress wait for the same drain
+  /// future instead of returning early. This lets the interview screen keep
+  /// the mic locked until the examiner audio has actually finished playing.
   Future<void> flushAndPlay() async {
-    if (_pcmBuffer.isEmpty) return;
-    if (_playing) {
-      _playAgainAfterCurrent = true;
+    if (_disposed) return;
+    if (_flushFuture != null) {
+      await _flushFuture;
       return;
     }
+    if (_pcmBuffer.isEmpty) return;
 
+    _flushFuture = _drainBuffer();
+    try {
+      await _flushFuture;
+    } finally {
+      _flushFuture = null;
+    }
+  }
+
+  Future<void> _drainBuffer() async {
     while (_pcmBuffer.isNotEmpty && !_disposed) {
       final pendingBytes = _pcmBuffer.length;
       // V16: trace local audio playback so we can diagnose missed-audio reports.
       // Bytes / sample rate / channels gives effective duration in seconds.
-      final approxSec = pendingBytes /
-          (_sampleRate * _channels * (_bitsPerSample / 8));
+      final approxSec =
+          pendingBytes / (_sampleRate * _channels * (_bitsPerSample / 8));
       debugPrint(
         'PcmAudioPlayer.flushAndPlay sampleRate=$_sampleRate '
+        'gain=${_volumeGain.toStringAsFixed(2)} '
         'bytes=$pendingBytes approxDurationSec=${approxSec.toStringAsFixed(2)}',
       );
       await _playCurrentBuffer();
-      if (!_playAgainAfterCurrent && _pcmBuffer.isEmpty) return;
-      _playAgainAfterCurrent = false;
     }
   }
 
@@ -67,8 +85,11 @@ class PcmAudioPlayer {
     // Declare file outside try so finally can clean it up on any code path.
     File? file;
     try {
-      _playing = true;
-      final wavBytes = wavBytesForTesting(data, sampleRate: _sampleRate);
+      final adjustedData = applyPcm16GainForTesting(data, _volumeGain);
+      final wavBytes = wavBytesForTesting(
+        adjustedData,
+        sampleRate: _sampleRate,
+      );
       final dir = await getTemporaryDirectory();
       file = File(
         '${dir.path}/interview_audio_${DateTime.now().millisecondsSinceEpoch}.wav',
@@ -83,7 +104,6 @@ class PcmAudioPlayer {
       // Audio playback failure is non-fatal — conversation continues.
       debugPrint('Interview audio playback failed: $err');
     } finally {
-      _playing = false;
       if (file != null && file.existsSync()) file.deleteSync();
     }
   }
@@ -91,7 +111,9 @@ class PcmAudioPlayer {
   /// Clear buffer without playing (e.g., on interruption).
   void clearBuffer() {
     if (_pcmBuffer.isNotEmpty) {
-      debugPrint('PcmAudioPlayer.clearBuffer dropping ${_pcmBuffer.length} bytes');
+      debugPrint(
+        'PcmAudioPlayer.clearBuffer dropping ${_pcmBuffer.length} bytes',
+      );
     }
     _pcmBuffer.clear();
   }
@@ -110,6 +132,30 @@ class PcmAudioPlayer {
     final parsed = int.tryParse(normalized.substring(4));
     if (parsed == null || parsed <= 0) return null;
     return parsed;
+  }
+
+  @visibleForTesting
+  static double normalizeVolumeGain(double gain) {
+    if (gain.isNaN || gain.isInfinite) return 1.0;
+    return gain.clamp(0.0, 2.0).toDouble();
+  }
+
+  @visibleForTesting
+  static Uint8List applyPcm16GainForTesting(Uint8List pcmData, double gain) {
+    final normalizedGain = normalizeVolumeGain(gain);
+    if (pcmData.isEmpty || normalizedGain == 1.0) {
+      return Uint8List.fromList(pcmData);
+    }
+
+    final result = Uint8List.fromList(pcmData);
+    final view = ByteData.sublistView(result);
+    for (var offset = 0; offset + 1 < result.length; offset += 2) {
+      final sample = view.getInt16(offset, Endian.little);
+      final adjusted =
+          (sample * normalizedGain).round().clamp(-32768, 32767).toInt();
+      view.setInt16(offset, adjusted, Endian.little);
+    }
+    return result;
   }
 
   @visibleForTesting

@@ -1016,7 +1016,7 @@ Hai exercise types mới:
 | exercise_type | Mô tả | Scoring |
 |---|---|---|
 | `interview_conversation` | Hội thoại theo chủ đề, agent hỏi 5–8 câu | LLM post-session |
-| `interview_choice_explain` | Chọn 1/3–4 phương án → giải thích lý do | LLM post-session |
+| `interview_choice_explain` | Chọn 1 trong 1–4 phương án → giải thích lý do | LLM post-session |
 
 Platform: Flutter iOS only. Entry point: `ModuleDetail` (cùng hàng với Nói/Nghe/Viết/Đọc).
 
@@ -1132,8 +1132,8 @@ prompt := strings.ReplaceAll(exercise.SystemPrompt, "{selected_option}", req.Sel
 {
   "question": "Bạn muốn đi du lịch ở đâu?",
   "options": [
-    { "id": "1", "label": "Praha", "image_asset_id": "..." },
-    { "id": "2", "label": "Krkonoše", "image_asset_id": "" },
+    { "id": "1", "label": "Praha", "image_asset_id": "...", "tips": ["památky", "doprava"] },
+    { "id": "2", "label": "Krkonoše", "image_asset_id": "", "tips": ["počasí", "sport"] },
     { "id": "3", "label": "Brno", "image_asset_id": "" },
     { "id": "4", "label": "Český Krumlov", "image_asset_id": "" }
   ],
@@ -1145,6 +1145,7 @@ prompt := strings.ReplaceAll(exercise.SystemPrompt, "{selected_option}", req.Sel
 
 Ghi chú:
 - `tips` optional (chỉ hiển thị trong IntroScreen, không gửi tới ElevenLabs)
+- `interview_choice_explain.options[].tips` optional, tối đa 5 gợi ý cho từng phương án; Flutter hiển thị sau khi learner chọn option và dùng lại trong prompt card của session. Nếu option không có tips thì fallback về `detail.tips` nếu có.
 - `image_asset_id` optional — dùng `image_asset_id = ""` nếu không có ảnh (choice hiển thị text only)
 - `show_transcript`: nếu `true`, overlay phụ đề dưới avatar trong session; nếu `false`, không hiển thị
 
@@ -1171,6 +1172,7 @@ type InterviewOption struct {
     ID           string `json:"id"`
     Label        string `json:"label"`
     ImageAssetID string `json:"image_asset_id,omitempty"`
+    Tips         []string `json:"tips,omitempty"`
 }
 
 type InterviewTokenRequest struct {
@@ -1297,19 +1299,19 @@ Map `readiness_level` → `total_score` dùng `DEFAULT_MAX_POINTS` của exercis
 - Topic (hiển thị trong IntroScreen cho learner) `*`
 - Tips (repeater, optional, max 5)
 - System Prompt (textarea, `*`) + hint: "Agent dùng prompt này để dẫn dắt hội thoại Czech A2"
-- Max turns (number input, default 8, range 4–12)
+- Max turns (number input, default 8, range 2–12)
 - Show transcript toggle (default on)
 
 **InterviewChoiceExplainFields.tsx fields:**
 - Tiêu đề `*`
 - Câu hỏi chính (hiển thị cho learner) `*`
-- Options repeater (3–4 items, mỗi item: label `*` + image upload optional)
+- Options repeater (1–4 items, mỗi item: label `*` + image upload optional + learner tips optional tối đa 5)
 - System Prompt `*` + hint: "`{selected_option}` sẽ bị thay bằng lựa chọn thực tế của learner"
 - Max turns (number, default 6)
 - Show transcript toggle (default off)
 
 Validate:
-- Options: 3–4 items bắt buộc
+- Options: 1–4 items bắt buộc
 - System prompt phải không rỗng
 - `interview_choice_explain`: system_prompt nên chứa `{selected_option}` — warning (không block)
 
@@ -1398,7 +1400,7 @@ choice_option_grid_test.dart — tap selects, second tap on different = deselect
 - `show_transcript` flag quyết định overlay display — không hardcode trong Flutter
 - Transcript accumulate client-side từ WebSocket `transcript` events — không gọi endpoint nào của ElevenLabs để lấy transcript sau session
 - `max_turns` là soft limit: Flutter end session khi đủ lượt, không cần ElevenLabs force-close
-- `interview_choice_explain` phải có 3–4 options, validate tại CMS trước submit
+- `interview_choice_explain` phải có 1–4 options, validate tại CMS trước submit
 - Mỗi route mới (`/v1/interview-sessions/token`, `/v1/attempts/:id/submit-interview`) phải có `withAuth`
 
 **ASK FIRST:**
@@ -1436,18 +1438,23 @@ choice_option_grid_test.dart — tap selects, second tap on different = deselect
 
 ## V16 — Interview First-Turn Fix + Push-to-Talk + UX Polish (2026-05-04)
 
-Sửa bug examiner mất audio đầu phiên Simli + nâng UX hội thoại + chuyển sang push-to-talk.
+Sửa bug examiner mất audio đầu phiên Simli + nâng UX hội thoại + chuyển sang push-to-talk. Post-smoke update: Simli trở thành opt-in trong Profile; mặc định dùng sound wave local audio vì log thực tế cho thấy ElevenLabs trả audio nhanh nhưng Simli `SPEAK` có thể trễ 11–15s.
 
 ### Scope
 
 | Slice | Mô tả |
 |---|---|
 | Audio gate fix | Buffer agent chunks tới khi Simli `onVideoReady` (first-frame) thay `isConnected` (WS START); fallback timer flush local PCM khi quá `audio_buffer_timeout_ms` |
+| Simli opt-in | `InterviewPreferenceService.avatarEnabled` default `false`; learner bật avatar trong Profile khi muốn luyện với mặt người; sound wave là path mặc định để giảm latency |
+| Local audio gain | Profile slider `Âm lượng giám khảo` 100–180%, default 135%; `PcmAudioPlayer` apply PCM16 gain có clipping |
 | Display prompt | Backend derive `display_prompt` từ `system_prompt` (strip "You are…", extract ÚKOL/TASK block); admin nhập timeout trong CMS; preview real-time |
 | Prompt card UI | Card đáy + auto-collapse 8s + pulse animation khi `agent_response_complete`; choice variant hiện option đã chọn |
 | Preparing overlay | 4-step checklist (init → avatar → examiner → ready) thay cho black screen |
-| Audio session | `AVAudioSessionMode.videoChat` để bật iOS hardware AEC (echo cancel + noise suppress) |
-| Push-to-talk | Mic button toggle (idle gray / orange enabled / red pulse recording / send icon); state authoritative từ Simli SPEAK/SILENT WS messages; 8s agent-wait timeout sau user turn; 550ms preroll buffer + 1600 byte minimum trước khi flush |
+| Audio session | Simli duplex dùng `playAndRecord + videoChat`; sound-wave PTT mic dùng `playAndRecord + measurement` và giữ `record` không tự đổi lại iOS audio session; sound-wave examiner playback chuyển sang `playback/spokenAudio` trước mỗi lượt để tránh iOS ducking làm turn sau nhỏ tiếng dần |
+| Push-to-talk | Mic button toggle (idle gray / orange enabled / red pulse recording / send icon); state authoritative từ Simli SPEAK/SILENT WS messages; 12s agent-wait timeout sau user turn; 550ms preroll buffer + 1600 byte minimum trước khi flush |
+| Outbound mic gain | Sound-wave mode boost PCM16 gửi lên ElevenLabs `2.4x` có clipping an toàn; log `rawPeak`/`sentPeak` + ElevenLabs `vad_score` max để debug VAD |
+| Local playback gate | Sound-wave mode chờ local playback phát xong mới enable mic; chunk flush không tự mở mic, chỉ `agent_response_complete` hoặc silence timeout mới complete turn; flush defer khi mic active/transition để tránh iOS `!pri`; `PcmAudioPlayer` serialize drain để không bỏ chunk khi silence timer và `agent_response_complete` cùng fire |
+| Responsive session UI | Bottom panel tách scroll lane (transcript + prompt) và fixed controls lane (timer + mic + end); compact screen có prompt max-height, compact mic/sound-wave/status pill |
 | Result CTA | Sticky "Hoàn thành" / "Finish" button → `Navigator.popUntil(home)` |
 
 ### Decisions (frozen)
@@ -1459,11 +1466,15 @@ Sửa bug examiner mất audio đầu phiên Simli + nâng UX hội thoại + ch
 5. Mic = push-to-talk, không server VAD always-on
 6. Simli SPEAK/SILENT là authoritative signal cho `_state`; EL `agent_response_complete` chỉ dùng cho local-only path
 7. Filter empty learner turns (Unicode `\p{L}|\p{N}` regex) — drop "..."/whitespace
+8. Simli avatar không auto-enable theo API key; learner phải opt-in trong Profile
+9. Sound-wave examiner playback phải giữ mic locked tới khi audio phát xong
+10. Profile local audio volume chỉ áp dụng examiner playback; sound-wave mic send gain là fixed internal boost cho ElevenLabs VAD, không expose trong Profile
+11. Local chunk flush không được đổi state `ready`; chỉ agent complete/silence timeout mới mở lại mic
 
 ### Touched files
 
 - Backend: `processing/interview_prompt.go` (new), `contracts/types.go`, `httpapi/server.go`, `httpapi/interview_preview.go` (new), `httpapi/v16_interview*_test.go` (new)
-- Flutter: `models/models.dart`, `features/interview/screens/interview_session_screen.dart`, `features/interview/services/{simli_session_manager,pcm_audio_player,elevenlabs_ws_client}.dart`, `features/interview/widgets/{prompt_card,session_status_pill,avatar_video_container}.dart`, `lib/l10n/app_{vi,en}.arb`, tests
+- Flutter: `models/models.dart`, `core/interview/interview_preference_service.dart`, `features/profile/screens/profile_screen.dart`, `features/interview/screens/interview_session_screen.dart`, `features/interview/services/{simli_session_manager,pcm_audio_player,elevenlabs_ws_client}.dart`, `features/interview/widgets/{prompt_card,session_status_pill,avatar_video_container}.dart`, `lib/l10n/app_{vi,en}.arb`, tests
 - CMS: `components/exercise-form/InterviewConversationFields.tsx`, `InterviewChoiceExplainFields.tsx`, `components/PromptPreview.tsx` (new), `components/exercise-utils.ts`, `app/api/admin/interview/preview-prompt/route.ts` (new), `__tests__/interview-fields-v16.test.ts` (new)
 - Docs: `docs/ideas/interview-first-turn-fix.md`, `docs/specs/interview-first-turn-fix.md`, `docs/plans/interview-first-turn-fix-plan.md`, `docs/designs/interview-first-turn-fix.html`
 
@@ -1477,6 +1488,12 @@ Sửa bug examiner mất audio đầu phiên Simli + nâng UX hội thoại + ch
 | `interviewPttIdleHint` | Tap để bắt đầu nói | Tap to start speaking |
 | `interviewPttSendHint` | Đang ghi · Tap để gửi | Recording · Tap to send |
 | `interviewFinishBtn` | Hoàn thành | Finish |
+| `profileInterviewSection` | Phỏng vấn | Interview |
+| `profileInterviewAvatarTitle` | Dùng avatar Simli | Use Simli avatar |
+| `profileInterviewAvatarDescription` | Tắt để phản hồi nhanh bằng sound wave. Bật khi muốn luyện với avatar. | Turn this off for faster sound wave replies. Turn it on when you want avatar practice. |
+| `profileInterviewVolumeTitle` | Âm lượng giám khảo | Examiner volume |
+| `profileInterviewVolumeDescription` | Chỉ áp dụng khi dùng sound wave. | Only applies when sound wave mode is used. |
+| `profileInterviewVolumeValue` | `{percent}%` | `{percent}%` |
 
 ### Required ElevenLabs agent settings
 
@@ -1490,6 +1507,7 @@ Nếu không bật `first_message` override → agent không nói câu chào →
 ### Avoid in V16
 
 - ❌ Mute mic global (regression interruption capability — handled by PTT)
+- ❌ Auto-enable Simli chỉ vì `SIMLI_API_KEY` tồn tại; avatar phải là learner opt-in
 - ❌ Server-side `display_prompt` storage (luôn derive)
 - ❌ Hardcode `audio_buffer_timeout_ms` (admin config)
 - ❌ Bypass admin auth cho preview endpoint
@@ -1500,8 +1518,8 @@ Nếu không bật `first_message` override → agent không nói câu chào →
 | Step | Lệnh | Manual check |
 |---|---|---|
 | BE-1 | `make backend-test` | 297 tests pass — `TestDerivePromptForLearner_*`, `TestExerciseGet_*`, `TestInterviewPreviewPrompt_*` |
-| FE-1 | `make flutter-analyze && make flutter-test` | 137 tests pass — `interview_prompt_derive_test`, `prompt_card_test`, `interview_session_widgets_test` |
-| CMS-1 | `make cms-lint && cd cms && npm test && make cms-build` | 92 Vitest pass — `interview-fields-v16` clamp + payload + parser |
+| FE-1 | `make flutter-analyze && make flutter-test` | 159 tests pass — `interview_prompt_derive_test`, `prompt_card_test`, `interview_session_widgets_test`, `interview_intro_screen_test`, `profile_screen_test`, `interview_preference_service_test` |
+| CMS-1 | `make cms-lint && cd cms && npm test && make cms-build` | 95 Vitest pass — `interview-fields-v16` clamp + payload + option tips parser + min 1 option |
 | MAN-1 | iPhone Simli ON + ElevenLabs first_message enabled | 5 sessions liên tiếp · 0 lần miss audio đầu · examiner phát đầy đủ câu chào |
 | MAN-2 | iPhone với `SIMLI_API_KEY` empty | Regression: audio đầy đủ qua local PcmAudioPlayer |
 | MAN-3 | Network Link Conditioner "3G slow" | Fallback timer fire (`debugPrint`); audio vẫn nghe được |
@@ -1509,4 +1527,8 @@ Nếu không bật `first_message` override → agent không nói câu chào →
 | MAN-5 | Tap mic khi examiner xong (Simli SILENT) | Mic enable orange → tap → red pulse → speak → tap send |
 | MAN-6 | Result screen | Nút "Hoàn thành" cam ở bottom; tap → quay home |
 | MAN-7 | Echo test | Speakerphone iPhone — không có turn rỗng "..." trong transcript |
+| MAN-8 | Profile Simli OFF (default) | Session dùng sound wave; first audio nhanh; log `Simli disabled by learner preference` |
+| MAN-9 | Profile volume 180% | Log `Interview local audio gain=1.80`; examiner volume ổn định qua nhiều turn |
+| MAN-10 | iPhone compact / Facebook in-app browser | Prompt card scroll được, mic + end button không bị che/chồng; no overflow |
+| MAN-11 | Sound-wave PTT giọng nhỏ | Log `sentPeak` cao hơn `rawPeak` khoảng 2.4x; `vadMax` không còn `none`/rất thấp; learner transcript không rỗng |
 | CHECKPOINT | `make verify` | Full pass |

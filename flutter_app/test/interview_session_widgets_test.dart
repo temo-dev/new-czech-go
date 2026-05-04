@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -148,6 +149,21 @@ void main() {
       );
     });
 
+    test('Simli avatar is learner opt-in and requires API key', () {
+      expect(
+        shouldStartSimliAvatar(learnerEnabled: false, apiKeyConfigured: true),
+        isFalse,
+      );
+      expect(
+        shouldStartSimliAvatar(learnerEnabled: true, apiKeyConfigured: false),
+        isFalse,
+      );
+      expect(
+        shouldStartSimliAvatar(learnerEnabled: true, apiKeyConfigured: true),
+        isTrue,
+      );
+    });
+
     test('mic start is blocked while waiting for examiner turn', () {
       expect(
         canStartInterviewMic(
@@ -156,6 +172,7 @@ void main() {
           micActive: false,
           micTransitioning: false,
           waitingForAgentAfterUserTurn: true,
+          autoEndScheduled: false,
           state: InterviewSessionState.thinking,
         ),
         isFalse,
@@ -167,6 +184,7 @@ void main() {
           micActive: false,
           micTransitioning: false,
           waitingForAgentAfterUserTurn: false,
+          autoEndScheduled: false,
           state: InterviewSessionState.ready,
         ),
         isTrue,
@@ -178,7 +196,20 @@ void main() {
           micActive: false,
           micTransitioning: false,
           waitingForAgentAfterUserTurn: false,
+          autoEndScheduled: false,
           state: InterviewSessionState.connecting,
+        ),
+        isFalse,
+      );
+      expect(
+        canStartInterviewMic(
+          conversationStarted: true,
+          ending: false,
+          micActive: false,
+          micTransitioning: false,
+          waitingForAgentAfterUserTurn: false,
+          autoEndScheduled: true,
+          state: InterviewSessionState.ready,
         ),
         isFalse,
       );
@@ -199,6 +230,336 @@ void main() {
         ),
         isTrue,
       );
+    });
+
+    test('auto end waits for learner answer to final examiner turn', () {
+      expect(shouldArmInterviewAutoEnd(maxTurns: 3, examinerTurns: 2), isFalse);
+      expect(shouldArmInterviewAutoEnd(maxTurns: 3, examinerTurns: 3), isTrue);
+      expect(
+        shouldFinishInterviewAfterLearnerTurn(
+          maxTurns: 3,
+          examinerTurns: 3,
+          learnerTurns: 2,
+          autoEndArmed: true,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldFinishInterviewAfterLearnerTurn(
+          maxTurns: 3,
+          examinerTurns: 3,
+          learnerTurns: 3,
+          autoEndArmed: true,
+        ),
+        isTrue,
+      );
+      expect(
+        shouldFinishInterviewAfterLearnerTurn(
+          maxTurns: 3,
+          examinerTurns: 3,
+          learnerTurns: 3,
+          autoEndArmed: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('VAD trailing silence is sent only for accepted learner turns', () {
+      expect(
+        shouldSendInterviewVadTrailingSilence(
+          micPrerollReleased: true,
+          waitForAgent: true,
+        ),
+        isTrue,
+      );
+      expect(
+        shouldSendInterviewVadTrailingSilence(
+          micPrerollReleased: false,
+          waitForAgent: true,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldSendInterviewVadTrailingSilence(
+          micPrerollReleased: true,
+          waitForAgent: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('local agent audio flush waits until recorder releases the mic', () {
+      expect(
+        shouldDeferLocalAgentAudioFlush(
+          useSimliAudio: false,
+          micActive: true,
+          micTransitioning: false,
+        ),
+        isTrue,
+      );
+      expect(
+        shouldDeferLocalAgentAudioFlush(
+          useSimliAudio: false,
+          micActive: false,
+          micTransitioning: true,
+        ),
+        isTrue,
+      );
+      expect(
+        shouldDeferLocalAgentAudioFlush(
+          useSimliAudio: true,
+          micActive: true,
+          micTransitioning: false,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldDeferLocalAgentAudioFlush(
+          useSimliAudio: false,
+          micActive: false,
+          micTransitioning: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('VAD trailing silence is paced in realtime-sized chunks', () {
+      expect(
+        interviewVadSilenceChunkCount(
+          totalDuration: interviewVadInitialSilenceDuration,
+          chunkDuration: interviewVadSilenceChunkDuration,
+        ),
+        12,
+      );
+      expect(
+        interviewVadSilenceChunkCount(
+          totalDuration: const Duration(milliseconds: 250),
+          chunkDuration: interviewVadSilenceChunkDuration,
+        ),
+        4,
+      );
+      expect(
+        interviewVadSilenceChunkCount(
+          totalDuration: Duration.zero,
+          chunkDuration: interviewVadSilenceChunkDuration,
+        ),
+        0,
+      );
+    });
+
+    test('PCM16 mic peak helper reads little-endian signed samples', () {
+      final pcm = Uint8List.fromList([
+        0x00, 0x00, // 0
+        0x10, 0x00, // +16
+        0x00, 0x80, // -32768
+        0xff, 0x7f, // +32767
+      ]);
+
+      expect(interviewPcm16PeakAbs(pcm), 32768);
+      expect(interviewPcm16PeakAbs(Uint8List.fromList([0, 0, 1])), 0);
+    });
+
+    test('outbound mic gain boosts PCM16 chunks with clipping', () {
+      final pcm = Uint8List(8);
+      final input = ByteData.sublistView(pcm);
+      input.setInt16(0, 1000, Endian.little);
+      input.setInt16(2, -1000, Endian.little);
+      input.setInt16(4, 20000, Endian.little);
+      input.setInt16(6, -20000, Endian.little);
+
+      final boosted = applyInterviewPcm16Gain(pcm, 2.4);
+      final output = ByteData.sublistView(boosted);
+
+      expect(output.getInt16(0, Endian.little), 2400);
+      expect(output.getInt16(2, Endian.little), -2400);
+      expect(output.getInt16(4, Endian.little), 32767);
+      expect(output.getInt16(6, Endian.little), -32768);
+      expect(interviewPcm16PeakAbs(boosted), 32768);
+      expect(normalizeInterviewMicSendGain(9), 3.0);
+      expect(normalizeInterviewMicSendGain(double.nan), 1.0);
+    });
+
+    test('turn latency helper clamps negative clock drift', () {
+      final startedAt = DateTime(2026, 5, 4, 14, 0, 0);
+      expect(
+        interviewTurnLatencyMs(
+          startedAt: startedAt,
+          now: startedAt.add(const Duration(milliseconds: 1234)),
+        ),
+        1234,
+      );
+      expect(interviewTurnLatencyMs(startedAt: null, now: startedAt), isNull);
+      expect(
+        interviewTurnLatencyMs(
+          startedAt: startedAt,
+          now: startedAt.subtract(const Duration(milliseconds: 50)),
+        ),
+        0,
+      );
+    });
+
+    test(
+      'prompt card body prefers learner-facing question over display prompt',
+      () {
+        const choiceDetail = ExerciseDetail(
+          id: 'exercise-choice',
+          title: 'Interview choice',
+          exerciseType: 'interview_choice_explain',
+          learnerInstruction: '',
+          assets: [],
+          questions: [],
+          scenarioTitle: '',
+          scenarioPrompt: '',
+          requiredInfoSlots: [],
+          customQuestionHint: '',
+          storyTitle: '',
+          imageAssetIds: [],
+          narrativeCheckpoints: [],
+          grammarFocus: [],
+          choiceScenarioPrompt: '',
+          choiceOptions: [],
+          expectedReasoningAxes: [],
+          interviewQuestion: 'Bạn muốn đi du lịch ở đâu?',
+          interviewDisplayPrompt: 'You are Jana. Ask follow-up questions.',
+        );
+
+        expect(
+          interviewPromptBodyForLearner(choiceDetail),
+          'Bạn muốn đi du lịch ở đâu?',
+        );
+      },
+    );
+
+    test('prompt card body falls back to topic then display prompt', () {
+      const conversationDetail = ExerciseDetail(
+        id: 'exercise-conversation',
+        title: 'Interview conversation',
+        exerciseType: 'interview_conversation',
+        learnerInstruction: '',
+        assets: [],
+        questions: [],
+        scenarioTitle: '',
+        scenarioPrompt: '',
+        requiredInfoSlots: [],
+        customQuestionHint: '',
+        storyTitle: '',
+        imageAssetIds: [],
+        narrativeCheckpoints: [],
+        grammarFocus: [],
+        choiceScenarioPrompt: '',
+        choiceOptions: [],
+        expectedReasoningAxes: [],
+        interviewTopic: 'Gia đình và bạn bè',
+        interviewDisplayPrompt: 'You are Jana. Ask about family.',
+      );
+      const legacyDetail = ExerciseDetail(
+        id: 'exercise-legacy',
+        title: 'Interview legacy',
+        exerciseType: 'interview_conversation',
+        learnerInstruction: '',
+        assets: [],
+        questions: [],
+        scenarioTitle: '',
+        scenarioPrompt: '',
+        requiredInfoSlots: [],
+        customQuestionHint: '',
+        storyTitle: '',
+        imageAssetIds: [],
+        narrativeCheckpoints: [],
+        grammarFocus: [],
+        choiceScenarioPrompt: '',
+        choiceOptions: [],
+        expectedReasoningAxes: [],
+        interviewDisplayPrompt: 'Mô tả công việc bạn muốn làm.',
+      );
+
+      expect(
+        interviewPromptBodyForLearner(conversationDetail),
+        'Gia đình và bạn bè',
+      );
+      expect(
+        interviewPromptBodyForLearner(legacyDetail),
+        'Mô tả công việc bạn muốn làm.',
+      );
+    });
+
+    test(
+      'prompt card tips trim blanks and keep at most five learner hints',
+      () {
+        const detail = ExerciseDetail(
+          id: 'exercise-tips',
+          title: 'Interview tips',
+          exerciseType: 'interview_conversation',
+          learnerInstruction: '',
+          assets: [],
+          questions: [],
+          scenarioTitle: '',
+          scenarioPrompt: '',
+          requiredInfoSlots: [],
+          customQuestionHint: '',
+          storyTitle: '',
+          imageAssetIds: [],
+          narrativeCheckpoints: [],
+          grammarFocus: [],
+          choiceScenarioPrompt: '',
+          choiceOptions: [],
+          expectedReasoningAxes: [],
+          interviewTips: [
+            ' Velikosti bot ',
+            '',
+            'barva',
+            'cena',
+            'vlastní otázka',
+            'materiál',
+            'extra',
+          ],
+        );
+
+        expect(interviewPromptTipsForLearner(detail), [
+          'Velikosti bot',
+          'barva',
+          'cena',
+          'vlastní otázka',
+          'materiál',
+        ]);
+      },
+    );
+
+    test('prompt card tips prefer the selected choice option', () {
+      final detail = ExerciseDetail.fromJson({
+        'id': 'exercise-choice-tips',
+        'title': 'Obchod',
+        'exercise_type': 'interview_choice_explain',
+        'learner_instruction': '',
+        'detail': {
+          'question': 'Jaké boty chcete?',
+          'tips': ['global tip'],
+          'system_prompt': 'You are Jana. The learner chose {selected_option}.',
+          'max_turns': 6,
+          'options': [
+            {
+              'id': '1',
+              'label': 'Bílé boty',
+              'tips': [' velikost ', '', 'barva'],
+            },
+            {
+              'id': '2',
+              'label': 'Černé boty',
+              'tips': ['cena'],
+            },
+            {'id': '3', 'label': 'Modré boty'},
+          ],
+        },
+      });
+
+      expect(interviewPromptTipsForLearner(detail), ['global tip']);
+      expect(
+        interviewPromptTipsForLearner(detail, selectedOption: 'Bílé boty'),
+        ['velikost', 'barva'],
+      );
+      expect(interviewPromptTipsForLearner(detail, selectedOption: '2'), [
+        'cena',
+      ]);
     });
 
     testWidgets('end button submits immediately without confirmation dialog', (
@@ -229,6 +590,62 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
       client.submitCompleter.complete({'id': 'attempt-1', 'status': 'scoring'});
       await tester.pump();
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('compact interview layout keeps controls visible', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      const compactDetail = ExerciseDetail(
+        id: 'exercise-compact',
+        title: 'Interview compact',
+        exerciseType: 'interview_conversation',
+        learnerInstruction: '',
+        assets: [],
+        questions: [],
+        scenarioTitle: '',
+        scenarioPrompt: '',
+        requiredInfoSlots: [],
+        customQuestionHint: '',
+        storyTitle: '',
+        imageAssetIds: [],
+        narrativeCheckpoints: [],
+        grammarFocus: [],
+        choiceScenarioPrompt: '',
+        choiceOptions: [],
+        expectedReasoningAxes: [],
+        interviewTopic: 'Obchod',
+        interviewTips: [
+          'Jste v obchodě s obuví. Potřebujete boty na sport.',
+          'Velikosti bot',
+          'barva',
+          'cena',
+          'vlastní otázka',
+        ],
+        interviewShowTranscript: true,
+      );
+
+      await tester.pumpWidget(
+        _wrapHome(
+          InterviewSessionScreen(
+            client: _FakeInterviewApiClient(),
+            exerciseId: 'exercise-compact',
+            attemptId: 'attempt-compact',
+            detail: compactDetail,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Kết thúc'), findsOneWidget);
+      expect(find.byIcon(Icons.mic_rounded), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
       await tester.pumpWidget(const SizedBox.shrink());
     });
   });

@@ -1325,6 +1325,42 @@ abstract class AppLocalizations {
   /// **'Không thể phát thử giọng này'**
   String get profileVoicePreviewError;
 
+  /// No description provided for @profileInterviewSection.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phỏng vấn'**
+  String get profileInterviewSection;
+
+  /// No description provided for @profileInterviewAvatarTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Dùng avatar Simli'**
+  String get profileInterviewAvatarTitle;
+
+  /// No description provided for @profileInterviewAvatarDescription.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tắt để phản hồi nhanh bằng sound wave. Bật khi muốn luyện với avatar.'**
+  String get profileInterviewAvatarDescription;
+
+  /// No description provided for @profileInterviewVolumeTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Âm lượng giám khảo'**
+  String get profileInterviewVolumeTitle;
+
+  /// No description provided for @profileInterviewVolumeDescription.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chỉ áp dụng khi dùng sound wave.'**
+  String get profileInterviewVolumeDescription;
+
+  /// No description provided for @profileInterviewVolumeValue.
+  ///
+  /// In vi, this message translates to:
+  /// **'{percent}%'**
+  String profileInterviewVolumeValue(int percent);
+
   /// No description provided for @submitAnswersCta.
   ///
   /// In vi, this message translates to:

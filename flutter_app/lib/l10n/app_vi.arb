@@ -312,6 +312,15 @@
     "profileVoiceProviderPolly": "AWS Polly",
     "profileVoiceProviderElevenLabs": "ElevenLabs",
     "profileVoicePreviewError": "Không thể phát thử giọng này",
+    "profileInterviewSection": "Phỏng vấn",
+    "profileInterviewAvatarTitle": "Dùng avatar Simli",
+    "profileInterviewAvatarDescription": "Tắt để phản hồi nhanh bằng sound wave. Bật khi muốn luyện với avatar.",
+    "profileInterviewVolumeTitle": "Âm lượng giám khảo",
+    "profileInterviewVolumeDescription": "Chỉ áp dụng khi dùng sound wave.",
+    "profileInterviewVolumeValue": "{percent}%",
+    "@profileInterviewVolumeValue": {
+        "placeholders": { "percent": { "type": "int" } }
+    },
 
     "submitAnswersCta": "Nộp đáp án",
     "submitWritingCta": "Nộp bài",
