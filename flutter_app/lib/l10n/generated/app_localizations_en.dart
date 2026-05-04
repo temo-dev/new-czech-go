@@ -1050,4 +1050,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get interviewMicDenied => 'Microphone permission required';
+
+  @override
+  String get interviewPromptLabel => 'Task';
+
+  @override
+  String get interviewTapToView => 'Tap to view task';
+
+  @override
+  String get interviewVocabHints => 'Vocab hints';
 }

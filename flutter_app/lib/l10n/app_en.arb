@@ -425,5 +425,8 @@
     "interviewExaminer": "Examiner",
     "interviewYou": "You",
     "interviewConnectError": "Connection failed, try again",
-    "interviewMicDenied": "Microphone permission required"
+    "interviewMicDenied": "Microphone permission required",
+    "interviewPromptLabel": "Task",
+    "interviewTapToView": "Tap to view task",
+    "interviewVocabHints": "Vocab hints"
 }

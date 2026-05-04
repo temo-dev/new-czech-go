@@ -15,6 +15,7 @@ import '../services/simli_config.dart';
 import '../services/simli_session_manager.dart';
 import '../widgets/avatar_video_container.dart';
 import '../widgets/mic_waveform_widget.dart';
+import '../widgets/prompt_card.dart';
 import '../widgets/session_status_pill.dart';
 import 'interview_result_screen.dart';
 
@@ -79,6 +80,9 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   final List<Uint8List> _pendingAgentChunks = [];
   Timer? _audioBufferTimeoutTimer;
   bool _videoReadyFired = false;
+
+  // V16: prompt card key — used to trigger pulse on agent response complete.
+  final GlobalKey<InterviewPromptCardState> _promptCardKey = GlobalKey();
 
   @override
   void initState() {
@@ -191,6 +195,7 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
         if (!_useSimliAudio) {
           _scheduleAgentAudioFlush(delay: const Duration(milliseconds: 120));
         }
+        _promptCardKey.currentState?.onAgentResponseComplete();
       };
       _wsClient.onDisconnected = () {
         if (mounted) setState(() => _state = InterviewSessionState.connecting);
@@ -464,6 +469,23 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     });
   }
 
+  String? _choiceTitle() {
+    final selected = widget.selectedOption;
+    if (selected == null || selected.isEmpty) return null;
+    final option = widget.detail.interviewOptions.firstWhere(
+      (o) => o.id == selected,
+      orElse: () => const InterviewOptionView(id: '', label: ''),
+    );
+    if (option.id.isEmpty) return selected;
+    return '${option.id} — ${option.label}';
+  }
+
+  String? _choiceContent() {
+    // Reserved for V16 follow-up. The current InterviewOptionView model only
+    // exposes label + image, so falls back to using the body alone.
+    return null;
+  }
+
   String _timerText() {
     final elapsed =
         (DateTime.now().millisecondsSinceEpoch ~/ 1000) - _sessionStartSec;
@@ -547,11 +569,12 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
             ),
 
           // ── Transcript overlay ────────────────────────────────────────
+          // V16: lifted above the prompt card so both can coexist.
           if (showTranscript && _lastTranscriptText != null)
             Positioned(
               left: 16,
               right: 16,
-              bottom: bottomSafe + 150,
+              bottom: bottomSafe + 280,
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
@@ -591,6 +614,22 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
                     ),
                   ],
                 ),
+              ),
+            ),
+
+          // ── Prompt card (V16) ────────────────────────────────────────
+          // Sits above the controls so the learner can glance at the task
+          // while speaking. Hidden when display_prompt is empty.
+          if (widget.detail.interviewDisplayPrompt.trim().isNotEmpty)
+            Positioned(
+              left: 14,
+              right: 14,
+              bottom: bottomSafe + 140,
+              child: InterviewPromptCard(
+                key: _promptCardKey,
+                body: widget.detail.interviewDisplayPrompt,
+                choiceTitle: _choiceTitle(),
+                choiceContent: _choiceContent(),
               ),
             ),
 

@@ -470,5 +470,8 @@
     "interviewExaminer": "Examiner",
     "interviewYou": "Bạn",
     "interviewConnectError": "Không kết nối được, thử lại",
-    "interviewMicDenied": "Cần quyền microphone"
+    "interviewMicDenied": "Cần quyền microphone",
+    "interviewPromptLabel": "Đề bài",
+    "interviewTapToView": "Tap để xem đề bài",
+    "interviewVocabHints": "Gợi ý từ"
 }

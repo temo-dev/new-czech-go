@@ -1050,4 +1050,13 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get interviewMicDenied => 'Cần quyền microphone';
+
+  @override
+  String get interviewPromptLabel => 'Đề bài';
+
+  @override
+  String get interviewTapToView => 'Tap để xem đề bài';
+
+  @override
+  String get interviewVocabHints => 'Gợi ý từ';
 }

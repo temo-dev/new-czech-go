@@ -2008,6 +2008,24 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Cần quyền microphone'**
   String get interviewMicDenied;
+
+  /// No description provided for @interviewPromptLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đề bài'**
+  String get interviewPromptLabel;
+
+  /// No description provided for @interviewTapToView.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tap để xem đề bài'**
+  String get interviewTapToView;
+
+  /// No description provided for @interviewVocabHints.
+  ///
+  /// In vi, this message translates to:
+  /// **'Gợi ý từ'**
+  String get interviewVocabHints;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
