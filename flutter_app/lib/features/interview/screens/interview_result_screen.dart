@@ -204,6 +204,36 @@ class _ResultViewState extends State<_ResultView> {
                 ? _FeedbackTab(feedback: feedback, l: l)
                 : _TranscriptTab(turns: widget.turns, l: l),
           ),
+
+          // V16: sticky bottom CTA so the learner has an explicit way out
+          // beyond the back arrow.
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                  icon: const Icon(Icons.check_rounded, size: 20),
+                  label: Text(
+                    l?.interviewFinishBtn ?? 'Hoàn thành',
+                    style: AppTypography.labelLarge.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.onPrimary,
+                    shape: const StadiumBorder(),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

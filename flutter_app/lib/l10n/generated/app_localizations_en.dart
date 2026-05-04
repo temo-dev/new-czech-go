@@ -1065,4 +1065,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get interviewPttSendHint => 'Recording · Tap to send';
+
+  @override
+  String get interviewFinishBtn => 'Finish';
 }

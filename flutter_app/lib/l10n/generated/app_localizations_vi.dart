@@ -1065,4 +1065,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get interviewPttSendHint => 'Đang ghi · Tap để gửi';
+
+  @override
+  String get interviewFinishBtn => 'Hoàn thành';
 }

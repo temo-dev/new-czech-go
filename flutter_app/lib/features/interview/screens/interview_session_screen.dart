@@ -731,78 +731,10 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
               ),
             ),
 
-          // ── Transcript overlay ────────────────────────────────────────
-          // V16: stacked above the prompt card; prompt card sits above the
-          // PTT controls bar (~240px tall with the mic button + end link).
-          if (showTranscript && _lastTranscriptText != null)
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: bottomSafe + 380,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black45,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _lastSpeakerIsExaminer
-                          ? l.interviewExaminer
-                          : l.interviewYou,
-                      style: TextStyle(
-                        color:
-                            _lastSpeakerIsExaminer
-                                ? Colors.white54
-                                : AppColors.primary,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      _lastTranscriptText!,
-                      style: const TextStyle(
-                        color: Color(0xD9FFFFFF),
-                        fontSize: 13,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-          // ── Prompt card (V16) ────────────────────────────────────────
-          // Sits above the controls bar so the learner can glance at the task
-          // while speaking. The PTT controls bar is ~240px tall (mic button
-          // 96px + hint + end link), so we offset 250 to clear it.
-          if (widget.detail.interviewDisplayPrompt.trim().isNotEmpty)
-            Positioned(
-              left: 14,
-              right: 14,
-              bottom: bottomSafe + 250,
-              child: InterviewPromptCard(
-                key: _promptCardKey,
-                body: widget.detail.interviewDisplayPrompt,
-                choiceTitle: _choiceTitle(),
-                choiceContent: _choiceContent(),
-              ),
-            ),
-
           // ── Preparing overlay (V16) ──────────────────────────────────
-          // Sits BELOW the controls bar so the learner can cancel via the
-          // End button while waiting. IgnorePointer once the first audio
-          // chunk arrives — at that point we want the live transcript +
-          // status pill back without blocking taps.
+          // Rendered BEFORE the bottom panel so the End button stays
+          // tappable. Width-stretched but reserves bottomReserved space at
+          // the bottom for the controls.
           IgnorePointer(
             ignoring: _prepareStep >= 4,
             child: AnimatedOpacity(
@@ -812,12 +744,16 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
               child: _PreparingOverlay(
                 step: _prepareStep,
                 useSimli: _useSimliAudio || _simli != null,
-                bottomReserved: bottomSafe + 260,
+                bottomReserved: bottomSafe + 240,
               ),
             ),
           ),
 
-          // ── Controls ─────────────────────────────────────────────────
+          // ── Bottom panel (V16) ────────────────────────────────────────
+          // Single Column anchored at the bottom containing transcript +
+          // prompt card + PTT controls so they stack naturally and never
+          // overlap regardless of screen size. Avatar still fills the
+          // top portion of the screen behind everything.
           Positioned(
             bottom: 0,
             left: 0,
@@ -827,18 +763,47 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Color(0x0006111F), Color(0xF006111F)],
+                  colors: [
+                    Color(0x0006111F),
+                    Color(0x9906111F),
+                    Color(0xFA06111F),
+                  ],
+                  stops: [0, 0.35, 1],
                 ),
               ),
-              padding: EdgeInsets.fromLTRB(24, 28, 24, bottomSafe + 16),
+              padding: EdgeInsets.fromLTRB(16, 18, 16, bottomSafe + 12),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (showTranscript && _lastTranscriptText != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _TranscriptBubble(
+                        speakerLabel: _lastSpeakerIsExaminer
+                            ? l.interviewExaminer
+                            : l.interviewYou,
+                        speakerIsExaminer: _lastSpeakerIsExaminer,
+                        text: _lastTranscriptText!,
+                      ),
+                    ),
+                  if (widget.detail.interviewDisplayPrompt.trim().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: InterviewPromptCard(
+                        key: _promptCardKey,
+                        body: widget.detail.interviewDisplayPrompt,
+                        choiceTitle: _choiceTitle(),
+                        choiceContent: _choiceContent(),
+                      ),
+                    ),
                   Text(
                     _timerText(),
-                    style: const TextStyle(color: Colors.white30, fontSize: 12),
+                    style: const TextStyle(
+                      color: Colors.white30,
+                      fontSize: 12,
+                    ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
                   _PttMicButton(
                     enabled: _conversationStarted &&
                         !_ending &&
@@ -846,12 +811,12 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
                     active: _micActive,
                     onTap: _toggleMic,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     _pttHint(l),
                     style: const TextStyle(color: Colors.white54, fontSize: 12),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
                   TextButton.icon(
                     onPressed: _ending ? null : _endSession,
                     icon: _ending
@@ -1170,6 +1135,66 @@ class _PttMicButtonState extends State<_PttMicButton>
                 ],
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// V16 transcript bubble shown above the prompt card / mic. Aligns left for
+/// the examiner, right for the learner so the "who is talking" cue is clear
+/// at a glance even before the small label is read.
+class _TranscriptBubble extends StatelessWidget {
+  const _TranscriptBubble({
+    required this.speakerLabel,
+    required this.speakerIsExaminer,
+    required this.text,
+  });
+
+  final String speakerLabel;
+  final bool speakerIsExaminer;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: speakerIsExaminer ? Alignment.centerLeft : Alignment.centerRight,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.85,
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                speakerLabel.toUpperCase(),
+                style: TextStyle(
+                  color: speakerIsExaminer ? Colors.white60 : AppColors.primary,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                text,
+                style: const TextStyle(
+                  color: Color(0xE6FFFFFF),
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
         ),
       ),

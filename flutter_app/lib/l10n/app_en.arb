@@ -430,5 +430,6 @@
     "interviewTapToView": "Tap to view task",
     "interviewVocabHints": "Vocab hints",
     "interviewPttIdleHint": "Tap to start speaking",
-    "interviewPttSendHint": "Recording · Tap to send"
+    "interviewPttSendHint": "Recording · Tap to send",
+    "interviewFinishBtn": "Finish"
 }

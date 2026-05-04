@@ -2038,6 +2038,12 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Đang ghi · Tap để gửi'**
   String get interviewPttSendHint;
+
+  /// No description provided for @interviewFinishBtn.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hoàn thành'**
+  String get interviewFinishBtn;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
