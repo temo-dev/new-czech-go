@@ -18,11 +18,17 @@ import '../widgets/mic_waveform_widget.dart';
 import '../widgets/session_status_pill.dart';
 import 'interview_result_screen.dart';
 
+/// V16: gate routing of agent audio chunks. When Simli is enabled but the
+/// avatar's video track has not yet rendered its first frame, the WebRTC
+/// audio track is not yet attached and chunks sent to Simli are silently
+/// dropped. The gate now waits for [simliVideoReady] (first frame rendered)
+/// rather than [SimliSessionManager.isConnected] (WS handshake) which fires
+/// hundreds of milliseconds earlier.
 bool shouldPlayInterviewAudioLocally({
   required bool useSimliAudio,
-  required bool simliConnected,
+  required bool simliVideoReady,
 }) {
-  return !(useSimliAudio && simliConnected);
+  return !(useSimliAudio && simliVideoReady);
 }
 
 class InterviewSessionScreen extends StatefulWidget {
@@ -66,6 +72,14 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   bool _simliConnected = false;
   bool _useSimliAudio = false;
 
+  // V16: buffer agent audio chunks while Simli has connected its WS but the
+  // first video frame (and therefore the WebRTC audio track) has not yet
+  // attached. Flush as soon as `onVideoReady` fires; fall back to local
+  // playback if the timeout expires first.
+  final List<Uint8List> _pendingAgentChunks = [];
+  Timer? _audioBufferTimeoutTimer;
+  bool _videoReadyFired = false;
+
   @override
   void initState() {
     super.initState();
@@ -79,6 +93,8 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     _micSub?.cancel();
     _sessionTimer?.cancel();
     _agentAudioFlushTimer?.cancel();
+    _audioBufferTimeoutTimer?.cancel();
+    _pendingAgentChunks.clear();
     _wsClient.disconnect();
     _audioPlayer.dispose();
     _recorder.dispose();
@@ -121,20 +137,30 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       }) {
         final _ = userInputAudioFormat;
         _audioPlayer.setOutputAudioFormat(agentOutputAudioFormat);
+        _simli?.setInputAudioFormat(agentOutputAudioFormat);
       };
       _wsClient.onAudioChunk = (Uint8List chunk) {
         if (!mounted || _ending) return;
         setState(() => _state = InterviewSessionState.speaking);
-        final useLocalAudio = shouldPlayInterviewAudioLocally(
-          useSimliAudio: _useSimliAudio,
-          simliConnected: _simli?.isConnected == true,
-        );
-        if (useLocalAudio) {
+
+        if (!_useSimliAudio) {
           _audioPlayer.addChunk(chunk);
           _scheduleAgentAudioFlush();
-        } else {
-          _simli?.sendAudio(chunk);
+          return;
         }
+
+        if (_videoReadyFired) {
+          _simli?.sendAudio(chunk);
+          return;
+        }
+
+        // Simli WS is connected but its WebRTC audio track is not yet
+        // attached — buffer until onVideoReady fires (or fall back).
+        _pendingAgentChunks.add(chunk);
+        _audioBufferTimeoutTimer ??= Timer(
+          Duration(milliseconds: widget.detail.interviewAudioBufferTimeoutMs),
+          _fallbackToLocalAudio,
+        );
       };
       _wsClient.onInterruption = () {
         if (_useSimliAudio) {
@@ -218,9 +244,12 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     };
     simli.onVideoReady = () {
       debugPrint('Simli video ready');
-      if (mounted && !_disposing) {
-        setState(() => _simliConnected = true);
-      }
+      if (!mounted || _disposing) return;
+      _videoReadyFired = true;
+      _audioBufferTimeoutTimer?.cancel();
+      _audioBufferTimeoutTimer = null;
+      _flushPendingChunksToSimli();
+      setState(() => _simliConnected = true);
     };
     simli.onDisconnected = () {
       debugPrint('Simli disconnected');
@@ -287,6 +316,30 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       ),
     );
     await session.setActive(true);
+  }
+
+  void _flushPendingChunksToSimli() {
+    if (_pendingAgentChunks.isEmpty) return;
+    debugPrint('Flushing ${_pendingAgentChunks.length} buffered chunk(s) to Simli');
+    for (final chunk in _pendingAgentChunks) {
+      _simli?.sendAudio(chunk);
+    }
+    _pendingAgentChunks.clear();
+  }
+
+  /// V16: Simli failed to attach its audio track within the buffer timeout
+  /// — drop into local PCM playback so the learner still hears the agent.
+  void _fallbackToLocalAudio() {
+    if (!mounted || _videoReadyFired) return;
+    debugPrint('Audio buffer timeout — falling back to local audio (${_pendingAgentChunks.length} buffered chunks)');
+    setState(() {
+      _useSimliAudio = false;
+    });
+    for (final chunk in _pendingAgentChunks) {
+      _audioPlayer.addChunk(chunk);
+    }
+    _pendingAgentChunks.clear();
+    _scheduleAgentAudioFlush();
   }
 
   void _scheduleAgentAudioFlush({

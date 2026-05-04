@@ -128,21 +128,21 @@ void main() {
       expect(
         shouldPlayInterviewAudioLocally(
           useSimliAudio: true,
-          simliConnected: true,
+          simliVideoReady: true,
         ),
         isFalse,
       );
       expect(
         shouldPlayInterviewAudioLocally(
           useSimliAudio: true,
-          simliConnected: false,
+          simliVideoReady: false,
         ),
         isTrue,
       );
       expect(
         shouldPlayInterviewAudioLocally(
           useSimliAudio: false,
-          simliConnected: true,
+          simliVideoReady: true,
         ),
         isTrue,
       );

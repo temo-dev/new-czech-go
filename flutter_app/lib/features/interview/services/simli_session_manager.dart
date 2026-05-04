@@ -151,6 +151,19 @@ class SimliSessionManager {
   RTCVideoRenderer? get videoRenderer => _videoRenderer;
   ValueNotifier<bool> get isSpeakingNotifier => _isSpeakingNotifier;
 
+  String? _inputAudioFormat;
+
+  /// Records the agent's output audio format (e.g. "pcm_16000") so the Simli
+  /// pipeline can negotiate sample rate when its API exposes that. The
+  /// current Compose API encodes format in the token payload at session
+  /// start, so this is a no-op stub kept for call-site clarity (V16).
+  void setInputAudioFormat(String? format) {
+    _inputAudioFormat = format;
+  }
+
+  /// @visibleForTesting
+  String? get debugInputAudioFormat => _inputAudioFormat;
+
   Future<void> start() async {
     _disposed = false;
     _videoReady = false;

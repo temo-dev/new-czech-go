@@ -416,6 +416,9 @@ class ExerciseDetail {
     this.interviewShowTranscript = false,
     this.interviewQuestion = '',
     this.interviewOptions = const [],
+    // V16
+    this.interviewDisplayPrompt = '',
+    this.interviewAudioBufferTimeoutMs = 1500,
   });
 
   final String id;
@@ -480,6 +483,10 @@ class ExerciseDetail {
   final bool interviewShowTranscript;
   final String interviewQuestion;
   final List<InterviewOptionView> interviewOptions;
+
+  // V16: derived learner-facing prompt + Simli audio buffer fallback timeout
+  final String interviewDisplayPrompt;
+  final int interviewAudioBufferTimeoutMs;
 
   bool get isInterviewConversation => exerciseType == 'interview_conversation';
   bool get isInterviewChoiceExplain => exerciseType == 'interview_choice_explain';
@@ -664,8 +671,19 @@ class ExerciseDetail {
           .whereType<Map<String, dynamic>>()
           .map(InterviewOptionView.fromJson)
           .toList(),
+      // V16
+      interviewDisplayPrompt: detail['display_prompt'] as String? ?? '',
+      interviewAudioBufferTimeoutMs: _clampAudioBufferTimeout(detail['audio_buffer_timeout_ms']),
     );
   }
+}
+
+int _clampAudioBufferTimeout(dynamic raw) {
+  final n = (raw as num?)?.toInt() ?? 0;
+  if (n <= 0) return 1500;
+  if (n < 500) return 500;
+  if (n > 5000) return 5000;
+  return n;
 }
 
 // V13: One statement in a cteni_6 / poslech_6 exercise.
