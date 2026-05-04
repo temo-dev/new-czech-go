@@ -97,10 +97,18 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   int _prepareStep = 0;
   bool _firstAgentChunkSeen = false;
 
+  // V16 first-turn gate: defer mic + timer until the examiner finishes
+  // greeting. Otherwise the mic captures pre-roll noise/silence and
+  // ElevenLabs VAD registers an empty learner turn — the examiner then
+  // apologises for a missing self-introduction.
+  bool _conversationStarted = false;
+  Timer? _firstTurnSafetyTimer;
+
   @override
   void initState() {
     super.initState();
-    _sessionStartSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    // _sessionStartSec is set on the first agent response complete so the
+    // timer reflects conversation duration, not setup time.
     _startSession();
   }
 
@@ -111,6 +119,7 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     _sessionTimer?.cancel();
     _agentAudioFlushTimer?.cancel();
     _audioBufferTimeoutTimer?.cancel();
+    _firstTurnSafetyTimer?.cancel();
     _pendingAgentChunks.clear();
     _wsClient.disconnect();
     _audioPlayer.dispose();
@@ -149,8 +158,9 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       // 3. Wire WS callbacks
       _wsClient.onReady = () {
         if (!mounted) return;
+        // Mic + timer start are deferred to the end of the examiner's first
+        // turn (see _startConversation). onReady just flips visual state.
         setState(() => _state = InterviewSessionState.ready);
-        _startMic();
       };
       _wsClient.onMetadata = ({
         String? agentOutputAudioFormat,
@@ -170,6 +180,12 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
         if (!_firstAgentChunkSeen) {
           _firstAgentChunkSeen = true;
           _advancePrepareStep(4);
+          // Safety net: if agent_response_complete never fires (network glitch
+          // or short greeting), unblock mic 10s after the first audio chunk.
+          _firstTurnSafetyTimer = Timer(
+            const Duration(seconds: 10),
+            _startConversation,
+          );
         }
         setState(() => _state = InterviewSessionState.speaking);
 
@@ -209,8 +225,9 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       };
       _wsClient.onTranscript = (speaker, text) {
         if (!mounted || _ending) return;
-        final atSec =
-            (DateTime.now().millisecondsSinceEpoch ~/ 1000) - _sessionStartSec;
+        final atSec = _conversationStarted
+            ? (DateTime.now().millisecondsSinceEpoch ~/ 1000) - _sessionStartSec
+            : 0;
         setState(() {
           _turns.add(
             InterviewTranscriptTurn(speaker: speaker, text: text, atSec: atSec),
@@ -244,6 +261,10 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
           _scheduleAgentAudioFlush(delay: const Duration(milliseconds: 120));
         }
         _promptCardKey.currentState?.onAgentResponseComplete();
+        // Open the mic and start the timer once the examiner finishes their
+        // first turn — mic before this point captures noise that ElevenLabs
+        // VAD reports as an empty learner turn.
+        _startConversation();
       };
       _wsClient.onDisconnected = () {
         if (mounted) setState(() => _state = InterviewSessionState.connecting);
@@ -451,8 +472,9 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     unawaited(_stopRealtimeSession());
 
     try {
-      final durationSec =
-          (DateTime.now().millisecondsSinceEpoch ~/ 1000) - _sessionStartSec;
+      final durationSec = _conversationStarted
+          ? (DateTime.now().millisecondsSinceEpoch ~/ 1000) - _sessionStartSec
+          : 0;
       final turns = _turns.map((t) => t.toJson()).toList();
       debugPrint(
         'Interview submit started for attempt ${widget.attemptId} turns=${turns.length}',
@@ -523,6 +545,18 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
     setState(() => _prepareStep = step);
   }
 
+  /// V16: gate mic + session timer until the examiner has finished their
+  /// first turn. Subsequent calls are no-ops. Cancels the safety timer.
+  void _startConversation() {
+    if (_conversationStarted || !mounted) return;
+    _conversationStarted = true;
+    _firstTurnSafetyTimer?.cancel();
+    _firstTurnSafetyTimer = null;
+    _sessionStartSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    debugPrint('Interview conversation started — mic on, timer reset');
+    _startMic();
+  }
+
   String? _choiceTitle() {
     final selected = widget.selectedOption;
     if (selected == null || selected.isEmpty) return null;
@@ -541,6 +575,7 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   }
 
   String _timerText() {
+    if (!_conversationStarted) return '00:00';
     final elapsed =
         (DateTime.now().millisecondsSinceEpoch ~/ 1000) - _sessionStartSec;
     final min = elapsed ~/ 60;
