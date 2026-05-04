@@ -279,7 +279,7 @@ export function createInitialFormState(): ExerciseFormState {
       'start_time | Cas zacatku | V kolik hodin film zacina?\nprice | Cena listku | Kolik stoji jeden listek?\nonline_ticket | Nakup online | Muzu si koupit listek online?',
     customQuestionHint: 'Pridejte jeste jednu otazku, treba na sal nebo titulky.',
     storyTitle: 'Nakup televize',
-    imageAssetIds: 'asset-tv-1\nasset-tv-2\nasset-tv-3\nasset-tv-4',
+    imageAssetIds: '',
     narrativeCheckpoints:
       'Otec a syn sli do obchodu.\nDivali se na televize a porovnavali je.\nVybrali jednu televizi a zaplatili ji.\nOdvezli televizi domu autem.',
     grammarFocus: 'past_tense',
@@ -451,9 +451,15 @@ export function formStateFromExercise(item: Exercise): ExerciseFormState {
       : '',
     customQuestionHint: String(detail.custom_question_hint ?? ''),
     storyTitle: String(detail.story_title ?? ''),
-    imageAssetIds: Array.isArray(detail.image_asset_ids)
-      ? (detail.image_asset_ids as unknown[]).map(String).join('\n')
-      : '',
+    imageAssetIds: (() => {
+      if (!Array.isArray(detail.image_asset_ids)) return '';
+      const ids = (detail.image_asset_ids as unknown[]).map(String);
+      const realIds = new Set((item.assets ?? []).map(a => a.id));
+      // Filter out stale placeholder IDs that don't match uploaded assets.
+      // If no assets uploaded yet, keep saved IDs for backward compat.
+      const filtered = realIds.size > 0 ? ids.filter(id => realIds.has(id)) : ids;
+      return filtered.join('\n');
+    })(),
     narrativeCheckpoints: Array.isArray(detail.narrative_checkpoints)
       ? (detail.narrative_checkpoints as unknown[]).map(String).join('\n')
       : '',

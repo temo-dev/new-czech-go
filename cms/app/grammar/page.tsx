@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { adminFetch } from '../../lib/api';
+import AiImageButton from '../../components/AiImageButton';
+import { type AiImageResult } from '../../components/ai-image-utils';
 
 type GrammarRule = {
   id: string; module_id: string; title: string; level: string;
@@ -217,6 +219,16 @@ export default function GrammarPage() {
     }
   }
 
+  async function handleAiRuleImageCreated(result: AiImageResult) {
+    if (!editingRule?.id) return;
+    await fetch('/api/admin/ai/set-banner', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entity_type: 'grammar-rule', entity_id: editingRule.id, storage_key: result.storageKey }),
+    });
+    setEditingRule(r => r ? { ...r, image_asset_id: result.storageKey } : r);
+  }
+
   async function handleSave() {
     const isEdit = editingRule !== null;
     if (!fTitle.trim() || (!isEdit && !fModule)) { setFormErr(isEdit ? 'Nhập tên.' : 'Nhập tên và chọn module.'); return; }
@@ -427,14 +439,19 @@ export default function GrammarPage() {
 
             {/* Image upload — only for existing rules */}
             {editingRule?.id && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr', gap: 8, alignItems: 'center' }}>
                 <div style={{ width: 44, height: 44, borderRadius: 8, border: `1.5px ${editingRule.image_asset_id ? 'solid #22c55e' : 'dashed var(--border)'}`, overflow: 'hidden', background: 'var(--surface-alt)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   {editingRule.image_asset_id ? <span style={{ fontSize: 20 }}>🖼</span> : <span style={{ fontSize: 10, color: 'var(--ink-4)' }}>img</span>}
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, border: `1px ${editingRule.image_asset_id ? 'solid #22c55e' : 'dashed var(--border)'}`, borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: editingRule.image_asset_id ? '#15803d' : 'var(--ink-3)', background: editingRule.image_asset_id ? '#f0fdf4' : 'transparent' }}>
-                  {editingRule.image_asset_id ? '✓ Đã có ảnh — Đổi' : '+ Tải ảnh ngữ cảnh'}
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: `1px ${editingRule.image_asset_id ? 'solid #22c55e' : 'dashed var(--border)'}`, borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: editingRule.image_asset_id ? '#15803d' : 'var(--ink-3)', background: editingRule.image_asset_id ? '#f0fdf4' : 'transparent' }}>
+                  {editingRule.image_asset_id ? '✓ Đổi ảnh' : '📁 Tải ảnh lên'}
                   <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleRuleImageUpload(f); e.target.value = ''; }} />
                 </label>
+                <AiImageButton
+                  onAssetCreated={result => void handleAiRuleImageCreated(result)}
+                  disabled={false}
+                  existingAssetId={editingRule.image_asset_id}
+                />
               </div>
             )}
 

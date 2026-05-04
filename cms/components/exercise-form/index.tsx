@@ -282,6 +282,28 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
     onSaved();
   }
 
+  async function handleAiPromptAssetCreated(result: AiImageResult) {
+    if (!editingId) return;
+    await adminFetch(`/api/admin/exercises/${editingId}/assets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: result.assetId,
+        asset_kind: 'image',
+        storage_key: result.storageKey,
+        mime_type: 'image/jpeg',
+        sequence_no: currentAssets.length + 1,
+      }),
+    });
+    if (form.exerciseType === 'uloha_3_story_narration') {
+      setForm(current => ({
+        ...current,
+        imageAssetIds: appendLineIfMissing(current.imageAssetIds, result.assetId),
+      }));
+    }
+    onSaved();
+  }
+
   async function handleContextImageDelete() {
     if (!editingId) return;
     const existing = currentAssets.find((a: PromptAsset) => a.asset_kind === 'context_image');
@@ -801,18 +823,28 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                       </p>
                     ) : (
                       <>
-                        <label style={{ display: 'grid', gap: 8 }}>
+                        <div style={{ display: 'grid', gap: 8 }}>
                           <span style={fieldLabelStyle}>Upload image</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(event) => {
-                              const file = event.target.files?.[0];
-                              if (file) void handleAssetUpload(file);
-                              event.currentTarget.value = '';
-                            }}
-                          />
-                        </label>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: '1px dashed var(--border)', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', background: 'var(--surface-alt)', fontSize: 12, fontWeight: 600 }}>
+                              📁 Chọn tệp
+                              <input
+                                type="file"
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0];
+                                  if (file) void handleAssetUpload(file);
+                                  event.currentTarget.value = '';
+                                }}
+                              />
+                            </label>
+                            <AiImageButton
+                              onAssetCreated={result => void handleAiPromptAssetCreated(result)}
+                              disabled={!editingId}
+                            />
+                          </div>
+                        </div>
                         {assetError && (
                           <p
                             style={{

@@ -194,18 +194,6 @@ export function CourseDashboard() {
                         onChange={e => { const f = e.target.files?.[0]; if (f) void handleBannerUpload(c.id, f); e.target.value = ''; }}
                       />
                     </label>
-                    <AiImageButton
-                      onAssetCreated={async result => {
-                        await fetch('/api/admin/ai/set-banner', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ entity_type: 'course', entity_id: c.id, storage_key: result.storageKey }),
-                        });
-                        await load();
-                      }}
-                      disabled={false}
-                      existingAssetId={c.banner_image_id}
-                    />
                     {c.banner_image_id && (
                       <button type="button" onClick={() => void handleBannerDelete(c.id)} style={{ background: 'rgba(0,0,0,0.35)', color: '#fff', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>✕</button>
                     )}
@@ -233,15 +221,29 @@ export function CourseDashboard() {
                 <div style={{
                   padding: '10px 16px',
                   borderTop: '1px solid var(--border)',
-                  display: 'flex',
+                  display: 'grid',
                   gap: 8,
                 }}>
-                  <button onClick={() => openEdit(c)} className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center', fontSize: 12, padding: '6px 0' }}>
-                    Chỉnh sửa
-                  </button>
-                  <button onClick={() => del(c.id)} className="btn btn-danger" style={{ fontSize: 12, padding: '6px 12px' }}>
-                    Xoá
-                  </button>
+                  <AiImageButton
+                    onAssetCreated={async result => {
+                      await fetch('/api/admin/ai/set-banner', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ entity_type: 'course', entity_id: c.id, storage_key: result.storageKey }),
+                      });
+                      await load();
+                    }}
+                    disabled={false}
+                    existingAssetId={c.banner_image_id}
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => openEdit(c)} className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center', fontSize: 12, padding: '6px 0' }}>
+                      Chỉnh sửa
+                    </button>
+                    <button onClick={() => del(c.id)} className="btn btn-danger" style={{ fontSize: 12, padding: '6px 12px' }}>
+                      Xoá
+                    </button>
+                  </div>
                 </div>
               </div>
             );

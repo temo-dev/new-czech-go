@@ -51,6 +51,11 @@ class ElevenLabsWsClient {
   /// Set before calling [connect]. Sent as first WS message after connection.
   String? systemPrompt;
 
+  /// ElevenLabs voice ID override. When non-empty, sent as
+  /// conversation_config_override.tts.voice_id so the agent uses this voice
+  /// instead of the one configured in the ElevenLabs dashboard.
+  String? voiceId;
+
   // ── State ─────────────────────────────────────────────────────────────────
 
   WebSocket? _ws;
@@ -141,11 +146,20 @@ class ElevenLabsWsClient {
       agent['first_message'] = first.trim();
     }
 
+    final configOverride = <String, dynamic>{};
+    if (agent.isNotEmpty) {
+      configOverride['agent'] = agent;
+    }
+    final vid = voiceId;
+    if (vid != null && vid.trim().isNotEmpty) {
+      configOverride['tts'] = {'voice_id': vid.trim()};
+    }
+
     final message = <String, dynamic>{
       'type': 'conversation_initiation_client_data',
     };
-    if (agent.isNotEmpty) {
-      message['conversation_config_override'] = {'agent': agent};
+    if (configOverride.isNotEmpty) {
+      message['conversation_config_override'] = configOverride;
     }
     return message;
   }

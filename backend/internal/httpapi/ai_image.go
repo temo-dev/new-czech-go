@@ -194,8 +194,12 @@ func (s *Server) handleAdminAiSetBanner(w http.ResponseWriter, r *http.Request, 
 		ok = s.repo.SetCourseBannerImage(req.EntityID, req.StorageKey)
 	case "mock-test":
 		ok = s.repo.SetMockTestBannerImage(req.EntityID, req.StorageKey)
+	case "grammar-rule":
+		ok = s.repo.SetGrammarRuleImage(req.EntityID, req.StorageKey)
+	case "vocabulary-item":
+		ok = s.repo.SetVocabularyItemImage(req.EntityID, req.StorageKey)
 	default:
-		writeError(w, http.StatusBadRequest, "validation_error", "entity_type must be 'course' or 'mock-test'.", false)
+		writeError(w, http.StatusBadRequest, "validation_error", "entity_type must be 'course', 'mock-test', 'grammar-rule', or 'vocabulary-item'.", false)
 		return
 	}
 	if !ok {

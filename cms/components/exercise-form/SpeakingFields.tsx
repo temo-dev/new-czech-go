@@ -129,33 +129,156 @@ export function SpeakingFields({ form, setForm }: Props) {
   // Uloha 3 — story narration
   if (form.exerciseType === 'uloha_3_story_narration') {
     const checkpoints = form.narrativeCheckpoints.split('\n').filter(Boolean);
+    const grammarItems = form.grammarFocus.split('\n').filter(Boolean);
+    const imageIds = form.imageAssetIds.split('\n').filter(Boolean);
+    const imageCount = imageIds.length;
+
     return (
-      <div style={{ display: 'grid', gap: 16 }}>
+      <div style={{ display: 'grid', gap: 20 }}>
+
+        {/* Story title */}
         <label style={{ display: 'grid', gap: 6 }}>
-          <span style={labelStyle}>Story title</span>
-          <input value={form.storyTitle} onChange={e => set('storyTitle', e.target.value)} style={inputStyle} placeholder="Tiêu đề câu chuyện..." />
+          <span style={labelStyle}>Tiêu đề câu chuyện</span>
+          <input
+            value={form.storyTitle}
+            onChange={e => set('storyTitle', e.target.value)}
+            style={inputStyle}
+            placeholder="VD: Nákup televize, Výlet do Prahy..."
+          />
         </label>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: 'var(--border)' }} />
+
+        {/* Image asset IDs */}
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={labelStyle}>Ảnh câu chuyện</span>
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+              background: imageCount > 0 ? 'var(--accent-soft)' : 'var(--surface-alt)',
+              color: imageCount > 0 ? 'var(--accent)' : 'var(--ink-3)',
+            }}>
+              {imageCount}/4 ảnh
+            </span>
+          </div>
+
+          {/* ID pills — read-only visual */}
+          {imageCount > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {imageIds.map((id, i) => (
+                <span key={i} style={{
+                  fontSize: 11, fontFamily: 'monospace', padding: '3px 10px',
+                  borderRadius: 20, background: 'var(--surface-alt)',
+                  border: '1px solid var(--border-strong)', color: 'var(--ink-2)',
+                  maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {id}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Empty state */}
+          {imageCount === 0 && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 10,
+              background: 'var(--brand-soft)', border: '1px dashed var(--brand)',
+              fontSize: 12, color: 'var(--brand-ink)', lineHeight: 1.5,
+            }}>
+              Chưa có ảnh. Upload trong mục <strong>Ảnh / tài nguyên</strong> phía dưới — ID sẽ tự động thêm vào đây.
+            </div>
+          )}
+
+          {/* Editable textarea for manual override */}
+          <details style={{ marginTop: 2 }}>
+            <summary style={{ fontSize: 12, color: 'var(--ink-3)', cursor: 'pointer', userSelect: 'none' }}>
+              Chỉnh sửa thủ công ({imageCount} ID)
+            </summary>
+            <textarea
+              rows={4}
+              value={form.imageAssetIds}
+              onChange={e => set('imageAssetIds', e.target.value)}
+              style={{ ...txStyle, marginTop: 6, fontFamily: 'monospace', fontSize: 12, background: 'var(--surface-alt)' }}
+              placeholder="asset-id-1&#10;asset-id-2&#10;asset-id-3&#10;asset-id-4"
+            />
+          </details>
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: 'var(--border)' }} />
+
+        {/* Narrative checkpoints */}
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={labelStyle}>Trình tự câu chuyện</span>
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+              background: checkpoints.length >= 4 ? 'var(--success-bg)' : 'var(--warning-bg)',
+              color: checkpoints.length >= 4 ? 'var(--success)' : 'var(--warning)',
+            }}>
+              {checkpoints.length}/4 bước
+            </span>
+          </div>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.4 }}>
+            4 điểm then chốt trong câu chuyện — học viên kể lại theo thứ tự.
+          </p>
+          <ItemRepeater
+            label=""
+            items={checkpoints.length ? checkpoints : ['']}
+            onChange={rows => set('narrativeCheckpoints', rows.join('\n'))}
+            placeholder="VD: Họ vào cửa hàng và nhìn xung quanh..."
+            maxItems={4}
+            minItems={1}
+            rows={2}
+          />
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: 'var(--border)' }} />
+
+        {/* Grammar focus */}
+        <div style={{ display: 'grid', gap: 8 }}>
+          <span style={labelStyle}>Trọng tâm ngữ pháp</span>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-3)' }}>
+            Các điểm ngữ pháp cần chú ý. VD: Thì quá khứ, Câu phức với <em>protože</em>.
+          </p>
+          <ItemRepeater
+            label=""
+            items={grammarItems.length ? grammarItems : ['']}
+            onChange={rows => set('grammarFocus', rows.join('\n'))}
+            placeholder="VD: Động từ chia ở thì quá khứ..."
+            maxItems={6}
+            minItems={1}
+            rows={1}
+          />
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: 'var(--border)' }} />
+
+        {/* Sample answer */}
         <label style={{ display: 'grid', gap: 6 }}>
-          <span style={labelStyle}>Image asset IDs (1 ID/dòng)</span>
-          <textarea rows={5} value={form.imageAssetIds} onChange={e => set('imageAssetIds', e.target.value)} style={txStyle} placeholder="asset-id-1&#10;asset-id-2&#10;asset-id-3&#10;asset-id-4" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={labelStyle}>Câu trả lời mẫu</span>
+            <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, background: 'var(--surface-alt)', color: 'var(--ink-3)', fontWeight: 600 }}>
+              🇨🇿 Tiếng Séc
+            </span>
+          </div>
+          <textarea
+            rows={4}
+            value={form.sampleAnswerText}
+            onChange={e => set('sampleAnswerText', e.target.value)}
+            style={txStyle}
+            placeholder="VD: Otec a syn šli do obchodu s elektronikou. Dívali se na různé televize..."
+          />
+          {form.sampleAnswerText && (
+            <span style={{ fontSize: 11, color: 'var(--ink-4)', textAlign: 'right' }}>
+              {form.sampleAnswerText.trim().split(/\s+/).filter(Boolean).length} từ
+            </span>
+          )}
         </label>
-        <ItemRepeater
-          label="Narrative checkpoints (4 điểm kể chuyện)"
-          items={checkpoints.length ? checkpoints : ['']}
-          onChange={rows => set('narrativeCheckpoints', rows.join('\n'))}
-          placeholder="Điểm trong câu chuyện..."
-          maxItems={4}
-          minItems={1}
-          rows={1}
-        />
-        <label style={{ display: 'grid', gap: 6 }}>
-          <span style={labelStyle}>Grammar focus (1 điểm/dòng)</span>
-          <textarea rows={3} value={form.grammarFocus} onChange={e => set('grammarFocus', e.target.value)} style={txStyle} placeholder="Thì quá khứ đơn&#10;Câu phức với because" />
-        </label>
-        <label style={{ display: 'grid', gap: 6 }}>
-          <span style={labelStyle}>Sample answer</span>
-          <textarea rows={3} value={form.sampleAnswerText} onChange={e => set('sampleAnswerText', e.target.value)} style={txStyle} placeholder="Câu trả lời mẫu..." />
-        </label>
+
       </div>
     );
   }

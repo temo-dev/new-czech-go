@@ -334,7 +334,10 @@ func serveLocalAssetFile(w http.ResponseWriter, r *http.Request, storageKey stri
 // asset storage base directory, defeating path-traversal attempts including
 // URL-encoded variants (%2e%2e) that strings.Contains("..") cannot catch.
 func isSafeAssetKey(key string) bool {
-	base := filepath.Join(os.TempDir(), "czech-go-system-assets")
+	base := strings.TrimSpace(os.Getenv("LOCAL_ASSETS_DIR"))
+	if base == "" {
+		base = filepath.Join(os.TempDir(), "czech-go-system-assets")
+	}
 	resolved := filepath.Clean(filepath.Join(base, filepath.FromSlash(key)))
 	return strings.HasPrefix(resolved, base+string(filepath.Separator))
 }

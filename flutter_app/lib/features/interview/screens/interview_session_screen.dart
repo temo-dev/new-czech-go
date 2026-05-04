@@ -99,6 +99,7 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       );
       final signedUrl = tokenData['signed_url'] as String? ?? '';
       final systemPrompt = tokenData['system_prompt'] as String? ?? '';
+      final voiceId = tokenData['voice_id'] as String? ?? '';
       if (signedUrl.isEmpty || !mounted) return;
 
       await _configureDuplexAudioSession();
@@ -178,9 +179,10 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
         );
       };
 
-      // 3. Connect — systemPrompt + firstMessage sent via conversation_initiation_client_data.
+      // 3. Connect — systemPrompt + voiceId + firstMessage sent via conversation_initiation_client_data.
       // firstMessage ensures the agent speaks first without waiting for learner.
       _wsClient.systemPrompt = systemPrompt;
+      _wsClient.voiceId = voiceId.isNotEmpty ? voiceId : null;
       _wsClient.firstMessage =
           'Dobrý den! Jsem Jana Nováková, váš zkušební komisař. Jak se jmenujete?';
       await _wsClient.connect(signedUrl);

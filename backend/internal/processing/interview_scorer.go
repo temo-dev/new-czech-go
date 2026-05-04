@@ -142,7 +142,7 @@ func (p *Processor) ProcessInterviewAttempt(attemptID string, turns []contracts.
 
 	topic := interviewTopicFromExercise(exercise)
 	var feedback contracts.AttemptFeedback
-	if p.llmProvider != nil {
+	if p.llmProvider != nil && len(turns) > 0 {
 		fb, err := p.llmProvider.GenerateInterviewFeedback(turns, exercise.ExerciseType, topic, durationSec, locale)
 		if err != nil {
 			log.Printf("interview attempt %s: LLM feedback failed, using fallback: %v", attemptID, err)

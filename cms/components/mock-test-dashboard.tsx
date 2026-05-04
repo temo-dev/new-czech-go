@@ -330,21 +330,23 @@ export function MockTestDashboard() {
                     {uploadingBanner === t.id ? '⏳' : t.banner_image_id ? '🖼 ✓' : '🖼'}
                     <input ref={el => { bannerInputRefs.current[t.id] = el; }} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} disabled={uploadingBanner !== null} onChange={e => { const f = e.target.files?.[0]; if (f) void handleBannerUpload(t.id, f); e.target.value = ''; }} />
                   </label>
-                  <AiImageButton
-                    onAssetCreated={async result => {
-                      await fetch('/api/admin/ai/set-banner', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ entity_type: 'mock-test', entity_id: t.id, storage_key: result.storageKey }),
-                      });
-                      await fetchTests();
-                    }}
-                    disabled={false}
-                    existingAssetId={t.banner_image_id}
-                  />
                   <button onClick={() => openEdit(t)} style={btnStyle('secondary')}>{S.action.edit}</button>
                   <button onClick={() => handleDelete(t.id)} style={btnStyle('danger')}>{S.action.delete}</button>
                 </div>
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <AiImageButton
+                  onAssetCreated={async result => {
+                    await fetch('/api/admin/ai/set-banner', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ entity_type: 'mock-test', entity_id: t.id, storage_key: result.storageKey }),
+                    });
+                    await fetchTests();
+                  }}
+                  disabled={false}
+                  existingAssetId={t.banner_image_id}
+                />
               </div>
               {t.sections && t.sections.length > 0 && (
                 <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -530,6 +532,19 @@ export function MockTestDashboard() {
                     {uploadingBanner === editingId ? '⏳ Đang tải...' : hasBanner ? '🔄 Đổi banner' : '🖼 Tải banner'}
                     <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} disabled={uploadingBanner !== null} onChange={e => { const f = e.target.files?.[0]; if (f && editingId) void handleBannerUpload(editingId, f); e.target.value = ''; }} />
                   </label>
+                  <AiImageButton
+                    onAssetCreated={async result => {
+                      if (!editingId) return;
+                      await fetch('/api/admin/ai/set-banner', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ entity_type: 'mock-test', entity_id: editingId, storage_key: result.storageKey }),
+                      });
+                      await fetchTests();
+                    }}
+                    disabled={uploadingBanner !== null}
+                    existingAssetId={test?.banner_image_id}
+                  />
                   {hasBanner && editingId && (
                     <button type="button" onClick={() => void handleBannerDelete(editingId)} style={{ ...btnStyle('danger'), fontSize: 12, padding: '6px 10px' }}>Xóa</button>
                   )}

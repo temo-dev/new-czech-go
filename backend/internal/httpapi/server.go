@@ -29,8 +29,9 @@ type Server struct {
 	audioGenerator     processing.ExerciseAudioGenerator
 	contentGenerator   processing.ContentGenerator
 	voiceRegistry      *processing.VoiceRegistry
-	elevenLabsAPIKey   string // for interview session token creation
-	elevenLabsAgentID  string // pre-created agent in ElevenLabs dashboard
+	elevenLabsAPIKey    string // for interview session token creation
+	elevenLabsAgentID   string // pre-created agent in ElevenLabs dashboard
+	elevenLabsVoiceIDC  string // ELEVENLABS_VOICE_ID_C — voice override for interviews
 	replicateAPIKey    string // for AI image generation via Flux
 	aiImageRL          *aiImageRateLimiter
 	mux                *http.ServeMux
@@ -86,8 +87,9 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 		audioGenerator:   audioGen,
 		contentGenerator: contentGen,
 		voiceRegistry:    voiceRegistry,
-		elevenLabsAPIKey:  strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")),
-		elevenLabsAgentID: strings.TrimSpace(os.Getenv("ELEVENLABS_AGENT_ID")),
+		elevenLabsAPIKey:   strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")),
+		elevenLabsAgentID:  strings.TrimSpace(os.Getenv("ELEVENLABS_AGENT_ID")),
+		elevenLabsVoiceIDC: strings.TrimSpace(os.Getenv("ELEVENLABS_VOICE_ID_C")),
 		replicateAPIKey:   strings.TrimSpace(os.Getenv("REPLICATE_API_KEY")),
 		aiImageRL:         newAiImageRateLimiter(),
 		mux:              http.NewServeMux(),
@@ -139,7 +141,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/admin/vocabulary-items/", s.withRole("admin", s.handleAdminVocabItemImage))
 	s.mux.HandleFunc("/v1/vocabulary-items/", s.withRole("learner", s.handleVocabItemImageFile))
 	s.mux.HandleFunc("/v1/grammar-rules/", s.withRole("learner", s.handleGrammarRuleImageFile))
-	s.mux.HandleFunc("/v1/media/file", s.withRole("learner", s.handleMediaFile))
+	s.mux.HandleFunc("/v1/media/file", s.withAuth(s.handleMediaFile))
 	// V15: AI image generation
 	s.mux.HandleFunc("/v1/admin/ai/generate-image", s.withRole("admin", s.handleAdminGenerateImage))
 	s.mux.HandleFunc("/v1/admin/ai/set-banner", s.withRole("admin", s.handleAdminAiSetBanner))
@@ -1292,6 +1294,7 @@ func (s *Server) handleInterviewSessionToken(w http.ResponseWriter, r *http.Requ
 	}
 	// Return system_prompt so Flutter can inject it via conversation_initiation_client_data.
 	tokenResp.SystemPrompt = systemPrompt
+	tokenResp.VoiceID = s.elevenLabsVoiceIDC
 
 	writeJSON(w, http.StatusOK, map[string]any{"data": tokenResp, "meta": map[string]any{}})
 }
@@ -2223,7 +2226,11 @@ func (s *Server) handleAdminAssetDelete(w http.ResponseWriter, r *http.Request, 
 }
 
 func localExerciseAssetPath(storageKey string) string {
-	return filepath.Join(os.TempDir(), "czech-go-system-assets", filepath.FromSlash(storageKey))
+	base := strings.TrimSpace(os.Getenv("LOCAL_ASSETS_DIR"))
+	if base == "" {
+		base = filepath.Join(os.TempDir(), "czech-go-system-assets")
+	}
+	return filepath.Join(base, filepath.FromSlash(storageKey))
 }
 
 func exerciseAssetStorageKey(exerciseID, assetID, mimeType string) string {

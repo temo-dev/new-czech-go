@@ -339,9 +339,10 @@ type InterviewTokenRequest struct {
 // SystemPrompt is the injected prompt (with {selected_option} replaced) — Flutter
 // sends this in the conversation_initiation_client_data WebSocket message.
 type InterviewTokenResponse struct {
-	SignedURL     string `json:"signed_url"`
-	ExpiresIn     int    `json:"expires_in"`
-	SystemPrompt  string `json:"system_prompt"`
+	SignedURL    string `json:"signed_url"`
+	ExpiresIn    int    `json:"expires_in"`
+	SystemPrompt string `json:"system_prompt"`
+	VoiceID      string `json:"voice_id,omitempty"`
 }
 
 // InterviewTranscriptTurn is one turn in a completed interview session.

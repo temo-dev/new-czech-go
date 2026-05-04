@@ -728,15 +728,18 @@ class InterviewTokenResponse {
   const InterviewTokenResponse({
     required this.signedUrl,
     required this.expiresIn,
+    this.voiceId = '',
   });
 
   final String signedUrl;
   final int expiresIn;
+  final String voiceId;
 
   factory InterviewTokenResponse.fromJson(Map<String, dynamic> json) {
     return InterviewTokenResponse(
       signedUrl: json['signed_url'] as String? ?? '',
       expiresIn: (json['expires_in'] as num?)?.toInt() ?? 30,
+      voiceId: json['voice_id'] as String? ?? '',
     );
   }
 }
