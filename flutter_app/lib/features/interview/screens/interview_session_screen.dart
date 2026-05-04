@@ -84,6 +84,13 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
   // V16: prompt card key — used to trigger pulse on agent response complete.
   final GlobalKey<InterviewPromptCardState> _promptCardKey = GlobalKey();
 
+  // V16 diagnostics: per-turn audio chunk counters. Reset on every
+  // agent_response_complete so each turn logs how many chunks went where.
+  int _turnChunksToSimli = 0;
+  int _turnChunksToLocal = 0;
+  int _turnChunksBuffered = 0;
+  int _turnIndex = 0;
+
   @override
   void initState() {
     super.initState();
@@ -139,6 +146,10 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
         String? agentOutputAudioFormat,
         String? userInputAudioFormat,
       }) {
+        debugPrint(
+          'Interview WS metadata agentOutputFormat=$agentOutputAudioFormat '
+          'userInputFormat=$userInputAudioFormat',
+        );
         final _ = userInputAudioFormat;
         _audioPlayer.setOutputAudioFormat(agentOutputAudioFormat);
         _simli?.setInputAudioFormat(agentOutputAudioFormat);
@@ -149,29 +160,37 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
 
         if (!_useSimliAudio) {
           _audioPlayer.addChunk(chunk);
+          _turnChunksToLocal++;
           _scheduleAgentAudioFlush();
           return;
         }
 
         if (_videoReadyFired) {
           _simli?.sendAudio(chunk);
+          _turnChunksToSimli++;
           return;
         }
 
         // Simli WS is connected but its WebRTC audio track is not yet
         // attached — buffer until onVideoReady fires (or fall back).
         _pendingAgentChunks.add(chunk);
+        _turnChunksBuffered++;
         _audioBufferTimeoutTimer ??= Timer(
           Duration(milliseconds: widget.detail.interviewAudioBufferTimeoutMs),
           _fallbackToLocalAudio,
         );
       };
       _wsClient.onInterruption = () {
+        debugPrint(
+          'Interview interruption — clearing ${_useSimliAudio ? "Simli" : "local"} buffer '
+          '(buffered=$_turnChunksBuffered)',
+        );
         if (_useSimliAudio) {
           _simli?.clearBuffer();
         } else {
           _audioPlayer.clearBuffer();
         }
+        _pendingAgentChunks.clear();
       };
       _wsClient.onTranscript = (speaker, text) {
         if (!mounted || _ending) return;
@@ -192,6 +211,20 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       };
       _wsClient.onAgentResponseComplete = () {
         if (!mounted) return;
+        // V16 diagnostics: log per-turn audio routing summary, then reset.
+        _turnIndex++;
+        debugPrint(
+          'Interview turn=$_turnIndex audio chunks: '
+          'simli=$_turnChunksToSimli '
+          'local=$_turnChunksToLocal '
+          'buffered=$_turnChunksBuffered '
+          'useSimliAudio=$_useSimliAudio '
+          'videoReady=$_videoReadyFired',
+        );
+        _turnChunksToSimli = 0;
+        _turnChunksToLocal = 0;
+        _turnChunksBuffered = 0;
+
         if (!_useSimliAudio) {
           _scheduleAgentAudioFlush(delay: const Duration(milliseconds: 120));
         }

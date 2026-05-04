@@ -45,6 +45,15 @@ class PcmAudioPlayer {
     }
 
     while (_pcmBuffer.isNotEmpty && !_disposed) {
+      final pendingBytes = _pcmBuffer.length;
+      // V16: trace local audio playback so we can diagnose missed-audio reports.
+      // Bytes / sample rate / channels gives effective duration in seconds.
+      final approxSec = pendingBytes /
+          (_sampleRate * _channels * (_bitsPerSample / 8));
+      debugPrint(
+        'PcmAudioPlayer.flushAndPlay sampleRate=$_sampleRate '
+        'bytes=$pendingBytes approxDurationSec=${approxSec.toStringAsFixed(2)}',
+      );
       await _playCurrentBuffer();
       if (!_playAgainAfterCurrent && _pcmBuffer.isEmpty) return;
       _playAgainAfterCurrent = false;
@@ -80,7 +89,12 @@ class PcmAudioPlayer {
   }
 
   /// Clear buffer without playing (e.g., on interruption).
-  void clearBuffer() => _pcmBuffer.clear();
+  void clearBuffer() {
+    if (_pcmBuffer.isNotEmpty) {
+      debugPrint('PcmAudioPlayer.clearBuffer dropping ${_pcmBuffer.length} bytes');
+    }
+    _pcmBuffer.clear();
+  }
 
   Future<void> dispose() async {
     _disposed = true;
