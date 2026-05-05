@@ -395,10 +395,10 @@ Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
   - **Files:** `backend/internal/contracts/user_account.go` (new), `backend/internal/store/user_store.go` (new), `postgres_users.go` (new), `user_store_test.go` (new)
   - **Verify:** memory tests 8/8 pass; Postgres impl compiles; Postgres apply test deferred (no DB in CI fixture)
   - **Size:** M (4 files)
-- [ ] **V17-A1.5** `AuthTokenStore` interface + memory + Postgres impl: Create, GetByHash, Revoke, RevokeAllForUser, RevokeAllByKind, CleanupExpired
-  - **AC:** lookup by sha256 hash; revoke single + bulk; cleanup cron-friendly
-  - **Files:** `backend/internal/store/auth_token_store.go`, `postgres_auth_tokens.go`, `memory.go` (extend)
-  - **Verify:** unit test
+- [x] **V17-A1.5** `AuthTokenStore` interface + memory + Postgres impl: CreateAuthToken, AuthTokenByHash (active-only), RevokeAuthToken, RevokeAllAuthTokensForUser, RevokeAllAuthTokensByKind, TouchAuthTokenLastUsed, CleanupExpiredAuthTokens; new `contracts.AuthToken` + 3 token-kind constants; 8 memory tests (2026-05-05)
+  - **AC:** lookup by sha256 hash, expired/revoked excluded ✅; revoke single (idempotent) + bulk by user + bulk by kind ✅; cleanup deletes rows past expiry ✅; duplicate hash fatal (security incident) ✅
+  - **Files:** `backend/internal/contracts/auth_token.go` (new), `backend/internal/store/auth_token_store.go` (new), `postgres_auth_tokens.go` (new), `auth_token_store_test.go` (new)
+  - **Verify:** memory tests 8/8 pass; Postgres impl compiles
   - **Size:** M
 - [ ] **V17-A1.6** `StreakStore` + `ProPurchaseStore` + `DailyUsageStore`: interface + memory + Postgres impls
   - **AC:** streak compute helper `CurrentStreak(userID)` trả `{current, longest, last_day, grace_left}`; daily_usage upsert atomic
