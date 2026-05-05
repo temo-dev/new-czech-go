@@ -50,8 +50,14 @@ export function DictationFields({ initialData, onChange, editingId }: Props) {
   const [rowError, setRowError] = useState<string | null>(null);
 
   // Re-init only when editingId changes (matches AnoNeFields pattern).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setState(initState(initialData)); setTranscript(''); }, [editingId]);
+  // Reconstruct the raw transcript from sentences so admins re-opening an
+  // edit see their original paragraph back in the textarea.
+  useEffect(() => {
+    const next = initState(initialData);
+    setState(next);
+    setTranscript(next.sentences.map((s) => s.text).join(' '));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingId]);
 
   function emit(next: DictationFormState) {
     setState(next);
