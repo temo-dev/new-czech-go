@@ -22,16 +22,12 @@ type postgresUserStore struct{ db *sql.DB }
 // NewPostgresUserStore opens a connection (or reuses one) and ensures the
 // users table exists. Returns ready-to-use UserStore.
 func NewPostgresUserStore(databaseURL string) (UserStore, error) {
-	db, err := sql.Open("postgres", databaseURL)
+	db, err := openPostgresPool(databaseURL, "users")
 	if err != nil {
-		return nil, fmt.Errorf("open postgres: %w", err)
+		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("ping postgres: %w", err)
-	}
 	store := &postgresUserStore{db: db}
 	if err := store.ensureSchema(ctx); err != nil {
 		db.Close()
@@ -282,6 +278,57 @@ func (s *postgresUserStore) SoftDeleteUser(id string) bool {
 	}
 	n, _ := res.RowsAffected()
 	return n > 0
+}
+
+func (s *postgresUserStore) ListUsers(opts ListUsersOptions) ([]contracts.UserAccount, int, error) {
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	offset := opts.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	search := strings.ToLower(strings.TrimSpace(opts.Search))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	args := []any{}
+	where := []string{"deleted_at IS NULL"}
+	if opts.Role != "" {
+		args = append(args, opts.Role)
+		where = append(where, fmt.Sprintf("role = $%d", len(args)))
+	}
+	if search != "" {
+		args = append(args, "%"+search+"%")
+		where = append(where, fmt.Sprintf("(LOWER(email) LIKE $%d OR LOWER(display_name) LIKE $%d)", len(args), len(args)))
+	}
+	whereSQL := "WHERE " + strings.Join(where, " AND ")
+
+	var total int
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users "+whereSQL, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count users: %w", err)
+	}
+
+	args = append(args, limit, offset)
+	query := fmt.Sprintf("SELECT %s FROM users %s ORDER BY created_at DESC LIMIT $%d OFFSET $%d",
+		userColumns, whereSQL, len(args)-1, len(args))
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list users: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]contracts.UserAccount, 0, limit)
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			return nil, 0, fmt.Errorf("scan user: %w", err)
+		}
+		out = append(out, u)
+	}
+	return out, total, rows.Err()
 }
 
 func (s *postgresUserStore) MarkUserEmailVerified(id string) bool {

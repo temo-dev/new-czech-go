@@ -1,32 +1,9 @@
 package store
 
-import (
-	"context"
-	"database/sql"
-	"fmt"
-	"time"
-
-	_ "github.com/lib/pq"
-)
-
 // V17 store URL-based constructors. The WithDB variants accept an
-// existing *sql.DB; these wrappers open a fresh pool from a Postgres
-// URL the same way NewPostgresAttemptStore et al. do, so cmd/api/main.go
-// can wire them with the same per-store pool pattern.
-
-func openPostgresPool(databaseURL string, label string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", databaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("open postgres for %s: %w", label, err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("ping postgres for %s: %w", label, err)
-	}
-	return db, nil
-}
+// existing *sql.DB; these wrappers open a fresh pool via the shared
+// openPostgresPool helper (postgres_pool.go) so every store applies the
+// same connection-pool ceiling.
 
 // NewPostgresAuthTokenStore opens a fresh pool + ensures the schema.
 func NewPostgresAuthTokenStore(databaseURL string) (AuthTokenStore, error) {

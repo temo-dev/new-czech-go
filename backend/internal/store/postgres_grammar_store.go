@@ -13,16 +13,12 @@ import (
 type postgresGrammarStore struct{ db *sql.DB }
 
 func NewPostgresGrammarStore(databaseURL string) (GrammarStore, error) {
-	db, err := sql.Open("postgres", databaseURL)
+	db, err := openPostgresPool(databaseURL, "grammar")
 	if err != nil {
-		return nil, fmt.Errorf("open grammar db: %w", err)
+		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("ping grammar db: %w", err)
-	}
 	// Migration 021: image_asset_id on grammar_rules
 	if err := addColumnIfMissing(ctx, db, "grammar_rules", "image_asset_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
 		db.Close()

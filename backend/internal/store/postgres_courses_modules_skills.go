@@ -16,7 +16,7 @@ import (
 type postgresCourseStore struct{ db *sql.DB }
 
 func NewPostgresCourseStore(databaseURL string) (CourseStore, error) {
-	db, err := openPostgresDB(databaseURL)
+	db, err := openPostgresPool(databaseURL, "courses_modules")
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (s *postgresCourseStore) SetCourseBannerImage(id, storageKey string) bool {
 type postgresModuleStore struct{ db *sql.DB }
 
 func NewPostgresModuleStore(databaseURL string) (ModuleStore, error) {
-	db, err := openPostgresDB(databaseURL)
+	db, err := openPostgresPool(databaseURL, "courses_modules")
 	if err != nil {
 		return nil, err
 	}
@@ -294,18 +294,4 @@ func (s *postgresModuleStore) DeleteModule(id string) bool {
 	return n > 0
 }
 
-// ── Shared DB helper ───────────────────────────────────────────────────────────
-
-func openPostgresDB(databaseURL string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", databaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("open postgres: %w", err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("ping postgres: %w", err)
-	}
-	return db, nil
-}
+// ── Shared DB helper consolidated into postgres_pool.go ─────────────────────

@@ -32,16 +32,12 @@ CREATE INDEX IF NOT EXISTS idx_exercise_sentence_audio_exercise
     ON exercise_sentence_audio (exercise_id)`
 
 func NewPostgresExerciseSentenceAudioStore(databaseURL string) (ExerciseSentenceAudioStore, error) {
-	db, err := sql.Open("postgres", databaseURL)
+	db, err := openPostgresPool(databaseURL, "exercise_sentence_audio")
 	if err != nil {
-		return nil, fmt.Errorf("open exercise_sentence_audio db: %w", err)
+		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("ping exercise_sentence_audio db: %w", err)
-	}
 	if _, err := db.ExecContext(ctx, createExerciseSentenceAudioTableSQL); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("create exercise_sentence_audio: %w", err)

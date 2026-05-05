@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
 	"time"
 
@@ -13,15 +12,9 @@ import (
 type postgresGenerationJobStore struct{ db *sql.DB }
 
 func NewPostgresGenerationJobStore(databaseURL string) (GenerationJobStore, error) {
-	db, err := sql.Open("postgres", databaseURL)
+	db, err := openPostgresPool(databaseURL, "generation_jobs")
 	if err != nil {
-		return nil, fmt.Errorf("open generation_job db: %w", err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("ping generation_job db: %w", err)
+		return nil, err
 	}
 	return &postgresGenerationJobStore{db: db}, nil
 }

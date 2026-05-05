@@ -16,18 +16,13 @@ type postgresExerciseStore struct {
 }
 
 func NewPostgresExerciseStore(databaseURL string) (ExerciseStore, error) {
-	db, err := sql.Open("postgres", databaseURL)
+	db, err := openPostgresPool(databaseURL, "exercises")
 	if err != nil {
-		return nil, fmt.Errorf("open postgres connection: %w", err)
+		return nil, err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("ping postgres: %w", err)
-	}
 
 	store := &postgresExerciseStore{db: db}
 	if err := store.ensureSchema(ctx); err != nil {

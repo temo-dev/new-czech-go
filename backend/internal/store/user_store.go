@@ -36,6 +36,11 @@ type UserStore interface {
 	// SoftDeleteUser sets DeletedAt and frees the email for re-registration.
 	SoftDeleteUser(id string) bool
 
+	// ListUsers returns active (non-soft-deleted) accounts ordered by
+	// CreatedAt DESC, paginated by limit + offset. A non-empty `search`
+	// filters case-insensitively on email or display_name.
+	ListUsers(opts ListUsersOptions) ([]contracts.UserAccount, int, error)
+
 	// MarkUserEmailVerified flips EmailVerifiedAt and lifts the grace cap so
 	// downstream rate limits no longer hard-block the learner.
 	MarkUserEmailVerified(id string) bool
@@ -48,6 +53,16 @@ type UserStore interface {
 // ErrDuplicateEmail is returned when CreateUser is called with an email that
 // already exists on an active row.
 var ErrDuplicateEmail = errors.New("email already registered")
+
+// ListUsersOptions filters + paginates ListUsers. Limit <= 0 falls back
+// to 50; Offset < 0 is clamped to 0. Search is case-insensitive substring
+// against email + display_name.
+type ListUsersOptions struct {
+	Limit  int
+	Offset int
+	Search string
+	Role   string // "" = no filter; otherwise exact-match on role
+}
 
 // graceAfterVerify is the value GraceAttemptsLeft is lifted to once the
 // learner clicks the verify-email link. The exact ceiling is unimportant —
@@ -184,6 +199,52 @@ func (s *memoryUserStore) SoftDeleteUser(id string) bool {
 	u.DeletedAt = &now
 	u.UpdatedAt = now
 	return true
+}
+
+func (s *memoryUserStore) ListUsers(opts ListUsersOptions) ([]contracts.UserAccount, int, error) {
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	offset := opts.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	search := strings.ToLower(strings.TrimSpace(opts.Search))
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	all := make([]contracts.UserAccount, 0, len(s.users))
+	for _, u := range s.users {
+		if u.DeletedAt != nil {
+			continue
+		}
+		if opts.Role != "" && u.Role != opts.Role {
+			continue
+		}
+		if search != "" {
+			if !strings.Contains(strings.ToLower(u.Email), search) &&
+				!strings.Contains(strings.ToLower(u.DisplayName), search) {
+				continue
+			}
+		}
+		all = append(all, *u)
+	}
+	// sort by CreatedAt DESC
+	for i := 1; i < len(all); i++ {
+		for j := i; j > 0 && all[j].CreatedAt.After(all[j-1].CreatedAt); j-- {
+			all[j], all[j-1] = all[j-1], all[j]
+		}
+	}
+	total := len(all)
+	if offset >= total {
+		return []contracts.UserAccount{}, total, nil
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return all[offset:end], total, nil
 }
 
 func (s *memoryUserStore) MarkUserEmailVerified(id string) bool {

@@ -12,16 +12,12 @@ import (
 type postgresVocabularyStore struct{ db *sql.DB }
 
 func NewPostgresVocabularyStore(databaseURL string) (VocabularyStore, error) {
-	db, err := sql.Open("postgres", databaseURL)
+	db, err := openPostgresPool(databaseURL, "vocabulary")
 	if err != nil {
-		return nil, fmt.Errorf("open vocab db: %w", err)
+		return nil, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("ping vocab db: %w", err)
-	}
 	// Migration 017/018: vocabulary_sets schema flatten — drop skill_id FK+col, add module_id
 	db.ExecContext(ctx, `ALTER TABLE vocabulary_sets DROP CONSTRAINT IF EXISTS vocabulary_sets_skill_id_fkey`)
 	db.ExecContext(ctx, `ALTER TABLE vocabulary_sets DROP COLUMN IF EXISTS skill_id`)
