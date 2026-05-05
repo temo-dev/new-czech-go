@@ -49,6 +49,20 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
       LOCAL_ASSETS_DIR: /app/assets
+      # V17 self-serve learner — opt-in. When USE_V17_AUTH=true the backend
+      # registers /v1/auth/signup, /login, /verify, IAP webhook, quota gates.
+      # Without these vars set, the legacy dev-fixture token path stays.
+      USE_V17_AUTH: ${USE_V17_AUTH:-false}
+      V17_BASE_URL: ${V17_BASE_URL:-}
+      EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST:-}
+      EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-587}
+      EMAIL_SMTP_USERNAME: ${EMAIL_SMTP_USERNAME:-}
+      EMAIL_SMTP_PASSWORD: ${EMAIL_SMTP_PASSWORD:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Czech Go}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@czechgo.hadoo.eu}
+      APPLE_SHARED_SECRET: ${APPLE_SHARED_SECRET:-}
+      APPLE_BUNDLE_ID: ${APPLE_BUNDLE_ID:-eu.hadoo.czechgo}
+      IAP_WEBHOOK_SECRET: ${IAP_WEBHOOK_SECRET:-}
     volumes:
       - backend_assets:/app/assets
       - backend_attempts:/tmp/czech-go-system
