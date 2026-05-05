@@ -346,15 +346,32 @@ buildDictationUserPrompt(sentences []DictationLLMInput) string
 
 ### 6.4 Database
 
-Single inline migration via `addColumnIfMissing()` at startup:
+**Implementation deviates from earlier draft:** the existing `exercise_audio`
+table has `exercise_id` as PRIMARY KEY (one row per exercise). Adding
+sentence rows there would require dropping the PK, which is risky against
+prod RDS. Instead V18 introduces a **separate** table `exercise_sentence_audio`
+with composite PK `(exercise_id, sentence_idx)`. The legacy single-row
+behavior for poslech/writing audio stays untouched.
+
+Goose migration `024_exercise_sentence_audio.sql`:
 ```sql
-ALTER TABLE exercise_audios
-  ADD COLUMN IF NOT EXISTS sentence_idx INT NULL;
-CREATE INDEX IF NOT EXISTS idx_exercise_audios_exercise_sentence
-  ON exercise_audios(exercise_id, sentence_idx);
+CREATE TABLE IF NOT EXISTS exercise_sentence_audio (
+    exercise_id  TEXT        NOT NULL,
+    sentence_idx INT         NOT NULL,
+    storage_key  TEXT        NOT NULL,
+    mime_type    TEXT        NOT NULL DEFAULT 'audio/mpeg',
+    source_type  TEXT        NOT NULL DEFAULT 'polly',
+    generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (exercise_id, sentence_idx)
+);
+CREATE INDEX IF NOT EXISTS idx_exercise_sentence_audio_exercise
+    ON exercise_sentence_audio (exercise_id);
 ```
 
-No goose migration file. Per AGENTS.md V11 RDS caveat: `czech_user` must own the table or have `ALTER` privilege; if not, run a one-time `ALTER TABLE ... OWNER TO czech_user` post-deploy.
+`NewPostgresExerciseSentenceAudioStore` also runs `CREATE TABLE IF NOT EXISTS`
++ `CREATE INDEX IF NOT EXISTS` at startup so deployments that skipped the
+goose migration still come up cleanly. RDS caveat (V11) does not apply
+because the table is brand-new — created by whatever role first connects.
 
 ---
 

@@ -222,6 +222,20 @@ type ExerciseAudio struct {
 	GeneratedAt string `json:"generated_at"`
 }
 
+// ExerciseSentenceAudio (V18) stores per-sentence audio metadata for a
+// dictation exercise. Lives in a separate table from ExerciseAudio because
+// dictation exercises have N rows (one per sentence) keyed by
+// (exercise_id, sentence_idx); other exercise types still use the single-row
+// ExerciseAudio.
+type ExerciseSentenceAudio struct {
+	ExerciseID  string `json:"exercise_id"`
+	SentenceIdx int    `json:"sentence_idx"`
+	StorageKey  string `json:"storage_key"`
+	MimeType    string `json:"mime_type"`
+	SourceType  string `json:"source_type"` // "polly" | "upload"
+	GeneratedAt string `json:"generated_at"`
+}
+
 // --- Reading (V4) ---
 
 type ReadingItem struct {

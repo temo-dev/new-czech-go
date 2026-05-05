@@ -27,10 +27,11 @@ type MemoryStore struct {
 	attempts           AttemptStore
 	mockExams          MockExamStore
 	mockTests          MockTestStore
-	exerciseAudioStore ExerciseAudioStore // Postgres-backed when available
-	vocabulary         VocabularyStore
-	grammar            GrammarStore
-	generationJobs     GenerationJobStore
+	exerciseAudioStore         ExerciseAudioStore // Postgres-backed when available
+	exerciseSentenceAudioStore ExerciseSentenceAudioStore // V18 — dictation per-sentence audio
+	vocabulary                 VocabularyStore
+	grammar                    GrammarStore
+	generationJobs             GenerationJobStore
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -104,8 +105,9 @@ func NewMemoryStoreWithStores(attempts AttemptStore, exercises ExerciseStore) *M
 		attempts:           attempts,
 		mockExams:          newMemoryMockExamStore(exercises, attempts),
 		mockTests:          newMemoryMockTestStore(),
-		exerciseAudioStore: newMemoryExerciseAudioStore(),
-		vocabulary:         newMemoryVocabularyStore(),
+		exerciseAudioStore:         newMemoryExerciseAudioStore(),
+		exerciseSentenceAudioStore: newMemoryExerciseSentenceAudioStore(),
+		vocabulary:                 newMemoryVocabularyStore(),
 		grammar:            newMemoryGrammarStore(),
 		generationJobs:     newMemoryGenerationJobStore(),
 	}
@@ -497,6 +499,30 @@ func (s *MemoryStore) ExerciseAudioByExercise(exerciseID string) (*contracts.Exe
 
 func (s *MemoryStore) SetExerciseAudio(exerciseID string, audio contracts.ExerciseAudio) {
 	s.exerciseAudioStore.SetExerciseAudio(exerciseID, audio)
+}
+
+// ExerciseSentenceAudio methods (V18) — delegate to exerciseSentenceAudioStore.
+
+func (s *MemoryStore) SetExerciseSentenceAudioStore(store ExerciseSentenceAudioStore) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.exerciseSentenceAudioStore = store
+}
+
+func (s *MemoryStore) SentenceAudio(exerciseID string, sentenceIdx int) (*contracts.ExerciseSentenceAudio, bool) {
+	return s.exerciseSentenceAudioStore.SentenceAudio(exerciseID, sentenceIdx)
+}
+
+func (s *MemoryStore) SentenceAudiosByExercise(exerciseID string) []contracts.ExerciseSentenceAudio {
+	return s.exerciseSentenceAudioStore.SentenceAudiosByExercise(exerciseID)
+}
+
+func (s *MemoryStore) SetSentenceAudio(exerciseID string, sentenceIdx int, audio contracts.ExerciseAudio) {
+	s.exerciseSentenceAudioStore.SetSentenceAudio(exerciseID, sentenceIdx, audio)
+}
+
+func (s *MemoryStore) DeleteSentenceAudio(exerciseID string, sentenceIdx int) error {
+	return s.exerciseSentenceAudioStore.DeleteSentenceAudio(exerciseID, sentenceIdx)
 }
 
 func rollupReadiness(levels []string) (string, string) {
