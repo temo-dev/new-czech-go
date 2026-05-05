@@ -385,10 +385,76 @@ type Psani2Detail struct {
 
 // WritingSubmission is the body of POST /v1/attempts/:id/submit-text.
 // Use Answers for psani_1_formular (3 items), Text for psani_2_email.
+// Use Sentences for psani_3_dictation (V18). Handler dispatches on exercise type.
 type WritingSubmission struct {
-	Answers          []string `json:"answers,omitempty"`
-	Text             string   `json:"text,omitempty"`
-	PreferredVoiceID string   `json:"preferred_voice_id,omitempty"`
+	Answers          []string                  `json:"answers,omitempty"`
+	Text             string                    `json:"text,omitempty"`
+	Sentences        []DictationSentenceAnswer `json:"sentences,omitempty"`
+	PreferredVoiceID string                    `json:"preferred_voice_id,omitempty"`
+}
+
+// --- Dictation (V18: psani_3_dictation) ---
+
+// DictationDetail is the details_json shape for a psani_3_dictation exercise.
+// Sentences are 3..8 Czech utterances; each one has its own Polly-generated MP3
+// referenced by AudioAssetID. MaxReplaysPerSentence=0 means unlimited (client-only cap).
+// PassThresholdPercent reuses the V7 mock-test pass threshold semantics.
+type DictationDetail struct {
+	Topic                 string              `json:"topic"`
+	ContextImageAssetID   string              `json:"context_image_asset_id,omitempty"`
+	Sentences             []DictationSentence `json:"sentences"`
+	MaxReplaysPerSentence int                 `json:"max_replays_per_sentence"`
+	VoiceID               string              `json:"voice_id,omitempty"`
+	MaxPoints             int                 `json:"max_points,omitempty"`
+	PassThresholdPercent  int                 `json:"pass_threshold_percent,omitempty"`
+}
+
+// DictationSentence is one sentence row in a dictation exercise.
+type DictationSentence struct {
+	Idx          int    `json:"idx"`
+	Text         string `json:"text"`
+	AudioAssetID string `json:"audio_asset_id,omitempty"`
+}
+
+// DictationSubmission is the body shape used by submit-text for psani_3_dictation.
+// Coexists with the {answers}/{text} shapes via WritingSubmission.Sentences.
+type DictationSubmission struct {
+	Sentences []DictationSentenceAnswer `json:"sentences"`
+}
+
+// DictationSentenceAnswer is one learner-submitted sentence.
+// ReplayCount is telemetry only — never used to gate or modify the score.
+type DictationSentenceAnswer struct {
+	Idx         int    `json:"idx"`
+	Text        string `json:"text"`
+	ReplayCount int    `json:"replay_count,omitempty"`
+}
+
+// DictationFeedback is persisted on attempts.feedback_json after scoring.
+// OverallScore is the deterministic Levenshtein-based result; Sentences[i] holds
+// per-sentence accuracy plus optional LLM annotations (error_tags, feedback_*, diff_chunks).
+type DictationFeedback struct {
+	OverallScore     int                      `json:"overall_score"`
+	MaxPoints        int                      `json:"max_points"`
+	Passed           bool                     `json:"passed"`
+	PassThresholdPct int                      `json:"pass_threshold_percent"`
+	Sentences        []DictationSentenceScore `json:"sentences"`
+}
+
+// DictationSentenceScore captures both the deterministic score
+// (Accuracy in [0.0,1.0], DistanceWeighted) and optional LLM annotation
+// (ErrorTags, FeedbackVI/EN, DiffChunks). Annotation fields stay empty when LLM is unavailable.
+type DictationSentenceScore struct {
+	Idx              int         `json:"idx"`
+	Reference        string      `json:"reference"`
+	Learner          string      `json:"learner"`
+	Accuracy         float64     `json:"accuracy"`
+	DistanceWeighted float64     `json:"distance_weighted"`
+	AudioAssetID     string      `json:"audio_asset_id,omitempty"`
+	ErrorTags        []string    `json:"error_tags,omitempty"`
+	FeedbackVI       string      `json:"feedback_vi,omitempty"`
+	FeedbackEN       string      `json:"feedback_en,omitempty"`
+	DiffChunks       []DiffChunk `json:"diff_chunks,omitempty"`
 }
 
 // --- Objective scoring (V3/V4) ---

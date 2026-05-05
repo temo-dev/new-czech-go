@@ -1532,3 +1532,93 @@ Nếu không bật `first_message` override → agent không nói câu chào →
 | MAN-10 | iPhone compact / Facebook in-app browser | Prompt card scroll được, mic + end button không bị che/chồng; no overflow |
 | MAN-11 | Sound-wave PTT giọng nhỏ | Log `sentPeak` cao hơn `rawPeak` khoảng 2.4x; `vadMax` không còn `none`/rất thấp; learner transcript không rỗng |
 | CHECKPOINT | `make verify` | Full pass |
+
+---
+
+## V18 — Dictation Exercise (`psani_3_dictation`)
+
+> Status: spec frozen, implementation pending
+> Spec: `docs/specs/dictation-exercise.md`
+> Idea: `docs/ideas/dictation-exercise.md`
+> Design: `docs/designs/dictation-exercise.html`
+
+### Tóm tắt
+
+Thêm exercise type mới `psani_3_dictation` vào skill `viet`. Admin author 3–8 câu Czech + ảnh ngữ cảnh tùy chọn → Polly sinh MP3 từng câu → learner nghe (auto-play lần đầu, repeat tối đa N) → gõ lại → backend chấm bằng weighted Levenshtein (diacritic substitution weight 0.5) + LLM annotate diff/error_tags. Pool=`course` only. Không vào MockTest exam pool.
+
+### Mục tiêu
+
+- Luyện chính tả (pravopisné cvičení) cho A2 learner: dấu phụ, viết hoa, ranh giới từ.
+- Reuse hạ tầng V1 (Polly, Claude, image_asset_id, submit-text endpoint) — không thêm SDK mới.
+- Score deterministic + LLM annotation song song (LLM fail không block result).
+
+### Decisions locked (xem spec § 0)
+
+| # | Decision | Value |
+|---|---|---|
+| D1 | Voice picker | Admin per-exercise (`voice_id` field). |
+| D2 | Pass threshold default | 60%, admin override per-exercise. |
+| D3 | Replay-count storage | `attempts.details_json.replay_counts: [int]`. |
+| D4 | Sentence count | Min 3, Max 8 hard. |
+| D5 | OCR | Out of V18, planned V18.1 sau pilot. |
+| D6 | Audio | N MP3s per exercise, `exercise_audios.sentence_idx` nullable column. |
+| D7 | Submit endpoint | `POST /v1/attempts/:id/submit-text` extended với `sentences[]` shape. |
+| D8 | LLM annotation | Async/parallel, fail-soft. |
+| D9 | Replay cap | Client-only enforcement. |
+| D10 | Pool | `course` only. |
+
+### Acceptance Criteria (xem spec § 2.2)
+
+10 AC measurable: từ "publish exercise dưới 2 phút" → "diacritic-only mistake ≥ 50% accuracy" → "≥ 25 new tests across 3 layers".
+
+### File changes
+
+- Backend: `processing/dictation_scorer.go` (new), `processing/dictation_llm.go` (new), `processing/dictation_scorer_test.go` (new), `processing/exercise_audio.go` (edit — add `GenerateSentenceAudio`), `processing/llm_config.go` (edit), `processing/llm_prompts.go` (edit — `DictationSystemPrompt`), `processing/llm_user_prompts.go` (edit — `buildDictationUserPrompt`), `processing/llm_fallbacks.go` (edit), `contracts/types.go` (edit — `DictationDetail`/`DictationSubmission`/`DictationFeedback`/`DictationSentenceScore`), `httpapi/server.go` (edit), `httpapi/admin_dictation_audio.go` (new), `httpapi/attempts.go` (edit — branch on exercise_type), `httpapi/dictation_test.go` (new), `store/postgres_exercise_audio.go` (edit — `addColumnIfMissing` cho `sentence_idx`)
+- CMS: `components/exercise-form/DictationFields.tsx` (new), `components/exercise-form/exercise-utils.ts` (edit — types + helpers), `components/exercise-form/index.tsx` (edit — branch), `lib/i18n.tsx` (edit), `app/api/admin/exercises/[exerciseId]/dictation/sentences/[idx]/audio/route.ts` (new), `components/__tests__/dictation-fields.test.ts` (new)
+- Flutter: `features/exercise/screens/dictation_exercise_screen.dart` (new), `features/exercise/widgets/dictation_audio_card.dart` (new), `features/exercise/widgets/czech_keyboard_chips.dart` (new), `features/exercise/widgets/dictation_result_card.dart` (new), `models/models.dart` (edit), `core/api/api_client.dart` (edit — `submitDictation`), `l10n/app_{vi,en}.arb` (edit), `test/dictation_exercise_screen_test.dart` (new), `test/dictation_models_test.dart` (new)
+- DB: inline `ALTER TABLE exercise_audios ADD COLUMN IF NOT EXISTS sentence_idx INT NULL` + composite index. Không có goose migration file.
+- Docs: `docs/ideas/dictation-exercise.md`, `docs/specs/dictation-exercise.md`, `docs/designs/dictation-exercise.html` (đã có)
+
+### V18 New i18n keys
+
+| Key | VI | EN |
+|---|---|---|
+| `dictationListenInstruction` | Nghe và viết lại câu | Listen and write the sentence |
+| `dictationSentenceLabel` | Câu {idx} / {total} | Sentence {idx} / {total} |
+| `dictationRepeatRemaining` | Còn {n} lượt nghe lại | {n} replay(s) left |
+| `dictationRepeatExhausted` | Hết lượt nghe lại | No replays left |
+| `dictationKeyboardHint` | Bàn phím Czech | Czech keyboard |
+| `dictationNextBtn` | Tiếp → | Next → |
+| `dictationSubmitBtn` | Nộp bài | Submit |
+| `dictationPrevBtn` | ← Trước | ← Prev |
+| `dictationResultPerSentence` | Độ chính xác từng câu | Per-sentence accuracy |
+| `dictationLLMUnavailable` | Phản hồi chi tiết tạm không khả dụng | Detailed feedback temporarily unavailable |
+
+### Avoid in V18
+
+- ❌ OCR submission (defer V18.1)
+- ❌ Single-MP3 + SSML break + timestamp-seek (per-sentence MP3 chosen)
+- ❌ LLM as scorer (deterministic Levenshtein is the score)
+- ❌ Server-side replay-cap enforcement
+- ❌ Auto-advance on Enter key
+- ❌ Live char-by-char scoring under TextField
+- ❌ Penalty for paste / Czech chip
+- ❌ Block submit on missing sentence audio at runtime (admin prevents at publish)
+- ❌ Include dictation in MockTest exam pool
+
+### V18 Verification
+
+| Step | Lệnh | Manual check |
+|---|---|---|
+| BE-1 | `make backend-test` | +10 tests min — `TestDictationDistance_*`, `TestSentenceAccuracy_*`, `TestSubmitDictation_*` |
+| FE-1 | `make flutter-analyze && make flutter-test` | +10 tests min — `dictation_exercise_screen_test`, `dictation_models_test`, `dictation_result_card_test` |
+| CMS-1 | `make cms-lint && cd cms && npm test && make cms-build` | +5 Vitest min — `dictation-fields` split + validate + payload |
+| MAN-1 | Admin author 6-câu, Polly từng row, publish | Exercise xuất hiện ở learner Module Viết |
+| MAN-2 | Learner gõ exact ref text | 10/10, PASS |
+| MAN-3 | Learner gõ ref minus all diacritics | 50–70%, biên giới PASS/FAIL |
+| MAN-4 | Repeat 3× câu 2 | Nút disable ở 3/3, tooltip "Hết lượt" |
+| MAN-5 | Submit fail (mạng off) | Banner Retry, text không mất |
+| MAN-6 | Background app giữa attempt | TextField + replay counter preserved |
+| MAN-7 | Tab Sửa bài | Diff highlight green/red |
+| MAN-8 | LLM mock fail | Result vẫn render với deterministic-only diff |
+| CHECKPOINT | `make verify` | Full pass |

@@ -673,3 +673,157 @@ Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
 - [ ] Cutover smoke test pass
 - [ ] 24h post-cutover metrics OK
 - [ ] Rollback plan tested staging
+
+---
+
+## V18 — Dictation Exercise (`psani_3_dictation`)
+
+Spec: `docs/specs/dictation-exercise.md` · Plan: `tasks/plan.md § V18` · SPEC.md: § V18
+
+### Phase A — Backend foundation (1.5 ngày)
+
+- [ ] **V18-A1.1** Contracts: `DictationDetail`, `DictationSentence`, `DictationSubmission`, `DictationSentenceAnswer`, `DictationFeedback`, `DictationSentenceScore` + `ExerciseDetail.DictationDetail()` getter
+  - **Files:** `backend/internal/contracts/types.go`
+  - **AC:** `make backend-build` pass; JSON tags exact match spec § 4.1
+  - **Verify:** unit test parse + nil-on-wrong-type
+  - **Size:** S
+- [ ] **V18-A2.1** Levenshtein scorer + diacritic pair table + normalize
+  - **Files:** `backend/internal/processing/dictation_scorer.go` (new), `dictation_scorer_test.go` (new)
+  - **AC:** 15 diacritic pairs cost 0.5; normalize NFC + lowercase + collapse; empty/identical edge cases
+  - **Verify:** 10+ test cases incl. perfect, all-diacritics-stripped (≥ 50%), totally-different (= 0), empty
+  - **Size:** M
+- [ ] **V18-A3.1** LLM config + prompt + provider + fallback
+  - **Files:** `processing/llm_config.go` (edit), `llm_prompts.go` (edit — `DictationSystemPrompt`), `llm_user_prompts.go` (edit — `buildDictationUserPrompt`), `llm_fallbacks.go` (edit), `processing/dictation_llm.go` (new — interface + Claude impl + nil fallback)
+  - **AC:** All prompt strings stay in SoT files (per AGENTS.md); env var `LLM_DICTATION_MODEL` loads
+  - **Verify:** mock provider returns correct annotation shape
+  - **Size:** M
+- [ ] **V18-A4.1** DB migration: `exercise_audios.sentence_idx` nullable + composite index
+  - **Files:** `backend/internal/store/postgres_exercise_audio.go` (edit), `backend/internal/store/exercise_audio.go` (interface edit)
+  - **AC:** `addColumnIfMissing` adds column; index created; existing audio rows untouched
+  - **Verify:** start backend twice — second run no-op; existing poslech audio still readable
+  - **Size:** S
+- [ ] **V18-A5.1** Admin per-sentence audio endpoint + Polly client wrap
+  - **Files:** `backend/internal/httpapi/admin_dictation_audio.go` (new), `processing/exercise_audio.go` (edit — `GenerateSentenceAudio`), `httpapi/server.go` (edit — register routes)
+  - **AC:** POST creates MP3 + DB row; DELETE removes both; non-admin → 403; text > 250 → 400
+  - **Verify:** integration test in `httpapi/admin_dictation_audio_test.go`
+  - **Size:** M
+
+**[CHECKPOINT V18-A]** `make backend-build && make backend-test` pass with +10 tests
+
+### Phase B — Backend integration (0.5 ngày)
+
+- [ ] **V18-B1.1** Dispatch `submit-text` on exercise_type → dictation goroutine
+  - **Files:** `backend/internal/httpapi/attempts.go` (edit)
+  - **AC:** body cap 16 KB; sentence count mismatch → 400 `invalid_sentence_count`; sentence > 200 chars → 400 `sentence_too_long`; goroutine has `defer recover()` → FailAttempt; `replay_counts` saved to `attempts.details_json`
+  - **Verify:** unit test handler branching
+  - **Size:** M
+- [ ] **V18-B2.1** Integration test
+  - **Files:** `backend/internal/httpapi/dictation_test.go` (new)
+  - **AC:** 7 tests — happy, diacritic-only ≥ 50%, wrong count, too-long, body-too-large, LLM fail fallback, audio gen
+  - **Verify:** `go test ./internal/httpapi -run TestSubmitDictation` pass
+  - **Size:** M
+
+**[CHECKPOINT V18-B]** Backend test count ≥ +10; smoke `curl` POST submit-text với dictation payload returns valid result
+
+### Phase C — CMS authoring (1 ngày)
+
+- [ ] **V18-C1.1** `DictationFields` component
+  - **Files:** `cms/components/exercise-form/DictationFields.tsx` (new)
+  - **AC:** topic + image + transcript + sentence repeater (Polly per row + preview + delete) + voice/replay/points/threshold inputs; inline validation banner
+  - **Verify:** Storybook-style render với 6-sentence mock
+  - **Size:** L
+- [ ] **V18-C2.1** Utils: split, validate, payload, formState
+  - **Files:** `cms/components/exercise-form/exercise-utils.ts` (edit)
+  - **AC:** `splitTranscriptIntoSentences` handles `Mgr.`/`Dr.`/`Bc.`/`Ph.D.`/`pan.`/`ing.` abbreviations; `validateDictation` enforces 3..8 sentences, 1..200 char each, audio_asset_id required, replay 0..10
+  - **Verify:** Vitest in C4
+  - **Size:** M
+- [ ] **V18-C3.1** Proxy routes for sentence audio
+  - **Files:** `cms/app/api/admin/exercises/[exerciseId]/dictation/sentences/[idx]/audio/route.ts` (new)
+  - **AC:** POST + DELETE thread `admin_token` cookie; forward to backend
+  - **Verify:** route response shape match backend
+  - **Size:** S
+- [ ] **V18-C4.1** i18n + Vitest
+  - **Files:** `cms/lib/i18n.tsx` (edit), `cms/components/__tests__/dictation-fields.test.ts` (new)
+  - **AC:** 8 VI+EN keys; +5 Vitest minimum (split basic, split keeps abbreviations, split trims empty, validate min/max, validate missing audio, payload shape)
+  - **Verify:** `cd cms && npm test` pass
+  - **Size:** M
+- [ ] **V18-C5.1** Wire vào slide-over + skill_kind + pool filter
+  - **Files:** `cms/components/exercise-form/index.tsx` (edit)
+  - **AC:** dropdown shows `Chính tả (psani_3_dictation)` only khi skill=`viet` && pool=`course`; submit gated by `validateDictation`
+  - **Verify:** manual click-through CMS
+  - **Size:** S
+
+**[CHECKPOINT V18-C]** `make cms-lint && cd cms && npm test && make cms-build` pass; admin authors test exercise end-to-end với 6 câu Polly
+
+### Phase D — Flutter (2 ngày)
+
+- [ ] **V18-D1.1** Models parser
+  - **Files:** `flutter_app/lib/models/models.dart` (edit), `flutter_app/test/dictation_models_test.dart` (new)
+  - **AC:** parse `DictationDetail`/`DictationSentence`/`DictationSentenceScore` from JSON; `ExerciseDetail.dictationDetail` getter returns null cho non-dictation
+  - **Verify:** +3 tests
+  - **Size:** S
+- [ ] **V18-D2.1** `DictationAudioCard` widget
+  - **Files:** `flutter_app/lib/features/exercise/widgets/dictation_audio_card.dart` (new), test
+  - **AC:** auto-play once on mount (no count); manual repeat increments counter; disable at cap; `maxReplays=0` unlimited
+  - **Verify:** +3 widget tests
+  - **Size:** M
+- [ ] **V18-D3.1** `CzechKeyboardChips` widget
+  - **Files:** `flutter_app/lib/features/exercise/widgets/czech_keyboard_chips.dart` (new), test
+  - **AC:** 13 chip glyphs; tap inserts at cursor; 44pt min target; semantics labels
+  - **Verify:** +2 widget tests
+  - **Size:** S
+- [ ] **V18-D4.1** `DictationExerciseScreen` stepper
+  - **Files:** `flutter_app/lib/features/exercise/screens/dictation_exercise_screen.dart` (new), test
+  - **AC:** initial idx=0; Next disabled empty; last → Submit; Prev preserves text; `AutomaticKeepAliveClientMixin`; back-confirm dialog when dirty
+  - **Verify:** +6 widget tests (initial state, Next gate, Prev preserve, Submit triggers API, last-sentence label, replay-cap doesn't block submit)
+  - **Size:** L
+- [ ] **V18-D5.1** `DictationResultCard` 3-tab + diff highlight
+  - **Files:** `flutter_app/lib/features/exercise/widgets/dictation_result_card.dart` (new), test
+  - **AC:** 3 tabs render; accuracy bar color (green ≥ 80%, orange < 80%); LLM-empty fallback banner; reuse `_DiffTextBlock`
+  - **Verify:** +4 widget tests
+  - **Size:** M
+- [ ] **V18-D6.1** `submitDictation` API client
+  - **Files:** `flutter_app/lib/core/api/api_client.dart` (edit)
+  - **AC:** Czech UTF-8 chars > U+00FF round-trip OK (V2 fix verified); payload shape match backend
+  - **Verify:** unit test
+  - **Size:** S
+- [ ] **V18-D7.1** i18n ARB keys VI+EN
+  - **Files:** `flutter_app/lib/l10n/app_vi.arb`, `app_en.arb` (edit)
+  - **AC:** 10 keys (xem SPEC.md § V18); VI=EN count
+  - **Verify:** `make flutter-analyze` no missing-l10n warning
+  - **Size:** S
+- [ ] **V18-D8.1** Router dispatch psani_3_dictation
+  - **Files:** dispatcher equivalent (next to where `WritingExerciseScreen` is pushed today)
+  - **AC:** dictation exercises route đúng screen; reading/listening/writing routes intact
+  - **Verify:** manual smoke + 1 navigation test
+  - **Size:** S
+
+**[CHECKPOINT V18-D]** `make flutter-analyze && make flutter-test` pass with +10 tests; manual: TestFlight build dictation flow end-to-end
+
+### Phase E — End-to-end (0.5 ngày)
+
+- [ ] **V18-E1.1** Manual acceptance MAN-1..MAN-8 (xem SPEC.md § V18 Verification)
+  - Admin author 6 câu → Polly per row → publish
+  - Learner perfect text → 10/10 PASS
+  - Learner ref minus diacritics → 50–70%
+  - Repeat 3× câu 2 → button disable
+  - Submit fail (mạng off) → text not lost
+  - Background app → state preserved
+  - Tab Sửa bài → diff highlight green/red
+  - LLM mock fail → deterministic-only diff renders
+  - **Manual task** — không code
+- [ ] **V18-E2.1** Smoke extension
+  - **Files:** `scripts/smoke_attempt_flow.py` (or equivalent — extend với dictation case)
+  - **AC:** `make smoke-attempt-flow` pass với dictation submit
+  - **Size:** S
+- [ ] **V18-E3.1** `make verify` final
+  - **AC:** all CI green; backend tests ≥ +10; Flutter ≥ +10; CMS ≥ +5
+
+**[CHECKPOINT V18-FINAL]**
+- [ ] `make backend-test` pass (target: 462+ tests)
+- [ ] `make flutter-test` pass (target: 211+ tests)
+- [ ] `cd cms && npm test` pass (target: 100+ tests)
+- [ ] `make smoke-all` xanh
+- [ ] Manual MAN-1..MAN-8 pass
+- [ ] CMS guide page updated với dictation section
+- [ ] No regression: existing `psani_1_formular` + `psani_2_email` submissions still work end-to-end

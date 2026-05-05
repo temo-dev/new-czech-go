@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dictation Exercise — UI/UX Design</title>
+<style>
+  :root {
+    --orange: #FF6A14;
+    --orange-soft: #FFE8DA;
+    --cream: #FBF3E7;
+    --teal: #0F3D3A;
+    --teal-light: #1A5C58;
+    --white: #FFFFFF;
+    --grey-50: #F9F9F9;
+    --grey-100: #F0F0F0;
+    --grey-200: #E5E2DA;
+    --grey-400: #9E9E9E;
+    --grey-600: #616161;
+    --grey-900: #212121;
+    --green: #2E8B57;
+    --green-light: #E6F4EC;
+    --red: #D14343;
+    --red-light: #FCEAEA;
+    --r-md: 12px;
+    --r-lg: 16px;
+    --r-xl: 24px;
+    --shadow-sm: 0 1px 3px rgba(15,61,58,0.06);
+    --shadow-md: 0 4px 12px rgba(15,61,58,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #1A1A2E;
+    color: var(--grey-900);
+    padding: 40px 20px;
+    min-height: 100vh;
+  }
+  h1 { color: var(--white); font-size: 28px; font-weight: 700; letter-spacing: -0.5px; text-align: center; }
+  .subtitle { color: rgba(255,255,255,0.6); font-size: 14px; text-align: center; margin: 8px 0 48px; }
+
+  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--orange); margin-bottom: 12px; }
+  .section-title { font-size: 18px; font-weight: 700; color: var(--white); margin-bottom: 6px; }
+  .section-desc { font-size: 13px; color: rgba(255,255,255,0.55); margin-bottom: 28px; line-height: 1.6; }
+
+  .grid {
+    display: grid;
+    gap: 32px;
+    max-width: 1200px;
+    margin: 0 auto 56px;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  }
+
+  /* ── Phone frame ─────────────────────────────── */
+  .phone {
+    background: var(--cream);
+    border-radius: 36px;
+    padding: 12px;
+    box-shadow: var(--shadow-md);
+    width: 360px;
+    margin: 0 auto;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .phone-screen {
+    background: var(--cream);
+    border-radius: 28px;
+    overflow: hidden;
+    min-height: 720px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .appbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 16px 12px;
+    background: var(--cream);
+  }
+  .appbar .back {
+    width: 36px;
+    height: 36px;
+    border-radius: 18px;
+    background: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--teal);
+    font-size: 18px;
+    box-shadow: var(--shadow-sm);
+  }
+  .appbar h3 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 18px;
+    color: var(--teal);
+    font-weight: 600;
+  }
+
+  .body {
+    padding: 0 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+  }
+
+  .ctx-image {
+    width: 100%;
+    aspect-ratio: 16/9;
+    border-radius: var(--r-lg);
+    background:
+      linear-gradient(135deg, rgba(255,106,20,0.18), rgba(15,61,58,0.18)),
+      repeating-linear-gradient(45deg, #d6c9a8, #d6c9a8 14px, #c9bb96 14px, #c9bb96 28px);
+    display: flex;
+    align-items: flex-end;
+    padding: 12px;
+    color: var(--white);
+    font-size: 13px;
+    font-weight: 600;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+
+  .progress-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--teal);
+    font-weight: 600;
+  }
+  .progress-row .label { white-space: nowrap; }
+  .progress-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--grey-200);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-bar > .fill {
+    height: 100%;
+    background: var(--orange);
+    border-radius: 3px;
+  }
+
+  .audio-card {
+    background: var(--white);
+    border-radius: var(--r-lg);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .audio-card .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .play-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 22px;
+    background: var(--orange);
+    color: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    box-shadow: 0 2px 6px rgba(255,106,20,0.4);
+  }
+  .scrub {
+    flex: 1;
+    height: 4px;
+    background: var(--grey-200);
+    border-radius: 2px;
+    position: relative;
+  }
+  .scrub > .filled {
+    height: 100%;
+    background: var(--orange);
+    border-radius: 2px;
+    width: 38%;
+  }
+  .scrub > .knob {
+    position: absolute;
+    top: 50%;
+    left: 38%;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    background: var(--orange);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  }
+  .audio-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--grey-600);
+  }
+  .replay-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--orange-soft);
+    color: var(--orange);
+    font-weight: 600;
+    font-size: 12px;
+  }
+  .replay-pill.exhausted {
+    background: var(--red-light);
+    color: var(--red);
+  }
+
+  .input-card {
+    background: var(--white);
+    border-radius: var(--r-lg);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .input-card .label {
+    font-size: 12px;
+    color: var(--grey-600);
+    font-weight: 600;
+  }
+  .input-field {
+    border: 1.5px solid var(--orange);
+    border-radius: 12px;
+    padding: 12px;
+    min-height: 96px;
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--teal);
+    background: var(--cream);
+  }
+  .input-field .caret { display: inline-block; width: 1px; background: var(--orange); height: 18px; vertical-align: middle; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .chip-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 4px 0;
+  }
+  .chip {
+    flex: 0 0 auto;
+    min-width: 44px;
+    height: 44px;
+    padding: 0 10px;
+    border-radius: 10px;
+    background: var(--cream);
+    border: 1px solid var(--grey-200);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--teal);
+    font-weight: 600;
+    font-size: 16px;
+  }
+
+  .bottom-bar {
+    background: var(--white);
+    padding: 12px 16px calc(env(safe-area-inset-bottom) + 16px);
+    display: flex;
+    gap: 12px;
+    border-top: 1px solid var(--grey-200);
+  }
+  .btn {
+    flex: 1;
+    height: 48px;
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .btn.primary { background: var(--orange); color: var(--white); }
+  .btn.ghost { background: var(--cream); color: var(--teal); border: 1px solid var(--grey-200); }
+  .btn.disabled { background: var(--grey-200); color: var(--grey-400); }
+  .btn.full { flex: 1; }
+
+  /* ── Result screen ─────────────────────────────── */
+  .result-hero {
+    background: linear-gradient(135deg, var(--teal), var(--teal-light));
+    color: var(--white);
+    padding: 24px;
+    border-radius: var(--r-lg);
+    text-align: center;
+  }
+  .result-hero .score {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 56px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .result-hero .total { font-size: 18px; opacity: 0.7; margin-left: 4px; }
+  .result-hero .badge {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 4px 12px;
+    background: var(--orange);
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .tabs {
+    display: flex;
+    background: var(--white);
+    border-radius: var(--r-md);
+    padding: 4px;
+    gap: 4px;
+    box-shadow: var(--shadow-sm);
+  }
+  .tab {
+    flex: 1;
+    padding: 8px;
+    text-align: center;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--grey-600);
+  }
+  .tab.active { background: var(--orange); color: var(--white); }
+
+  .sentence-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--grey-200);
+    font-size: 13px;
+  }
+  .sentence-row .num { width: 28px; color: var(--grey-600); font-weight: 600; }
+  .sentence-row .bar-bg { flex: 1; height: 6px; background: var(--grey-200); border-radius: 3px; overflow: hidden; }
+  .sentence-row .bar-fill { height: 100%; border-radius: 3px; }
+  .sentence-row .pct { width: 40px; text-align: right; font-weight: 600; color: var(--teal); }
+
+  .diff-card {
+    background: var(--white);
+    border-radius: var(--r-md);
+    padding: 14px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow-sm);
+  }
+  .diff-card .label { font-size: 12px; color: var(--grey-600); margin-bottom: 6px; }
+  .diff-line { font-size: 14px; line-height: 1.5; color: var(--teal); }
+  .ins { background: var(--green-light); color: var(--green); padding: 1px 4px; border-radius: 4px; font-weight: 600; }
+  .del { background: var(--red-light); color: var(--red); padding: 1px 4px; border-radius: 4px; text-decoration: line-through; }
+
+  /* ── CMS form mockup ─────────────────────────────── */
+  .cms-form {
+    background: var(--white);
+    border-radius: var(--r-lg);
+    padding: 24px;
+    max-width: 640px;
+    margin: 0 auto;
+    box-shadow: var(--shadow-md);
+  }
+  .field { margin-bottom: 20px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: var(--teal); margin-bottom: 6px; }
+  .field input, .field textarea {
+    width: 100%;
+    border: 1px solid var(--grey-200);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--teal);
+    background: var(--cream);
+  }
+  .field textarea { min-height: 96px; resize: vertical; }
+  .row-flex { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn-sm { padding: 8px 14px; border-radius: 10px; background: var(--cream); color: var(--teal); border: 1px solid var(--grey-200); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-sm.primary { background: var(--orange); color: var(--white); border: none; }
+  .sentence-edit {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--grey-100);
+  }
+  .sentence-edit .idx { width: 24px; color: var(--grey-600); font-weight: 600; font-size: 13px; }
+  .sentence-edit input { flex: 1; }
+  .sentence-edit .audio-status { font-size: 11px; color: var(--green); font-weight: 600; }
+
+  /* ── Flow diagram ─────────────────────────────── */
+  .flow {
+    background: var(--white);
+    border-radius: var(--r-lg);
+    padding: 24px;
+    max-width: 880px;
+    margin: 0 auto;
+    box-shadow: var(--shadow-md);
+  }
+  .flow ol { padding-left: 20px; }
+  .flow li { padding: 6px 0; font-size: 14px; line-height: 1.6; color: var(--teal); }
+  .flow li code { background: var(--cream); padding: 2px 6px; border-radius: 4px; color: var(--orange); font-size: 12px; font-family: 'JetBrains Mono', Consolas, monospace; }
+
+  /* ── Token table ─────────────────────────────── */
+  .tokens {
+    background: var(--white);
+    border-radius: var(--r-lg);
+    padding: 24px;
+    max-width: 880px;
+    margin: 0 auto;
+    box-shadow: var(--shadow-md);
+    overflow-x: auto;
+  }
+  .tokens table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tokens th, .tokens td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--grey-200); }
+  .tokens th { background: var(--cream); color: var(--teal); font-weight: 700; }
+  .swatch { display: inline-block; width: 16px; height: 16px; border-radius: 4px; vertical-align: middle; margin-right: 8px; box-shadow: 0 0 0 1px rgba(0,0,0,0.1); }
+</style>
+</head>
+<body>
+
+<h1>Dictation Exercise — UI/UX Design</h1>
+<p class="subtitle">A2 Mluveni Sprint • <code>psani_3_dictation</code> • V18 candidate</p>
+
+<!-- ─────────────── Screen mockups ─────────────── -->
+<div class="section-label">01 · Learner screens</div>
+<h2 class="section-title">Three states across the dictation flow</h2>
+<p class="section-desc">Auto-play first time on entering each sentence. Up to 3 manual repeats. Czech keyboard hint chips above keyboard. Submit replaces Next on last sentence.</p>
+
+<div class="grid">
+
+  <!-- State 1: typing -->
+  <div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="appbar">
+          <div class="back">←</div>
+          <h3>Trong quán cafe</h3>
+        </div>
+        <div class="body">
+          <div class="ctx-image">Pavel ngồi quán cafe</div>
+          <div class="progress-row">
+            <span class="label">Câu 3 / 6</span>
+            <div class="progress-bar"><div class="fill" style="width:50%"></div></div>
+          </div>
+          <div class="audio-card">
+            <div class="row">
+              <div class="play-btn">▶</div>
+              <div class="scrub"><div class="filled"></div><div class="knob"></div></div>
+            </div>
+            <div class="audio-meta">
+              <span>00:03 / 00:08</span>
+              <span class="replay-pill">🔁 1 / 3</span>
+            </div>
+          </div>
+          <div class="input-card">
+            <span class="label">Viết lại câu bạn vừa nghe</span>
+            <div class="input-field">Pavel jde do kavarny<span class="caret"></span></div>
+            <div class="chip-row">
+              <div class="chip">č</div>
+              <div class="chip">š</div>
+              <div class="chip">ž</div>
+              <div class="chip">ě</div>
+              <div class="chip">ř</div>
+              <div class="chip">ý</div>
+              <div class="chip">á</div>
+              <div class="chip">í</div>
+              <div class="chip">ú</div>
+              <div class="chip">ů</div>
+            </div>
+          </div>
+        </div>
+        <div class="bottom-bar">
+          <div class="btn ghost">← Trước</div>
+          <div class="btn primary">Tiếp →</div>
+        </div>
+      </div>
+    </div>
+    <p style="text-align:center; color: rgba(255,255,255,0.6); font-size: 12px; margin-top: 12px;">A · Đang viết câu 3, còn 2 lượt nghe</p>
+  </div>
+
+  <!-- State 2: replay exhausted, last sentence -->
+  <div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="appbar">
+          <div class="back">←</div>
+          <h3>Trong quán cafe</h3>
+        </div>
+        <div class="body">
+          <div class="progress-row">
+            <span class="label">Câu 6 / 6</span>
+            <div class="progress-bar"><div class="fill" style="width:100%"></div></div>
+          </div>
+          <div class="audio-card">
+            <div class="row">
+              <div class="play-btn" style="background: var(--grey-200); color: var(--grey-400); box-shadow: none;">▶</div>
+              <div class="scrub"><div class="filled" style="width:100%"></div></div>
+            </div>
+            <div class="audio-meta">
+              <span>00:06 / 00:06</span>
+              <span class="replay-pill exhausted">🔁 Hết lượt</span>
+            </div>
+          </div>
+          <div class="input-card">
+            <span class="label">Câu cuối — viết xong rồi nộp bài</span>
+            <div class="input-field">Děkuji, na shledanou.<span class="caret"></span></div>
+            <div class="chip-row">
+              <div class="chip">č</div>
+              <div class="chip">š</div>
+              <div class="chip">ž</div>
+              <div class="chip">ě</div>
+              <div class="chip">ř</div>
+              <div class="chip">ý</div>
+              <div class="chip">á</div>
+              <div class="chip">í</div>
+            </div>
+          </div>
+          <div style="background: var(--orange-soft); border-radius: 12px; padding: 12px; font-size: 12px; color: var(--orange); font-weight: 600; line-height: 1.5;">
+            💡 Đã nghe đủ 3 lần. Cứ viết theo trí nhớ rồi xem đáp án sau.
+          </div>
+        </div>
+        <div class="bottom-bar">
+          <div class="btn ghost">← Trước</div>
+          <div class="btn primary">Nộp bài</div>
+        </div>
+      </div>
+    </div>
+    <p style="text-align:center; color: rgba(255,255,255,0.6); font-size: 12px; margin-top: 12px;">B · Câu cuối, hết lượt repeat → Nộp bài</p>
+  </div>
+
+  <!-- State 3: result -->
+  <div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="appbar">
+          <div class="back">←</div>
+          <h3>Kết quả chính tả</h3>
+        </div>
+        <div class="body">
+          <div class="result-hero">
+            <div><span class="score">7</span><span class="total">/10</span></div>
+            <div class="badge">ĐẠT 60%</div>
+          </div>
+          <div class="tabs">
+            <div class="tab active">Tổng quan</div>
+            <div class="tab">Phản hồi</div>
+            <div class="tab">Sửa bài</div>
+          </div>
+          <div class="input-card" style="border-top: 3px solid var(--orange);">
+            <span class="label">Độ chính xác từng câu</span>
+            <div class="sentence-row"><span class="num">1</span><div class="bar-bg"><div class="bar-fill" style="width:98%; background: var(--green);"></div></div><span class="pct">98%</span></div>
+            <div class="sentence-row"><span class="num">2</span><div class="bar-bg"><div class="bar-fill" style="width:52%; background: var(--orange);"></div></div><span class="pct">52%</span></div>
+            <div class="sentence-row"><span class="num">3</span><div class="bar-bg"><div class="bar-fill" style="width:72%; background: var(--orange);"></div></div><span class="pct">72%</span></div>
+            <div class="sentence-row"><span class="num">4</span><div class="bar-bg"><div class="bar-fill" style="width:88%; background: var(--green);"></div></div><span class="pct">88%</span></div>
+            <div class="sentence-row"><span class="num">5</span><div class="bar-bg"><div class="bar-fill" style="width:64%; background: var(--orange);"></div></div><span class="pct">64%</span></div>
+            <div class="sentence-row" style="border-bottom: none;"><span class="num">6</span><div class="bar-bg"><div class="bar-fill" style="width:100%; background: var(--green);"></div></div><span class="pct">100%</span></div>
+          </div>
+          <div class="diff-card">
+            <div class="label">Câu 2 — Sửa bài</div>
+            <div class="diff-line">Chce si dát <span class="del">caj</span><span class="ins">čaj</span> a <span class="del">kolac</span><span class="ins">koláč</span>.</div>
+          </div>
+        </div>
+        <div class="bottom-bar">
+          <div class="btn primary full">Hoàn thành</div>
+        </div>
+      </div>
+    </div>
+    <p style="text-align:center; color: rgba(255,255,255,0.6); font-size: 12px; margin-top: 12px;">C · Kết quả: per-sentence accuracy + diff</p>
+  </div>
+
+</div>
+
+<!-- ─────────────── CMS form ─────────────── -->
+<div class="section-label">02 · CMS authoring</div>
+<h2 class="section-title">DictationFields slide-over</h2>
+<p class="section-desc">Admin nhập transcript, bấm "Tách câu tự động", sau đó tap "Tạo audio" trên từng câu để Polly sinh MP3 riêng từng row. Nghe thử trước khi publish.</p>
+
+<div class="cms-form">
+  <div class="field">
+    <label>Chủ đề</label>
+    <input type="text" value="Trong quán cafe" />
+  </div>
+  <div class="field">
+    <label>Ảnh ngữ cảnh (tùy chọn)</label>
+    <div class="row-flex">
+      <button class="btn-sm">📷 Upload</button>
+      <button class="btn-sm">✨ Tạo bằng AI</button>
+      <span style="font-size: 12px; color: var(--green); font-weight: 600;">✓ Đã có ảnh</span>
+    </div>
+  </div>
+  <div class="field">
+    <label>Transcript</label>
+    <textarea>Pavel jde do kavárny.
+Chce si dát čaj a koláč.
+Číšník ho zdraví.
+Pavel platí kartou.
+Sedí u okna a čte noviny.
+Děkuji, na shledanou.</textarea>
+    <div style="margin-top: 8px;">
+      <button class="btn-sm primary">Tách câu tự động</button>
+    </div>
+  </div>
+  <div class="field">
+    <label>Câu (6) — bấm "Tạo audio" mỗi dòng</label>
+    <div class="sentence-edit">
+      <span class="idx">1.</span>
+      <input value="Pavel jde do kavárny." />
+      <button class="btn-sm">▶</button>
+      <span class="audio-status">✓ 28 KB</span>
+    </div>
+    <div class="sentence-edit">
+      <span class="idx">2.</span>
+      <input value="Chce si dát čaj a koláč." />
+      <button class="btn-sm">▶</button>
+      <span class="audio-status">✓ 31 KB</span>
+    </div>
+    <div class="sentence-edit">
+      <span class="idx">3.</span>
+      <input value="Číšník ho zdraví." />
+      <button class="btn-sm primary">Tạo audio</button>
+    </div>
+    <div class="sentence-edit">
+      <span class="idx">4.</span>
+      <input value="Pavel platí kartou." />
+      <button class="btn-sm primary">Tạo audio</button>
+    </div>
+    <div class="sentence-edit">
+      <span class="idx">5.</span>
+      <input value="Sedí u okna a čte noviny." />
+      <button class="btn-sm primary">Tạo audio</button>
+    </div>
+    <div class="sentence-edit">
+      <span class="idx">6.</span>
+      <input value="Děkuji, na shledanou." />
+      <button class="btn-sm primary">Tạo audio</button>
+    </div>
+  </div>
+  <div class="row-flex">
+    <div class="field" style="flex: 1; margin: 0;">
+      <label>Số lần nghe lại tối đa</label>
+      <input type="number" value="3" />
+    </div>
+    <div class="field" style="flex: 1; margin: 0;">
+      <label>Điểm tối đa</label>
+      <input type="number" value="10" />
+    </div>
+    <div class="field" style="flex: 1; margin: 0;">
+      <label>Giọng đọc</label>
+      <input type="text" value="Tomáš (Czech)" />
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────── User flow ─────────────── -->
+<div class="section-label" style="margin-top: 56px;">03 · User flow</div>
+<h2 class="section-title">Happy path + edge paths</h2>
+<p class="section-desc">Learner flow theo course pool, không xuất hiện trong MockTest exam pool. Submit fail không mất text đã gõ.</p>
+
+<div class="flow">
+  <h4 style="color: var(--teal); margin-bottom: 12px;">Happy path</h4>
+  <ol>
+    <li>Home → Course → Module "Trong quán cafe"</li>
+    <li>Filter pill <code>Viết</code> → ExerciseListScreen</li>
+    <li>Tap "Chính tả: Trong quán cafe" → DictationExerciseScreen</li>
+    <li>Câu 1/6 audio auto-plays. Học viên gõ. Tap <code>Tiếp →</code></li>
+    <li>… loops 1–6 …</li>
+    <li>Câu 6/6: <code>Tiếp →</code> đổi thành <code>Nộp bài</code></li>
+    <li>Tap Nộp bài → <code>POST /v1/attempts/:id/submit-text</code> với <code>{sentences: [...]}</code></li>
+    <li>AnalysisScreen (orbiting ring) poll <code>GET /v1/attempts/:id</code></li>
+    <li>status=<code>completed</code> → DictationResultScreen → 3 tabs</li>
+    <li>Tap "Hoàn thành" → pop về ExerciseListScreen</li>
+  </ol>
+
+  <h4 style="color: var(--teal); margin: 20px 0 12px;">Edge paths</h4>
+  <ol>
+    <li><b>Audio 404</b> → audio card hiện retry button; typing không bị block; submit cho phép kèm cảnh báo</li>
+    <li><b>Hết lượt repeat</b> → nút Repeat disabled + tooltip "Hết lượt. Cứ viết theo trí nhớ rồi xem đáp án sau."</li>
+    <li><b>App background</b> → text giữ qua <code>AutomaticKeepAliveClientMixin</code>; audio pause; replay-counter giữ in-memory</li>
+    <li><b>Submit network fail</b> → banner Retry; <b>không</b> mất text đã gõ</li>
+    <li><b>LLM fail</b> → result vẫn hiện score deterministic + diff thô; banner "Phản hồi chi tiết tạm không khả dụng"</li>
+    <li><b>TextField &gt; 200 chars</b> → soft warn 180; hard stop 200; toast "Câu quá dài"</li>
+    <li><b>Paste từ clipboard</b> → cho phép (V1 không có anti-cheat)</li>
+  </ol>
+</div>
+
+<!-- ─────────────── Design tokens ─────────────── -->
+<div class="section-label" style="margin-top: 56px;">04 · Tokens (existing V2 system)</div>
+<h2 class="section-title">No new tokens introduced</h2>
+<p class="section-desc">Reuse <code>AppColors</code>, <code>AppSpacing</code>, <code>AppTypography</code>. Match listening + writing exercise visual rhythm.</p>
+
+<div class="tokens">
+  <table>
+    <thead><tr><th>Token</th><th>Value</th><th>Use</th></tr></thead>
+    <tbody>
+      <tr><td><code>AppColors.primary</code></td><td><span class="swatch" style="background:#FF6A14"></span>#FF6A14</td><td>CTA, progress fill, replay pill</td></tr>
+      <tr><td><code>AppColors.background</code></td><td><span class="swatch" style="background:#FBF3E7"></span>#FBF3E7</td><td>Screen bg</td></tr>
+      <tr><td><code>AppColors.surface</code></td><td><span class="swatch" style="background:#FFFFFF"></span>#FFFFFF</td><td>Cards</td></tr>
+      <tr><td><code>AppColors.onSurface</code></td><td><span class="swatch" style="background:#0F3D3A"></span>#0F3D3A</td><td>Body text + icons</td></tr>
+      <tr><td><code>AppColors.success</code></td><td><span class="swatch" style="background:#2E8B57"></span>#2E8B57</td><td>Diff inserted, ≥80% accuracy bar</td></tr>
+      <tr><td><code>AppColors.error</code></td><td><span class="swatch" style="background:#D14343"></span>#D14343</td><td>Diff deleted, replay-exhausted pill</td></tr>
+      <tr><td>Card radius</td><td>16</td><td>All cards</td></tr>
+      <tr><td>Button height</td><td>48</td><td>Bottom-bar Tiếp/Nộp</td></tr>
+      <tr><td>Touch target min</td><td>44pt</td><td>Czech chip, replay pill, play btn</td></tr>
+      <tr><td>Font heading</td><td>Fraunces 22/28</td><td>AppBar topic, result score</td></tr>
+      <tr><td>Font body</td><td>Inter 16/24</td><td>TextField input</td></tr>
+      <tr><td>Animation</td><td>200ms ease-out</td><td>Sentence transition, progress fill</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</body>
+</html>

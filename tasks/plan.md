@@ -2924,3 +2924,538 @@ make verify
 9. Course và MockTest banner → nút AI hoạt động
 
 **Note production:** Thêm `REPLICATE_API_KEY` vào `.env.ec2` trước deploy. Thiếu key → 503, không crash.
+
+---
+
+## V18 — Dictation Exercise (`psani_3_dictation`) (2026-05-05)
+
+Spec: `docs/specs/dictation-exercise.md` · Idea: `docs/ideas/dictation-exercise.md` · Design: `docs/designs/dictation-exercise.html` · SPEC.md: § V18
+
+### Mục tiêu
+
+Thêm exercise type `psani_3_dictation` vào skill `viet`. Admin nhập 3–8 câu Czech + ảnh tùy chọn → Polly sinh MP3 từng câu → learner nghe (auto-play lần đầu, repeat ≤ N) → gõ lại → backend chấm bằng weighted Levenshtein (diacritic substitution = 0.5) + LLM annotate diff/error_tags. Pool=`course` only.
+
+Decisions locked (xem spec § 0): admin per-exercise voice, 60% pass default, replay-count trong `attempts.details_json`, sentence count 3–8 hard, OCR defer V18.1, N MP3s per exercise.
+
+### Dependency graph
+
+```
+Phase A: Backend foundation (parallel-safe)
+  A1 (contracts + types)
+  A2 (Levenshtein scorer + tests)        ──┐
+  A3 (LLM prompt + provider + fallback)  ──┼── B1 (submit-text branch)
+  A4 (DB migration sentence_idx)         ──┤
+  A5 (admin per-sentence audio endpoint) ──┘
+                                              │
+Phase B: Backend integration                  │
+  B1 (submit-text dispatch on exercise_type) ─┴── B2 (integration test)
+
+Phase C: CMS form (parallel-safe with A/B)
+  C1 (DictationFields component)
+  C2 (utils: split, validate, payload, formState)
+  C3 (proxy routes for sentence audio)
+  C4 (i18n + Vitest)
+       │
+       └── C5 (wire vào exercise-form/index.tsx slide-over)
+
+Phase D: Flutter (parallel-safe with A/B/C)
+  D1 (models: DictationDetail/Sentence/Score parser)
+  D2 (DictationAudioCard widget)
+  D3 (CzechKeyboardChips widget)
+  D4 (DictationExerciseScreen stepper)        ── needs D1 D2 D3
+  D5 (DictationResultCard 3-tab)              ── needs D1
+  D6 (api_client.submitDictation)
+  D7 (l10n ARB keys VI+EN)
+  D8 (router dispatch psani_3_dictation)      ── needs D4 D5 D6 D7
+
+Phase E: End-to-end checkpoint
+  E1 (manual MAN-1..MAN-8 acceptance)
+  E2 (smoke-attempt-flow extension)
+  E3 (make verify pass)
+
+A1 + A4 trước A2 và A3 (cần struct).
+B1 sau A1/A2/A3/A4.
+B2 sau B1.
+C5 sau C1-C4.
+D8 sau D4-D7.
+E sau B2 + C5 + D8.
+```
+
+---
+
+### V18-A1 — Backend contracts + types
+
+**File:** `backend/internal/contracts/types.go`
+
+**Changes:**
+1. Thêm 5 struct: `DictationDetail`, `DictationSentence`, `DictationSubmission`, `DictationSentenceAnswer`, `DictationFeedback`, `DictationSentenceScore`. Đầy đủ shape trong spec § 4.1.
+2. Thêm `(d *ExerciseDetail) DictationDetail() *DictationDetail` getter parse `details_json` khi `exercise_type == "psani_3_dictation"`.
+
+**AC:**
+```
+make backend-build → pass
+JSON tags match spec exactly
+DictationDetail() trả nil khi exercise type khác
+```
+
+---
+
+### V18-A2 — Backend Levenshtein scorer
+
+**Files mới:**
+- `backend/internal/processing/dictation_scorer.go`
+- `backend/internal/processing/dictation_scorer_test.go`
+
+**Implementation:**
+1. `normalizeForScoring(s string) string`: `golang.org/x/text/unicode/norm.NFC` → `strings.ToLower` → trim + collapse whitespace.
+2. `dictationDistance(a, b []rune) float64`: 2D DP với `subCost(x, y rune) float64`.
+3. `subCost`: equal=0, diacritic-pair=0.5, other=1.0. Pair table:
+   ```
+   c↔č, s↔š, z↔ž, e↔ě, r↔ř, n↔ň, t↔ť, d↔ď,
+   a↔á, e↔é, i↔í, o↔ó, u↔ú, u↔ů, y↔ý
+   ```
+   Lưu trong `var diacriticPairs = map[rune]rune{...}` đối xứng.
+4. `SentenceAccuracy(ref, learner string) float64`: normalize → distance → `1 - d/max(len(refNorm), 1)` clamp [0,1].
+5. `ComputeDictationScore(refs, learners []string, maxPoints, passThresholdPct int) DictationFeedback`: aggregate.
+
+**Tests:**
+- `TestSubCost_Equal_Pair_Other`
+- `TestDictationDistance_*` (10+ cases incl. empty, identical, all-diacritic-flipped, completely-different)
+- `TestSentenceAccuracy_PerfectMatch` → 1.0 exactly
+- `TestSentenceAccuracy_AllDiacriticsMissing` → ≥ 0.5
+- `TestSentenceAccuracy_TotallyDifferent` → 0.0
+- `TestNormalize_NFC_Compose` → `č` → `č`
+- `TestComputeDictationScore_PassFail` → score & passed match threshold
+
+**AC:** `go test ./internal/processing/ -run TestDictation` pass với ≥ 10 test cases.
+
+---
+
+### V18-A3 — LLM prompt + provider + fallback
+
+**Files edited:**
+- `backend/internal/processing/llm_config.go` — add `DictationModel` constant + env loader `LLM_DICTATION_MODEL`
+- `backend/internal/processing/llm_prompts.go` — add `DictationSystemPrompt`
+- `backend/internal/processing/llm_user_prompts.go` — add `buildDictationUserPrompt(inputs []DictationLLMInput)` + `extractDictationSentences` helper
+- `backend/internal/processing/llm_fallbacks.go` — add `dictationFallbackFeedback(idx int, accuracy float64) string`
+
+**File mới:** `backend/internal/processing/dictation_llm.go`
+- Interface `DictationFeedbackProvider` với `Annotate(ctx, []DictationLLMInput) ([]DictationLLMAnnotation, error)`
+- Claude impl reuse `AnthropicClient` từ `LLMReviewProvider`
+- Nil/fallback impl trả empty annotations để caller dùng deterministic-only diff
+
+**System prompt skeleton (Vietnamese A2 tutor):**
+```
+Bạn là gia sư tiếng Czech cho học viên A2 người Việt. Với mỗi câu, so sánh `reference` và `learner`. Trả JSON array với cùng số phần tử và cùng `idx`. Mỗi phần tử có:
+- error_tags: subset của ["missing_diacritic","wrong_case","missing_word","extra_word","spelling","wrong_word"]
+- feedback_vi: 1 câu tiếng Việt động viên, ≤ 25 từ
+- feedback_en: 1 câu tiếng Anh, ≤ 25 từ
+- diff_chunks: array {type:"unchanged|deleted|inserted|replaced", ref, learner}
+KHÔNG chấm điểm. Điểm đã được tính deterministic.
+```
+
+**AC:**
+- Build pass; provider mock trả annotations đúng shape
+- Khi `LLM_PROVIDER=` empty → `dictationFallbackFeedback` được dùng
+
+---
+
+### V18-A4 — DB migration: exercise_audios.sentence_idx
+
+**File:** `backend/internal/store/postgres_exercise_audio.go`
+
+**Changes:**
+1. Trong `addColumnIfMissing()` block tại startup, thêm:
+   ```sql
+   ALTER TABLE exercise_audios ADD COLUMN IF NOT EXISTS sentence_idx INT NULL
+   ```
+   + composite index:
+   ```sql
+   CREATE INDEX IF NOT EXISTS idx_exercise_audios_exercise_sentence
+     ON exercise_audios(exercise_id, sentence_idx)
+   ```
+2. Update interface `ExerciseAudioStore`:
+   - `GetForSentence(exerciseID string, sentenceIdx int) (*ExerciseAudio, error)`
+   - `UpsertForSentence(...)` / `DeleteForSentence(...)`
+   - Existing methods (no `sentence_idx`) tiếp tục work cho non-dictation exercises (where `sentence_idx IS NULL`).
+
+**AC:**
+- `make backend-build` pass
+- Postgres start lên thấy column; rerun không lỗi
+- Existing audio cho poslech/cteni/writing không bị phá
+
+---
+
+### V18-A5 — Admin per-sentence audio endpoint
+
+**File mới:** `backend/internal/httpapi/admin_dictation_audio.go`
+
+**Routes (registered trong `server.go`):**
+- `POST /v1/admin/exercises/:id/dictation/sentences/:idx/audio` — body `{voice_id, text}`, returns `{audio_asset_id}`
+- `DELETE /v1/admin/exercises/:id/dictation/sentences/:idx/audio` — clears
+
+**Implementation:**
+1. Auth: `withRole("admin")`
+2. Body cap 4 KB
+3. Validate: `idx` ≥ 0, `text` 1–250 chars, `voice_id` non-empty (or default)
+4. Call `processing.GenerateSentenceAudio(ctx, exerciseID, idx, text, voiceID)` — wraps existing Polly client + saves blob via `LocalAssetsDir` or S3
+5. Upsert `exercise_audios(exercise_id, sentence_idx, asset_id)`
+6. Return `200 {audio_asset_id, size_bytes, duration_sec}`
+
+**AC:**
+- Admin call POST → MP3 file ở `LOCAL_ASSETS_DIR` + DB row
+- DELETE → row removed, file removed
+- Non-admin → 403
+
+---
+
+### V18-B1 — Submit-text dispatch on exercise_type
+
+**File edited:** `backend/internal/httpapi/attempts.go`
+
+**Changes:**
+1. Trong `handleSubmitText`: sau khi load exercise, branch:
+   - `psani_1_formular` / `psani_2_email` → existing path
+   - `psani_3_dictation` → new path:
+     - `http.MaxBytesReader(16 KB)`
+     - Decode body vào `DictationSubmission`
+     - Validate sentence count == exercise sentence count → 400 `invalid_sentence_count`
+     - Validate each sentence text ≤ 200 chars → 400 `sentence_too_long`
+     - Spawn goroutine `processDictationAttempt(ctx, attemptID, submission, exercise)`:
+       - Compute deterministic score via `ComputeDictationScore`
+       - Call `DictationFeedbackProvider.Annotate` (timeout 30s) → merge or fallback
+       - Persist via `AttemptStore.SaveDictationFeedback(attemptID, fb)`
+       - Set status `completed`
+     - Recover panic → `FailAttempt(reason)`
+     - Save `replay_counts` vào `attempts.details_json`
+2. Reuse `submit-text` route — không add endpoint mới.
+
+**AC:**
+- Happy path returns 202 + status polling shows `completed`
+- Body > 16 KB → 413
+- Wrong sentence count → 400 với error code chính xác
+
+---
+
+### V18-B2 — Integration test backend
+
+**File mới:** `backend/internal/httpapi/dictation_test.go`
+
+**Tests:**
+- `TestSubmitDictation_Happy` — full submit → poll → result với perfect score
+- `TestSubmitDictation_DiacriticOnly` — score ≥ 50%
+- `TestSubmitDictation_WrongSentenceCount` — 400 `invalid_sentence_count`
+- `TestSubmitDictation_SentenceTooLong` — 400 `sentence_too_long`
+- `TestSubmitDictation_BodyTooLarge` — 413
+- `TestSubmitDictation_LLMFailure_FallsBack` — mock LLM panic → result vẫn có deterministic diff, no `feedback_vi`
+- `TestGenerateSentenceAudio_Happy` — Polly stub returns asset_id
+
+**AC:** `make backend-test` pass; total backend tests ≥ existing+10.
+
+---
+
+### V18-C1 — CMS DictationFields component
+
+**File mới:** `cms/components/exercise-form/DictationFields.tsx`
+
+**UI per design § 2.3:**
+1. Topic input (max 80 chars)
+2. Context image upload (reuse V11) + AI button (reuse V15)
+3. Transcript textarea + "Tách câu tự động" button
+4. Sentence repeater rows: idx, text input, "Tạo audio" / "▶" preview / "🗑 Xóa audio", status pill
+5. Inputs: voice picker (Tomáš/Jakub), `max_replays_per_sentence` (0..10), `max_points`, `pass_threshold_percent`
+6. Inline validation banner
+
+**Props:** `value: DictationFormState`, `onChange(next)`, `exerciseId?: string` (cho audio endpoints)
+
+**AC:**
+- Form renders với 6 sentence rows mock
+- Mỗi row có Polly button gọi proxy route đúng exerciseId + idx
+- Validation hiện inline
+
+---
+
+### V18-C2 — CMS utils helpers
+
+**File edited:** `cms/components/exercise-form/exercise-utils.ts`
+
+**Adds:**
+- `interface DictationFormState`, `interface DictationSentenceForm` (xem spec § 4.3)
+- `splitTranscriptIntoSentences(raw: string): string[]`
+  - Regex `/(?<=[.!?])\s+/` split
+  - Skip abbreviation breakpoints: `Mgr.`, `Dr.`, `Bc.`, `Ph.D.`, `pan.`, `ing.` — hardcoded list
+  - Trim each, filter empty
+- `dictationFormStateFromExercise(ex): DictationFormState`
+- `dictationPayloadFromForm(state): { details_json, ...exercise fields }`
+- `validateDictation(state): { ok: boolean; errors: string[] }`
+  - 3 ≤ sentences.length ≤ 8
+  - Mỗi sentence text 1..200 chars
+  - Mỗi sentence có `audioAssetId`
+  - `max_replays_per_sentence` 0..10
+  - `max_points` ≥ 1, `pass_threshold_percent` 1..100
+
+**AC:** Vitest unit tests cho từng helper (xem C4).
+
+---
+
+### V18-C3 — CMS proxy routes
+
+**File mới:** `cms/app/api/admin/exercises/[exerciseId]/dictation/sentences/[idx]/audio/route.ts`
+
+**Methods:** POST, DELETE — thread `admin_token` qua `getAdminToken(request)` → forward backend.
+
+**AC:** call POST từ form → backend trả 200 → form state nhận `audio_asset_id`.
+
+---
+
+### V18-C4 — CMS i18n + Vitest tests
+
+**File edited:** `cms/lib/i18n.tsx` — thêm VI+EN strings:
+- `dictationFormTopic` / `dictationFormTranscript` / `dictationFormSentences` / `dictationFormSplit` / `dictationFormGenerateAudio` / `dictationFormReplayCap` / `dictationFormVoice` / `dictationFormValidationErrors`
+
+**File mới:** `cms/components/__tests__/dictation-fields.test.ts`
+
+**Tests:**
+- `splitTranscript_basic` — 6 câu split chính xác
+- `splitTranscript_keepsAbbreviations` — `Mgr. Pavel jde.` → 1 câu, không 2
+- `splitTranscript_trimsEmpty` — trailing whitespace OK
+- `validateDictation_minSentences` — 2 câu → fail
+- `validateDictation_maxSentences` — 9 câu → fail
+- `validateDictation_missingAudio` — 1 row thiếu audioAssetId → fail
+- `dictationPayloadFromForm` — shape đúng
+
+**AC:** `cd cms && npm test` pass +5 tests min.
+
+---
+
+### V18-C5 — Wire vào slide-over
+
+**File edited:** `cms/components/exercise-form/index.tsx`
+
+**Changes:**
+1. Import `DictationFields`
+2. Branch `exerciseType == "psani_3_dictation"` trong `renderFields()`
+3. Submit button gọi `dictationPayloadFromForm` thay vì generic builder
+4. `validateDictation` gate trước khi enable Submit
+5. Skill_kind filter: `psani_3_dictation` chỉ hiện khi `skill_kind == "viet"`
+6. Pool filter: ẩn `psani_3_dictation` khi pool=`exam`
+
+**AC:** Click "+ Tạo exercise" → chọn module → chọn skill `viet` → exercise_type dropdown có "Chính tả (psani_3_dictation)" → form renders DictationFields đúng.
+
+---
+
+### V18-D1 — Flutter models
+
+**File edited:** `flutter_app/lib/models/models.dart`
+
+**Adds:**
+- `class DictationDetail` với factory `.fromJson` parsing `details_json`
+- `class DictationSentence`, `class DictationSentenceScore`, `class DictationSentenceAnswer`
+- `ExerciseDetail.dictationDetail` getter trả `DictationDetail?` khi `exerciseType == 'psani_3_dictation'`
+- `AttemptFeedback.dictationFeedback` getter trả `DictationFeedback?`
+
+**Test mới:** `flutter_app/test/dictation_models_test.dart`
+- Parses sample JSON → fields đúng
+- Returns null cho exercise type khác
+- Handles missing optional fields gracefully
+
+**AC:** `make flutter-analyze` clean; +3 tests pass.
+
+---
+
+### V18-D2 — DictationAudioCard widget
+
+**File mới:** `flutter_app/lib/features/exercise/widgets/dictation_audio_card.dart`
+
+**Wraps:** existing `AudioPlayerWidget` (just_audio + auth headers)
+
+**State:**
+- `_replayCount: int` (per-sentence, owned by parent)
+- `_autoPlayedOnce: bool`
+
+**Behavior:**
+- On mount: if `!autoPlayedOnce` → play immediately, set `autoPlayedOnce=true`. Auto-play does NOT increment `_replayCount`.
+- Repeat tap: increment `_replayCount`, replay từ đầu
+- Disabled khi `_replayCount >= maxReplays && maxReplays > 0`
+- Show pill: `🔁 N / max` hoặc `🔁 Hết lượt` (red variant)
+
+**Test:**
+- Initial autoplay fires once
+- Repeat tap increments
+- At cap: button disabled, semantics label "Hết lượt nghe lại"
+- `maxReplays = 0` → unlimited (button never disables on count)
+
+**AC:** widget test pass.
+
+---
+
+### V18-D3 — CzechKeyboardChips widget
+
+**File mới:** `flutter_app/lib/features/exercise/widgets/czech_keyboard_chips.dart`
+
+**Static chip list:** `['č','š','ž','ě','ř','ý','á','í','ú','ů','ň','ť','ď']`
+
+**API:**
+```dart
+CzechKeyboardChips({
+  required TextEditingController controller,
+})
+```
+
+**Behavior:** tap chip → insert glyph at current `controller.selection.baseOffset`, advance cursor.
+
+**A11y:** mỗi chip có `Semantics(label: 'Chèn ký tự $glyph', button: true)`.
+
+**Test:** chip tap → controller.text contains glyph; cursor at position+1.
+
+**AC:** widget test pass; height 44pt minimum.
+
+---
+
+### V18-D4 — DictationExerciseScreen stepper
+
+**File mới:** `flutter_app/lib/features/exercise/screens/dictation_exercise_screen.dart`
+
+**Layout:** xem design § 2.2 Screen B (3 zones).
+
+**State:**
+- `_currentIdx: int = 0`
+- `_controllers: List<TextEditingController>` (1 per sentence)
+- `_replayCounts: List<int>` (1 per sentence)
+- `_submitting: bool`
+
+**Behavior:**
+- Auto-advance audio on entering new sentence (DictationAudioCard handles)
+- Next button: enabled khi `_controllers[_currentIdx].text.trim().isNotEmpty`
+- Last sentence: Next morphs into Submit (orange filled)
+- Submit: createAttempt → `submitDictation(attemptId, sentences, replayCounts)` → push `_DictationResultPoller`
+- Back button: confirm dialog if any text typed (giống writing_exercise_screen pattern)
+
+**Mixin:** `AutomaticKeepAliveClientMixin` để giữ TextField khi background.
+
+**Tests** (`dictation_exercise_screen_test.dart`):
+- Initial sentence index = 0
+- Next disabled when TextField empty
+- Next advances index, audio reset
+- Prev preserves text
+- Last sentence: button label = `dictationSubmitBtn`
+- Submit triggers API call (mocked)
+- Replay cap exceeded → submit still allowed
+
+**AC:** `make flutter-test` +6 tests min.
+
+---
+
+### V18-D5 — DictationResultCard 3-tab
+
+**File mới:** `flutter_app/lib/features/exercise/widgets/dictation_result_card.dart`
+
+**Tabs:** Tổng quan / Phản hồi / Sửa bài (tabs reuse pattern từ ResultCard).
+
+**Tab 1 — Tổng quan:**
+- Hero score X/maxPoints + PASS/FAIL badge
+- Per-sentence accuracy bar list (color: ≥ 80% green, else orange)
+- Tap row → expand inline diff
+
+**Tab 2 — Phản hồi:**
+- LLM `feedback_vi` per sentence grouped by `error_tags`
+- Counts: "3 lỗi dấu, 1 lỗi viết hoa, 0 thiếu từ"
+- Banner "Phản hồi chi tiết tạm không khả dụng" khi `feedback_vi` empty cho all sentences
+
+**Tab 3 — Sửa bài:**
+- Per-sentence card với:
+  - Audio replay button (đọc lại)
+  - `_DiffTextBlock` reuse từ writing_exercise_screen V2 — chỉ cần feed `diff_chunks` vào widget hiện có
+
+**Tests:**
+- 3 tabs render
+- Accuracy bar color thresholds đúng
+- LLM-empty fallback banner xuất hiện
+- Tap row 2 expand diff đúng sentence
+
+**AC:** widget test +4.
+
+---
+
+### V18-D6 — api_client.submitDictation
+
+**File edited:** `flutter_app/lib/core/api/api_client.dart`
+
+**Add:**
+```dart
+Future<void> submitDictation(
+  String attemptId, {
+  required List<({int idx, String text, int replayCount})> sentences,
+  String? preferredVoiceId,
+}) async {
+  await _request('POST', '/v1/attempts/$attemptId/submit-text', body: {
+    'sentences': sentences.map((s) => {
+      'idx': s.idx,
+      'text': s.text,
+      'replay_count': s.replayCount,
+    }).toList(),
+    if (preferredVoiceId != null) 'preferred_voice_id': preferredVoiceId,
+  });
+}
+```
+
+**AC:** Czech text characters > U+00FF round-trip via `_request` đúng (đã fix V2 bug).
+
+---
+
+### V18-D7 — i18n ARB keys
+
+**Files edited:** `flutter_app/lib/l10n/app_vi.arb`, `app_en.arb`
+
+10 keys (xem SPEC.md § V18 i18n table):
+`dictationListenInstruction`, `dictationSentenceLabel`, `dictationRepeatRemaining`, `dictationRepeatExhausted`, `dictationKeyboardHint`, `dictationNextBtn`, `dictationSubmitBtn`, `dictationPrevBtn`, `dictationResultPerSentence`, `dictationLLMUnavailable`
+
+**AC:** `make flutter-test` không lỗi missing l10n key; VI=EN key count.
+
+---
+
+### V18-D8 — Router dispatch
+
+**File edited:** equivalent dispatcher routing exercise_type → screen (writing_exercise_screen call site).
+
+**Changes:** add branch `exerciseType == 'psani_3_dictation'` → push `DictationExerciseScreen`. Reading/Listening/Writing still route đúng.
+
+**AC:** Manual: tap dictation exercise từ ExerciseList → opens DictationExerciseScreen với 6 câu.
+
+---
+
+### V18-E1 — Manual acceptance pass (MAN-1..MAN-8)
+
+Theo SPEC.md § V18 Verification table.
+
+---
+
+### V18-E2 — Smoke extension
+
+**File edited:** `scripts/smoke_attempt_flow.py` (or equivalent) — extend với dictation case: create exercise stub → submit perfect text → verify score=10/10.
+
+**AC:** `make smoke-attempt-flow` pass.
+
+---
+
+### V18-E3 — make verify
+
+**AC:**
+- Backend tests ≥ +10 (target: 462)
+- Flutter tests ≥ +10 (target: 211)
+- CMS tests ≥ +5 (target: 100)
+- `make verify` xanh
+- TestFlight build successful nếu ship cùng đợt
+
+### Sizing summary
+
+| Phase | Total tasks | Effort |
+|---|---|---|
+| A (BE foundation) | 5 | 1.5 ngày |
+| B (BE integration) | 2 | 0.5 ngày |
+| C (CMS) | 5 | 1 ngày |
+| D (Flutter) | 8 | 2 ngày |
+| E (E2E) | 3 | 0.5 ngày |
+| **Total** | **23** | **~5.5 ngày** dev |
+
+Phase A + C + D có thể chạy song song nếu ≥ 2 dev. Single dev: tuần tự A → B → C → D → E.
