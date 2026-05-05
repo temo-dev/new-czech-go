@@ -12,6 +12,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/voice/voice_option.dart';
 import '../../../core/voice/voice_preference_service.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../widgets/v17_account_section.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({
@@ -30,10 +31,17 @@ class ProfileScreen extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final h = AppSpacing.pagePaddingH(context);
 
+    final v17Section = V17AccountSection.maybe(context);
     return ListView(
       padding: EdgeInsets.symmetric(horizontal: h, vertical: AppSpacing.x5),
       children: [
         _Avatar(),
+        if (v17Section != null) ...[
+          const SizedBox(height: AppSpacing.x6),
+          _SectionLabel('Tài khoản'),
+          const SizedBox(height: AppSpacing.x2),
+          v17Section,
+        ],
         const SizedBox(height: AppSpacing.x6),
         _SectionLabel(l.profileLanguageSection),
         const SizedBox(height: AppSpacing.x2),
