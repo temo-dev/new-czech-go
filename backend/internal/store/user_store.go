@@ -72,6 +72,11 @@ func newMemoryUserStore() UserStore {
 	return &memoryUserStore{users: map[string]*contracts.UserAccount{}}
 }
 
+// NewMemoryUserStore returns a fresh in-memory UserStore. Exported for
+// dev/test wiring outside this package; production callers should reach
+// for NewPostgresUserStoreWithDB instead.
+func NewMemoryUserStore() UserStore { return newMemoryUserStore() }
+
 func (s *memoryUserStore) CreateUser(account contracts.UserAccount) (contracts.UserAccount, error) {
 	if strings.TrimSpace(account.Email) == "" {
 		return contracts.UserAccount{}, errors.New("email required")

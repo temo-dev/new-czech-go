@@ -16,9 +16,15 @@ import (
 	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
+	"github.com/danieldev/czech-go-system/backend/internal/email"
 	"github.com/danieldev/czech-go-system/backend/internal/processing"
 	"github.com/danieldev/czech-go-system/backend/internal/store"
 )
+
+// EmailSender is the V17 transactional-email transport. Aliased here so
+// every httpapi handler can name the dependency without importing the
+// email package directly.
+type EmailSender = email.Sender
 
 type Server struct {
 	repo               *store.MemoryStore
@@ -28,6 +34,18 @@ type Server struct {
 	audioSignSecret    []byte
 	audioGenerator     processing.ExerciseAudioGenerator
 	contentGenerator   processing.ContentGenerator
+
+	// V17 self-serve learner — populated by NewServerWithAuth, nil for
+	// the legacy dev-fixture path.
+	userStore        store.UserStore
+	authTokenStore   store.AuthTokenStore
+	streakStore      store.StreakStore
+	proPurchaseStore store.ProPurchaseStore
+	dailyUsageStore  store.DailyUsageStore
+	emailSender      EmailSender
+	authBaseURL      string
+	authVerifyTTL    time.Duration
+
 	voiceRegistry      *processing.VoiceRegistry
 	elevenLabsAPIKey   string // for interview session token creation
 	elevenLabsAgentID  string // pre-created agent in ElevenLabs dashboard
@@ -44,8 +62,17 @@ func NewServer(repo *store.MemoryStore, processor *processing.Processor, uploadP
 
 // NewServerWithAudio is the full constructor that takes an explicit
 // AudioURLProvider and signing secret. NewServer delegates here with defaults
-// sourced from env.
+// sourced from env. V17 callers that also need self-serve auth should use
+// NewServerWithAuth (in auth_handlers.go) which wires the same setup plus
+// the UserStore/AuthTokenStore/EmailSender dependency bundle.
 func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider, audioURLProvider AudioURLProvider, audioSignSecret []byte) http.Handler {
+	return assembleServer(repo, processor, uploadProvider, audioURLProvider, audioSignSecret, nil)
+}
+
+// assembleServer is the shared builder for the public constructors. Pass a
+// nil authDeps to keep the legacy dev-fixture token path; supply a populated
+// AuthDeps to wire the V17 self-serve auth handlers.
+func assembleServer(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider, audioURLProvider AudioURLProvider, audioSignSecret []byte, authDeps *AuthDeps) http.Handler {
 	if processor == nil {
 		processor = processing.NewProcessor(repo, nil, nil, nil, nil)
 	}
@@ -95,6 +122,9 @@ func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor
 		aiImageRL:          newAiImageRateLimiter(),
 		interviewPreviewRL: newInterviewPreviewLimiter(),
 		mux:                http.NewServeMux(),
+	}
+	if authDeps != nil {
+		authDeps.applyTo(s)
 	}
 	// Recover any jobs stuck in "running" from a previous server crash.
 	repo.MarkAllRunningJobsFailed("Server restarted while generation was running")
@@ -149,6 +179,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/admin/ai/set-banner", s.withRole("admin", s.handleAdminAiSetBanner))
 	// V16: interview prompt preview
 	s.mux.HandleFunc("/v1/admin/interview/preview-prompt", s.withRole("admin", s.handleAdminInterviewPreviewPrompt))
+
+	// V17: self-serve learner — only registered when AuthDeps are wired.
+	s.registerAuthRoutes()
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

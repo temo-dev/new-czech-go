@@ -61,6 +61,10 @@ func newMemoryAuthTokenStore() AuthTokenStore {
 	return &memoryAuthTokenStore{tokens: map[string]*contracts.AuthToken{}}
 }
 
+// NewMemoryAuthTokenStore returns a fresh in-memory AuthTokenStore.
+// Exported for dev/test wiring outside this package.
+func NewMemoryAuthTokenStore() AuthTokenStore { return newMemoryAuthTokenStore() }
+
 func (s *memoryAuthTokenStore) CreateAuthToken(token contracts.AuthToken) (contracts.AuthToken, error) {
 	if token.TokenHash == "" {
 		return contracts.AuthToken{}, errors.New("token_hash required")

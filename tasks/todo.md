@@ -427,10 +427,10 @@ Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
   - **Files:** `backend/internal/email/sender.go` (Sender interface + RecorderSender + 3 helpers), `templates.go` (embed render), `smtp_sender.go` (production), 3 HTML templates, `email_test.go`
   - **Verify:** 12/12 pass; manual SES inbox placement test deferred to A5
   - **Size:** M
-- [ ] **V17-A2.3** `POST /v1/auth/signup`: validate, bcrypt, insert user + session token + verify token, send SES
-  - **AC:** 200 + token; 409 duplicate; 400 weak password / invalid email
-  - **Files:** `backend/internal/httpapi/auth_handlers.go`, `server.go` (route wiring)
-  - **Verify:** `TestSignup_*` pass
+- [x] **V17-A2.3** `POST /v1/auth/signup` + `AuthDeps` wiring + new `NewServerWithAuth` constructor + `assembleServer` private helper to share setup with legacy `NewServerWithAudio`. Validates email shape + password policy, hashes via auth.HashPassword, persists user, mints sha256-hashed session token (30d) + verify token (24h), dispatches verify email async via goroutine; legacy server (no AuthDeps) returns 404 on `/v1/auth/signup` (2026-05-05)
+  - **AC:** 200 + session token + user payload ✅; 409 email_taken on duplicate (case-insensitive) ✅; 400 invalid_email ✅; 400 weak_password (too short / no digit-or-special / common-list / empty) ✅; 4KiB body cap ✅; verify email rendered + dispatched ✅; legacy server isolated (404) ✅
+  - **Files:** `backend/internal/httpapi/{auth_handlers,auth_handlers_test}.go` (new), `server.go` (3 hooks: EmailSender alias, fields, assembleServer split + registerAuthRoutes call), `store/{user_store,auth_token_store}.go` (export NewMemoryUserStore + NewMemoryAuthTokenStore for test wiring)
+  - **Verify:** 12/12 signup tests pass (350→362 from A2.2 → 362→374 from A2.3)
   - **Size:** S
 - [ ] **V17-A2.4** `POST /v1/auth/login` + rate limit middleware (5 fails/15min/email): not leak email-existence
   - **AC:** invalid email vs invalid password → cùng response 401
