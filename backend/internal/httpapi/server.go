@@ -46,6 +46,7 @@ type Server struct {
 	authBaseURL      string
 	authVerifyTTL    time.Duration
 	loginRL          *loginRateLimiter
+	resendCooldown   *resendCooldownTracker
 
 	voiceRegistry      *processing.VoiceRegistry
 	elevenLabsAPIKey   string // for interview session token creation

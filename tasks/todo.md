@@ -437,10 +437,10 @@ Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
   - **Files:** `httpapi/auth_rate_limit.go` (new), `auth_handlers.go` (handleAuthLogin + route), `server.go` (legacy login conditional)
   - **Verify:** 6/6 login tests pass; legacy admin login still works (existing tests intact)
   - **Size:** M
-- [ ] **V17-A2.5** `POST /v1/auth/logout` + `GET /v1/auth/verify-email` (HTML response + deep link redirect) + `POST /v1/auth/resend-verify` (60s cooldown)
-  - **AC:** logout 204; verify HTML + redirect `czechgo://verified`; resend 429 trong cooldown
-  - **Files:** `auth_handlers.go` (extend)
-  - **Verify:** integration test
+- [x] **V17-A2.5** `POST /v1/auth/logout` (204 + revoke session token, idempotent re-call → 401) + `GET /v1/auth/verify-email` (HTML page + meta-refresh deep link `czechgo://verified`, one-shot replay → 400) + `POST /v1/auth/resend-verify` (60s cooldown per user, revokes prior pending verify tokens before issuing new one, no-op 204 when already verified); requireV17User helper bridges Bearer header → UserAccount until middleware swap in A2.7; resendCooldownTracker per-user 60s sliding state; 8 tests (2026-05-05)
+  - **AC:** logout revokes hash + 204 ✅; re-logout 401 ✅; verify-email happy path sets verified + revokes token ✅; replay 400 ✅; missing/unknown token 400 ✅; resend requires auth ✅; resend 429 within cooldown with Retry-After header ✅; resend no-op when already verified ✅
+  - **Files:** `httpapi/auth_handlers.go` (3 handlers + requireV17User + bearerToken + htmlEscape), `auth_rate_limit.go` (resendCooldownTracker), `server.go` (field), `auth_handlers_test.go` (8 tests)
+  - **Verify:** 8/8 pass; existing 374→388
   - **Size:** S
 - [ ] **V17-A2.6** `POST /v1/auth/forgot-password` (always 200) + `POST /v1/auth/reset-password` (revoke all sessions) + `POST /v1/auth/change-password` (revoke other sessions)
   - **AC:** forgot không leak existence; reset revoke all `kind=session` của user

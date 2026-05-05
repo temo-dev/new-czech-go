@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -52,6 +53,9 @@ func (d *AuthDeps) applyTo(s *Server) {
 	if s.loginRL == nil {
 		s.loginRL = newLoginRateLimiter()
 	}
+	if s.resendCooldown == nil {
+		s.resendCooldown = newResendCooldownTracker()
+	}
 }
 
 // NewServerWithAuth is the V17 entry point that wires auth dependencies
@@ -71,6 +75,9 @@ func (s *Server) registerAuthRoutes() {
 	}
 	s.mux.HandleFunc("/v1/auth/signup", s.handleSignup)
 	s.mux.HandleFunc("/v1/auth/login", s.handleAuthLogin)
+	s.mux.HandleFunc("/v1/auth/logout", s.handleLogout)
+	s.mux.HandleFunc("/v1/auth/verify-email", s.handleVerifyEmail)
+	s.mux.HandleFunc("/v1/auth/resend-verify", s.handleResendVerify)
 }
 
 // ── POST /v1/auth/signup ─────────────────────────────────────────────────
@@ -355,6 +362,205 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		SessionToken: rawSession,
 		ExpiresAt:    expiresAt,
 	})
+}
+
+// ── POST /v1/auth/logout ─────────────────────────────────────────────────
+
+// handleLogout revokes the current session token. Returns 204 on success;
+// 401 if the bearer token is missing or invalid (idempotent re-logout
+// after the session is gone hits 401 — that's fine, the client treats
+// either response as "session is dead").
+//
+// Spec: docs/specs/self-serve-learner-spec.md §4.3
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	rawToken, ok := bearerToken(r)
+	if !ok {
+		writeAuthError(w, http.StatusUnauthorized, "missing_token", "missing bearer token")
+		return
+	}
+	hash := auth.HashToken(rawToken)
+	if !s.authTokenStore.RevokeAuthToken(hash) {
+		// Either unknown or already revoked — both look the same to the
+		// client, mirroring the rest of the auth surface that does not
+		// leak existence.
+		writeAuthError(w, http.StatusUnauthorized, "invalid_token", "session is not active")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── GET /v1/auth/verify-email ────────────────────────────────────────────
+
+// handleVerifyEmail consumes a verify-email token. The link comes from
+// the email body, so the response is HTML (small confirmation page that
+// also redirects via a meta-refresh to the app deep link). The token is
+// revoked on success so it cannot be replayed; the user's
+// EmailVerifiedAt is set and grace_attempts_left is lifted to the
+// effective-infinity ceiling.
+//
+// Spec: docs/specs/self-serve-learner-spec.md §4.4
+func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+	raw := strings.TrimSpace(r.URL.Query().Get("token"))
+	if raw == "" {
+		writeVerifyHTML(w, http.StatusBadRequest, "Link không hợp lệ. Hãy yêu cầu gửi lại email xác minh.")
+		return
+	}
+	hash := auth.HashToken(raw)
+	tok, ok := s.authTokenStore.AuthTokenByHash(hash)
+	if !ok || tok.Kind != contracts.AuthTokenKindEmailVerify {
+		writeVerifyHTML(w, http.StatusBadRequest, "Link đã hết hạn hoặc không còn hiệu lực. Mở app và yêu cầu gửi lại.")
+		return
+	}
+	if !s.userStore.MarkUserEmailVerified(tok.UserID) {
+		writeVerifyHTML(w, http.StatusInternalServerError, "Không cập nhật được trạng thái xác minh. Liên hệ hỗ trợ.")
+		return
+	}
+	// One-shot — revoke so the link cannot be replayed.
+	s.authTokenStore.RevokeAuthToken(hash)
+	writeVerifyHTML(w, http.StatusOK,
+		"Đã xác minh email thành công. Quay lại app để tiếp tục.")
+}
+
+// writeVerifyHTML renders a minimal confirmation page. The deep link
+// `czechgo://verified` triggers a return to the Flutter app on devices
+// where the URL scheme is registered; on a desktop browser the meta
+// refresh is harmless because the scheme is unknown there and the
+// fallback paragraph is what the user reads.
+func writeVerifyHTML(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	tpl := `<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="2; url=czechgo://verified">
+  <title>Czech Go — Xác minh email</title>
+  <style>
+    body{font-family:Inter,system-ui,sans-serif;background:#FBF3E7;color:#14110C;margin:0;padding:48px 16px;text-align:center;}
+    .card{background:#FFFFFF;border-radius:16px;padding:32px;max-width:480px;margin:0 auto;box-shadow:0 4px 24px rgba(20,17,12,.06);}
+    h1{color:#0F3D3A;margin:0 0 16px 0;font-size:22px;}
+    p{margin:0 0 12px 0;line-height:1.6;}
+    a.btn{display:inline-block;margin-top:16px;padding:14px 28px;background:#FF6A14;color:#fff;text-decoration:none;border-radius:12px;font-weight:600;}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Czech Go</h1>
+    <p>` + htmlEscape(message) + `</p>
+    <a class="btn" href="czechgo://verified">Mở app</a>
+  </div>
+</body>
+</html>`
+	_, _ = w.Write([]byte(tpl))
+}
+
+// ── POST /v1/auth/resend-verify ──────────────────────────────────────────
+
+// handleResendVerify issues a fresh verify-email token, revokes the
+// learner's previous pending verify tokens, and dispatches a new email.
+// Cooldown 60s per user, enforced via resendCooldownTracker.
+//
+// Spec: docs/specs/self-serve-learner-spec.md §4.5
+func (s *Server) handleResendVerify(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+
+	user, ok := s.requireV17User(r)
+	if !ok {
+		writeAuthError(w, http.StatusUnauthorized, "missing_token", "authentication required")
+		return
+	}
+	if user.IsEmailVerified() {
+		// Already verified — nothing to send. 200 + no-op so the client
+		// can call this idempotently after a deep link without a
+		// confusing error.
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	if allowed, retryAfter := s.resendCooldown.Allow(user.ID); !allowed {
+		w.Header().Set("Retry-After", fmt.Sprintf("%d", int(retryAfter.Seconds())+1))
+		writeAuthError(w, http.StatusTooManyRequests, "cooldown",
+			fmt.Sprintf("please wait %d more seconds before resending", int(retryAfter.Seconds())+1))
+		return
+	}
+
+	// Invalidate any earlier pending verify tokens so only the freshest
+	// link works. Spec mandates this so a stolen old link cannot be
+	// replayed if the learner forwards their inbox by accident.
+	s.authTokenStore.RevokeAllAuthTokensByKind(user.ID, contracts.AuthTokenKindEmailVerify)
+
+	verifyRaw, _, err := s.issueAuthToken(user.ID, contracts.AuthTokenKindEmailVerify, s.authVerifyTTL, r)
+	if err != nil {
+		log.Printf("resend-verify: issue token: %v", err)
+		writeAuthError(w, http.StatusInternalServerError, "internal", "could not issue token")
+		return
+	}
+	s.dispatchVerifyEmail(user, verifyRaw)
+	s.resendCooldown.MarkSent(user.ID)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// requireV17User pulls the bearer token, looks it up in the V17
+// auth_tokens store, and resolves the owning UserAccount. Until the
+// withAuth middleware is swapped in A2.7, V17 handlers call this helper
+// directly.
+func (s *Server) requireV17User(r *http.Request) (contracts.UserAccount, bool) {
+	rawToken, ok := bearerToken(r)
+	if !ok {
+		return contracts.UserAccount{}, false
+	}
+	tok, ok := s.authTokenStore.AuthTokenByHash(auth.HashToken(rawToken))
+	if !ok || tok.Kind != contracts.AuthTokenKindSession {
+		return contracts.UserAccount{}, false
+	}
+	user, ok := s.userStore.UserAccountByID(tok.UserID)
+	if !ok {
+		return contracts.UserAccount{}, false
+	}
+	return user, true
+}
+
+// htmlEscape replaces the four characters that matter for the
+// confirmation page so a future caller passing externally-controlled
+// content cannot inject markup. The verify endpoint currently passes
+// only constants, but constants drift.
+func htmlEscape(s string) string {
+	r := strings.NewReplacer(
+		"&", "&amp;",
+		"<", "&lt;",
+		">", "&gt;",
+		"\"", "&quot;",
+	)
+	return r.Replace(s)
+}
+
+// bearerToken extracts the raw token from an "Authorization: Bearer ..."
+// header. Returns "", false when the header is missing or malformed.
+func bearerToken(r *http.Request) (string, bool) {
+	v := strings.TrimSpace(r.Header.Get("Authorization"))
+	if v == "" {
+		return "", false
+	}
+	const prefix = "Bearer "
+	if !strings.HasPrefix(v, prefix) {
+		return "", false
+	}
+	tok := strings.TrimSpace(v[len(prefix):])
+	if tok == "" {
+		return "", false
+	}
+	return tok, true
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────

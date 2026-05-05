@@ -74,6 +74,59 @@ func (l *loginRateLimiter) Reset(email string) {
 	delete(l.failures, key)
 }
 
+// ── Resend-verify cooldown ───────────────────────────────────────────────
+
+// resendCooldownTracker enforces "no more than one resend per 60 seconds"
+// per user. Keyed by user_id (not email) so a learner who changes email
+// still gets their cooldown reset along with the new pending verify.
+type resendCooldownTracker struct {
+	mu       sync.Mutex
+	last     map[string]time.Time
+	cooldown time.Duration
+	now      func() time.Time
+}
+
+// newResendCooldownTracker returns a 60s-per-user cooldown.
+func newResendCooldownTracker() *resendCooldownTracker {
+	return &resendCooldownTracker{
+		last:     map[string]time.Time{},
+		cooldown: 60 * time.Second,
+		now:      time.Now,
+	}
+}
+
+// Allow reports whether the user can request a resend right now and, if
+// not, how long until they can. Must be combined with MarkSent to record
+// the dispatch — separating the two lets the handler avoid burning the
+// cooldown when the email send itself fails synchronously.
+func (t *resendCooldownTracker) Allow(userID string) (bool, time.Duration) {
+	if userID == "" {
+		return false, 0
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	last, ok := t.last[userID]
+	if !ok {
+		return true, 0
+	}
+	elapsed := t.now().Sub(last)
+	if elapsed >= t.cooldown {
+		return true, 0
+	}
+	return false, t.cooldown - elapsed
+}
+
+// MarkSent records a successful dispatch so the next Allow call enforces
+// the cooldown.
+func (t *resendCooldownTracker) MarkSent(userID string) {
+	if userID == "" {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.last[userID] = t.now()
+}
+
 // pruneLocked drops timestamps older than the window. Must be called with
 // the lock held.
 func (l *loginRateLimiter) pruneLocked(key string) {

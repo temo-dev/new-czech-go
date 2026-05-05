@@ -370,6 +370,216 @@ func TestLogin_InvalidJSON_Returns400(t *testing.T) {
 	}
 }
 
+// ── logout / verify-email / resend-verify ────────────────────────────────
+
+func (env *authTestEnv) loginToken(t *testing.T, emailAddr, password string) string {
+	t.Helper()
+	resp, body := env.login(t, emailAddr, password)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("login failed: %d %v", resp.StatusCode, body)
+	}
+	tok, _ := body["session_token"].(string)
+	if tok == "" {
+		t.Fatal("missing session token")
+	}
+	return tok
+}
+
+func TestLogout_RevokesSessionToken(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "u@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "u@x.com", "Strong1Password!")
+
+	req, _ := http.NewRequest(http.MethodPost, env.srv.URL+"/v1/auth/logout", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("logout: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", resp.StatusCode)
+	}
+
+	// Token must no longer authenticate.
+	if _, ok := env.tokens.AuthTokenByHash(auth.HashToken(tok)); ok {
+		t.Error("expected token to be revoked")
+	}
+
+	// Re-logout returns 401 (already gone).
+	req2, _ := http.NewRequest(http.MethodPost, env.srv.URL+"/v1/auth/logout", nil)
+	req2.Header.Set("Authorization", "Bearer "+tok)
+	resp2, _ := http.DefaultClient.Do(req2)
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401 on re-logout, got %d", resp2.StatusCode)
+	}
+}
+
+func TestLogout_NoBearerHeader_Returns401(t *testing.T) {
+	env := newAuthTestEnv(t)
+	resp, err := http.Post(env.srv.URL+"/v1/auth/logout", "", nil)
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func TestVerifyEmail_HappyPath_SetsVerifiedAndRevokesToken(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "v@x.com", "Strong1Password!")
+	user, _ := env.users.UserAccountByEmail("v@x.com")
+
+	// Trigger a fresh verify token via resend so we can capture the link
+	// from the recorder. (preSignup discarded the original.)
+	tok := env.loginToken(t, "v@x.com", "Strong1Password!")
+	req, _ := http.NewRequest(http.MethodPost, env.srv.URL+"/v1/auth/resend-verify", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, _ := http.DefaultClient.Do(req)
+	resp.Body.Close()
+
+	// Wait for the goroutine email dispatch.
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if len(env.emails.Sent()) > 0 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if len(env.emails.Sent()) == 0 {
+		t.Fatal("expected resent verify email")
+	}
+	body := env.emails.Sent()[0].HTMLBody
+	rawToken := extractVerifyToken(t, body)
+
+	// Hit the verify endpoint.
+	verifyResp, err := http.Get(env.srv.URL + "/v1/auth/verify-email?token=" + rawToken)
+	if err != nil {
+		t.Fatalf("get verify: %v", err)
+	}
+	defer verifyResp.Body.Close()
+	if verifyResp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", verifyResp.StatusCode)
+	}
+	if ct := verifyResp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Errorf("expected HTML response, got %q", ct)
+	}
+
+	updated, _ := env.users.UserAccountByID(user.ID)
+	if !updated.IsEmailVerified() {
+		t.Error("expected user to be verified after link click")
+	}
+
+	// Replay must fail (token revoked).
+	replay, _ := http.Get(env.srv.URL + "/v1/auth/verify-email?token=" + rawToken)
+	defer replay.Body.Close()
+	if replay.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected replay 400, got %d", replay.StatusCode)
+	}
+}
+
+func TestVerifyEmail_MissingToken_Returns400(t *testing.T) {
+	env := newAuthTestEnv(t)
+	resp, _ := http.Get(env.srv.URL + "/v1/auth/verify-email")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestVerifyEmail_UnknownToken_Returns400(t *testing.T) {
+	env := newAuthTestEnv(t)
+	resp, _ := http.Get(env.srv.URL + "/v1/auth/verify-email?token=not-a-real-token")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestResendVerify_RequiresAuth(t *testing.T) {
+	env := newAuthTestEnv(t)
+	resp, err := http.Post(env.srv.URL+"/v1/auth/resend-verify", "", nil)
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func TestResendVerify_Cooldown(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "rs@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "rs@x.com", "Strong1Password!")
+
+	// First call -> 204.
+	resp1 := postWithAuth(t, env.srv.URL+"/v1/auth/resend-verify", tok)
+	defer resp1.Body.Close()
+	if resp1.StatusCode != http.StatusNoContent {
+		t.Fatalf("first resend expected 204, got %d", resp1.StatusCode)
+	}
+
+	// Second call within 60s -> 429.
+	resp2 := postWithAuth(t, env.srv.URL+"/v1/auth/resend-verify", tok)
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("second resend expected 429, got %d", resp2.StatusCode)
+	}
+	if ra := resp2.Header.Get("Retry-After"); ra == "" {
+		t.Error("expected Retry-After header on 429")
+	}
+}
+
+func TestResendVerify_AlreadyVerified_NoOps(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "av@x.com", "Strong1Password!")
+	user, _ := env.users.UserAccountByEmail("av@x.com")
+	env.users.MarkUserEmailVerified(user.ID)
+
+	tok := env.loginToken(t, "av@x.com", "Strong1Password!")
+	resp := postWithAuth(t, env.srv.URL+"/v1/auth/resend-verify", tok)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("expected 204 (no-op) for already-verified, got %d", resp.StatusCode)
+	}
+	// No new email dispatched.
+	if len(env.emails.Sent()) != 0 {
+		t.Error("expected no email when already verified")
+	}
+}
+
+// extractVerifyToken pulls the raw token out of the verify URL the email
+// body contains.
+func extractVerifyToken(t *testing.T, htmlBody string) string {
+	t.Helper()
+	const marker = "/v1/auth/verify-email?token="
+	idx := strings.Index(htmlBody, marker)
+	if idx < 0 {
+		t.Fatalf("marker not found in body: %s", htmlBody)
+	}
+	rest := htmlBody[idx+len(marker):]
+	end := strings.IndexAny(rest, "\"' <>\r\n")
+	if end < 0 {
+		t.Fatalf("could not find token end in: %s", rest)
+	}
+	return rest[:end]
+}
+
+func postWithAuth(t *testing.T, url, token string) *http.Response {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodPost, url, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	return resp
+}
+
 // ── existing test ────────────────────────────────────────────────────────
 
 func TestSignup_LegacyServerWithoutAuthDeps_ReturnsNotFound(t *testing.T) {
