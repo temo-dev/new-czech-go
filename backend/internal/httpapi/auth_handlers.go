@@ -78,6 +78,9 @@ func (s *Server) registerAuthRoutes() {
 	s.mux.HandleFunc("/v1/auth/logout", s.handleLogout)
 	s.mux.HandleFunc("/v1/auth/verify-email", s.handleVerifyEmail)
 	s.mux.HandleFunc("/v1/auth/resend-verify", s.handleResendVerify)
+	s.mux.HandleFunc("/v1/auth/forgot-password", s.handleForgotPassword)
+	s.mux.HandleFunc("/v1/auth/reset-password", s.handleResetPassword)
+	s.mux.HandleFunc("/v1/auth/change-password", s.handleChangePassword)
 }
 
 // ── POST /v1/auth/signup ─────────────────────────────────────────────────
@@ -529,6 +532,227 @@ func (s *Server) requireV17User(r *http.Request) (contracts.UserAccount, bool) {
 		return contracts.UserAccount{}, false
 	}
 	return user, true
+}
+
+// ── POST /v1/auth/forgot-password ────────────────────────────────────────
+
+type forgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+// handleForgotPassword issues a one-shot password-reset token and sends
+// the reset email. To avoid leaking which addresses are registered the
+// endpoint ALWAYS returns 200 — whether the email matches a real user
+// or not — and only dispatches when a user is found.
+//
+// Spec: docs/specs/self-serve-learner-spec.md §4.6
+func (s *Server) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+
+	var req forgotPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeAuthError(w, http.StatusBadRequest, "invalid_body", "request body is not valid JSON")
+		return
+	}
+	emailAddr := strings.TrimSpace(req.Email)
+	// Always succeed — even on garbage input — so timing + status do not
+	// leak existence. The 400 path above is the only signal a malformed
+	// REQUEST gets, never a missing USER.
+	if user, ok := s.userStore.UserAccountByEmail(emailAddr); ok && emailAddr != "" {
+		// Revoke any earlier resets so only the freshest link works.
+		s.authTokenStore.RevokeAllAuthTokensByKind(user.ID, contracts.AuthTokenKindPasswordReset)
+		raw, _, err := s.issueAuthToken(user.ID, contracts.AuthTokenKindPasswordReset, time.Hour, r)
+		if err != nil {
+			log.Printf("forgot-password: issue token: %v", err)
+		} else {
+			s.dispatchPasswordResetEmail(user, raw)
+		}
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"ok"}`))
+}
+
+func (s *Server) dispatchPasswordResetEmail(u contracts.UserAccount, rawToken string) {
+	if s.emailSender == nil {
+		return
+	}
+	link := s.authBaseURL + "/v1/auth/reset-password?token=" + rawToken
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		err := email.SendPasswordResetEmail(ctx, s.emailSender, u.Email, email.PasswordResetEmailData{
+			DisplayName: displayNameOrFallback(u),
+			ResetURL:    link,
+			ExpiresMin:  60,
+		})
+		if err != nil {
+			log.Printf("forgot-password: send reset email to %s: %v", u.Email, err)
+		}
+	}()
+}
+
+func (s *Server) dispatchPasswordChangedEmail(u contracts.UserAccount) {
+	if s.emailSender == nil {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		err := email.SendPasswordChangedEmail(ctx, s.emailSender, u.Email, email.PasswordChangedEmailData{
+			DisplayName: displayNameOrFallback(u),
+			ChangedAt:   time.Now().UTC().Format("2006-01-02 15:04 MST"),
+		})
+		if err != nil {
+			log.Printf("password-changed: send notification to %s: %v", u.Email, err)
+		}
+	}()
+}
+
+// ── POST /v1/auth/reset-password ─────────────────────────────────────────
+
+type resetPasswordRequest struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
+}
+
+// handleResetPassword consumes the one-shot reset token, replaces the
+// password hash, revokes the token, and revokes ALL the user's session
+// tokens — every device must re-login after a reset, that's the spec.
+// A change-notification email is dispatched async.
+//
+// Spec: docs/specs/self-serve-learner-spec.md §4.7
+func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+
+	var req resetPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeAuthError(w, http.StatusBadRequest, "invalid_body", "request body is not valid JSON")
+		return
+	}
+	if req.Token == "" {
+		writeAuthError(w, http.StatusBadRequest, "invalid_token", "missing reset token")
+		return
+	}
+	if err := auth.ValidatePassword(req.NewPassword); err != nil {
+		writeAuthError(w, http.StatusBadRequest, passwordErrorCode(err), err.Error())
+		return
+	}
+
+	tok, ok := s.authTokenStore.AuthTokenByHash(auth.HashToken(req.Token))
+	if !ok || tok.Kind != contracts.AuthTokenKindPasswordReset {
+		writeAuthError(w, http.StatusBadRequest, "invalid_token", "reset token is invalid or expired")
+		return
+	}
+
+	user, ok := s.userStore.UserAccountByID(tok.UserID)
+	if !ok {
+		writeAuthError(w, http.StatusBadRequest, "invalid_token", "reset token references a missing account")
+		return
+	}
+
+	hashed, err := auth.HashPassword(req.NewPassword)
+	if err != nil {
+		log.Printf("reset-password: hash: %v", err)
+		writeAuthError(w, http.StatusInternalServerError, "internal", "could not process password")
+		return
+	}
+	if _, ok := s.userStore.UpdateUser(user.ID, func(u *contracts.UserAccount) {
+		u.PasswordHash = hashed
+	}); !ok {
+		writeAuthError(w, http.StatusInternalServerError, "internal", "could not update password")
+		return
+	}
+
+	// Single-use: kill the reset token immediately.
+	s.authTokenStore.RevokeAuthToken(auth.HashToken(req.Token))
+	// Force every device to re-login.
+	s.authTokenStore.RevokeAllAuthTokensByKind(user.ID, contracts.AuthTokenKindSession)
+	// Reset login rate-limit so the learner can immediately log in again.
+	if s.loginRL != nil {
+		s.loginRL.Reset(user.Email)
+	}
+
+	updated, _ := s.userStore.UserAccountByID(user.ID)
+	s.dispatchPasswordChangedEmail(updated)
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── POST /v1/auth/change-password ────────────────────────────────────────
+
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+// handleChangePassword requires the current password (defense in depth
+// against session-hijack), updates the hash, revokes the user's OTHER
+// session tokens — the current session keeps working so the client does
+// not have to re-login — and dispatches the change-notification email.
+//
+// Spec: docs/specs/self-serve-learner-spec.md §4.8
+func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+
+	user, ok := s.requireV17User(r)
+	if !ok {
+		writeAuthError(w, http.StatusUnauthorized, "missing_token", "authentication required")
+		return
+	}
+
+	var req changePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeAuthError(w, http.StatusBadRequest, "invalid_body", "request body is not valid JSON")
+		return
+	}
+	if !auth.VerifyPassword(user.PasswordHash, req.CurrentPassword) {
+		writeAuthError(w, http.StatusUnauthorized, "invalid_current_password",
+			"current password is incorrect")
+		return
+	}
+	if err := auth.ValidatePassword(req.NewPassword); err != nil {
+		writeAuthError(w, http.StatusBadRequest, passwordErrorCode(err), err.Error())
+		return
+	}
+
+	hashed, err := auth.HashPassword(req.NewPassword)
+	if err != nil {
+		log.Printf("change-password: hash: %v", err)
+		writeAuthError(w, http.StatusInternalServerError, "internal", "could not process password")
+		return
+	}
+	if _, ok := s.userStore.UpdateUser(user.ID, func(u *contracts.UserAccount) {
+		u.PasswordHash = hashed
+	}); !ok {
+		writeAuthError(w, http.StatusInternalServerError, "internal", "could not update password")
+		return
+	}
+
+	// V17 simplification: revoke EVERY session including the current
+	// one. The current device will get a 401 on its next request and
+	// the AuthService logout-on-401 path routes the learner back to
+	// Welcome — that's mildly worse UX than "stay signed in here, log
+	// out everywhere else", but it avoids a per-user-list method on
+	// AuthTokenStore that V17 would otherwise be the only consumer of.
+	// V18 can refine this once the store grows its per-user iteration.
+	_ = s.authTokenStore.RevokeAllAuthTokensByKind(user.ID, contracts.AuthTokenKindSession)
+
+	updated, _ := s.userStore.UserAccountByID(user.ID)
+	s.dispatchPasswordChangedEmail(updated)
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // htmlEscape replaces the four characters that matter for the

@@ -580,6 +580,226 @@ func postWithAuth(t *testing.T, url, token string) *http.Response {
 	return resp
 }
 
+// ── forgot / reset / change password ─────────────────────────────────────
+
+func (env *authTestEnv) postJSON(t *testing.T, path string, body any) (*http.Response, map[string]any) {
+	t.Helper()
+	buf, _ := json.Marshal(body)
+	resp, err := http.Post(env.srv.URL+path, "application/json", bytes.NewReader(buf))
+	if err != nil {
+		t.Fatalf("post %s: %v", path, err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	var out map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	return resp, out
+}
+
+func (env *authTestEnv) postJSONWithAuth(t *testing.T, path, token string, body any) (*http.Response, map[string]any) {
+	t.Helper()
+	buf, _ := json.Marshal(body)
+	req, _ := http.NewRequest(http.MethodPost, env.srv.URL+path, bytes.NewReader(buf))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("post %s: %v", path, err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	var out map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	return resp, out
+}
+
+func TestForgotPassword_KnownEmail_DispatchesResetLink(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "fp@x.com", "Strong1Password!")
+
+	resp, _ := env.postJSON(t, "/v1/auth/forgot-password", map[string]string{"email": "fp@x.com"})
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	// Wait for async dispatch.
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if len(env.emails.Sent()) > 0 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if len(env.emails.Sent()) != 1 {
+		t.Fatalf("expected 1 reset email, got %d", len(env.emails.Sent()))
+	}
+	if !strings.Contains(env.emails.Sent()[0].HTMLBody, "/v1/auth/reset-password?token=") {
+		t.Error("expected reset URL in body")
+	}
+}
+
+func TestForgotPassword_UnknownEmail_StillReturns200_NoLeak(t *testing.T) {
+	env := newAuthTestEnv(t)
+
+	resp, _ := env.postJSON(t, "/v1/auth/forgot-password", map[string]string{"email": "nobody@x.com"})
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200 for unknown email, got %d", resp.StatusCode)
+	}
+	// And nothing dispatched.
+	time.Sleep(50 * time.Millisecond)
+	if len(env.emails.Sent()) != 0 {
+		t.Errorf("expected zero emails for unknown user, got %d", len(env.emails.Sent()))
+	}
+}
+
+func TestResetPassword_HappyPath_RevokesAllSessions(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "rp@x.com", "Strong1Password!")
+	user, _ := env.users.UserAccountByEmail("rp@x.com")
+
+	// Issue an extra session token directly so we can prove it gets
+	// revoked alongside the original.
+	tok1 := env.loginToken(t, "rp@x.com", "Strong1Password!")
+	tok2 := env.loginToken(t, "rp@x.com", "Strong1Password!")
+
+	// Trigger forgot-password to capture a real reset token from the
+	// recorder.
+	env.postJSON(t, "/v1/auth/forgot-password", map[string]string{"email": "rp@x.com"})
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if len(env.emails.Sent()) > 0 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	resetToken := extractResetToken(t, env.emails.Sent()[0].HTMLBody)
+
+	resp, _ := env.postJSON(t, "/v1/auth/reset-password", map[string]string{
+		"token":        resetToken,
+		"new_password": "NewStrong1Password!",
+	})
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", resp.StatusCode)
+	}
+
+	// Old password must no longer work.
+	respLogin, _ := env.login(t, "rp@x.com", "Strong1Password!")
+	if respLogin.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected old password to fail, got %d", respLogin.StatusCode)
+	}
+	// New password works.
+	respNew, _ := env.login(t, "rp@x.com", "NewStrong1Password!")
+	if respNew.StatusCode != http.StatusOK {
+		t.Errorf("expected new password to succeed, got %d", respNew.StatusCode)
+	}
+
+	// Both prior session tokens must be revoked.
+	for i, tok := range []string{tok1, tok2} {
+		if _, ok := env.tokens.AuthTokenByHash(auth.HashToken(tok)); ok {
+			t.Errorf("session token %d should be revoked", i+1)
+		}
+	}
+
+	// Reset token itself must be revoked (replay -> 400).
+	respReplay, _ := env.postJSON(t, "/v1/auth/reset-password", map[string]string{
+		"token":        resetToken,
+		"new_password": "AnotherStrong1Password!",
+	})
+	if respReplay.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected replay 400, got %d", respReplay.StatusCode)
+	}
+	_ = user
+}
+
+func TestResetPassword_InvalidToken_Returns400(t *testing.T) {
+	env := newAuthTestEnv(t)
+	resp, body := env.postJSON(t, "/v1/auth/reset-password", map[string]string{
+		"token": "not-a-real-token", "new_password": "Strong1Password!",
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+	if body["error"] != "invalid_token" {
+		t.Errorf("expected error=invalid_token, got %v", body["error"])
+	}
+}
+
+func TestResetPassword_WeakNewPassword_Returns400(t *testing.T) {
+	env := newAuthTestEnv(t)
+	resp, body := env.postJSON(t, "/v1/auth/reset-password", map[string]string{
+		"token": "anything", "new_password": "abc",
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+	if body["error"] != "weak_password" {
+		t.Errorf("expected weak_password, got %v", body["error"])
+	}
+}
+
+func TestChangePassword_HappyPath(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "cp@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "cp@x.com", "Strong1Password!")
+
+	resp, _ := env.postJSONWithAuth(t, "/v1/auth/change-password", tok, map[string]string{
+		"current_password": "Strong1Password!",
+		"new_password":     "NewerStrong1Password!",
+	})
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", resp.StatusCode)
+	}
+
+	// Old password no longer works on login.
+	if r, _ := env.login(t, "cp@x.com", "Strong1Password!"); r.StatusCode != http.StatusUnauthorized {
+		t.Errorf("old pwd should be invalid, got %d", r.StatusCode)
+	}
+	// New password works.
+	if r, _ := env.login(t, "cp@x.com", "NewerStrong1Password!"); r.StatusCode != http.StatusOK {
+		t.Errorf("new pwd should work, got %d", r.StatusCode)
+	}
+}
+
+func TestChangePassword_WrongCurrent_Returns401(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "cw@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "cw@x.com", "Strong1Password!")
+
+	resp, body := env.postJSONWithAuth(t, "/v1/auth/change-password", tok, map[string]string{
+		"current_password": "wrong",
+		"new_password":     "NewStrong1Password!",
+	})
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", resp.StatusCode)
+	}
+	if body["error"] != "invalid_current_password" {
+		t.Errorf("expected invalid_current_password, got %v", body["error"])
+	}
+}
+
+func TestChangePassword_RequiresAuth(t *testing.T) {
+	env := newAuthTestEnv(t)
+	resp, _ := env.postJSON(t, "/v1/auth/change-password", map[string]string{
+		"current_password": "x", "new_password": "y",
+	})
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func extractResetToken(t *testing.T, htmlBody string) string {
+	t.Helper()
+	const marker = "/v1/auth/reset-password?token="
+	idx := strings.Index(htmlBody, marker)
+	if idx < 0 {
+		t.Fatalf("marker not found in body: %s", htmlBody)
+	}
+	rest := htmlBody[idx+len(marker):]
+	end := strings.IndexAny(rest, "\"' <>\r\n")
+	if end < 0 {
+		t.Fatalf("could not find token end")
+	}
+	return rest[:end]
+}
+
 // ── existing test ────────────────────────────────────────────────────────
 
 func TestSignup_LegacyServerWithoutAuthDeps_ReturnsNotFound(t *testing.T) {

@@ -442,10 +442,10 @@ Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
   - **Files:** `httpapi/auth_handlers.go` (3 handlers + requireV17User + bearerToken + htmlEscape), `auth_rate_limit.go` (resendCooldownTracker), `server.go` (field), `auth_handlers_test.go` (8 tests)
   - **Verify:** 8/8 pass; existing 374→388
   - **Size:** S
-- [ ] **V17-A2.6** `POST /v1/auth/forgot-password` (always 200) + `POST /v1/auth/reset-password` (revoke all sessions) + `POST /v1/auth/change-password` (revoke other sessions)
-  - **AC:** forgot không leak existence; reset revoke all `kind=session` của user
-  - **Files:** `auth_handlers.go` (extend)
-  - **Verify:** `TestResetPassword_RevokesAllSessions`, `TestForgotPassword_NonexistentEmail_ReturnsOK`
+- [x] **V17-A2.6** `POST /v1/auth/forgot-password` (always 200, no leak) + `POST /v1/auth/reset-password` (one-shot 1h token, revokes all sessions, sends change notification) + `POST /v1/auth/change-password` (auth + current pwd verify, revokes all sessions including current — V17 simplification, V18 may refine — sends change notification); 8 tests (2026-05-05)
+  - **AC:** forgot 200 always (known + unknown email indistinguishable) ✅; known triggers reset email ✅; reset happy path: new pwd works, old pwd 401, prior session tokens revoked, replay 400 ✅; reset 400 invalid_token ✅; reset 400 weak_password ✅; change-password 204 + new pwd works + old fails ✅; 401 invalid_current_password ✅; 401 missing auth ✅
+  - **Files:** `httpapi/auth_handlers.go` (3 handlers + dispatchPasswordResetEmail + dispatchPasswordChangedEmail), `auth_handlers_test.go` (8 tests)
+  - **Verify:** 8/8 pass; total 388→396
   - **Size:** M
 - [ ] **V17-A2.7** Replace `withAuth` middleware: lookup `auth_tokens` sha256, check expires + not revoked, attach user to context, update `last_used_at`
   - **AC:** old hardcoded token map xóa; tất cả existing endpoints vẫn pass với token mới
