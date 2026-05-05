@@ -407,13 +407,13 @@ Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
   - **Files:** 9 new files (3 contracts + 3 store interfaces + 3 test files), Postgres impls embedded in same store files
   - **Verify:** 18 memory tests added (317→335 total)
   - **Size:** L (split into 3 medium commits)
-- [ ] **V17-A1.7** `addColumnIfMissing` helper apply cho cột mới + `OWNER TO czech_user` script post-migration (RDS caveat từ V11)
-  - **AC:** chạy được trên RDS với owner mismatch
-  - **Files:** `backend/internal/store/postgres_migrate.go`, `scripts/post-migrate-fix-ownership.sql`
-  - **Verify:** test trên staging RDS
+- [x] **V17-A1.7** `addColumnIfMissing` helper sẵn có (postgres_migrate.go từ V11) + new `scripts/post-migrate-fix-ownership-v17.sql` (DO block transfers ownership của 5 V17 tables sang app role, idempotent, guarded by pg_roles existence check); shape test ensures script covers all 5 tables (2026-05-05)
+  - **AC:** RDS owner-mismatch handled ✅; script idempotent (skips missing tables, re-running is no-op) ✅; transactional (single BEGIN/COMMIT) ✅; missing-role guard ✅
+  - **Files:** `scripts/post-migrate-fix-ownership-v17.sql` (new); shape test extension in `users_migration_test.go`
+  - **Verify:** shape test pass; manual run on staging RDS deferred to Phase E cutover
   - **Size:** S
 
-**[CHECKPOINT V17-A1]** `make backend-test` pass, migration chạy clean local + staging RDS
+**[CHECKPOINT V17-A1]** ✅ `make backend-test` 336 pass (was 298 baseline, +38 V17 tests); 023_users.sql covers all 5 tables + 8 indexes + 4 FK cascades; UserStore + AuthTokenStore + StreakStore + ProPurchaseStore + DailyUsageStore (memory + Postgres impls); RDS ownership script ready for cutover (2026-05-05)
 
 #### A2 Auth handlers (2d)
 

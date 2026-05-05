@@ -154,6 +154,63 @@ func TestStreakProPurchasesDailyUsageMigration_FileShapesTables(t *testing.T) {
 	}
 }
 
+// TestRDSOwnershipFixScript_CoversAllV17Tables validates the V17-A1.7
+// post-migrate ownership-fix script. The script is run manually against
+// production after 023_users.sql lands; this test just ensures it does
+// not silently miss one of the V17 tables (a forgotten ALTER OWNER TO
+// would mean the runtime addColumnIfMissing helper later panics).
+func TestRDSOwnershipFixScript_CoversAllV17Tables(t *testing.T) {
+	path := findRepoFile(t, "scripts/post-migrate-fix-ownership-v17.sql")
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read script: %v", err)
+	}
+	sql := string(raw)
+
+	// Script must reference every table created by 023_users.sql.
+	for _, table := range []string{
+		"users",
+		"auth_tokens",
+		"streak_days",
+		"pro_purchases",
+		"daily_usage",
+	} {
+		mustContain(t, sql, "'"+table+"'")
+	}
+
+	// Script must guard against running against a missing role.
+	mustContain(t, sql, "pg_roles")
+
+	// Script must wrap in a transaction so a partial failure rolls back.
+	mustContain(t, sql, "BEGIN;")
+	mustContain(t, sql, "COMMIT;")
+}
+
+// findRepoFile walks up from the package directory until it finds the
+// requested repo-relative path (e.g. "scripts/foo.sql").
+func findRepoFile(t *testing.T, relPath string) string {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	dir := wd
+	for i := 0; i < 6; i++ {
+		candidate := filepath.Join(dir, relPath)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	t.Fatalf("could not locate %s starting from %s", relPath, wd)
+	return ""
+}
+
 func findMigration(t *testing.T, name string) string {
 	t.Helper()
 
