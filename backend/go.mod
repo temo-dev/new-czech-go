@@ -28,4 +28,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.13 // indirect
 	github.com/aws/smithy-go v1.25.0 // indirect
 	golang.org/x/crypto v0.26.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 )
