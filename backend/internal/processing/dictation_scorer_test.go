@@ -225,3 +225,49 @@ func TestSentenceAccuracy_NeverNaNOrNegative(t *testing.T) {
 
 // Type-assert that the result struct compiles against the contracts.DictationFeedback shape.
 var _ = contracts.DictationFeedback{}
+
+func TestEnrichDictationDetail_HydratesAudioFromStore(t *testing.T) {
+	detail := map[string]any{
+		"topic": "test",
+		"sentences": []any{
+			map[string]any{"idx": float64(0), "text": "A.", "audio_asset_id": ""},
+			map[string]any{"idx": float64(1), "text": "B.", "audio_asset_id": ""},
+			map[string]any{"idx": float64(2), "text": "C.", "audio_asset_id": "stale-key"},
+		},
+	}
+	audios := []contracts.ExerciseSentenceAudio{
+		{ExerciseID: "ex-1", SentenceIdx: 0, StorageKey: "audio/ex-1/sentence-0.mp3"},
+		{ExerciseID: "ex-1", SentenceIdx: 1, StorageKey: "audio/ex-1/sentence-1.mp3"},
+		// idx=2 missing in store — should keep existing "stale-key"
+	}
+	out := EnrichDictationDetail(detail, audios)
+	m := out.(map[string]any)
+	sentences := m["sentences"].([]any)
+	for i, want := range []string{
+		"audio/ex-1/sentence-0.mp3",
+		"audio/ex-1/sentence-1.mp3",
+		"stale-key",
+	} {
+		got := sentences[i].(map[string]any)["audio_asset_id"]
+		if got != want {
+			t.Errorf("sentence[%d] audio_asset_id: want %q got %q", i, want, got)
+		}
+	}
+}
+
+func TestEnrichDictationDetail_NoAudiosReturnsUnchanged(t *testing.T) {
+	detail := map[string]any{"sentences": []any{}}
+	out := EnrichDictationDetail(detail, nil)
+	if out == nil {
+		t.Errorf("expected non-nil")
+	}
+}
+
+func TestEnrichDictationDetail_NonMapDetailUnchanged(t *testing.T) {
+	out := EnrichDictationDetail("not-a-map", []contracts.ExerciseSentenceAudio{
+		{SentenceIdx: 0, StorageKey: "k"},
+	})
+	if out != "not-a-map" {
+		t.Errorf("expected pass-through, got %v", out)
+	}
+}

@@ -450,6 +450,10 @@ func (s *Server) handleExercise(w http.ResponseWriter, r *http.Request, _ contra
 	if exercise.SkillKind == "interview" {
 		exercise.Detail = processing.EnrichInterviewDetail(exercise.Detail)
 	}
+	if exercise.ExerciseType == "psani_3_dictation" {
+		audios := s.repo.SentenceAudiosByExercise(exercise.ID)
+		exercise.Detail = processing.EnrichDictationDetail(exercise.Detail, audios)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": exercise, "meta": map[string]any{}})
 }
 
@@ -1947,6 +1951,10 @@ func (s *Server) handleAdminExerciseByID(w http.ResponseWriter, r *http.Request,
 			if !ok {
 				writeNotFound(w)
 				return
+			}
+			if exercise.ExerciseType == "psani_3_dictation" {
+				audios := s.repo.SentenceAudiosByExercise(exercise.ID)
+				exercise.Detail = processing.EnrichDictationDetail(exercise.Detail, audios)
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"data": exercise, "meta": map[string]any{}})
 		case http.MethodPatch:

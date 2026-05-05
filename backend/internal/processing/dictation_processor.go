@@ -175,6 +175,47 @@ func fillDictationFallback(scores []contracts.DictationSentenceScore) {
 	}
 }
 
+// EnrichDictationDetail rewrites the exercise detail map to populate each
+// sentence's `audio_asset_id` from the most recent rows in
+// ExerciseSentenceAudioStore. This decouples audio generation (admin clicks
+// "Tạo audio" → exercise_sentence_audio table) from exercise persistence
+// (admin clicks Save → exercises.detail.sentences). Without this, learners
+// see "audio_asset_id":"" on sentences whose audio was generated AFTER the
+// last form save, even though the MP3 exists on disk.
+//
+// Returns the original detail unchanged when it is not a dictation map.
+func EnrichDictationDetail(detail any, audios []contracts.ExerciseSentenceAudio) any {
+	if len(audios) == 0 {
+		return detail
+	}
+	m, ok := detail.(map[string]any)
+	if !ok {
+		return detail
+	}
+	rawSentences, ok := m["sentences"].([]any)
+	if !ok {
+		return detail
+	}
+	byIdx := make(map[int]string, len(audios))
+	for _, a := range audios {
+		byIdx[a.SentenceIdx] = a.StorageKey
+	}
+	for i, s := range rawSentences {
+		sm, ok := s.(map[string]any)
+		if !ok {
+			continue
+		}
+		idx := i
+		if v, ok := sm["idx"].(float64); ok {
+			idx = int(v)
+		}
+		if key, ok := byIdx[idx]; ok && key != "" {
+			sm["audio_asset_id"] = key
+		}
+	}
+	return m
+}
+
 // ExtractDictationDetail unmarshals a generic exercise.Detail into a typed
 // DictationDetail. Mirrors extractPsani1Detail in llm_user_prompts.go.
 // Exported because the HTTP submit-text handler calls it during validation.
