@@ -5,8 +5,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
+	"time"
 
+	"github.com/danieldev/czech-go-system/backend/internal/email"
 	"github.com/danieldev/czech-go-system/backend/internal/httpapi"
+	"github.com/danieldev/czech-go-system/backend/internal/iap"
 	"github.com/danieldev/czech-go-system/backend/internal/processing"
 	"github.com/danieldev/czech-go-system/backend/internal/store"
 )
@@ -138,10 +142,105 @@ func main() {
 	if err != nil {
 		log.Fatalf("could not configure audio url provider: %v", err)
 	}
-	handler := httpapi.NewServerWithAudio(repo, processing.NewProcessor(repo, transcriber, ttsProvider, llmProvider, reviewProvider), uploadProvider, audioURLProvider, audioSignSecret)
+	// V17 self-serve learner — opt-in via the standard env shape.
+	// Requires DATABASE_URL (so V17 stores live in Postgres) AND
+	// USE_V17_AUTH=true so legacy fixture builds keep working
+	// unchanged. Missing dependencies fall through to the legacy
+	// NewServerWithAudio path (no V17 routes).
+	authDeps, useAuth := buildV17AuthDeps()
+
+	processorInst := processing.NewProcessor(repo, transcriber, ttsProvider, llmProvider, reviewProvider)
+	var handler http.Handler
+	if useAuth {
+		log.Printf("V17 self-serve auth enabled (signup/login/IAP/quota gates)")
+		handler = httpapi.NewServerWithAuth(repo, processorInst, uploadProvider, audioURLProvider, audioSignSecret, authDeps)
+	} else {
+		handler = httpapi.NewServerWithAudio(repo, processorInst, uploadProvider, audioURLProvider, audioSignSecret)
+	}
 
 	log.Printf("backend listening on %s", addr)
 	if err := http.ListenAndServe(addr, handler); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// buildV17AuthDeps assembles the V17 dependency bundle from env. Returns
+// (deps, false) when any required piece is missing — caller falls back
+// to the legacy NewServerWithAudio path so existing dev/test setups
+// keep working without USE_V17_AUTH.
+//
+// Required:
+//   - USE_V17_AUTH=true
+//   - DATABASE_URL (for the four V17 Postgres stores)
+//
+// Optional but recommended:
+//   - EMAIL_SMTP_* env vars (no email = signup verify links don't ship)
+//   - APPLE_SHARED_SECRET + APPLE_BUNDLE_ID (no IAP verify path)
+//   - V17_BASE_URL (defaults to http://localhost:8080)
+func buildV17AuthDeps() (httpapi.AuthDeps, bool) {
+	if strings.ToLower(strings.TrimSpace(os.Getenv("USE_V17_AUTH"))) != "true" {
+		return httpapi.AuthDeps{}, false
+	}
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		log.Printf("V17 auth requested but DATABASE_URL is empty; falling back to legacy")
+		return httpapi.AuthDeps{}, false
+	}
+
+	users, err := store.NewPostgresUserStore(databaseURL)
+	if err != nil {
+		log.Fatalf("V17 user store: %v", err)
+	}
+	tokens, err := store.NewPostgresAuthTokenStore(databaseURL)
+	if err != nil {
+		log.Fatalf("V17 auth_token store: %v", err)
+	}
+	streaks, err := store.NewPostgresStreakStore(databaseURL)
+	if err != nil {
+		log.Fatalf("V17 streak store: %v", err)
+	}
+	purchases, err := store.NewPostgresProPurchaseStore(databaseURL)
+	if err != nil {
+		log.Fatalf("V17 pro_purchase store: %v", err)
+	}
+	usage, err := store.NewPostgresDailyUsageStore(databaseURL)
+	if err != nil {
+		log.Fatalf("V17 daily_usage store: %v", err)
+	}
+
+	var sender email.Sender
+	if smtpHost := strings.TrimSpace(os.Getenv("EMAIL_SMTP_HOST")); smtpHost != "" {
+		s, err := email.NewSMTPSenderFromEnv()
+		if err != nil {
+			log.Printf("warning: V17 email sender disabled (%v); verify links will not be sent", err)
+		} else {
+			sender = s
+		}
+	}
+
+	var appleVerifier iap.AppleVerifier
+	if secret := strings.TrimSpace(os.Getenv("APPLE_SHARED_SECRET")); secret != "" {
+		bundle := strings.TrimSpace(os.Getenv("APPLE_BUNDLE_ID"))
+		if bundle == "" {
+			bundle = "eu.hadoo.czechgo"
+		}
+		appleVerifier = iap.DefaultHTTPAppleVerifier(secret, bundle)
+	}
+
+	baseURL := strings.TrimSpace(os.Getenv("V17_BASE_URL"))
+	if baseURL == "" {
+		baseURL = "http://localhost:8080"
+	}
+
+	return httpapi.AuthDeps{
+		Users:         users,
+		AuthTokens:    tokens,
+		Streaks:       streaks,
+		ProPurchases:  purchases,
+		DailyUsage:    usage,
+		EmailSender:   sender,
+		AppleVerifier: appleVerifier,
+		BaseURL:       baseURL,
+		VerifyTTL:     24 * time.Hour,
+	}, true
 }

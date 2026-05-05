@@ -47,6 +47,7 @@ type Server struct {
 	authBaseURL      string
 	authVerifyTTL    time.Duration
 	loginRL          *loginRateLimiter
+	signupRL         *signupRateLimiter
 	resendCooldown   *resendCooldownTracker
 	appleVerifier    AppleVerifier
 	webhookSeen      *webhookDedupe

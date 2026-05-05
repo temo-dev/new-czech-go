@@ -127,6 +127,57 @@ func (t *resendCooldownTracker) MarkSent(userID string) {
 	t.last[userID] = t.now()
 }
 
+// ── Signup rate limiter ──────────────────────────────────────────────────
+
+// signupRateLimiter caps signups at 10/hour per IP — the cheapest
+// mitigation for someone harvesting SES quota by registering throwaway
+// accounts. Keyed by IP because multiple emails per IP is the attack
+// shape we care about; multiple IPs per email is already covered by
+// the email_normalized unique constraint.
+type signupRateLimiter struct {
+	mu       sync.Mutex
+	failures map[string][]time.Time
+	window   time.Duration
+	cap      int
+	now      func() time.Time
+}
+
+func newSignupRateLimiter() *signupRateLimiter {
+	return &signupRateLimiter{
+		failures: map[string][]time.Time{},
+		window:   1 * time.Hour,
+		cap:      10,
+		now:      time.Now,
+	}
+}
+
+// Allow returns true if the IP can submit a signup right now and
+// records the attempt. Returns false when the cap has been hit (and
+// does NOT record the failed attempt — punishing bursts past the cap
+// with longer cooldowns is V18 polish).
+func (l *signupRateLimiter) Allow(ip string) bool {
+	if ip == "" {
+		return true // missing IP -> let it through; bigger problem upstream
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	cutoff := l.now().Add(-l.window)
+	src := l.failures[ip]
+	keep := src[:0]
+	for _, t := range src {
+		if t.After(cutoff) {
+			keep = append(keep, t)
+		}
+	}
+	if len(keep) >= l.cap {
+		l.failures[ip] = keep
+		return false
+	}
+	keep = append(keep, l.now())
+	l.failures[ip] = keep
+	return true
+}
+
 // pruneLocked drops timestamps older than the window. Must be called with
 // the lock held.
 func (l *loginRateLimiter) pruneLocked(key string) {

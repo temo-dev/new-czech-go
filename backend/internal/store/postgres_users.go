@@ -40,8 +40,10 @@ func NewPostgresUserStore(databaseURL string) (UserStore, error) {
 	return store, nil
 }
 
-// NewPostgresUserStoreWithDB wraps an existing *sql.DB (used by the app
-// bootstrap that already manages a single shared pool).
+// NewPostgresUserStoreWithDB wraps an existing *sql.DB. Production
+// bootstrap uses [NewPostgresUserStore] (URL-based) so each V17 store
+// owns its own pool, matching the legacy NewPostgresXxxStore pattern
+// elsewhere in the codebase.
 func NewPostgresUserStoreWithDB(db *sql.DB) (UserStore, error) {
 	store := &postgresUserStore{db: db}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

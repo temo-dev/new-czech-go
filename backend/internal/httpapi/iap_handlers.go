@@ -1,11 +1,13 @@
 package httpapi
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -63,6 +65,34 @@ func (s *Server) ensureIAPDefaults() {
 	if s.webhookSeen == nil {
 		s.webhookSeen = newWebhookDedupe()
 	}
+}
+
+// allowIAPWebhook enforces the IAP_WEBHOOK_SECRET shared-secret guard.
+// Behavior:
+//   - Production (ENV=production) without IAP_WEBHOOK_SECRET set →
+//     reject everything. Operator MUST set the secret before
+//     unblocking the webhook.
+//   - Non-production with IAP_WEBHOOK_SECRET unset → allow (dev
+//     ergonomics). The TestFlight flow expects open access on
+//     staging until ASSN is configured for that environment.
+//   - Both production and dev with IAP_WEBHOOK_SECRET set → require
+//     constant-time-equal X-Czechgo-Webhook-Secret header.
+//
+// V18 polish replaces this with a proper JWS verifier against
+// Apple's public keys. Until then, deploy the webhook URL via a
+// shape that injects the secret (e.g. Apple ASSN URL =
+// https://api.../v1/iap/apple/webhook?ws=<rand>) + nginx rewrites
+// the query into the header.
+func (s *Server) allowIAPWebhook(r *http.Request) bool {
+	expected := strings.TrimSpace(os.Getenv("IAP_WEBHOOK_SECRET"))
+	provided := strings.TrimSpace(r.Header.Get("X-Czechgo-Webhook-Secret"))
+	if expected == "" {
+		if strings.EqualFold(strings.TrimSpace(os.Getenv("ENV")), "production") {
+			return false
+		}
+		return true // dev ergonomics
+	}
+	return subtle.ConstantTimeCompare([]byte(expected), []byte(provided)) == 1
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────
@@ -223,6 +253,20 @@ func (s *Server) handleIAPWebhook(w http.ResponseWriter, r *http.Request) {
 		writeMethodNotAllowed(w)
 		return
 	}
+
+	// Defense-in-depth pending the V18 JWS verifier: production
+	// deployments MUST set IAP_WEBHOOK_SECRET to a 32+ byte random
+	// string and configure ASSN to send it on the
+	// X-Czechgo-Webhook-Secret header (custom header). Apple does not
+	// natively send this; we wire it via a lightweight middleware /
+	// proxy / Apple endpoint URL that includes the secret. Until JWS
+	// verification ships in V18, this is the only thing standing
+	// between an attacker and entitlement-flipping forgeries.
+	if !s.allowIAPWebhook(r) {
+		writeAuthError(w, http.StatusUnauthorized, "webhook_unauthorized", "missing or invalid webhook secret")
+		return
+	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {

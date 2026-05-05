@@ -751,8 +751,23 @@ func TestResetPassword_InvalidToken_Returns400(t *testing.T) {
 
 func TestResetPassword_WeakNewPassword_Returns400(t *testing.T) {
 	env := newAuthTestEnv(t)
+	env.preSignup(t, "wp@x.com", "Strong1Password!")
+	// Trigger forgot-password to materialize a real reset token —
+	// the V17 review reorder validates the token BEFORE the password
+	// policy, so a bogus token would short-circuit and we wouldn't
+	// reach the weak-password branch we're trying to cover.
+	env.postJSON(t, "/v1/auth/forgot-password", map[string]string{"email": "wp@x.com"})
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if len(env.emails.Sent()) > 0 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	resetToken := extractResetToken(t, env.emails.Sent()[0].HTMLBody)
+
 	resp, body := env.postJSON(t, "/v1/auth/reset-password", map[string]string{
-		"token": "anything", "new_password": "abc",
+		"token": resetToken, "new_password": "abc",
 	})
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", resp.StatusCode)

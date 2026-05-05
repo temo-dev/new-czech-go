@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -54,6 +55,9 @@ func (d *AuthDeps) applyTo(s *Server) {
 	}
 	if s.loginRL == nil {
 		s.loginRL = newLoginRateLimiter()
+	}
+	if s.signupRL == nil {
+		s.signupRL = newSignupRateLimiter()
 	}
 	if s.resendCooldown == nil {
 		s.resendCooldown = newResendCooldownTracker()
@@ -129,6 +133,14 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	// Cap the request body so a flood of "{ ...32MB of zeros... }" cannot
 	// pin a backend goroutine. 4 KiB is comfortable for the schema.
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+
+	// Per-IP signup rate limit (10/hour) — cheapest mitigation for an
+	// attacker harvesting SES quota by registering throwaway accounts.
+	if s.signupRL != nil && !s.signupRL.Allow(clientIP(r)) {
+		writeAuthError(w, http.StatusTooManyRequests, "too_many_signups",
+			"too many signups from this address; try again later")
+		return
+	}
 
 	var req signupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -245,7 +257,7 @@ func (s *Server) dispatchVerifyEmail(u contracts.UserAccount, rawToken string) {
 			ExpiresHrs:  hoursOrDefault(s.authVerifyTTL, 24),
 		})
 		if err != nil {
-			log.Printf("signup: send verify email to %s: %v", u.Email, err)
+			log.Printf("signup: send verify email to %s: %v", redactEmail(u.Email), err)
 		}
 	}()
 }
@@ -598,7 +610,7 @@ func (s *Server) dispatchPasswordResetEmail(u contracts.UserAccount, rawToken st
 			ExpiresMin:  60,
 		})
 		if err != nil {
-			log.Printf("forgot-password: send reset email to %s: %v", u.Email, err)
+			log.Printf("forgot-password: send reset email to %s: %v", redactEmail(u.Email), err)
 		}
 	}()
 }
@@ -615,7 +627,7 @@ func (s *Server) dispatchPasswordChangedEmail(u contracts.UserAccount) {
 			ChangedAt:   time.Now().UTC().Format("2006-01-02 15:04 MST"),
 		})
 		if err != nil {
-			log.Printf("password-changed: send notification to %s: %v", u.Email, err)
+			log.Printf("password-changed: send notification to %s: %v", redactEmail(u.Email), err)
 		}
 	}()
 }
@@ -649,14 +661,22 @@ func (s *Server) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 		writeAuthError(w, http.StatusBadRequest, "invalid_token", "missing reset token")
 		return
 	}
-	if err := auth.ValidatePassword(req.NewPassword); err != nil {
-		writeAuthError(w, http.StatusBadRequest, passwordErrorCode(err), err.Error())
-		return
-	}
 
+	// Token lookup BEFORE password validation. Reverse-order
+	// throughput attack: invalid tokens are cheap to reject (indexed
+	// sha256 lookup), so an attacker spamming bogus tokens with
+	// strong passwords does not get to do password-policy work
+	// (cheap but more than a hash compare) on every request. Order
+	// also matches the spec wording: "the reset token is the
+	// authority".
 	tok, ok := s.authTokenStore.AuthTokenByHash(auth.HashToken(req.Token))
 	if !ok || tok.Kind != contracts.AuthTokenKindPasswordReset {
 		writeAuthError(w, http.StatusBadRequest, "invalid_token", "reset token is invalid or expired")
+		return
+	}
+
+	if err := auth.ValidatePassword(req.NewPassword); err != nil {
+		writeAuthError(w, http.StatusBadRequest, passwordErrorCode(err), err.Error())
 		return
 	}
 
@@ -1129,24 +1149,46 @@ func passwordErrorCode(err error) string {
 	}
 }
 
-// looksLikeEmail is a permissive RFC-5321-ish check: an "@" with at least
-// one rune on each side and a "." in the domain. Stricter validation is
-// counterproductive here — anything we reject the SMTP sender will reject
-// (or the verify email will simply bounce) so this guard only catches
-// trivially-malformed inputs.
+// looksLikeEmail validates the address using the stdlib mail.ParseAddress
+// parser. This is stricter than the previous hand-rolled check: it
+// rejects display-name forms (`"Anh" <a@x>`), embedded whitespace, and
+// most malformed inputs SES would otherwise bounce on. We additionally
+// require the parser's normalized address to equal the input so a
+// sneaky `<a@x>` does not slip through.
+//
+// Domain still must contain a dot — `name@local` is technically valid
+// per RFC but not useful for sending mail in practice.
 func looksLikeEmail(s string) bool {
+	addr, err := mail.ParseAddress(s)
+	if err != nil {
+		return false
+	}
+	if addr.Address != s {
+		return false
+	}
 	at := strings.IndexByte(s, '@')
-	if at <= 0 || at == len(s)-1 {
+	if at < 0 {
 		return false
 	}
-	domain := s[at+1:]
-	if !strings.Contains(domain, ".") {
-		return false
-	}
-	if strings.ContainsAny(s, " \t\n\r") {
+	if !strings.Contains(s[at+1:], ".") {
 		return false
 	}
 	return true
+}
+
+// redactEmail keeps logs useful for debugging without dumping the full
+// learner email into log aggregation. "an@example.com" -> "a***@example.com".
+func redactEmail(email string) string {
+	at := strings.IndexByte(email, '@')
+	if at <= 0 {
+		return "***"
+	}
+	local := email[:at]
+	domain := email[at+1:]
+	if len(local) <= 1 {
+		return local + "***@" + domain
+	}
+	return local[:1] + "***@" + domain
 }
 
 // clientIP extracts the originating address. It honors X-Forwarded-For
