@@ -441,5 +441,26 @@
     "interviewVocabHints": "Vocab hints",
     "interviewPttIdleHint": "Tap to start speaking",
     "interviewPttSendHint": "Recording · Tap to send",
-    "interviewFinishBtn": "Finish"
+    "interviewFinishBtn": "Finish",
+    "dictationListenInstruction": "Listen and write the sentence",
+    "dictationSentenceLabel": "Sentence {idx} / {total}",
+    "@dictationSentenceLabel": {
+        "placeholders": {
+            "idx": {"type": "int"},
+            "total": {"type": "int"}
+        }
+    },
+    "dictationRepeatRemaining": "{n} replay(s) left",
+    "@dictationRepeatRemaining": {
+        "placeholders": {
+            "n": {"type": "int"}
+        }
+    },
+    "dictationRepeatExhausted": "No replays left",
+    "dictationKeyboardHint": "Czech keyboard",
+    "dictationNextBtn": "Next →",
+    "dictationSubmitBtn": "Submit",
+    "dictationPrevBtn": "← Prev",
+    "dictationResultPerSentence": "Per-sentence accuracy",
+    "dictationLLMUnavailable": "Detailed feedback temporarily unavailable"
 }

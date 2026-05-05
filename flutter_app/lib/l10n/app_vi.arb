@@ -486,5 +486,26 @@
     "interviewVocabHints": "Gợi ý từ",
     "interviewPttIdleHint": "Tap để bắt đầu nói",
     "interviewPttSendHint": "Đang ghi · Tap để gửi",
-    "interviewFinishBtn": "Hoàn thành"
+    "interviewFinishBtn": "Hoàn thành",
+    "dictationListenInstruction": "Nghe và viết lại câu",
+    "dictationSentenceLabel": "Câu {idx} / {total}",
+    "@dictationSentenceLabel": {
+        "placeholders": {
+            "idx": {"type": "int"},
+            "total": {"type": "int"}
+        }
+    },
+    "dictationRepeatRemaining": "Còn {n} lượt nghe lại",
+    "@dictationRepeatRemaining": {
+        "placeholders": {
+            "n": {"type": "int"}
+        }
+    },
+    "dictationRepeatExhausted": "Hết lượt nghe lại",
+    "dictationKeyboardHint": "Bàn phím Czech",
+    "dictationNextBtn": "Tiếp →",
+    "dictationSubmitBtn": "Nộp bài",
+    "dictationPrevBtn": "← Trước",
+    "dictationResultPerSentence": "Độ chính xác từng câu",
+    "dictationLLMUnavailable": "Phản hồi chi tiết tạm không khả dụng"
 }

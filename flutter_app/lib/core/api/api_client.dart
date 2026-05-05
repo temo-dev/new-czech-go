@@ -7,13 +7,17 @@ import '../auth/auth_models.dart';
 import '../streak/streak_models.dart';
 import '../voice/voice_option.dart';
 
-const _kDefaultBaseUrl = String.fromEnvironment(
-  'API_BASE_URL',
-  defaultValue: 'http://localhost:8080',
-);
+const _kEnvBaseUrl = String.fromEnvironment('API_BASE_URL');
+const _kFallbackBaseUrl = 'http://localhost:8080';
+
+String _resolveBaseUrl(String? override) {
+  if (override != null && override.isNotEmpty) return override;
+  if (_kEnvBaseUrl.isNotEmpty) return _kEnvBaseUrl;
+  return _kFallbackBaseUrl;
+}
 
 class ApiClient {
-  ApiClient({this.baseUrl = _kDefaultBaseUrl});
+  ApiClient({String? baseUrl}) : baseUrl = _resolveBaseUrl(baseUrl);
 
   final String baseUrl;
   String? _token;
@@ -286,6 +290,55 @@ class ApiClient {
     _token = null;
   }
 
+  /// Uploads a new avatar image (jpg/png/webp, ≤5 MB) for the current
+  /// learner. Returns the new `avatar_asset_id` (storage key) which the
+  /// caller threads back into [AuthUser] after [getMeV17] refresh.
+  Future<String> uploadAvatarV17(File image) async {
+    final t = _token;
+    if (t == null) {
+      throw AuthException(statusCode: 401, code: 'missing_token', message: 'Not authenticated.');
+    }
+    final uri = Uri.parse('$baseUrl/v1/users/me/avatar');
+    final request = await HttpClient().openUrl('POST', uri);
+    final boundary = '----flutter${DateTime.now().microsecondsSinceEpoch}';
+    request.headers.set(HttpHeaders.contentTypeHeader, 'multipart/form-data; boundary=$boundary');
+    request.headers.set('Authorization', 'Bearer $t');
+
+    final fileBytes = await image.readAsBytes();
+    final filename = image.path.split(Platform.pathSeparator).last;
+    final mime = _guessImageMime(filename);
+    final head = utf8.encode(
+      '--$boundary\r\n'
+      'Content-Disposition: form-data; name="file"; filename="$filename"\r\n'
+      'Content-Type: $mime\r\n\r\n',
+    );
+    final tail = utf8.encode('\r\n--$boundary--\r\n');
+    request.contentLength = head.length + fileBytes.length + tail.length;
+    request.add(head);
+    request.add(fileBytes);
+    request.add(tail);
+
+    final response = await request.close();
+    final text = await response.transform(utf8.decoder).join();
+    Map<String, dynamic> payload = const {};
+    if (text.isNotEmpty) {
+      final decoded = jsonDecode(text);
+      if (decoded is Map<String, dynamic>) payload = decoded;
+    }
+    if (response.statusCode >= 400) {
+      throw AuthException(
+        statusCode: response.statusCode,
+        code: (payload['error'] as String?) ?? 'http_${response.statusCode}',
+        message: (payload['message'] as String?) ?? 'Avatar upload failed.',
+      );
+    }
+    final data = (payload['data'] as Map<String, dynamic>?) ?? const {};
+    return (data['image_asset_id'] as String?) ?? '';
+  }
+
+  Future<void> deleteAvatarV17() =>
+      _v17Request(method: 'DELETE', path: '/v1/users/me/avatar', authed: true);
+
   Future<void> resendVerifyV17() => _v17Request(
         method: 'POST',
         path: '/v1/auth/resend-verify',
@@ -417,6 +470,28 @@ class ApiClient {
     if (preferredVoiceId != null && preferredVoiceId.isNotEmpty) {
       body['preferred_voice_id'] = preferredVoiceId;
     }
+    await _authed('POST', '/v1/attempts/$attemptId/submit-text', body: body);
+  }
+
+  /// Submits a dictation attempt (V18 — psani_3_dictation).
+  ///
+  /// [sentences] must contain exactly as many entries as the exercise has,
+  /// keyed by 0-based [DictationSentenceSubmission.idx]. Backend caps the body
+  /// at 16 KB and each sentence text at 200 runes; mismatches return
+  /// `invalid_sentence_count` or `sentence_too_long` error codes.
+  Future<void> submitDictation(
+    String attemptId, {
+    required List<DictationSentenceSubmission> sentences,
+  }) async {
+    final body = <String, dynamic>{
+      'sentences': sentences
+          .map((s) => {
+                'idx': s.idx,
+                'text': s.text,
+                'replay_count': s.replayCount,
+              })
+          .toList(),
+    };
     await _authed('POST', '/v1/attempts/$attemptId/submit-text', body: body);
   }
 
@@ -650,6 +725,14 @@ class ApiClient {
   }
 }
 
+String _guessImageMime(String filename) {
+  final lower = filename.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.heic') || lower.endsWith('.heif')) return 'image/heic';
+  return 'image/jpeg';
+}
+
 class AudioStreamInfo {
   AudioStreamInfo({
     required this.url,
@@ -675,4 +758,19 @@ class AudioStreamInfo {
 
   bool get isExpiringSoon =>
       expiresAt.difference(DateTime.now()).inSeconds < 60;
+}
+
+// V18: One sentence submitted as part of a dictation attempt.
+// `replayCount` is telemetry only — backend stores it in attempt details_json
+// and never gates or modifies the score based on it.
+class DictationSentenceSubmission {
+  const DictationSentenceSubmission({
+    required this.idx,
+    required this.text,
+    this.replayCount = 0,
+  });
+
+  final int idx;
+  final String text;
+  final int replayCount;
 }

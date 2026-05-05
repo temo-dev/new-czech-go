@@ -12,6 +12,7 @@ import '../../exercise/screens/exercise_screen.dart' as exercise_feature;
 import '../../exercise/screens/listening_exercise_screen.dart';
 import '../../exercise/screens/reading_exercise_screen.dart';
 import '../../exercise/screens/vocab_grammar_exercise_screen.dart';
+import '../../exercise/screens/dictation_exercise_screen.dart';
 import '../../exercise/screens/writing_exercise_screen.dart';
 
 class ExerciseListScreen extends StatefulWidget {
@@ -96,6 +97,20 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => WritingExerciseScreen(client: widget.client, detail: detail),
+        ),
+      );
+      return;
+    }
+
+    // V18: dictation exercises (psani_3_dictation) → DictationExerciseScreen.
+    if (detail.isPsani3) {
+      // ignore: use_build_context_synchronously
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DictationExerciseScreen(
+            client: widget.client,
+            detail: detail,
+          ),
         ),
       );
       return;

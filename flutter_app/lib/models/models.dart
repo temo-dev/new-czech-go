@@ -419,6 +419,14 @@ class ExerciseDetail {
     // V16
     this.interviewDisplayPrompt = '',
     this.interviewAudioBufferTimeoutMs = 1500,
+    // V18: dictation (psani_3_dictation)
+    this.dictationTopic = '',
+    this.dictationContextImageAssetId = '',
+    this.dictationSentences = const [],
+    this.dictationMaxReplaysPerSentence = 3,
+    this.dictationVoiceId = '',
+    this.dictationMaxPoints = 10,
+    this.dictationPassThresholdPercent = 60,
   });
 
   final String id;
@@ -488,6 +496,15 @@ class ExerciseDetail {
   final String interviewDisplayPrompt;
   final int interviewAudioBufferTimeoutMs;
 
+  // V18: dictation (psani_3_dictation)
+  final String dictationTopic;
+  final String dictationContextImageAssetId;
+  final List<DictationSentenceView> dictationSentences;
+  final int dictationMaxReplaysPerSentence;
+  final String dictationVoiceId;
+  final int dictationMaxPoints;
+  final int dictationPassThresholdPercent;
+
   bool get isInterviewConversation => exerciseType == 'interview_conversation';
   bool get isInterviewChoiceExplain =>
       exerciseType == 'interview_choice_explain';
@@ -495,6 +512,7 @@ class ExerciseDetail {
 
   bool get isPsani1 => exerciseType == 'psani_1_formular';
   bool get isPsani2 => exerciseType == 'psani_2_email';
+  bool get isPsani3 => exerciseType == 'psani_3_dictation';
   bool get isPoslech => exerciseType.startsWith('poslech_');
   bool get isPoslech5 => exerciseType == 'poslech_5';
   bool get isCteni => exerciseType.startsWith('cteni_');
@@ -683,6 +701,21 @@ class ExerciseDetail {
       interviewAudioBufferTimeoutMs: _clampAudioBufferTimeout(
         detail['audio_buffer_timeout_ms'],
       ),
+      // V18: dictation
+      dictationTopic: detail['topic'] as String? ?? '',
+      dictationContextImageAssetId:
+          detail['context_image_asset_id'] as String? ?? '',
+      dictationSentences:
+          (detail['sentences'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(DictationSentenceView.fromJson)
+              .toList(),
+      dictationMaxReplaysPerSentence:
+          (detail['max_replays_per_sentence'] as num?)?.toInt() ?? 3,
+      dictationVoiceId: detail['voice_id'] as String? ?? '',
+      dictationMaxPoints: (detail['max_points'] as num?)?.toInt() ?? 10,
+      dictationPassThresholdPercent:
+          (detail['pass_threshold_percent'] as num?)?.toInt() ?? 60,
     );
   }
 }
@@ -693,6 +726,126 @@ int _clampAudioBufferTimeout(dynamic raw) {
   if (n < 500) return 500;
   if (n > 5000) return 5000;
   return n;
+}
+
+// V18: One sentence in a psani_3_dictation exercise.
+class DictationSentenceView {
+  const DictationSentenceView({
+    required this.idx,
+    required this.text,
+    this.audioAssetId = '',
+  });
+
+  final int idx;
+  final String text;
+  final String audioAssetId;
+
+  factory DictationSentenceView.fromJson(Map<String, dynamic> json) {
+    return DictationSentenceView(
+      idx: (json['idx'] as num?)?.toInt() ?? 0,
+      text: json['text'] as String? ?? '',
+      audioAssetId: json['audio_asset_id'] as String? ?? '',
+    );
+  }
+}
+
+// V18: Per-sentence dictation score returned by the backend after submit.
+class DictationSentenceScoreView {
+  const DictationSentenceScoreView({
+    required this.idx,
+    required this.reference,
+    required this.learner,
+    required this.accuracy,
+    this.audioAssetId = '',
+    this.errorTags = const [],
+    this.feedbackVI = '',
+    this.feedbackEN = '',
+    this.diffChunks = const [],
+  });
+
+  final int idx;
+  final String reference;
+  final String learner;
+  final double accuracy; // 0.0..1.0
+  final String audioAssetId;
+  final List<String> errorTags;
+  final String feedbackVI;
+  final String feedbackEN;
+  final List<DictationDiffChunkView> diffChunks;
+
+  factory DictationSentenceScoreView.fromJson(Map<String, dynamic> json) {
+    return DictationSentenceScoreView(
+      idx: (json['idx'] as num?)?.toInt() ?? 0,
+      reference: json['reference'] as String? ?? '',
+      learner: json['learner'] as String? ?? '',
+      accuracy: (json['accuracy'] as num?)?.toDouble() ?? 0.0,
+      audioAssetId: json['audio_asset_id'] as String? ?? '',
+      errorTags:
+          (json['error_tags'] as List<dynamic>? ?? const [])
+              .map((e) => e.toString())
+              .toList(),
+      feedbackVI: json['feedback_vi'] as String? ?? '',
+      feedbackEN: json['feedback_en'] as String? ?? '',
+      diffChunks:
+          (json['diff_chunks'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(DictationDiffChunkView.fromJson)
+              .toList(),
+    );
+  }
+}
+
+// V18: One diff chunk in a dictation sentence comparison.
+class DictationDiffChunkView {
+  const DictationDiffChunkView({
+    required this.kind,
+    this.sourceText = '',
+    this.targetText = '',
+  });
+
+  final String kind; // unchanged | deleted | inserted | replaced
+  final String sourceText;
+  final String targetText;
+
+  factory DictationDiffChunkView.fromJson(Map<String, dynamic> json) {
+    return DictationDiffChunkView(
+      kind: json['kind'] as String? ?? 'unchanged',
+      sourceText: json['source_text'] as String? ?? '',
+      targetText: json['target_text'] as String? ?? '',
+    );
+  }
+}
+
+// V18: Aggregated dictation result.
+class DictationResultView {
+  const DictationResultView({
+    required this.overallScore,
+    required this.maxPoints,
+    required this.passed,
+    required this.passThresholdPercent,
+    required this.sentences,
+  });
+
+  final int overallScore;
+  final int maxPoints;
+  final bool passed;
+  final int passThresholdPercent;
+  final List<DictationSentenceScoreView> sentences;
+
+  factory DictationResultView.fromJson(Map<String, dynamic> json) {
+    return DictationResultView(
+      overallScore: (json['overall_score'] as num?)?.toInt() ?? 0,
+      maxPoints: (json['max_points'] as num?)?.toInt() ?? 10,
+      passed: json['passed'] as bool? ?? false,
+      passThresholdPercent:
+          (json['pass_threshold_percent'] as num?)?.toInt() ?? 60,
+      sentences:
+          (json['sentences'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(DictationSentenceScoreView.fromJson)
+              .toList(),
+    );
+  }
 }
 
 // V13: One statement in a cteni_6 / poslech_6 exercise.
@@ -1306,6 +1459,7 @@ class AttemptFeedbackView {
     required this.sampleAnswer,
     this.criteriaResults = const [],
     this.objectiveResult,
+    this.dictationResult,
   });
 
   final String readinessLevel;
@@ -1316,6 +1470,7 @@ class AttemptFeedbackView {
   final String sampleAnswer;
   final List<CriterionCheckView> criteriaResults;
   final ObjectiveResult? objectiveResult;
+  final DictationResultView? dictationResult; // V18: psani_3_dictation
 
   factory AttemptFeedbackView.fromJson(Map<String, dynamic> json) {
     List<String> toStrings(dynamic value) {
@@ -1334,6 +1489,7 @@ class AttemptFeedbackView {
             .toList();
 
     final objRaw = json['objective_result'] as Map<String, dynamic>?;
+    final dictRaw = json['dictation_result'] as Map<String, dynamic>?;
 
     return AttemptFeedbackView(
       readinessLevel: json['readiness_level'] as String? ?? 'needs_work',
@@ -1344,6 +1500,8 @@ class AttemptFeedbackView {
       sampleAnswer: json['sample_answer_text'] as String? ?? '',
       criteriaResults: criteria,
       objectiveResult: objRaw != null ? ObjectiveResult.fromJson(objRaw) : null,
+      dictationResult:
+          dictRaw != null ? DictationResultView.fromJson(dictRaw) : null,
     );
   }
 }
