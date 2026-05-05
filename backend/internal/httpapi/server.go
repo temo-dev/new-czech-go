@@ -190,6 +190,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/admin/ai/set-banner", s.withRole("admin", s.handleAdminAiSetBanner))
 	// V16: interview prompt preview
 	s.mux.HandleFunc("/v1/admin/interview/preview-prompt", s.withRole("admin", s.handleAdminInterviewPreviewPrompt))
+	// V17: admin user management — list + soft-delete learner accounts
+	s.mux.HandleFunc("/v1/admin/users", s.withRole("admin", s.handleAdminUsers))
+	s.mux.HandleFunc("/v1/admin/users/", s.withRole("admin", s.handleAdminUserByID))
 
 	// V17: self-serve learner — only registered when AuthDeps are wired.
 	s.registerAuthRoutes()
@@ -1881,6 +1884,13 @@ func (s *Server) handleAdminExerciseByID(w http.ResponseWriter, r *http.Request,
 		s.handleAdminAssetDelete(w, r, parts[0], parts[1])
 	case strings.HasSuffix(path, "/generate-audio"):
 		s.handleAdminGenerateAudio(w, r, strings.TrimSuffix(path, "/generate-audio"))
+	case strings.Contains(path, "/dictation/sentences/") && strings.HasSuffix(path, "/audio"):
+		exerciseID, sentenceIdx, okPath := parseDictationSentencePath(path)
+		if !okPath {
+			writeNotFound(w)
+			return
+		}
+		s.handleAdminDictationSentenceAudio(w, r, exerciseID, sentenceIdx)
 	case strings.HasSuffix(path, "/scoring-template"):
 		writeJSON(w, http.StatusOK, map[string]any{
 			"data": map[string]any{"status": "saved"},

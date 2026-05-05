@@ -152,6 +152,14 @@ type DialogExerciseAudioGenerator interface {
 	GenerateDialogAudio(exerciseID string, segments []contracts.AudioSegment) (*contracts.ExerciseAudio, error)
 }
 
+// SentenceExerciseAudioGenerator extends ExerciseAudioGenerator with V18
+// per-sentence dictation audio. Each call writes one MP3 keyed by
+// (exercise_id, sentence_idx). Implemented by both Dev and Polly generators.
+type SentenceExerciseAudioGenerator interface {
+	ExerciseAudioGenerator
+	GenerateSentenceAudio(exerciseID string, sentenceIdx int, text string) (*contracts.ExerciseAudio, error)
+}
+
 // HasMultipleSpeakers returns true when the exercise has segments with ≥2 distinct
 // speaker labels, indicating dialog (2-voice) TTS should be used.
 func HasMultipleSpeakers(exercise contracts.Exercise) bool {
@@ -232,6 +240,25 @@ func (DevExerciseAudioGenerator) GenerateDialogAudio(exerciseID string, _ []cont
 	return (DevExerciseAudioGenerator{}).GenerateAudio(exerciseID, "")
 }
 
+// GenerateSentenceAudio for dev: writes a stub silent WAV per (exercise, sentence).
+func (DevExerciseAudioGenerator) GenerateSentenceAudio(exerciseID string, sentenceIdx int, _ string) (*contracts.ExerciseAudio, error) {
+	storageKey := fmt.Sprintf("exercise-audio/%s/sentence-%d.wav", exerciseID, sentenceIdx)
+	dst := localExerciseAudioPath(storageKey)
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return nil, fmt.Errorf("dev sentence audio dir: %w", err)
+	}
+	if err := os.WriteFile(dst, devSilentWAV(), 0o644); err != nil {
+		return nil, fmt.Errorf("dev sentence audio write: %w", err)
+	}
+	return &contracts.ExerciseAudio{
+		ExerciseID:  exerciseID,
+		StorageKey:  storageKey,
+		MimeType:    "audio/wav",
+		SourceType:  "dev",
+		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
+	}, nil
+}
+
 // devSilentWAV returns a minimal valid 44-byte WAV file (0 audio samples).
 func devSilentWAV() []byte {
 	buf := make([]byte, 44)
@@ -295,6 +322,42 @@ func (g *PollyExerciseAudioGenerator) GenerateAudio(exerciseID, text string) (*c
 		return nil, fmt.Errorf("write exercise audio: %w", err)
 	}
 
+	return &contracts.ExerciseAudio{
+		ExerciseID:  exerciseID,
+		StorageKey:  storageKey,
+		MimeType:    "audio/mpeg",
+		SourceType:  "polly",
+		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
+	}, nil
+}
+
+// GenerateSentenceAudio for Polly: synthesizes one MP3 per dictation sentence.
+// Storage key is `exercise-audio/<exerciseID>/sentence-<idx>.mp3` so each
+// sentence is addressable independently of the whole-exercise audio file.
+func (g *PollyExerciseAudioGenerator) GenerateSentenceAudio(exerciseID string, sentenceIdx int, text string) (*contracts.ExerciseAudio, error) {
+	if strings.TrimSpace(text) == "" {
+		return nil, fmt.Errorf("exercise %s sentence %d: no text to synthesize", exerciseID, sentenceIdx)
+	}
+	// TTSProvider.Generate writes under attempt-review/...; rewrite the
+	// blob into the per-sentence exercise-audio path so it survives
+	// across attempts and is reachable by the dictation result UI.
+	ttsResult, err := g.tts.Generate(fmt.Sprintf("%s-sentence-%d", exerciseID, sentenceIdx), text)
+	if err != nil {
+		return nil, fmt.Errorf("polly sentence audio: %w", err)
+	}
+	storageKey := fmt.Sprintf("exercise-audio/%s/sentence-%d.mp3", exerciseID, sentenceIdx)
+	srcPath := localReviewAudioPath(ttsResult.StorageKey)
+	dstPath := localExerciseAudioPath(storageKey)
+	if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
+		return nil, fmt.Errorf("prepare sentence audio dir: %w", err)
+	}
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		return nil, fmt.Errorf("read polly output: %w", err)
+	}
+	if err := os.WriteFile(dstPath, data, 0o644); err != nil {
+		return nil, fmt.Errorf("write sentence audio: %w", err)
+	}
 	return &contracts.ExerciseAudio{
 		ExerciseID:  exerciseID,
 		StorageKey:  storageKey,
