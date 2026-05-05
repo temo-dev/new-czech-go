@@ -1244,10 +1244,18 @@ func (s *Server) handleSubmitText(w http.ResponseWriter, r *http.Request, user c
 		writeError(w, http.StatusInternalServerError, "internal_error", "Exercise not found.", true)
 		return
 	}
-	if exercise.ExerciseType != "psani_1_formular" && exercise.ExerciseType != "psani_2_email" {
+	switch exercise.ExerciseType {
+	case "psani_1_formular", "psani_2_email":
+		s.handleSubmitTextWriting(w, r, attemptID, exercise)
+	case "psani_3_dictation":
+		s.handleSubmitTextDictation(w, r, attemptID, exercise)
+	default:
 		writeError(w, http.StatusBadRequest, "validation_error", "Exercise type does not support text submission.", false)
-		return
 	}
+}
+
+// handleSubmitTextWriting handles psani_1_formular and psani_2_email.
+func (s *Server) handleSubmitTextWriting(w http.ResponseWriter, r *http.Request, attemptID string, exercise contracts.Exercise) {
 	const maxSubmitTextBytes = 64 * 1024 // 64 KB — generous for A2 Czech
 	r.Body = http.MaxBytesReader(w, r.Body, maxSubmitTextBytes)
 	var sub contracts.WritingSubmission
@@ -1261,6 +1269,41 @@ func (s *Server) handleSubmitText(w http.ResponseWriter, r *http.Request, user c
 	}
 	s.repo.SetAttemptStatus(attemptID, "scoring")
 	go s.processor.ProcessWritingAttempt(attemptID, sub)
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"data": map[string]any{"attempt_id": attemptID, "status": "scoring"},
+		"meta": map[string]any{},
+	})
+}
+
+// handleSubmitTextDictation handles psani_3_dictation (V18). The submission
+// shape is `{"sentences":[{"idx":N,"text":"...","replay_count":N}, ...]}`.
+// Body is capped at 16 KB; per-sentence text at DictationMaxSentenceChars
+// runes. Validation errors return stable error codes for the Flutter result
+// poller.
+func (s *Server) handleSubmitTextDictation(w http.ResponseWriter, r *http.Request, attemptID string, exercise contracts.Exercise) {
+	const maxDictationBytes = 16 * 1024
+	r.Body = http.MaxBytesReader(w, r.Body, maxDictationBytes)
+	var sub contracts.DictationSubmission
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error", "Invalid submission body.", false)
+		return
+	}
+	detail, ok := processing.ExtractDictationDetail(exercise.Detail)
+	if !ok || len(detail.Sentences) == 0 {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Exercise detail missing.", true)
+		return
+	}
+	if err := processing.ValidateDictationSubmission(detail, sub); err != nil {
+		var ve processing.DictationValidationError
+		if errors.As(err, &ve) {
+			writeError(w, http.StatusBadRequest, ve.Code, err.Error(), false)
+			return
+		}
+		writeError(w, http.StatusBadRequest, "validation_error", err.Error(), false)
+		return
+	}
+	s.repo.SetAttemptStatus(attemptID, "scoring")
+	go s.processor.ProcessDictationAttempt(attemptID, sub)
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"data": map[string]any{"attempt_id": attemptID, "status": "scoring"},
 		"meta": map[string]any{},

@@ -31,6 +31,55 @@ import (
 
 var collapseWhitespace = regexp.MustCompile(`\s+`)
 
+// DictationSubmissionLimits caps body shape for psani_3_dictation submissions.
+const (
+	DictationMaxSentenceChars = 200
+)
+
+// ValidateDictationSubmission enforces shape rules for psani_3_dictation
+// submissions. The exercise's authored sentence count must equal the number
+// of submitted sentence answers, and every sentence text must be ≤
+// DictationMaxSentenceChars runes after trimming. Empty learner answers are
+// allowed (scored as 0); whitespace-only is treated as empty.
+func ValidateDictationSubmission(detail contracts.DictationDetail, sub contracts.DictationSubmission) error {
+	if len(detail.Sentences) == 0 {
+		return errDictationDetailEmpty
+	}
+	if len(sub.Sentences) != len(detail.Sentences) {
+		return errDictationSentenceCountMismatch
+	}
+	for _, ans := range sub.Sentences {
+		if ans.Idx < 0 || ans.Idx >= len(detail.Sentences) {
+			return errDictationSentenceCountMismatch
+		}
+		trimmed := strings.TrimSpace(ans.Text)
+		if len([]rune(trimmed)) > DictationMaxSentenceChars {
+			return errDictationSentenceTooLong
+		}
+	}
+	return nil
+}
+
+// errDictationSentenceCountMismatch and friends are sentinel errors so the
+// HTTP handler can pick a stable error code without string-matching the
+// message. The handler maps these to 400 + a code; everything else stays 500.
+var (
+	errDictationDetailEmpty           = dictationValidationError("dictation_detail_empty")
+	errDictationSentenceCountMismatch = dictationValidationError("invalid_sentence_count")
+	errDictationSentenceTooLong       = dictationValidationError("sentence_too_long")
+)
+
+// DictationValidationError is the error type returned by
+// ValidateDictationSubmission. It carries a stable `Code` for the HTTP layer
+// while still satisfying the standard error interface.
+type DictationValidationError struct{ Code string }
+
+func (e DictationValidationError) Error() string { return e.Code }
+
+func dictationValidationError(code string) DictationValidationError {
+	return DictationValidationError{Code: code}
+}
+
 // diacriticPairs lists Czech base↔diacritic substitutions that score 0.5
 // instead of 1.0. Pairs are stored as base→accented; lookups check both
 // directions in subCost.

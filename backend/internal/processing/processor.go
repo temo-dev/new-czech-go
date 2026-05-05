@@ -19,12 +19,13 @@ type attemptRepository interface {
 }
 
 type Processor struct {
-	repo           attemptRepository
-	transcriber    Transcriber
-	ttsProvider    TTSProvider
-	voiceRegistry  *VoiceRegistry
-	llmProvider    LLMFeedbackProvider
-	reviewProvider LLMReviewProvider
+	repo              attemptRepository
+	transcriber       Transcriber
+	ttsProvider       TTSProvider
+	voiceRegistry     *VoiceRegistry
+	llmProvider       LLMFeedbackProvider
+	reviewProvider    LLMReviewProvider
+	dictationProvider DictationFeedbackProvider // V18 — lazy fallback to Dev when nil
 }
 
 func NewProcessor(repo attemptRepository, transcriber Transcriber, ttsProvider TTSProvider, llmProvider LLMFeedbackProvider, reviewProvider LLMReviewProvider) *Processor {
@@ -47,6 +48,15 @@ func NewProcessor(repo attemptRepository, transcriber Transcriber, ttsProvider T
 // Returns the processor for chaining.
 func (p *Processor) WithVoiceRegistry(r *VoiceRegistry) *Processor {
 	p.voiceRegistry = r
+	return p
+}
+
+// WithDictationFeedbackProvider wires the V18 dictation LLM annotator.
+// Pass DevDictationFeedbackProvider{} (or omit) to skip LLM annotation —
+// the deterministic Levenshtein scorer still runs and returns a valid
+// score even when annotation is unavailable.
+func (p *Processor) WithDictationFeedbackProvider(provider DictationFeedbackProvider) *Processor {
+	p.dictationProvider = provider
 	return p
 }
 

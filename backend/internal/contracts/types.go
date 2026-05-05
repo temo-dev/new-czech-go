@@ -539,15 +539,16 @@ type Transcript struct {
 }
 
 type AttemptFeedback struct {
-	ReadinessLevel  string           `json:"readiness_level"`
-	OverallSummary  string           `json:"overall_summary"`
-	Strengths       []string         `json:"strengths"`
-	Improvements    []string         `json:"improvements"`
-	TaskCompletion  TaskCompletion   `json:"task_completion"`
-	GrammarFeedback GrammarFeedback  `json:"grammar_feedback"`
-	RetryAdvice     []string         `json:"retry_advice"`
-	SampleAnswer    string           `json:"sample_answer_text,omitempty"`
-	ObjectiveResult *ObjectiveResult `json:"objective_result,omitempty"` // V3/V4: listening/reading
+	ReadinessLevel   string             `json:"readiness_level"`
+	OverallSummary   string             `json:"overall_summary"`
+	Strengths        []string           `json:"strengths"`
+	Improvements     []string           `json:"improvements"`
+	TaskCompletion   TaskCompletion     `json:"task_completion"`
+	GrammarFeedback  GrammarFeedback    `json:"grammar_feedback"`
+	RetryAdvice      []string           `json:"retry_advice"`
+	SampleAnswer     string             `json:"sample_answer_text,omitempty"`
+	ObjectiveResult  *ObjectiveResult   `json:"objective_result,omitempty"`  // V3/V4: listening/reading
+	DictationResult  *DictationFeedback `json:"dictation_result,omitempty"`  // V18: psani_3_dictation
 }
 
 type AttemptReviewArtifactSummary struct {
