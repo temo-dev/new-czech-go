@@ -422,10 +422,10 @@ Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
   - **Files:** `backend/internal/auth/{bcrypt,tokens,password_policy,auth_test}.go`
   - **Verify:** 14/14 pass; benchmark p95 deferred to staging (cost-12 verified structurally)
   - **Size:** M
-- [ ] **V17-A2.2** SES client + 3 email templates VI/EN: `verify_email.html`, `password_reset.html`, `password_changed.html`
-  - **AC:** templates render với Go html/template, brand orange button, không broken layout Gmail/Outlook
-  - **Files:** `backend/internal/email/ses_client.go`, `email/templates/*.html`, `email/sender.go`
-  - **Verify:** unit test render + manual SES send tới test inbox
+- [x] **V17-A2.2** Email Sender + SMTP impl + 3 templates VI/EN: `verify_email.html`, `password_reset.html`, `password_changed.html` — stdlib-only transport (`net/smtp` + STARTTLS) keeps zero new deps; html/template + embed.FS auto-escape DisplayName; brand cream + orange CTA + EN fallback block; RFC 2047 base64 subject wrapping for VN diacritics; multipart/alternative body so plain-text clients fall back; 12 tests (2026-05-05)
+  - **AC:** templates render Go html/template ✅; DisplayName HTML-escaped (XSS guard) ✅; brand orange button ✅; English fallback in every template ✅; security email tells learner what to do if not them ✅; subject UTF-8 round-trip ✅
+  - **Files:** `backend/internal/email/sender.go` (Sender interface + RecorderSender + 3 helpers), `templates.go` (embed render), `smtp_sender.go` (production), 3 HTML templates, `email_test.go`
+  - **Verify:** 12/12 pass; manual SES inbox placement test deferred to A5
   - **Size:** M
 - [ ] **V17-A2.3** `POST /v1/auth/signup`: validate, bcrypt, insert user + session token + verify token, send SES
   - **AC:** 200 + token; 409 duplicate; 400 weak password / invalid email
