@@ -48,3 +48,35 @@ CREATE INDEX IF NOT EXISTS users_role_idx
 CREATE INDEX IF NOT EXISTS users_pro_expires_at_idx
     ON users (pro_expires_at)
     WHERE pro_tier = 'pro' AND deleted_at IS NULL;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- V17-A1.2 — auth_tokens
+--
+-- Stores sha256-hashed bearer tokens for sessions, email-verify links, and
+-- password-reset links. Raw tokens are never persisted: only the hash. Rows
+-- are pruned by sweeping `expires_at` and `revoked_at`; a CASCADE on the
+-- user FK keeps the table self-cleaning when accounts are hard-deleted.
+-- ─────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS auth_tokens (
+    token_hash   TEXT        PRIMARY KEY,
+    user_id      TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind         TEXT        NOT NULL,
+    expires_at   TIMESTAMPTZ NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    revoked_at   TIMESTAMPTZ,
+    last_used_at TIMESTAMPTZ,
+    user_agent   TEXT,
+    ip_address   TEXT
+);
+
+-- Active-token lookup by (user, kind) — used by middleware to authenticate
+-- bearer tokens and by reset/verify flows that revoke previous siblings.
+CREATE INDEX IF NOT EXISTS auth_tokens_user_kind_idx
+    ON auth_tokens (user_id, kind)
+    WHERE revoked_at IS NULL;
+
+-- Expiry sweep — used by the cleanup job to delete stale tokens.
+CREATE INDEX IF NOT EXISTS auth_tokens_expires_at_idx
+    ON auth_tokens (expires_at)
+    WHERE revoked_at IS NULL;

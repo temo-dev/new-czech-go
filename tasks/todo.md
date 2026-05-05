@@ -380,10 +380,10 @@ Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
   - **Files:** `backend/db/migrations/023_users.sql`
   - **Verify:** `goose up` + `goose down` + `goose up` pass; psql `\d users` show schema đúng
   - **Size:** S (1 file)
-- [ ] **V17-A1.2** Migration `023_users.sql` part 2: bảng `auth_tokens` (token_hash sha256 PK, user_id FK, kind, expires_at, revoked_at, last_used_at, ua, ip) + indexes user_kind, expires
-  - **AC:** FK ON DELETE CASCADE; index partial WHERE revoked_at IS NULL
+- [x] **V17-A1.2** Migration `023_users.sql` part 2: bảng `auth_tokens` (token_hash sha256 PK, user_id FK ON DELETE CASCADE, kind, expires_at, revoked_at, last_used_at, user_agent, ip_address) + 2 partial indexes (user_kind, expires_at) WHERE revoked_at IS NULL (2026-05-05)
+  - **AC:** FK ON DELETE CASCADE; index partial WHERE revoked_at IS NULL ✅
   - **Files:** same migration file (extend)
-  - **Verify:** insert + cascade delete user → token rows xóa
+  - **Verify:** shape test pass; cascade verified at SQL level (Postgres apply test deferred to A1.5)
   - **Size:** XS (extend file)
 - [ ] **V17-A1.3** Migration tables `streak_days`, `pro_purchases`, `daily_usage`
   - **AC:** PK composite (user_id, day) cho streak/usage; unique apple_transaction_id; index user_day

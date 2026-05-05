@@ -60,6 +60,49 @@ func TestUsersMigration023_FileExistsAndShapesUsersTable(t *testing.T) {
 	mustContain(t, sql, "IF NOT EXISTS")
 }
 
+// TestAuthTokensMigration_FileShapesAuthTokensTable validates the V17-A1.2
+// extension of 023_users.sql: an auth_tokens table that stores sha256 token
+// hashes (never the raw token) and cascades on user deletion. Two partial
+// indexes target the active-token lookups (kind + user) and the cleanup
+// sweep (expires_at).
+func TestAuthTokensMigration_FileShapesAuthTokensTable(t *testing.T) {
+	path := findMigration(t, "023_users.sql")
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read migration: %v", err)
+	}
+	sql := string(raw)
+
+	mustContain(t, sql, "CREATE TABLE IF NOT EXISTS auth_tokens")
+
+	requiredColumns := []string{
+		"token_hash",
+		"user_id",
+		"kind",
+		"expires_at",
+		"created_at",
+		"revoked_at",
+		"last_used_at",
+		"user_agent",
+		"ip_address",
+	}
+	for _, col := range requiredColumns {
+		mustContain(t, sql, col)
+	}
+
+	// Foreign key with cascade so deleting a user removes their tokens.
+	mustContain(t, sql, "REFERENCES users(id) ON DELETE CASCADE")
+
+	// Partial indexes for active-only lookups.
+	mustContain(t, sql, "auth_tokens_user_kind_idx")
+	mustContain(t, sql, "auth_tokens_expires_at_idx")
+	// Both indexes scope to active rows.
+	if strings.Count(sql, "WHERE revoked_at IS NULL") < 2 {
+		t.Errorf("expected at least 2 partial indexes scoped WHERE revoked_at IS NULL")
+	}
+}
+
 func findMigration(t *testing.T, name string) string {
 	t.Helper()
 
