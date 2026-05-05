@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../auth/auth_models.dart';
+import '../streak/streak_models.dart';
 import '../voice/voice_option.dart';
 
 const _kDefaultBaseUrl = String.fromEnvironment(
@@ -251,6 +252,23 @@ class ApiClient {
       authed: true,
     );
     return AuthUser.fromJson(payload['user'] as Map<String, dynamic>);
+  }
+
+  /// Returns the (streak, usage) pair the Home + Profile widgets
+  /// render. Reuses the same /v1/users/me endpoint as [getMeV17] so a
+  /// single round-trip refreshes everything.
+  Future<({StreakSummary streak, DailyUsageSummary usage})> fetchStreakAndUsageV17() async {
+    final payload = await _v17Request(
+      method: 'GET',
+      path: '/v1/users/me',
+      authed: true,
+    );
+    final streakJson = (payload['streak'] as Map<String, dynamic>?) ?? const {};
+    final usageJson = (payload['usage_today'] as Map<String, dynamic>?) ?? const {};
+    return (
+      streak: StreakSummary.fromJson(streakJson),
+      usage: DailyUsageSummary.fromJson(usageJson),
+    );
   }
 
   Future<AuthUser> patchMeV17(Map<String, dynamic> updates) async {
