@@ -363,3 +363,327 @@ Spec: `SPEC.md § V16` · Detail: `docs/specs/interview-first-turn-fix.md` · Pl
 - Sound-wave default session: first audio audible, repeated turns do not get quieter
 - Profile volume 180%: examiner louder but not distorted
 - Compact/Facebook in-app browser: prompt scrolls, mic/end controls remain visible
+
+---
+
+## V17 — Self-Serve Learner (Auth + Profile + Streak + Pro Paywall)
+
+Spec: `docs/specs/self-serve-learner-spec.md` · Idea: `docs/ideas/self-serve-learner.md` · Plan: `docs/plans/self-serve-learner-plan.md`
+Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
+
+### Phase A — Backend infra (5 ngày)
+
+#### A1 Migration + stores (1d)
+
+- [x] **V17-A1.1** Migration `023_users.sql`: tạo bảng `users` (id, email, email_normalized, password_hash, role, pro_tier, pro_expires_at, onboarding fields, push_token, timezone, grace_attempts_left, soft delete) + partial unique index `email_normalized` WHERE deleted_at IS NULL + role/pro_expires indexes (2026-05-05)
+  - **AC:** migration chạy clean, idempotent, rollback test pass
+  - **Files:** `backend/db/migrations/023_users.sql`
+  - **Verify:** `goose up` + `goose down` + `goose up` pass; psql `\d users` show schema đúng
+  - **Size:** S (1 file)
+- [ ] **V17-A1.2** Migration `023_users.sql` part 2: bảng `auth_tokens` (token_hash sha256 PK, user_id FK, kind, expires_at, revoked_at, last_used_at, ua, ip) + indexes user_kind, expires
+  - **AC:** FK ON DELETE CASCADE; index partial WHERE revoked_at IS NULL
+  - **Files:** same migration file (extend)
+  - **Verify:** insert + cascade delete user → token rows xóa
+  - **Size:** XS (extend file)
+- [ ] **V17-A1.3** Migration tables `streak_days`, `pro_purchases`, `daily_usage`
+  - **AC:** PK composite (user_id, day) cho streak/usage; unique apple_transaction_id; index user_day
+  - **Files:** same migration file
+  - **Verify:** insert/upsert round-trip
+  - **Size:** S
+- [ ] **V17-A1.4** `UserStore` interface + memory + Postgres impl: Create, GetByEmail, GetByID, Update, SoftDelete, MarkVerified, IncrementGrace
+  - **AC:** email lookup case-insensitive; soft-deleted không lookup được
+  - **Files:** `backend/internal/store/user_store.go`, `postgres_users.go`, `memory.go` (extend)
+  - **Verify:** unit test CRUD round-trip cả memory + postgres
+  - **Size:** M (3 files)
+- [ ] **V17-A1.5** `AuthTokenStore` interface + memory + Postgres impl: Create, GetByHash, Revoke, RevokeAllForUser, RevokeAllByKind, CleanupExpired
+  - **AC:** lookup by sha256 hash; revoke single + bulk; cleanup cron-friendly
+  - **Files:** `backend/internal/store/auth_token_store.go`, `postgres_auth_tokens.go`, `memory.go` (extend)
+  - **Verify:** unit test
+  - **Size:** M
+- [ ] **V17-A1.6** `StreakStore` + `ProPurchaseStore` + `DailyUsageStore`: interface + memory + Postgres impls
+  - **AC:** streak compute helper `CurrentStreak(userID)` trả `{current, longest, last_day, grace_left}`; daily_usage upsert atomic
+  - **Files:** `backend/internal/store/streak_store.go`, `pro_purchase_store.go`, `daily_usage_store.go` + Postgres impls
+  - **Verify:** test timezone VN day boundary edge case
+  - **Size:** L (6 files) — chia nếu cần
+- [ ] **V17-A1.7** `addColumnIfMissing` helper apply cho cột mới + `OWNER TO czech_user` script post-migration (RDS caveat từ V11)
+  - **AC:** chạy được trên RDS với owner mismatch
+  - **Files:** `backend/internal/store/postgres_migrate.go`, `scripts/post-migrate-fix-ownership.sql`
+  - **Verify:** test trên staging RDS
+  - **Size:** S
+
+**[CHECKPOINT V17-A1]** `make backend-test` pass, migration chạy clean local + staging RDS
+
+#### A2 Auth handlers (2d)
+
+- [ ] **V17-A2.1** `auth/bcrypt.go` + `auth/tokens.go` + `auth/password_policy.go`: bcrypt cost 12, sha256 token (32B base64url), policy ≥8 ký tự + digit-or-special, top-1000 reject
+  - **AC:** benchmark bcrypt p95 ≤ 250ms trên dev; password "abc123" reject (top-1000)
+  - **Files:** `backend/internal/auth/{bcrypt,tokens,password_policy}.go` + tests
+  - **Verify:** `go test ./internal/auth/...`
+  - **Size:** M
+- [ ] **V17-A2.2** SES client + 3 email templates VI/EN: `verify_email.html`, `password_reset.html`, `password_changed.html`
+  - **AC:** templates render với Go html/template, brand orange button, không broken layout Gmail/Outlook
+  - **Files:** `backend/internal/email/ses_client.go`, `email/templates/*.html`, `email/sender.go`
+  - **Verify:** unit test render + manual SES send tới test inbox
+  - **Size:** M
+- [ ] **V17-A2.3** `POST /v1/auth/signup`: validate, bcrypt, insert user + session token + verify token, send SES
+  - **AC:** 200 + token; 409 duplicate; 400 weak password / invalid email
+  - **Files:** `backend/internal/httpapi/auth_handlers.go`, `server.go` (route wiring)
+  - **Verify:** `TestSignup_*` pass
+  - **Size:** S
+- [ ] **V17-A2.4** `POST /v1/auth/login` + rate limit middleware (5 fails/15min/email): not leak email-existence
+  - **AC:** invalid email vs invalid password → cùng response 401
+  - **Files:** `auth_handlers.go` (extend), `httpapi/rate_limit.go`
+  - **Verify:** `TestLogin_RateLimit`, `TestLogin_InvalidCredentials_NoLeakExistence`
+  - **Size:** M
+- [ ] **V17-A2.5** `POST /v1/auth/logout` + `GET /v1/auth/verify-email` (HTML response + deep link redirect) + `POST /v1/auth/resend-verify` (60s cooldown)
+  - **AC:** logout 204; verify HTML + redirect `czechgo://verified`; resend 429 trong cooldown
+  - **Files:** `auth_handlers.go` (extend)
+  - **Verify:** integration test
+  - **Size:** S
+- [ ] **V17-A2.6** `POST /v1/auth/forgot-password` (always 200) + `POST /v1/auth/reset-password` (revoke all sessions) + `POST /v1/auth/change-password` (revoke other sessions)
+  - **AC:** forgot không leak existence; reset revoke all `kind=session` của user
+  - **Files:** `auth_handlers.go` (extend)
+  - **Verify:** `TestResetPassword_RevokesAllSessions`, `TestForgotPassword_NonexistentEmail_ReturnsOK`
+  - **Size:** M
+- [ ] **V17-A2.7** Replace `withAuth` middleware: lookup `auth_tokens` sha256, check expires + not revoked, attach user to context, update `last_used_at`
+  - **AC:** old hardcoded token map xóa; tất cả existing endpoints vẫn pass với token mới
+  - **Files:** `httpapi/auth_middleware.go`, `server.go`
+  - **Verify:** existing test suite pass với token thật thay dev token (mock)
+  - **Size:** M
+- [ ] **V17-A2.8** `GET /v1/users/me` + `PATCH /v1/users/me` + `POST /v1/users/me/avatar` + `DELETE /v1/users/me` (soft) + `POST /v1/users/me/email-change`
+  - **AC:** GET trả user + streak + usage; PATCH partial fields; avatar reuse media_assets; DELETE anonymize
+  - **Files:** `httpapi/users_me_handlers.go`
+  - **Verify:** `TestGetMe_IncludesStreakAndUsage`, `TestDelete_AnonymizesEmail`
+  - **Size:** L (4 endpoints in 1 file ok)
+
+**[CHECKPOINT V17-A2]** 17+ test cases (§9.1 spec) pass; `make backend-test` xanh; smoke `signup→login→me` curl-based
+
+#### A3 Authorization gates (1d)
+
+- [ ] **V17-A3.1** `requireProOrUnderLimit` middleware: check `daily_usage.attempts_count < 7` cho free, unlimited cho pro; 429 với `X-Limit-Reset` header
+  - **AC:** Pro user vô hạn; free user 8th attempt trong ngày → 429
+  - **Files:** `httpapi/usage_middleware.go`
+  - **Verify:** `TestDailyUsage_FreeUserBlockedAt7thAttempt`, `TestDailyUsage_ProUserUnlimited`
+  - **Size:** S
+- [ ] **V17-A3.2** Weekly interview limit (1/tuần free) — wrap `/v1/interview-sessions/token`
+  - **AC:** 2nd interview trong tuần → 429
+  - **Files:** `usage_middleware.go` (extend), `server.go`
+  - **Verify:** test với mock clock
+  - **Size:** S
+- [ ] **V17-A3.3** Strip client `user_id` từ payload write path: attempt creation lấy user từ middleware-attached context
+  - **AC:** không thể spoof `user_id` qua POST body
+  - **Files:** `processing/processor.go`, `httpapi/server.go` (handlers)
+  - **Verify:** `TestAttemptUserIDFromAuth_NotFromBody`
+  - **Size:** S
+- [ ] **V17-A3.4** Email verify gate: `requireVerified` middleware apply khi `grace_attempts_left = 0` AND `email_verified_at IS NULL`
+  - **AC:** Grace 3 attempts ok; lần 4 chưa verify → 403 với code `email_verify_required`
+  - **Files:** `httpapi/verify_middleware.go`
+  - **Verify:** `TestGracceMode_3AttemptsThenBlock`
+  - **Size:** S
+
+**[CHECKPOINT V17-A3]** Quota + verify gate test pass
+
+#### A4 Apple IAP (1d)
+
+- [ ] **V17-A4.1** `iap/apple_verify.go`: call `/verifyReceipt` (sandbox first, fallback prod), parse `latest_receipt_info`, validate bundle `eu.hadoo.czechgo`
+  - **AC:** Test với mock Apple HTTP server; retry 3 lần với exponential backoff
+  - **Files:** `backend/internal/iap/apple_verify.go`
+  - **Verify:** `TestAppleVerify_*` (sandbox flag, retry, malformed)
+  - **Size:** M
+- [ ] **V17-A4.2** `POST /v1/iap/apple/verify` handler: dedupe `apple_transaction_id`, insert `pro_purchases`, update `users.pro_tier='pro'` + `pro_expires_at`
+  - **AC:** Duplicate transaction_id → 409; success update both tables atomically
+  - **Files:** `httpapi/iap_handlers.go`
+  - **Verify:** `TestIAPVerify_RejectsDuplicateTransaction`
+  - **Size:** S
+- [ ] **V17-A4.3** ASSN V2 webhook `POST /v1/iap/apple/webhook`: verify JWS signature, handle RENEWAL/EXPIRED/REFUND/GRACE_PERIOD, idempotent via `notificationUUID`
+  - **AC:** Apple sample payload tests pass; duplicate webhook xử lý 1 lần
+  - **Files:** `iap/apple_webhook.go`, `httpapi/iap_handlers.go` (extend)
+  - **Verify:** `TestIAPWebhook_HandlesRenewal/Refund/Expired`
+  - **Size:** M
+- [ ] **V17-A4.4** Pro lifecycle email: gửi welcome khi upgrade, expired notification khi auto-renew fail, refund notification
+  - **AC:** SES templates render; gửi đúng trigger
+  - **Files:** `iap/notification_email.go`, `email/templates/pro_*.html`
+  - **Verify:** unit test trigger conditions
+  - **Size:** S
+
+**[CHECKPOINT V17-A4]** Full IAP test suite pass; manual sandbox purchase 5 lần thành công
+
+#### A5 SES production access (parallel, manual)
+
+- [ ] **V17-A5.1** Verify domain `hadoo.eu` SES eu-central-1 (DKIM CNAME + SPF TXT)
+- [ ] **V17-A5.2** Submit production access request out of sandbox (kèm use case + sample emails)
+- [ ] **V17-A5.3** mail-tester.com score ≥ 9/10
+- [ ] **V17-A5.4** Inbox placement test 50 emails (Gmail/Outlook/Yahoo/iCloud) — 0 vào spam
+- [ ] **V17-A5.5** Bounce/complaint webhook → `/v1/internal/ses-webhook` (impl trong A2.2)
+
+### Phase B — Flutter auth UI (4 ngày)
+
+- [ ] **V17-B1.1** `AuthService` ChangeNotifier singleton: `signup/login/logout/refresh/me`, AuthState enum
+  - **Files:** `flutter_app/lib/core/auth/auth_service.dart`, `auth_models.dart`, `auth_state.dart`
+  - **AC:** 401 → auto logout; emit state changes
+  - **Verify:** `auth_service_test.dart` pass
+  - **Size:** M
+- [ ] **V17-B1.2** `AuthStorage` wrapper `flutter_secure_storage` (KeyChain iOS) + bootstrap trong `main()`
+  - **Files:** `core/auth/auth_storage.dart`, `main.dart` (edit)
+  - **AC:** Token persist qua app restart; bootstrap chạy trước `runApp`
+  - **Verify:** manual restart test
+  - **Size:** S
+- [ ] **V17-B1.3** Inject `Authorization: Bearer` header trong `ApiClient` + handle 401 trigger logout
+  - **Files:** `core/api/api_client.dart` (edit)
+  - **AC:** Token tự động attach; 401 emit AuthService.logout
+  - **Verify:** integration test với mock 401 response
+  - **Size:** S
+- [ ] **V17-B2.1** `WelcomeScreen` + `SignupScreen`: form 3 field + ToS checkbox, validate on blur
+  - **Files:** `features/auth/screens/welcome_screen.dart`, `signup_screen.dart`, `widgets/auth_text_field.dart`, `password_strength_meter.dart`, `password_visibility_toggle.dart`
+  - **AC:** submit disabled khi invalid; first invalid field auto-focus on error; iOS keyboard `emailAddress`/`newPassword`
+  - **Verify:** widget tests
+  - **Size:** L (5 files)
+- [ ] **V17-B2.2** `LoginScreen`: email + password + forgot link
+  - **Files:** `features/auth/screens/login_screen.dart`
+  - **AC:** show/hide password; error inline; forgot link navigate
+  - **Verify:** widget test
+  - **Size:** S
+- [ ] **V17-B3.1** `VerifyPendingScreen` với 60s cooldown resend + change email link
+  - **Files:** `features/auth/screens/verify_pending_screen.dart`, `widgets/cooldown_button.dart`
+  - **AC:** countdown chính xác; tap resend → call API + reset cooldown
+  - **Verify:** widget test cooldown timer
+  - **Size:** S
+- [ ] **V17-B3.2** `ForgotPasswordScreen` + `ResetPasswordScreen` (deep link entry)
+  - **Files:** `features/auth/screens/forgot_password_screen.dart`, `reset_password_screen.dart`
+  - **AC:** forgot 200 + toast; reset → redirect login
+  - **Verify:** widget test
+  - **Size:** M
+- [ ] **V17-B3.3** Deep link handler: parse `czechgo://verified` + `czechgo://reset?token=...` + `Info.plist` URL scheme registration
+  - **Files:** `core/deep_links/deep_link_handler.dart`, `ios/Runner/Info.plist` (edit)
+  - **AC:** Test bằng `xcrun simctl openurl booted czechgo://verified`
+  - **Verify:** manual device test
+  - **Size:** S
+- [ ] **V17-B4.1** `AppShell` routing swap dựa trên AuthService state
+  - **Files:** `features/shell/app_shell.dart` (rewrite), `core/auth/auth_state_router.dart`
+  - **AC:** loading→splash; unauth→Welcome; auth→HomeShell; needsVerify+grace=0→block banner
+  - **Verify:** widget test all 4 states
+  - **Size:** M
+
+**[CHECKPOINT V17-B]** `make flutter-analyze` + `make flutter-test` pass; manual signup→verify→login trên device
+
+### Phase C — Profile + Streak (3 ngày)
+
+- [ ] **V17-C1.1** `ProfileScreen` augment: thêm sections Account / Học tập / Pro / Đăng xuất; giữ existing locale + interview prefs
+  - **Files:** `features/profile/screens/profile_screen.dart` (edit), `widgets/profile_section.dart`
+  - **AC:** không break existing prefs; logout confirm dialog
+  - **Verify:** widget test sections render đủ
+  - **Size:** M
+- [ ] **V17-C1.2** `ChangePasswordScreen` + `EmailChangeScreen`
+  - **Files:** `features/profile/screens/change_password_screen.dart`, `email_change_screen.dart`
+  - **AC:** current password validation; success → toast + back
+  - **Verify:** widget test
+  - **Size:** S
+- [ ] **V17-C1.3** `AvatarPicker` widget: `image_picker` + crop + upload `/v1/users/me/avatar`
+  - **Files:** `features/profile/widgets/avatar_picker.dart`, `pubspec.yaml` (add deps)
+  - **AC:** preview; upload progress; error retry
+  - **Verify:** manual device
+  - **Size:** S
+- [ ] **V17-C1.4** Account deletion flow với double-confirm dialog (App Store 5.1.1v requirement)
+  - **Files:** `features/profile/widgets/delete_account_dialog.dart`
+  - **AC:** 2-step confirm; nhập "XÓA" để confirm
+  - **Verify:** widget test confirm flow
+  - **Size:** S
+- [ ] **V17-C2.1** `OnboardingScreen` 3 step (goal/level/reminder) + skip button
+  - **Files:** `features/auth/screens/onboarding_screen.dart`, `widgets/onboarding_step.dart`, `progress_dots.dart`, `time_picker_field.dart`
+  - **AC:** skip→Home với defaults; submit→PATCH /me + Home
+  - **Verify:** widget tests
+  - **Size:** M
+- [ ] **V17-C3.1** `StreakRingWidget` (Home top): 12 con số + 7 dots last week + spring animation
+  - **Files:** `features/home/widgets/streak_ring_widget.dart`
+  - **AC:** spring 280ms; reduced-motion → static; tap→history; a11y label "12 ngày liên tục"
+  - **Verify:** widget test + golden test
+  - **Size:** S
+- [ ] **V17-C3.2** `StreakHistoryScreen` calendar heatmap 12 tuần
+  - **Files:** `features/home/screens/streak_history_screen.dart`, `widgets/calendar_heatmap.dart`
+  - **AC:** show grace pass left; color intensity by completion
+  - **Verify:** widget test
+  - **Size:** M
+- [ ] **V17-C3.3** Home augment: StreakRing top + Pro banner nếu free + verify banner nếu chưa verify
+  - **Files:** `features/home/screens/home_screen.dart` (edit)
+  - **AC:** banners conditional render đúng state
+  - **Verify:** widget test mỗi state
+  - **Size:** S
+
+**[CHECKPOINT V17-C]** Manual: profile edit → onboarding → streak tick (làm 1 attempt → streak +1)
+
+### Phase D — Paywall + IAP (4 ngày)
+
+- [ ] **V17-D1.1** App Store Connect: tạo bundle `eu.hadoo.czechgo`, subscription group `pro`, 2 product IDs (placeholder pricing)
+  - **Manual task** — không code
+  - **AC:** Sandbox tester account ready; ASSN V2 endpoint configured
+- [ ] **V17-D2.1** Add `in_app_purchase: ^3.x` + `IAPService` wrapper
+  - **Files:** `pubspec.yaml`, `features/paywall/services/iap_service.dart`
+  - **AC:** load products từ StoreKit; buy/restore stream listener
+  - **Verify:** unit test mock StoreKit
+  - **Size:** M
+- [ ] **V17-D2.2** `PaywallScreen` + comparison table + monthly/yearly toggle + restore button
+  - **Files:** `features/paywall/screens/paywall_screen.dart`, `widgets/pro_comparison_table.dart`, `restore_purchase_button.dart`, `monthly_yearly_toggle.dart`
+  - **AC:** giá hiển thị từ StoreKit (không hardcode); restore button visible (Apple HIG)
+  - **Verify:** widget test
+  - **Size:** L (4 files)
+- [ ] **V17-D2.3** `ProSuccessScreen`: confetti animation (skip nếu reduced-motion) + "Bắt đầu" CTA
+  - **Files:** `features/paywall/screens/pro_success_screen.dart`, `widgets/confetti_overlay.dart`
+  - **AC:** reduced-motion → static checkmark
+  - **Verify:** widget test
+  - **Size:** S
+- [ ] **V17-D2.4** Buy flow: paywall→StoreKit sheet→backend verify→success/error
+  - **Files:** `features/paywall/services/iap_service.dart` (extend)
+  - **AC:** pending transaction cleanup; error retry
+  - **Verify:** sandbox manual 5 mua thành công
+  - **Size:** M
+- [ ] **V17-D3.1** Backend: hardening verifyReceipt (retry + timeout + structured logging)
+  - **Files:** `iap/apple_verify.go` (edit)
+  - **AC:** 3 retry expo backoff; timeout 10s; log JSON structured
+  - **Verify:** unit test retry logic
+  - **Size:** S
+- [ ] **V17-D3.2** Backend: webhook idempotency table `iap_webhook_events` (notificationUUID PK, processed_at)
+  - **Files:** migration `025_iap_webhook_events.sql`, `iap/apple_webhook.go` (edit)
+  - **AC:** Duplicate UUID xử lý 1 lần
+  - **Verify:** test gửi duplicate webhook
+  - **Size:** S
+- [ ] **V17-D4.1** Quota indicator widget Home: "3/7 attempts hôm nay" (hide cho Pro)
+  - **Files:** `features/home/widgets/usage_quota_indicator.dart`, `home_screen.dart` (edit)
+  - **AC:** update sau mỗi attempt; Pro user không thấy
+  - **Verify:** widget test
+  - **Size:** S
+- [ ] **V17-D4.2** `UpgradePromptDialog` khi nhận 429 từ backend
+  - **Files:** `features/exercise/widgets/upgrade_prompt_dialog.dart`
+  - **AC:** modal với CTA → Paywall
+  - **Verify:** widget test trigger trên 429
+  - **Size:** S
+
+**[CHECKPOINT V17-D]** Sandbox 5 mua thành công; webhook test pass; TestFlight beta deploy
+
+### Phase E — Cutover (1 ngày)
+
+- [ ] **V17-E1.1** Pre-cutover checklist: SES production access ✅, Apple agreement signed, App Privacy form filled, Privacy + ToS URLs live, account deletion + data export tested manual, backup snapshot ready, rollback image tag `pre-v17` ready, CMS deploy new `/learners`, TestFlight ổn định 48h
+- [ ] **V17-E2.1** Cutover sequence:
+  1. Backup Postgres `pg_dump` → S3
+  2. Maintenance mode 503 (5 phút)
+  3. Run scrub: `TRUNCATE attempts, mock_exam_sessions, mock_exam_sections, full_exam_sessions, attempt_feedbacks, attempt_review_artifacts CASCADE`
+  4. Run migration `023_users.sql`
+  5. Deploy backend `v17.0.0`
+  6. Disable maintenance mode
+  7. Smoke test: signup → verify → login → attempt → success
+  8. Submit Flutter v17.0.0 production
+  - **Files:** `scripts/cutover-v17.sh`, `scripts/scrub-attempts.sql`
+  - **AC:** smoke pass; zero error trong 5 phút post-cutover
+  - **Size:** S
+- [ ] **V17-E2.2** 24h monitoring: SES bounce rate, signup vs verified ratio, login p95 latency, attempt 429 rate, IAP success rate
+  - **AC:** không hit rollback trigger condition
+  - **Manual task**
+
+**[CHECKPOINT V17-FINAL]**
+- [ ] `make backend-test` pass (target: 320+ tests)
+- [ ] `make flutter-test` pass (target: 200+ tests)
+- [ ] `cd cms && npm test` pass
+- [ ] `make smoke-all` xanh
+- [ ] Manual TestFlight 48h ổn định
+- [ ] Cutover smoke test pass
+- [ ] 24h post-cutover metrics OK
+- [ ] Rollback plan tested staging
