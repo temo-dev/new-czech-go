@@ -246,6 +246,9 @@ func ExtractDictationDetail(v any) (contracts.DictationDetail, bool) {
 	if n, ok := m["pass_threshold_percent"].(float64); ok {
 		d.PassThresholdPercent = int(n)
 	}
+	if s, ok := m["submission_mode"].(string); ok {
+		d.SubmissionMode = s
+	}
 	if arr, ok := m["sentences"].([]any); ok {
 		for _, item := range arr {
 			sm, ok := item.(map[string]any)

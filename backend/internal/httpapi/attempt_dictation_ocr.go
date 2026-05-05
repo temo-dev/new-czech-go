@@ -17,8 +17,11 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -29,6 +32,7 @@ import (
 	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
+	"github.com/danieldev/czech-go-system/backend/internal/processing"
 )
 
 const (
@@ -183,4 +187,113 @@ func (s *Server) handleDictationOCRPreview(w http.ResponseWriter, r *http.Reques
 		},
 		"meta": map[string]any{},
 	})
+}
+
+// dictationOCRMaxSubmitBytes caps the multipart submit body. Practical worst
+// case: 8 sentences × (asset_id ≤ 256 bytes + text ≤ 200 runes × 4 bytes ≈
+// 1 KB) → ~8 KB. We allow 64 KB to absorb form overhead and any future audit
+// fields. Keeps OOM risk low.
+const dictationOCRMaxSubmitBytes = 64 * 1024
+
+// handleSubmitDictationOCR serves POST /v1/attempts/:id/submit-dictation-ocr.
+//
+// Multipart fields:
+//   - sentences (form field): JSON array shape `[{idx,text,asset_id,replay_count}, ...]`
+//
+// The handler converts the OCR submission into the V18 DictationSubmission
+// shape and dispatches the same `ProcessDictationAttempt` goroutine. Score
+// parity is enforced by reusing the deterministic Levenshtein scorer
+// unchanged. `submission_mode="ocr"` is logged for analytics.
+func (s *Server) handleSubmitDictationOCR(w http.ResponseWriter, r *http.Request, user contracts.User, attemptID string) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	attempt, ok := s.authorizedAttemptForUser(w, user, attemptID)
+	if !ok {
+		return
+	}
+	if attempt.Status != "created" {
+		writeError(w, http.StatusConflict, "attempt_not_pending",
+			"Attempt is not in the created state.", false)
+		return
+	}
+	exercise, ok := s.repo.Exercise(attempt.ExerciseID)
+	if !ok || exercise.ExerciseType != "psani_3_dictation" {
+		writeError(w, http.StatusBadRequest, "validation_error",
+			"OCR submission is only available for dictation exercises.", false)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, dictationOCRMaxSubmitBytes+1024)
+	if err := r.ParseMultipartForm(dictationOCRMaxSubmitBytes); err != nil {
+		var maxErr *http.MaxBytesError
+		if isMaxBytesError(err, &maxErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "payload_too_large",
+				"Submission payload exceeds 64 KB.", false)
+		} else {
+			writeError(w, http.StatusBadRequest, "validation_error",
+				"Invalid multipart form.", false)
+		}
+		return
+	}
+
+	raw := strings.TrimSpace(r.FormValue("sentences"))
+	if raw == "" {
+		writeError(w, http.StatusBadRequest, "validation_error",
+			"sentences form field is required.", false)
+		return
+	}
+	var rows []contracts.DictationOCRSentenceSubmission
+	if err := json.Unmarshal([]byte(raw), &rows); err != nil {
+		writeError(w, http.StatusBadRequest, "validation_error",
+			"sentences must be a JSON array.", false)
+		return
+	}
+
+	detail, ok := processing.ExtractDictationDetail(exercise.Detail)
+	if !ok || len(detail.Sentences) == 0 {
+		writeError(w, http.StatusInternalServerError, "internal_error",
+			"Exercise detail missing.", true)
+		return
+	}
+
+	sub := convertOCRSubmissionToDictation(rows)
+	if err := processing.ValidateDictationSubmission(detail, sub); err != nil {
+		var ve processing.DictationValidationError
+		if errors.As(err, &ve) {
+			writeError(w, http.StatusBadRequest, ve.Code, err.Error(), false)
+			return
+		}
+		writeError(w, http.StatusBadRequest, "validation_error", err.Error(), false)
+		return
+	}
+
+	s.repo.SetAttemptStatus(attemptID, "scoring")
+	log.Printf("dictation submit attempt=%s submission_mode=ocr sentences=%d",
+		attemptID, len(sub.Sentences))
+	go s.processor.ProcessDictationAttempt(attemptID, sub)
+
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"data": map[string]any{"attempt_id": attemptID, "status": "scoring"},
+		"meta": map[string]any{},
+	})
+}
+
+// convertOCRSubmissionToDictation maps the V18.1 OCR rows into the V18
+// DictationSubmission shape consumed by ProcessDictationAttempt. AssetID is
+// dropped from the scorer-facing payload — only Idx + Text + ReplayCount
+// affect scoring (asset is only used by audit/server-side workflows).
+func convertOCRSubmissionToDictation(rows []contracts.DictationOCRSentenceSubmission) contracts.DictationSubmission {
+	out := contracts.DictationSubmission{
+		Sentences: make([]contracts.DictationSentenceAnswer, 0, len(rows)),
+	}
+	for _, r := range rows {
+		out.Sentences = append(out.Sentences, contracts.DictationSentenceAnswer{
+			Idx:         r.Idx,
+			Text:        r.Text,
+			ReplayCount: r.ReplayCount,
+		})
+	}
+	return out
 }

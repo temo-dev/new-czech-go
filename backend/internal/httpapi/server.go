@@ -644,6 +644,10 @@ func (s *Server) handleAttemptByID(w http.ResponseWriter, r *http.Request, user 
 		s.handleDictationOCRPreview(w, r, user, strings.TrimSuffix(path, "/dictation-ocr-preview"))
 		return
 	}
+	if strings.HasSuffix(path, "/submit-dictation-ocr") {
+		s.handleSubmitDictationOCR(w, r, user, strings.TrimSuffix(path, "/submit-dictation-ocr"))
+		return
+	}
 	if r.Method != http.MethodGet {
 		writeMethodNotAllowed(w)
 		return
