@@ -31,6 +31,7 @@ func main() {
 	var grammarStore store.GrammarStore
 	var generationJobStore store.GenerationJobStore
 	var exerciseAudioStore store.ExerciseAudioStore
+	var exerciseSentenceAudioStore store.ExerciseSentenceAudioStore
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
 		persistentAttemptStore, err := store.NewPostgresAttemptStore(databaseURL)
 		if err != nil {
@@ -73,6 +74,11 @@ func main() {
 			log.Fatalf("could not initialize postgres exercise audio store: %v", err)
 		}
 		exerciseAudioStore = persistentExerciseAudioStore
+		persistentExerciseSentenceAudioStore, err := store.NewPostgresExerciseSentenceAudioStore(databaseURL)
+		if err != nil {
+			log.Fatalf("could not initialize postgres exercise sentence audio store: %v", err)
+		}
+		exerciseSentenceAudioStore = persistentExerciseSentenceAudioStore
 		attemptStore = persistentAttemptStore
 		exerciseStore = persistentExerciseStore
 		mockExamStore = persistentMockExamStore
@@ -82,7 +88,7 @@ func main() {
 		vocabularyStore = persistentVocabularyStore
 		grammarStore = persistentGrammarStore
 		generationJobStore = persistentGenerationJobStore
-		log.Printf("full Postgres persistence enabled (attempts, exercises, mock exams/tests, courses, modules, vocabulary, grammar, generation_jobs, exercise_audio)")
+		log.Printf("full Postgres persistence enabled (attempts, exercises, mock exams/tests, courses, modules, vocabulary, grammar, generation_jobs, exercise_audio, exercise_sentence_audio)")
 	}
 
 	repo := store.NewMemoryStoreWithStores(attemptStore, exerciseStore)
@@ -103,6 +109,9 @@ func main() {
 	}
 	if exerciseAudioStore != nil {
 		repo.SetExerciseAudioStore(exerciseAudioStore)
+	}
+	if exerciseSentenceAudioStore != nil {
+		repo.SetExerciseSentenceAudioStore(exerciseSentenceAudioStore)
 	}
 	transcriber, err := processing.NewConfiguredTranscriber(context.Background())
 	if err != nil {
