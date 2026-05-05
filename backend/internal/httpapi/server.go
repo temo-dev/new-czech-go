@@ -59,6 +59,8 @@ type Server struct {
 	replicateAPIKey    string // for AI image generation via Flux
 	aiImageRL          *aiImageRateLimiter
 	interviewPreviewRL *interviewPreviewLimiter
+	ocrProvider        processing.OCRProvider // V18.1 dictation handwriting OCR
+	dictationOCRRL     *dictationOCRRateLimiter
 	mux                *http.ServeMux
 }
 
@@ -112,6 +114,11 @@ func assembleServer(repo *store.MemoryStore, processor *processing.Processor, up
 	}
 	voiceRegistry := processing.NewVoiceRegistry(processor.TTSProvider())
 	processor.WithVoiceRegistry(voiceRegistry)
+	ocrProvider, err := processing.NewConfiguredOCRProvider()
+	if err != nil {
+		log.Printf("ocr provider init: %v; defaulting to noop", err)
+		ocrProvider = processing.NoopOCR{}
+	}
 	s := &Server{
 		repo:               repo,
 		processor:          processor,
@@ -127,6 +134,8 @@ func assembleServer(repo *store.MemoryStore, processor *processing.Processor, up
 		replicateAPIKey:    strings.TrimSpace(os.Getenv("REPLICATE_API_KEY")),
 		aiImageRL:          newAiImageRateLimiter(),
 		interviewPreviewRL: newInterviewPreviewLimiter(),
+		ocrProvider:        ocrProvider,
+		dictationOCRRL:     newDictationOCRRateLimiter(),
 		mux:                http.NewServeMux(),
 	}
 	if authDeps != nil {
@@ -136,6 +145,52 @@ func assembleServer(repo *store.MemoryStore, processor *processing.Processor, up
 	repo.MarkAllRunningJobsFailed("Server restarted while generation was running")
 	s.routes()
 	return s.withRequestLog(s.withCORS(s.mux))
+}
+
+// NewServerForTest is a test-only constructor that returns the *Server pointer
+// directly so callers can mutate fields like ocrProvider before exposing the
+// handler. Production code uses NewServer / NewServerWithAudio instead.
+func NewServerForTest(repo *store.MemoryStore, processor *processing.Processor) *Server {
+	if processor == nil {
+		processor = processing.NewProcessor(repo, nil, nil, nil, nil)
+	}
+	uploadProvider := NewLocalUploadTargetProvider()
+	audioSignSecret := AudioSigningSecretFromEnv(log.Printf)
+	audioURLProvider := NewLocalSignedAudioURLProvider(audioSignSecret)
+	voiceRegistry := processing.NewVoiceRegistry(processor.TTSProvider())
+	processor.WithVoiceRegistry(voiceRegistry)
+	s := &Server{
+		repo:               repo,
+		processor:          processor,
+		uploadProvider:     uploadProvider,
+		audioURLProvider:   audioURLProvider,
+		audioSignSecret:    audioSignSecret,
+		audioGenerator:     processing.DevExerciseAudioGenerator{},
+		voiceRegistry:      voiceRegistry,
+		aiImageRL:          newAiImageRateLimiter(),
+		interviewPreviewRL: newInterviewPreviewLimiter(),
+		ocrProvider:        processing.NoopOCR{},
+		dictationOCRRL:     newDictationOCRRateLimiter(),
+		mux:                http.NewServeMux(),
+	}
+	repo.MarkAllRunningJobsFailed("Server restarted while generation was running")
+	s.routes()
+	return s
+}
+
+// Handler wraps the *Server in standard middleware. Test code uses this to
+// expose the handler after mutating fields on the Server.
+func (s *Server) Handler() http.Handler {
+	return s.withRequestLog(s.withCORS(s.mux))
+}
+
+// SetOCRProvider swaps the OCR provider. Test-only; production code injects
+// via NewConfiguredOCRProvider during assembleServer.
+func (s *Server) SetOCRProvider(p processing.OCRProvider) {
+	if p == nil {
+		p = processing.NoopOCR{}
+	}
+	s.ocrProvider = p
 }
 
 func (s *Server) routes() {
@@ -583,6 +638,10 @@ func (s *Server) handleAttemptByID(w http.ResponseWriter, r *http.Request, user 
 	}
 	if strings.HasSuffix(path, "/submit-interview") {
 		s.handleSubmitInterview(w, r, user, strings.TrimSuffix(path, "/submit-interview"))
+		return
+	}
+	if strings.HasSuffix(path, "/dictation-ocr-preview") {
+		s.handleDictationOCRPreview(w, r, user, strings.TrimSuffix(path, "/dictation-ocr-preview"))
 		return
 	}
 	if r.Method != http.MethodGet {
