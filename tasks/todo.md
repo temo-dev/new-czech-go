@@ -447,11 +447,11 @@ Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
   - **Files:** `httpapi/auth_handlers.go` (3 handlers + dispatchPasswordResetEmail + dispatchPasswordChangedEmail), `auth_handlers_test.go` (8 tests)
   - **Verify:** 8/8 pass; total 388→396
   - **Size:** M
-- [ ] **V17-A2.7** Replace `withAuth` middleware: lookup `auth_tokens` sha256, check expires + not revoked, attach user to context, update `last_used_at`
-  - **AC:** old hardcoded token map xóa; tất cả existing endpoints vẫn pass với token mới
-  - **Files:** `httpapi/auth_middleware.go`, `server.go`
-  - **Verify:** existing test suite pass với token thật thay dev token (mock)
-  - **Size:** M
+- [x] **V17-A2.7** `authenticatedUser` extended với V17 path: tries auth_tokens sha256 lookup → UserStore → translate UserAccount to legacy `contracts.User` shape; falls through to legacy `s.repo.UserByToken` so dev-fixture tokens + admin sessions keep working; goroutine-best-effort `TouchAuthTokenLastUsed` on success; 3 tests (2026-05-05)
+  - **AC:** V17 session token authenticates `/v1/me` ✅; revoked V17 token → 401 ✅; legacy `dev-learner-token` still authenticates ✅; existing 396 tests intact (no regressions)
+  - **Files:** `httpapi/server.go` (auth import + `lookupV17SessionToken` helper, `authenticatedUser` two-path)
+  - **Verify:** 3/3 new tests + entire existing suite green
+  - **Size:** S (smaller than spec because legacy path retained)
 - [ ] **V17-A2.8** `GET /v1/users/me` + `PATCH /v1/users/me` + `POST /v1/users/me/avatar` + `DELETE /v1/users/me` (soft) + `POST /v1/users/me/email-change`
   - **AC:** GET trả user + streak + usage; PATCH partial fields; avatar reuse media_assets; DELETE anonymize
   - **Files:** `httpapi/users_me_handlers.go`

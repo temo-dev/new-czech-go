@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/danieldev/czech-go-system/backend/internal/auth"
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 	"github.com/danieldev/czech-go-system/backend/internal/email"
 	"github.com/danieldev/czech-go-system/backend/internal/processing"
@@ -2102,7 +2103,44 @@ func (s *Server) authenticatedUser(r *http.Request) (contracts.User, bool) {
 	if token == "" {
 		return contracts.User{}, false
 	}
+	// V17 path takes precedence: a freshly-issued session token from
+	// /v1/auth/login lands in auth_tokens, not the legacy
+	// usersByToken map. Fall through to the legacy lookup so existing
+	// admin sessions + dev-fixture tokens keep working.
+	if user, ok := s.lookupV17SessionToken(token); ok {
+		return user, true
+	}
 	return s.repo.UserByToken(token)
+}
+
+// lookupV17SessionToken resolves a Bearer token through the V17
+// auth_tokens + users stores and translates the UserAccount into the
+// legacy contracts.User shape the existing handlers consume. Returns
+// ok=false when V17 deps are not wired or the token does not match a
+// session-kind row.
+func (s *Server) lookupV17SessionToken(rawToken string) (contracts.User, bool) {
+	if s.authTokenStore == nil || s.userStore == nil {
+		return contracts.User{}, false
+	}
+	hash := auth.HashToken(rawToken)
+	tok, ok := s.authTokenStore.AuthTokenByHash(hash)
+	if !ok || tok.Kind != contracts.AuthTokenKindSession {
+		return contracts.User{}, false
+	}
+	account, ok := s.userStore.UserAccountByID(tok.UserID)
+	if !ok {
+		return contracts.User{}, false
+	}
+	// Best-effort touch — failure does not invalidate the request.
+	go s.authTokenStore.TouchAuthTokenLastUsed(hash, time.Now().UTC())
+
+	return contracts.User{
+		ID:                account.ID,
+		Role:              account.Role,
+		Email:             account.Email,
+		DisplayName:       account.DisplayName,
+		PreferredLanguage: "vi",
+	}, true
 }
 
 // withCORS enforces an origin allowlist. Set CORS_ALLOWED_ORIGINS to a

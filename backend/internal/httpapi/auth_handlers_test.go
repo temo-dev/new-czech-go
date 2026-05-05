@@ -800,6 +800,57 @@ func extractResetToken(t *testing.T, htmlBody string) string {
 	return rest[:end]
 }
 
+// ── A2.7 — withAuth middleware accepts V17 tokens ────────────────────────
+
+func TestWithAuth_AcceptsV17SessionToken(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "m@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "m@x.com", "Strong1Password!")
+
+	// /v1/me is a withAuth-protected endpoint registered by the legacy
+	// route table; passing a V17 session token must work.
+	req, _ := http.NewRequest(http.MethodGet, env.srv.URL+"/v1/me", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("get me: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200 with V17 token, got %d", resp.StatusCode)
+	}
+}
+
+func TestWithAuth_RejectsRevokedV17Token(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "rv@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "rv@x.com", "Strong1Password!")
+
+	// Revoke directly via the store.
+	env.tokens.RevokeAuthToken(auth.HashToken(tok))
+
+	req, _ := http.NewRequest(http.MethodGet, env.srv.URL+"/v1/me", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401 after revoke, got %d", resp.StatusCode)
+	}
+}
+
+func TestWithAuth_LegacyDevTokenStillWorks(t *testing.T) {
+	env := newAuthTestEnv(t)
+
+	// dev-learner-token is seeded by NewMemoryStore when ENV != production.
+	req, _ := http.NewRequest(http.MethodGet, env.srv.URL+"/v1/me", nil)
+	req.Header.Set("Authorization", "Bearer dev-learner-token")
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("legacy dev-learner-token should still authenticate, got %d", resp.StatusCode)
+	}
+}
+
 // ── existing test ────────────────────────────────────────────────────────
 
 func TestSignup_LegacyServerWithoutAuthDeps_ReturnsNotFound(t *testing.T) {
