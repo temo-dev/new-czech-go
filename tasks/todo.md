@@ -400,11 +400,13 @@ Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
   - **Files:** `backend/internal/contracts/auth_token.go` (new), `backend/internal/store/auth_token_store.go` (new), `postgres_auth_tokens.go` (new), `auth_token_store_test.go` (new)
   - **Verify:** memory tests 8/8 pass; Postgres impl compiles
   - **Size:** M
-- [ ] **V17-A1.6** `StreakStore` + `ProPurchaseStore` + `DailyUsageStore`: interface + memory + Postgres impls
-  - **AC:** streak compute helper `CurrentStreak(userID)` trả `{current, longest, last_day, grace_left}`; daily_usage upsert atomic
-  - **Files:** `backend/internal/store/streak_store.go`, `pro_purchase_store.go`, `daily_usage_store.go` + Postgres impls
-  - **Verify:** test timezone VN day boundary edge case
-  - **Size:** L (6 files) — chia nếu cần
+- [x] **V17-A1.6** `StreakStore` + `ProPurchaseStore` + `DailyUsageStore`: interface + memory + Postgres impls (split into 3 commits A1.6a/b/c — 2026-05-05)
+  - **A1.6a:** StreakStore + StreakSummary computation (current/longest/last/grace_this_week ISO Mon-Sun); vnCivilDay normalizer; 8 tests covering tz fold, grace bridge, streak break, weekly grace counter
+  - **A1.6b:** ProPurchaseStore with ErrDuplicateAppleTxn dedupe; ActiveProPurchaseByUser returns latest-expiring active; 5 tests including idempotent MarkInactive
+  - **A1.6c:** DailyUsageStore with atomic INSERT...ON CONFLICT...RETURNING running counter; 5 tests including VN day boundary (23:30 vs 00:30 → 2 rows) + per-user isolation
+  - **Files:** 9 new files (3 contracts + 3 store interfaces + 3 test files), Postgres impls embedded in same store files
+  - **Verify:** 18 memory tests added (317→335 total)
+  - **Size:** L (split into 3 medium commits)
 - [ ] **V17-A1.7** `addColumnIfMissing` helper apply cho cột mới + `OWNER TO czech_user` script post-migration (RDS caveat từ V11)
   - **AC:** chạy được trên RDS với owner mismatch
   - **Files:** `backend/internal/store/postgres_migrate.go`, `scripts/post-migrate-fix-ownership.sql`
