@@ -397,3 +397,39 @@ func extractUloha4Detail(v any) (contracts.Uloha4Detail, bool) {
 	}
 	return contracts.Uloha4Detail{}, false
 }
+
+// ── Dictation Annotation (V18) ───────────────────────────────────────────────
+
+// DictationLLMInput is what the user prompt feeds the model for one sentence.
+// DistanceWeighted is for context only — the model MUST NOT score.
+type DictationLLMInput struct {
+	Idx              int
+	Reference        string
+	Learner          string
+	DistanceWeighted float64
+}
+
+// DictationLLMAnnotation is what the model returns per sentence (parsed JSON).
+type DictationLLMAnnotation struct {
+	Idx        int                   `json:"idx"`
+	ErrorTags  []string              `json:"error_tags,omitempty"`
+	FeedbackVI string                `json:"feedback_vi,omitempty"`
+	FeedbackEN string                `json:"feedback_en,omitempty"`
+	DiffChunks []contracts.DiffChunk `json:"diff_chunks,omitempty"`
+}
+
+// buildDictationUserPrompt renders the user-message context for
+// DictationSystemPrompt. The reference and learner texts are passed in
+// raw (not normalized) so the model can comment on case, spacing, and
+// diacritics meaningfully.
+func buildDictationUserPrompt(inputs []DictationLLMInput) string {
+	var b strings.Builder
+	b.WriteString("Annotate the following dictation attempts. Output a JSON array, one entry per input, in the SAME order. Do NOT score.\n\n")
+	for _, in := range inputs {
+		fmt.Fprintf(&b, "Sentence idx=%d (deterministic distance=%.2f):\n", in.Idx, in.DistanceWeighted)
+		fmt.Fprintf(&b, "  reference: %q\n", in.Reference)
+		fmt.Fprintf(&b, "  learner:   %q\n\n", in.Learner)
+	}
+	b.WriteString("Output format: [{\"idx\":N,\"error_tags\":[...],\"feedback_vi\":\"...\",\"feedback_en\":\"...\",\"diff_chunks\":[...]}, ...]")
+	return b.String()
+}

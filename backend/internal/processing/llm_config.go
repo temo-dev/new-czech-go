@@ -20,8 +20,16 @@ const (
 // Feedback/Review use a fast, cheap model since they run per-attempt in real time.
 // Content generation uses a more capable model since it runs in batch (admin-triggered).
 const (
+	// Claude (Anthropic) — text feedback + content generation
 	DefaultFeedbackModel = "claude-haiku-4-5-20251001" // real-time, per-attempt
 	DefaultContentModel  = "claude-haiku-4-5-20251001" // batch, admin-triggered
+
+	// Replicate (Flux) — admin AI image generation
+	DefaultReplicateImageModel = "black-forest-labs/flux-schnell"
+
+	// ElevenLabs — TTS for review artifacts and dialog audio
+	DefaultElevenLabsTTSModel     = "eleven_multilingual_v2"
+	DefaultElevenLabsOutputFormat = "mp3_22050_32" // matches Polly default sample rate
 )
 
 // ── Request timeouts ──────────────────────────────────────────────────────────
@@ -40,25 +48,33 @@ const (
 //
 // Environment variables (all optional — defaults apply if unset):
 //
-//	LLM_MODEL          speaking/writing feedback  (default: DefaultFeedbackModel)
-//	LLM_REVIEW_MODEL   review artifact generation (default: LLM_MODEL → DefaultFeedbackModel)
-//	LLM_CONTENT_MODEL  vocab/grammar generation   (default: DefaultContentModel)
+//	LLM_MODEL                 speaking/writing feedback  (default: DefaultFeedbackModel)
+//	LLM_REVIEW_MODEL          review artifact generation (default: LLM_MODEL → DefaultFeedbackModel)
+//	LLM_CONTENT_MODEL         vocab/grammar generation   (default: DefaultContentModel)
+//	REPLICATE_IMAGE_MODEL     admin AI image generation  (default: DefaultReplicateImageModel)
+//	ELEVENLABS_MODEL_ID       TTS model for ElevenLabs   (default: DefaultElevenLabsTTSModel)
+//	ELEVENLABS_OUTPUT_FORMAT  TTS output format          (default: DefaultElevenLabsOutputFormat)
 type LLMModels struct {
-	Feedback string // ClaudeLLMFeedbackProvider
-	Review   string // ClaudeLLMReviewProvider
-	Content  string // ClaudeContentGenerator
+	Feedback            string // ClaudeLLMFeedbackProvider
+	Review              string // ClaudeLLMReviewProvider
+	Dictation           string // ClaudeDictationFeedbackProvider (V18)
+	Content             string // ClaudeContentGenerator
+	ReplicateImage      string // Replicate Flux (admin AI image)
+	ElevenLabsTTS       string // ElevenLabsTTSProvider
+	ElevenLabsOutputFmt string // ElevenLabs TTS output format
 }
 
 // LoadLLMModels resolves model IDs from environment variables with fallback defaults.
 // Call once on server startup; the result is passed to each provider constructor.
 func LoadLLMModels() LLMModels {
-	feedbackModel := env("LLM_MODEL", DefaultFeedbackModel)
-	reviewModel := env("LLM_REVIEW_MODEL", env("LLM_MODEL", DefaultFeedbackModel))
-	contentModel := env("LLM_CONTENT_MODEL", DefaultContentModel)
 	return LLMModels{
-		Feedback: feedbackModel,
-		Review:   reviewModel,
-		Content:  contentModel,
+		Feedback:            env("LLM_MODEL", DefaultFeedbackModel),
+		Review:              env("LLM_REVIEW_MODEL", env("LLM_MODEL", DefaultFeedbackModel)),
+		Dictation:           env("LLM_DICTATION_MODEL", env("LLM_MODEL", DefaultFeedbackModel)),
+		Content:             env("LLM_CONTENT_MODEL", DefaultContentModel),
+		ReplicateImage:      env("REPLICATE_IMAGE_MODEL", DefaultReplicateImageModel),
+		ElevenLabsTTS:       env("ELEVENLABS_MODEL_ID", DefaultElevenLabsTTSModel),
+		ElevenLabsOutputFmt: env("ELEVENLABS_OUTPUT_FORMAT", DefaultElevenLabsOutputFormat),
 	}
 }
 

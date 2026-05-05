@@ -20,6 +20,22 @@ func writingFallbackFeedback() contracts.AttemptFeedback {
 	}
 }
 
+// dictationFallbackFeedback returns a short Vietnamese sentence used per-sentence
+// when the LLM annotator is unavailable. Tone is encouraging and acknowledges
+// the deterministic accuracy without quoting an exact percentage.
+func dictationFallbackFeedback(idx int, accuracy float64) string {
+	switch {
+	case accuracy >= 0.95:
+		return "Tuyệt vời! Bạn viết câu này rất chuẩn."
+	case accuracy >= 0.75:
+		return "Khá tốt — chỉ cần kiểm tra lại dấu phụ và chính tả."
+	case accuracy >= 0.4:
+		return "Bạn nghe được phần lớn nội dung, hãy luyện thêm dấu và viết hoa."
+	default:
+		return "Câu này còn khó với bạn. Hãy nghe lại và viết theo trí nhớ."
+	}
+}
+
 // interviewFallbackFeedback returns minimal rule-based feedback for interview
 // sessions when the LLM is unavailable.
 func interviewFallbackFeedback() contracts.AttemptFeedback {

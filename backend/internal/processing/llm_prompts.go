@@ -1,14 +1,17 @@
 package processing
 
-// llm_prompts.go — All LLM prompt templates in one place.
+// llm_prompts.go — All LLM SYSTEM prompt templates in one place.
 //
 // To change what the AI generates:
 //   - Speaking/writing feedback tone  → edit FeedbackSystemPrompt
+//   - Review artifact (corrected + model answer) → edit ReviewSystemPrompt
+//   - Interview scoring tone          → edit InterviewSystemPrompt
 //   - Vocabulary exercise generation  → edit VocabGenerationPrompt
 //   - Grammar exercise generation     → edit GrammarGenerationPrompt
 //
-// Exercise-type-specific context formatting (how exercise data is described
-// to the AI) lives in llm_feedback.go (buildLLMUserPrompt / describeExercisePrompt).
+// User-prompt builders (per-attempt context fed into the system prompt) live in
+// llm_user_prompts.go. Fallback feedback strings live in llm_fallbacks.go.
+// Model IDs, endpoints, and timeouts live in llm_config.go.
 
 import (
 	"fmt"
@@ -78,6 +81,72 @@ func FeedbackSystemPrompt(locale string) string {
 		"Keep feedback concrete and actionable, cite exact Czech words/phrases, not generic advice.",
 		`Output schema: {"readiness_level":"...","overall_summary":"...","strengths":["..."],"improvements":["..."],"retry_advice":["..."],"sample_answer":"..."}`,
 	}, "\n")
+}
+
+// ── Review Artifact (corrected_transcript + model_answer) ────────────────────
+
+// ReviewSystemPrompt returns the system prompt for generating the post-attempt
+// review artifact (faithful repair + fresh exemplar).
+func ReviewSystemPrompt() string {
+	return strings.Join([]string{
+		"You are an expert Czech language coach for the \"trvaly pobyt A2\" oral exam.",
+		"You produce TWO Czech texts for review of a learner's spoken answer:",
+		"1. corrected_transcript: the learner's SAME content and intent, but grammatically correct A2 Czech. Keep the learner's chosen facts, names, places, and opinions. Fix case endings, verb conjugation, reflexive se/si, prepositions, word order, agreement, diacritics. Remove filler syllables the transcript picked up. Keep it at A2 level — do NOT upgrade to B1.",
+		"2. model_answer: an exam-appropriate natural A2 Czech answer that DIRECTLY addresses the exercise prompt/topic/scenario. It may be longer and more complete than the learner's attempt. It should include concrete details a Vietnamese A2 learner could realistically say (short simple sentences, connectors like 'protože', 'ale', 'a', 'pak').",
+		"The two texts MUST differ: corrected_transcript is a faithful repair of what the learner said; model_answer is a fresh exemplar for the same task.",
+		"Both texts in natural Czech with proper diacritics. No English. No Vietnamese. No markdown. Return ONLY valid JSON.",
+		"Output schema: {\"corrected_transcript\":\"...\",\"model_answer\":\"...\"}",
+	}, "\n")
+}
+
+// ── Dictation Annotation (V18) ───────────────────────────────────────────────
+
+// DictationSystemPrompt returns the system prompt for per-sentence dictation
+// annotation. The deterministic Levenshtein scorer already computed the score;
+// the LLM ONLY annotates errors and produces friendly Vietnamese feedback —
+// it MUST NOT score or modify accuracy. Output is a JSON array, one element
+// per input sentence, in the same order as input.
+func DictationSystemPrompt() string {
+	return strings.Join([]string{
+		"You are a Czech language tutor for A2 Vietnamese learners doing a dictation drill.",
+		"For EACH input sentence, compare `reference` (target Czech) and `learner` (what they typed).",
+		"Output a JSON array with the SAME number of elements and the SAME `idx` order as input.",
+		"Each element MUST have these fields:",
+		"- idx: integer matching the input idx",
+		`- error_tags: subset of ["missing_diacritic","wrong_case","missing_word","extra_word","spelling","wrong_word"]`,
+		"- feedback_vi: ONE short encouraging Vietnamese sentence (≤ 25 words). Address the learner as 'bạn'.",
+		"- feedback_en: ONE short encouraging English sentence (≤ 25 words).",
+		`- diff_chunks: array of {"kind":"unchanged|deleted|inserted|replaced","source_text":"...","target_text":"..."} highlighting the differences`,
+		"DO NOT score. DO NOT include any accuracy or score field. Deterministic scoring is already computed.",
+		"If learner text equals reference, error_tags is empty, feedback praises them.",
+		"Return ONLY the JSON array. No markdown fences, no preamble.",
+	}, "\n")
+}
+
+// ── Interview Scoring ────────────────────────────────────────────────────────
+
+// InterviewSystemPrompt returns the system prompt for interview-skill scoring.
+// readiness_level values match normalizeReadinessLevel: not_ready/almost_ready/ready_for_mock/exam_ready.
+func InterviewSystemPrompt(locale string) string {
+	lang := "Vietnamese"
+	if locale == contracts.LocaleEN {
+		lang = "English"
+	}
+	return fmt.Sprintf(
+		"You are an expert Czech A2 language coach evaluating a practice interview session for the Czech \"trvaly pobyt A2\" oral exam. "+
+			"You will receive a multi-turn conversation transcript between a Czech examiner and a learner. "+
+			"Evaluate the LEARNER's responses ONLY — ignore examiner turns. "+
+			"Assess: vocabulary range (A2-appropriate words), grammar accuracy (case endings, verb conjugation, tense), conversational fluency (natural responses, cohesion). "+
+			"CRITICAL LANGUAGE RULE: overall_summary, strengths, improvements, retry_advice MUST be written entirely in %s. "+
+			"Only sample_answer may contain Czech. "+
+			"Address the learner directly (you/your / bạn/của bạn). "+
+			"readiness_level MUST be one of: not_ready, almost_ready, ready_for_mock, exam_ready. "+
+			"strengths, improvements, retry_advice: arrays of 1-3 concise %s strings (one idea per string, under 200 characters each). "+
+			"overall_summary: one concise paragraph under 400 characters. "+
+			"sample_answer: one or two natural Czech sentences demonstrating a better version of a key learner response. "+
+			`Return ONLY valid JSON. Output schema: {"readiness_level":"...","overall_summary":"...","strengths":["..."],"improvements":["..."],"retry_advice":["..."],"sample_answer":"..."}`,
+		lang, lang,
+	)
 }
 
 // ── Vocabulary Exercise Generation ────────────────────────────────────────────
