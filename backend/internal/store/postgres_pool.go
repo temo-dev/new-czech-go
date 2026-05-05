@@ -27,6 +27,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -51,6 +52,14 @@ const (
 	pgConnMaxIdleTime = 5 * time.Minute
 	// pgPingTimeout bounds the at-startup connectivity check.
 	pgPingTimeout = 5 * time.Second
+	// pgPingRetries is the number of ping attempts before giving up. With
+	// pgPingBackoff the worst case is 1+2+4+8+16 = 31s of waiting before
+	// the process exits and Docker restarts it. This breaks the crash-loop
+	// pattern where Postgres briefly returns "remaining connection slots"
+	// during instance maintenance or while another tenant frees its
+	// connections.
+	pgPingRetries = 5
+	pgPingBackoff = 1 * time.Second
 )
 
 // openPostgresPool opens a `*sql.DB`, applies the per-store pool ceilings,
@@ -70,11 +79,38 @@ func openPostgresPool(databaseURL string, label string) (*sql.DB, error) {
 	db.SetConnMaxLifetime(pgConnMaxLifetime)
 	db.SetConnMaxIdleTime(pgConnMaxIdleTime)
 
-	ctx, cancel := context.WithTimeout(context.Background(), pgPingTimeout)
-	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
+	if err := pingWithBackoff(db, label); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("ping postgres for %s: %w", label, err)
+		return nil, err
 	}
 	return db, nil
+}
+
+// pingWithBackoff retries Postgres pings with exponential backoff so a
+// transient "remaining connection slots are reserved" response (RDS
+// maintenance, another tenant draining its pool) doesn't immediately crash
+// the process. Each retry doubles the wait. After pgPingRetries attempts
+// the function returns the last error and lets the caller surface it.
+func pingWithBackoff(db *sql.DB, label string) error {
+	wait := pgPingBackoff
+	var lastErr error
+	for attempt := 1; attempt <= pgPingRetries; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), pgPingTimeout)
+		err := db.PingContext(ctx)
+		cancel()
+		if err == nil {
+			if attempt > 1 {
+				log.Printf("postgres pool %s: ping ok after %d attempts", label, attempt)
+			}
+			return nil
+		}
+		lastErr = err
+		if attempt < pgPingRetries {
+			log.Printf("postgres pool %s: ping attempt %d/%d failed: %v; retrying in %s",
+				label, attempt, pgPingRetries, err, wait)
+			time.Sleep(wait)
+			wait *= 2
+		}
+	}
+	return fmt.Errorf("ping postgres for %s after %d attempts: %w", label, pgPingRetries, lastErr)
 }
