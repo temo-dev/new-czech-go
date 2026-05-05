@@ -6,6 +6,7 @@ import { adminFetch } from '../../lib/api';
 import { PoslechFields } from './PoslechFields';
 import { CteniFields } from './CteniFields';
 import { AnoNeFields } from './AnoNeFields';
+import { DictationFields } from './DictationFields';
 import { InterviewConversationFields } from './InterviewConversationFields';
 import { InterviewChoiceExplainFields } from './InterviewChoiceExplainFields';
 import AiImageButton from '../AiImageButton';
@@ -696,6 +697,14 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
 
                 {(form.exerciseType === 'psani_1_formular' || form.exerciseType === 'psani_2_email') && (
                   <WritingFields form={form as never} setForm={setForm as never} />
+                )}
+
+                {form.exerciseType === 'psani_3_dictation' && (
+                  <DictationFields
+                    initialData={form.typePayload ?? {}}
+                    onChange={(payload) => setForm((f) => ({ ...f, typePayload: payload }))}
+                    editingId={editingId}
+                  />
                 )}
 
                 {form.exerciseType === 'interview_conversation' && (

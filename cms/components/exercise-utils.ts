@@ -44,6 +44,7 @@ export type ExerciseType =
   | 'uloha_4_choice_reasoning'
   | 'psani_1_formular'
   | 'psani_2_email'
+  | 'psani_3_dictation'
   | 'poslech_1'
   | 'poslech_2'
   | 'poslech_3'
@@ -114,6 +115,7 @@ export const exerciseTypeOptions: Array<{ value: ExerciseType; label: string; hi
   { value: 'uloha_4_choice_reasoning', label: 'Uloha 4',             hint: 'Choose one option and justify the choice.' },
   { value: 'psani_1_formular',         label: 'Psaní 1 — Formulář',  hint: 'Writing: 3 form questions, ≥10 words each (8 pts).' },
   { value: 'psani_2_email',            label: 'Psaní 2 — E-mail',    hint: 'Writing: email from 5 image prompts, ≥35 words (12 pts).' },
+  { value: 'psani_3_dictation',        label: 'Psaní 3 — Chính tả',  hint: 'Writing: dictation drill — Polly đọc 3–8 câu, learner gõ lại (course pool).' },
   { value: 'poslech_1',  label: 'Poslech 1', hint: 'Listening: 5 short passages → A-D (5 pts).' },
   { value: 'poslech_2',  label: 'Poslech 2', hint: 'Listening: 5 short passages → A-D (5 pts).' },
   { value: 'poslech_3',  label: 'Poslech 3', hint: 'Listening: 5 passages → match A-G (5 pts).' },
@@ -136,7 +138,7 @@ export const exerciseTypeOptions: Array<{ value: ExerciseType; label: string; hi
 
 export const SKILL_KIND_EXERCISE_TYPES: Record<string, ExerciseType[]> = {
   noi:       ['uloha_1_topic_answers', 'uloha_2_dialogue_questions', 'uloha_3_story_narration', 'uloha_4_choice_reasoning'],
-  viet:      ['psani_1_formular', 'psani_2_email'],
+  viet:      ['psani_1_formular', 'psani_2_email', 'psani_3_dictation'],
   nghe:      ['poslech_1', 'poslech_2', 'poslech_3', 'poslech_4', 'poslech_5', 'poslech_6'],
   doc:       ['cteni_1', 'cteni_2', 'cteni_3', 'cteni_4', 'cteni_5', 'cteni_6'],
   tu_vung:   ['quizcard_basic', 'matching', 'fill_blank', 'choice_word'],
@@ -548,6 +550,7 @@ export function formStateFromExercise(item: Exercise): ExerciseFormState {
     typePayload:
       item.exercise_type.startsWith('poslech_') ||
       item.exercise_type.startsWith('cteni_') ||
+      item.exercise_type === 'psani_3_dictation' ||
       item.exercise_type === 'quizcard_basic' ||
       item.exercise_type === 'matching' ||
       item.exercise_type === 'fill_blank' ||
@@ -762,6 +765,16 @@ export function buildCreatePayload(form: ExerciseFormState) {
       },
     };
   }
+  if (form.exerciseType === 'psani_3_dictation') {
+    return {
+      module_id: form.moduleId, skill_kind: form.skillKind,
+      exercise_type: form.exerciseType, title: form.title,
+      short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
+      estimated_duration_sec: 600, sample_answer_enabled: false,
+      status: form.status, pool: form.pool,
+      detail: form.typePayload ?? {},
+    };
+  }
   if (['quizcard_basic', 'matching', 'fill_blank', 'choice_word'].includes(form.exerciseType)) {
     return {
       module_id: form.moduleId, skill_kind: form.skillKind,
@@ -869,6 +882,16 @@ export function buildUpdatePayload(form: ExerciseFormState) {
         prompt: form.emailPrompt.trim(), topics: parseLineList(form.emailTopics),
         image_asset_ids: parseLineList(form.imageAssetIds), min_words: form.emailMinWords,
       },
+    };
+  }
+  if (form.exerciseType === 'psani_3_dictation') {
+    return {
+      module_id: form.moduleId, skill_kind: form.skillKind,
+      exercise_type: form.exerciseType, title: form.title,
+      short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
+      estimated_duration_sec: 600, sample_answer_enabled: false,
+      status: form.status, pool: form.pool,
+      detail: form.typePayload ?? {},
     };
   }
   if (['quizcard_basic', 'matching', 'fill_blank', 'choice_word'].includes(form.exerciseType)) {
@@ -1048,4 +1071,138 @@ export function formStateFromAnoNe(detail: Record<string, unknown>): AnoNeFormSt
     })),
     maxPoints: typeof detail.max_points === 'number' ? detail.max_points : 3,
   };
+}
+
+// ─── V18: Dictation helpers (psani_3_dictation) ──────────────────────────────
+
+export type DictationSentenceForm = {
+  idx: number;
+  text: string;
+  audioAssetId: string | null;
+};
+
+export type DictationFormState = {
+  topic: string;
+  contextImageAssetId: string | null;
+  sentences: DictationSentenceForm[];
+  maxReplaysPerSentence: number;
+  voiceId: string;
+  maxPoints: number;
+  passThresholdPercent: number;
+};
+
+export const DICTATION_MIN_SENTENCES = 3;
+export const DICTATION_MAX_SENTENCES = 8;
+export const DICTATION_MAX_SENTENCE_CHARS = 200;
+
+// Czech abbreviations that look like sentence terminators because they end in
+// a period. Keep this list short — admin can manually re-split if a missed
+// case slips through.
+const DICTATION_ABBREVIATIONS = ['Mgr.', 'Dr.', 'Bc.', 'Ph.D.', 'pan.', 'ing.', 'Ing.', 'p.', 'tj.', 'např.'];
+
+export function splitTranscriptIntoSentences(raw: string): string[] {
+  if (!raw || !raw.trim()) return [];
+  // Replace abbreviation periods with a sentinel so the split regex doesn't
+  // treat them as sentence terminators, then restore.
+  const SENTINEL = ' ';
+  let text = raw;
+  for (const abbr of DICTATION_ABBREVIATIONS) {
+    const safe = abbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    text = text.replace(new RegExp(safe, 'g'), abbr.replace(/\./g, SENTINEL));
+  }
+  const parts = text.split(/(?<=[.!?])\s+/);
+  return parts
+    .map((s) => s.replace(new RegExp(SENTINEL, 'g'), '.').trim())
+    .filter((s) => s.length > 0);
+}
+
+export function emptyDictationFormState(): DictationFormState {
+  return {
+    topic: '',
+    contextImageAssetId: null,
+    sentences: [],
+    maxReplaysPerSentence: 3,
+    voiceId: '',
+    maxPoints: 10,
+    passThresholdPercent: 60,
+  };
+}
+
+export function formStateFromDictation(detail: Record<string, unknown>): DictationFormState {
+  const rawSentences = Array.isArray(detail.sentences)
+    ? (detail.sentences as Array<Record<string, unknown>>)
+    : [];
+  return {
+    topic: String(detail.topic ?? ''),
+    contextImageAssetId: typeof detail.context_image_asset_id === 'string' && detail.context_image_asset_id
+      ? detail.context_image_asset_id
+      : null,
+    sentences: rawSentences.map((s, i) => ({
+      idx: typeof s.idx === 'number' ? s.idx : i,
+      text: String(s.text ?? ''),
+      audioAssetId: typeof s.audio_asset_id === 'string' && s.audio_asset_id ? s.audio_asset_id : null,
+    })),
+    maxReplaysPerSentence: typeof detail.max_replays_per_sentence === 'number' ? detail.max_replays_per_sentence : 3,
+    voiceId: String(detail.voice_id ?? ''),
+    maxPoints: typeof detail.max_points === 'number' ? detail.max_points : 10,
+    passThresholdPercent: typeof detail.pass_threshold_percent === 'number' ? detail.pass_threshold_percent : 60,
+  };
+}
+
+export function buildDictationPayload(form: DictationFormState): Record<string, unknown> {
+  return {
+    topic: form.topic.trim(),
+    context_image_asset_id: form.contextImageAssetId ?? '',
+    sentences: form.sentences.map((s, i) => ({
+      idx: i,
+      text: s.text.trim(),
+      audio_asset_id: s.audioAssetId ?? '',
+    })),
+    max_replays_per_sentence: form.maxReplaysPerSentence,
+    voice_id: form.voiceId,
+    max_points: form.maxPoints,
+    pass_threshold_percent: form.passThresholdPercent,
+  };
+}
+
+export type DictationValidationResult = {
+  ok: boolean;
+  errors: string[];
+};
+
+export function validateDictation(form: DictationFormState, opts?: { requireAudio?: boolean }): DictationValidationResult {
+  const errors: string[] = [];
+  const requireAudio = opts?.requireAudio ?? true;
+
+  if (!form.topic.trim()) {
+    errors.push('Chủ đề là bắt buộc.');
+  }
+  if (form.sentences.length < DICTATION_MIN_SENTENCES) {
+    errors.push(`Cần ít nhất ${DICTATION_MIN_SENTENCES} câu.`);
+  }
+  if (form.sentences.length > DICTATION_MAX_SENTENCES) {
+    errors.push(`Tối đa ${DICTATION_MAX_SENTENCES} câu.`);
+  }
+  form.sentences.forEach((s, i) => {
+    const trimmed = s.text.trim();
+    if (!trimmed) {
+      errors.push(`Câu ${i + 1}: thiếu nội dung.`);
+    } else if (Array.from(trimmed).length > DICTATION_MAX_SENTENCE_CHARS) {
+      errors.push(`Câu ${i + 1}: quá ${DICTATION_MAX_SENTENCE_CHARS} ký tự.`);
+    }
+    if (requireAudio && !s.audioAssetId) {
+      errors.push(`Câu ${i + 1}: chưa tạo audio.`);
+    }
+  });
+  if (form.maxReplaysPerSentence < 0 || form.maxReplaysPerSentence > 10) {
+    errors.push('Số lần nghe lại phải trong khoảng 0–10.');
+  }
+  if (form.maxPoints < 1) {
+    errors.push('Điểm tối đa phải ≥ 1.');
+  }
+  if (form.passThresholdPercent < 1 || form.passThresholdPercent > 100) {
+    errors.push('Ngưỡng đạt phải trong khoảng 1–100%.');
+  }
+
+  return { ok: errors.length === 0, errors };
 }
