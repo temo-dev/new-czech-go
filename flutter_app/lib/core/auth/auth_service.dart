@@ -36,6 +36,13 @@ class AuthService extends ChangeNotifier {
   AuthUser? get currentUser => _user;
   bool get isAuthenticated => _state == AuthState.authenticated || _state == AuthState.needsVerify;
 
+  /// Read-only handle on the underlying [ApiClient] for screens that
+  /// need to call public V17 endpoints without changing auth state
+  /// (forgot-password, reset-password, etc). Mutating screens
+  /// (signup/login/logout) MUST go through the AuthService methods so
+  /// the state machine stays consistent.
+  ApiClient get apiClientForScreens => _api;
+
   /// Bootstrap from persisted state. Safe to call more than once; a
   /// later call short-circuits if the state is already settled.
   Future<void> bootstrap() async {
