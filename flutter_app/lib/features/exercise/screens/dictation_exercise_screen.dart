@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/locale/locale_scope.dart';
@@ -11,8 +13,26 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../widgets/czech_keyboard_chips.dart';
 import '../widgets/dictation_audio_card.dart';
+import '../widgets/dictation_ocr_preview_card.dart';
 import '../widgets/dictation_result_card.dart';
 import '../widgets/exercise_context_image.dart';
+
+/// V18.1: Camera/gallery image picker. Injectable for widget tests so they
+/// can simulate a learner picking a photo without touching the platform
+/// channel. Defaults to the real ImagePicker.pickImage(camera).
+typedef DictationImagePicker = Future<File?> Function();
+
+Future<File?> _defaultPickImage() async {
+  final picker = ImagePicker();
+  final picked = await picker.pickImage(
+    source: ImageSource.camera,
+    maxWidth: 1024,
+    maxHeight: 1024,
+    imageQuality: 85,
+  );
+  if (picked == null) return null;
+  return File(picked.path);
+}
 
 /// V18 — Stepper screen for psani_3_dictation.
 ///
@@ -26,6 +46,7 @@ class DictationExerciseScreen extends StatefulWidget {
     required this.detail,
     this.onAttemptCompleted,
     this.showResultOnCompletion = true,
+    this.imagePicker,
   });
 
   final ApiClient client;
@@ -33,17 +54,37 @@ class DictationExerciseScreen extends StatefulWidget {
   final FutureOr<void> Function(String attemptId)? onAttemptCompleted;
   final bool showResultOnCompletion;
 
+  /// V18.1: Override the default camera-based picker. Tests inject a stub
+  /// that returns a fixture File without going through platform channels.
+  final DictationImagePicker? imagePicker;
+
   @override
   State<DictationExerciseScreen> createState() =>
       _DictationExerciseScreenState();
 }
 
+// V18.1: per-sentence OCR submission state. `idle` means the learner has not
+// taken a photo yet; `uploading` is the in-flight preview call;
+// `previewing` shows the editable card; `confirmed` locks the sentence.
+enum _OCRStage { idle, uploading, previewing, confirmed }
+
 class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
   late final List<TextEditingController> _controllers;
   late final List<int> _replayCounts;
+  // V18.1 per-sentence state. Only used when the exercise opts into OCR.
+  late List<_OCRStage> _ocrStage;
+  late List<bool> _useOCR; // for `both` mode — per-sentence learner choice
+  late List<String> _assetIds; // confirmed asset_id per sentence (OCR rows)
+  late List<String> _photoUrls; // local preview URL or remote, used by card
+  late List<String> _ocrPreviewText; // most recent OCR result for this sentence
+  late List<String?> _ocrFailedBanner; // null when no banner needed
   int _currentIdx = 0;
   bool _submitting = false;
   String? _error;
+  // V18.1: lazily-created attempt ID. The preview endpoint requires an
+  // existing attempt, so OCR/Both modes provision one on first use rather
+  // than at submit time (V18 type-only flow continues to create at submit).
+  String? _attemptId;
 
   @override
   void initState() {
@@ -51,6 +92,14 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
     final n = widget.detail.dictationSentences.length;
     _controllers = List.generate(n, (_) => TextEditingController());
     _replayCounts = List.filled(n, 0);
+    _ocrStage = List.filled(n, _OCRStage.idle);
+    // For OCR-only mode, default every sentence to the OCR path. For Both
+    // mode, default to type unless the learner toggles. Type-only ignores.
+    _useOCR = List.filled(n, widget.detail.dictationIsOCRMode);
+    _assetIds = List.filled(n, '');
+    _photoUrls = List.filled(n, '');
+    _ocrPreviewText = List.filled(n, '');
+    _ocrFailedBanner = List.filled(n, null);
   }
 
   @override
@@ -61,10 +110,89 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
     super.dispose();
   }
 
-  bool get _canAdvance =>
-      _controllers[_currentIdx].text.trim().isNotEmpty && !_submitting;
+  bool _isOCRSentence(int i) {
+    if (widget.detail.dictationIsOCRMode) return true;
+    if (widget.detail.dictationIsBothMode) return _useOCR[i];
+    return false;
+  }
+
+  bool _isSentenceReady(int i) {
+    if (_isOCRSentence(i)) return _ocrStage[i] == _OCRStage.confirmed;
+    return _controllers[i].text.trim().isNotEmpty;
+  }
+
+  bool get _canAdvance => _isSentenceReady(_currentIdx) && !_submitting;
 
   bool get _isLast => _currentIdx == widget.detail.dictationSentences.length - 1;
+
+  // V18.1: kicks off the preview flow. Picks an image, posts to the preview
+  // endpoint, fills the editable card. All errors flip the row back to idle
+  // and surface a banner so the learner can retake or fall through to typing
+  // (in `both` mode).
+  Future<void> _startOCRPreview(int i) async {
+    final picker = widget.imagePicker ?? _defaultPickImage;
+    final file = await picker();
+    if (file == null) return;
+    setState(() {
+      _ocrStage[i] = _OCRStage.uploading;
+      _photoUrls[i] = file.path;
+      _ocrFailedBanner[i] = null;
+    });
+    try {
+      final attemptId = await _ensureAttempt();
+      final preview = await widget.client.dictationOCRPreview(
+        attemptId: attemptId,
+        idx: i,
+        image: file,
+      );
+      if (!mounted) return;
+      setState(() {
+        _ocrPreviewText[i] = preview.text;
+        _assetIds[i] = preview.assetId;
+        _ocrStage[i] = _OCRStage.previewing;
+        if (preview.text.isEmpty) {
+          _ocrFailedBanner[i] =
+              AppLocalizations.of(context).dictationOCRFailedBanner;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _ocrStage[i] = _OCRStage.idle;
+        _ocrFailedBanner[i] = e.toString();
+      });
+    }
+  }
+
+  void _confirmOCRPreview(int i, String text) {
+    setState(() {
+      _controllers[i].text = text.trim();
+      _ocrStage[i] = _OCRStage.confirmed;
+    });
+  }
+
+  void _retakeOCR(int i) {
+    setState(() {
+      _ocrStage[i] = _OCRStage.idle;
+      _photoUrls[i] = '';
+      _ocrPreviewText[i] = '';
+      _assetIds[i] = '';
+      _ocrFailedBanner[i] = null;
+    });
+  }
+
+  void _toggleBothMode(int i, bool useOCR) {
+    setState(() {
+      _useOCR[i] = useOCR;
+      // Reset progress when switching modes so we don't carry stale state.
+      _ocrStage[i] = _OCRStage.idle;
+      _photoUrls[i] = '';
+      _ocrPreviewText[i] = '';
+      _assetIds[i] = '';
+      _ocrFailedBanner[i] = null;
+      _controllers[i].clear();
+    });
+  }
 
   void _goPrev() {
     if (_currentIdx == 0) return;
@@ -80,6 +208,18 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
     }
   }
 
+  Future<String> _ensureAttempt() async {
+    final existing = _attemptId;
+    if (existing != null && existing.isNotEmpty) return existing;
+    final locale = LocaleScope.of(context).code;
+    final attempt = await widget.client.createAttempt(
+      widget.detail.id,
+      locale: locale,
+    );
+    _attemptId = attempt['id'] as String;
+    return _attemptId!;
+  }
+
   Future<void> _submit() async {
     if (_submitting) return;
     setState(() {
@@ -87,22 +227,35 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
       _error = null;
     });
     try {
-      final locale = LocaleScope.of(context).code;
-      final attempt = await widget.client.createAttempt(
-        widget.detail.id,
-        locale: locale,
-      );
-      final attemptId = attempt['id'] as String;
+      final attemptId = await _ensureAttempt();
 
-      final sentences = <DictationSentenceSubmission>[];
-      for (int i = 0; i < _controllers.length; i++) {
-        sentences.add(DictationSentenceSubmission(
-          idx: i,
-          text: _controllers[i].text.trim(),
-          replayCount: _replayCounts[i],
-        ));
+      // V18.1: route to OCR endpoint when any sentence used the photo path
+      // (OCR-only mode or any toggled `both` row). Otherwise stay on the
+      // V18 JSON submit-text path so backward-compat tests keep passing.
+      final anyOCR = List.generate(_controllers.length, (i) => _isOCRSentence(i))
+          .any((v) => v);
+      if (anyOCR) {
+        final rows = <DictationOCRSentenceSubmission>[];
+        for (int i = 0; i < _controllers.length; i++) {
+          rows.add(DictationOCRSentenceSubmission(
+            idx: i,
+            text: _controllers[i].text.trim(),
+            assetId: _isOCRSentence(i) ? _assetIds[i] : '',
+            replayCount: _replayCounts[i],
+          ));
+        }
+        await widget.client.submitDictationOCR(attemptId, sentences: rows);
+      } else {
+        final sentences = <DictationSentenceSubmission>[];
+        for (int i = 0; i < _controllers.length; i++) {
+          sentences.add(DictationSentenceSubmission(
+            idx: i,
+            text: _controllers[i].text.trim(),
+            replayCount: _replayCounts[i],
+          ));
+        }
+        await widget.client.submitDictation(attemptId, sentences: sentences);
       }
-      await widget.client.submitDictation(attemptId, sentences: sentences);
 
       if (!mounted) return;
       final completed = await Navigator.of(context).push<bool>(
@@ -208,12 +361,23 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
               },
             ),
             const SizedBox(height: AppSpacing.x3),
-            _InputCard(
-              controller: controller,
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: AppSpacing.x2),
-            CzechKeyboardChips(controller: controller),
+            if (d.dictationIsBothMode) ...[
+              _ModeTogglePill(
+                useOCR: _useOCR[_currentIdx],
+                onChanged: (v) => _toggleBothMode(_currentIdx, v),
+              ),
+              const SizedBox(height: AppSpacing.x2),
+            ],
+            if (_isOCRSentence(_currentIdx))
+              _buildOCRInput(_currentIdx)
+            else ...[
+              _InputCard(
+                controller: controller,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: AppSpacing.x2),
+              CzechKeyboardChips(controller: controller),
+            ],
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.x3),
               Text(
@@ -271,6 +435,108 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  // V18.1: render the OCR-mode UI for sentence `i`. Idle → camera button.
+  // Uploading → spinner card. Previewing → editable preview card. Confirmed
+  // → compact summary with edit affordance.
+  Widget _buildOCRInput(int i) {
+    final l = AppLocalizations.of(context);
+    switch (_ocrStage[i]) {
+      case _OCRStage.idle:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            FilledButton.icon(
+              key: const Key('ocr-take-photo'),
+              onPressed: _submitting ? null : () => _startOCRPreview(i),
+              icon: const Icon(Icons.camera_alt_outlined),
+              label: Text(l.dictationModeOCRLabel),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+              ),
+            ),
+            if (_ocrFailedBanner[i] != null) ...[
+              const SizedBox(height: AppSpacing.x2),
+              Text(
+                _ocrFailedBanner[i]!,
+                style: AppTypography.bodySmall.copyWith(color: AppColors.error),
+              ),
+            ],
+          ],
+        );
+      case _OCRStage.uploading:
+      case _OCRStage.previewing:
+        return DictationOCRPreviewCard(
+          photoUrl: _photoUrls[i],
+          ocrText: _ocrPreviewText[i],
+          isUploading: _ocrStage[i] == _OCRStage.uploading,
+          uploadingHint: l.dictationOCRUploadingHint,
+          previewTitle: l.dictationOCRPreviewTitle,
+          previewHint: l.dictationOCRPreviewHint,
+          confirmLabel: l.dictationOCRConfirmBtn,
+          retakeLabel: l.dictationOCRRetakeBtn,
+          failedBanner: _ocrFailedBanner[i],
+          onRetake: () => _retakeOCR(i),
+          onConfirm: (text) => _confirmOCRPreview(i, text),
+        );
+      case _OCRStage.confirmed:
+        return Container(
+          padding: const EdgeInsets.all(AppSpacing.x3),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _controllers[i].text,
+                style: AppTypography.bodyLarge,
+              ),
+              const SizedBox(height: AppSpacing.x2),
+              TextButton.icon(
+                onPressed: () => _retakeOCR(i),
+                icon: const Icon(Icons.refresh, size: 18),
+                label: Text(l.dictationOCRRetakeBtn),
+              ),
+            ],
+          ),
+        );
+    }
+  }
+}
+
+class _ModeTogglePill extends StatelessWidget {
+  const _ModeTogglePill({required this.useOCR, required this.onChanged});
+  final bool useOCR;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return Row(
+      key: const Key('mode-toggle-pill'),
+      children: [
+        Expanded(
+          child: ChoiceChip(
+            label: Text(l.dictationModeTypeLabel),
+            selected: !useOCR,
+            onSelected: (_) => onChanged(false),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.x2),
+        Expanded(
+          child: ChoiceChip(
+            label: Text(l.dictationModeOCRLabel),
+            selected: useOCR,
+            onSelected: (_) => onChanged(true),
+          ),
+        ),
+      ],
     );
   }
 }

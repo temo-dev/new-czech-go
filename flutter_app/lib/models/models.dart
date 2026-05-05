@@ -427,6 +427,7 @@ class ExerciseDetail {
     this.dictationVoiceId = '',
     this.dictationMaxPoints = 10,
     this.dictationPassThresholdPercent = 60,
+    this.dictationSubmissionMode = 'type',
   });
 
   final String id;
@@ -504,6 +505,15 @@ class ExerciseDetail {
   final String dictationVoiceId;
   final int dictationMaxPoints;
   final int dictationPassThresholdPercent;
+
+  // V18.1: how the learner submits each sentence.
+  //   "type" — keyboard only (V18 default)
+  //   "ocr"  — handwriting photo only
+  //   "both" — learner picks per sentence at runtime
+  final String dictationSubmissionMode;
+  bool get dictationIsTypeMode => dictationSubmissionMode == 'type';
+  bool get dictationIsOCRMode => dictationSubmissionMode == 'ocr';
+  bool get dictationIsBothMode => dictationSubmissionMode == 'both';
 
   bool get isInterviewConversation => exerciseType == 'interview_conversation';
   bool get isInterviewChoiceExplain =>
@@ -716,8 +726,18 @@ class ExerciseDetail {
       dictationMaxPoints: (detail['max_points'] as num?)?.toInt() ?? 10,
       dictationPassThresholdPercent:
           (detail['pass_threshold_percent'] as num?)?.toInt() ?? 60,
+      dictationSubmissionMode: _parseDictationSubmissionMode(
+        detail['submission_mode'],
+      ),
     );
   }
+}
+
+String _parseDictationSubmissionMode(dynamic raw) {
+  if (raw is String && const {'type', 'ocr', 'both'}.contains(raw)) {
+    return raw;
+  }
+  return 'type';
 }
 
 int _clampAudioBufferTimeout(dynamic raw) {

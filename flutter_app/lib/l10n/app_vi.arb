@@ -507,5 +507,13 @@
     "dictationSubmitBtn": "Nộp bài",
     "dictationPrevBtn": "← Trước",
     "dictationResultPerSentence": "Độ chính xác từng câu",
-    "dictationLLMUnavailable": "Phản hồi chi tiết tạm không khả dụng"
+    "dictationLLMUnavailable": "Phản hồi chi tiết tạm không khả dụng",
+    "dictationModeTypeLabel": "Gõ",
+    "dictationModeOCRLabel": "📷 Chụp ảnh",
+    "dictationOCRPreviewTitle": "Kiểm tra văn bản đã đọc",
+    "dictationOCRPreviewHint": "Sửa lại nếu cần, rồi xác nhận",
+    "dictationOCRConfirmBtn": "Dùng văn bản này",
+    "dictationOCRRetakeBtn": "Chụp lại",
+    "dictationOCRFailedBanner": "Không nhận diện được. Hãy chụp lại hoặc gõ tay",
+    "dictationOCRUploadingHint": "Đang nhận diện…"
 }

@@ -64,6 +64,52 @@ void main() {
       expect(p1.dictationSentences, isEmpty);
     });
 
+    test('parses submission_mode for V18.1 OCR exercises', () {
+      for (final mode in ['type', 'ocr', 'both']) {
+        final detail = ExerciseDetail.fromJson(<String, dynamic>{
+          'id': 'ex-mode',
+          'title': 't',
+          'exercise_type': 'psani_3_dictation',
+          'detail': <String, dynamic>{
+            'topic': 'x',
+            'sentences': const <Map<String, dynamic>>[],
+            'submission_mode': mode,
+          },
+        });
+        expect(detail.dictationSubmissionMode, mode, reason: 'mode=$mode');
+      }
+    });
+
+    test('defaults submission_mode to "type" when missing (V18 backward-compat)', () {
+      final detail = ExerciseDetail.fromJson(<String, dynamic>{
+        'id': 'ex-legacy',
+        'title': 't',
+        'exercise_type': 'psani_3_dictation',
+        'detail': <String, dynamic>{
+          'topic': 'x',
+          'sentences': const <Map<String, dynamic>>[],
+        },
+      });
+      expect(detail.dictationSubmissionMode, 'type');
+      expect(detail.dictationIsOCRMode, isFalse);
+      expect(detail.dictationIsTypeMode, isTrue);
+      expect(detail.dictationIsBothMode, isFalse);
+    });
+
+    test('coerces unknown submission_mode value back to "type"', () {
+      final detail = ExerciseDetail.fromJson(<String, dynamic>{
+        'id': 'ex-bogus',
+        'title': 't',
+        'exercise_type': 'psani_3_dictation',
+        'detail': <String, dynamic>{
+          'topic': 'x',
+          'sentences': const <Map<String, dynamic>>[],
+          'submission_mode': 'bogus',
+        },
+      });
+      expect(detail.dictationSubmissionMode, 'type');
+    });
+
     test('uses sane defaults when dictation fields are missing', () {
       final detail = ExerciseDetail.fromJson(<String, dynamic>{
         'id': 'ex-3',

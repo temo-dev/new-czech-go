@@ -495,6 +495,127 @@ class ApiClient {
     await _authed('POST', '/v1/attempts/$attemptId/submit-text', body: body);
   }
 
+  /// V18.1: One sentence in a dictation OCR submission. AssetID + Text are the
+  /// preview-confirm pair (text is what the learner edited after the OCR
+  /// returned). For the "both" submission_mode, learners may also submit
+  /// type-only sentences in the same payload — those rows have empty AssetID.
+  /// Sends a single handwriting photo for OCR preview (V18.1).
+  /// Returns recognized text (may be empty on OCR failure) and the asset_id
+  /// the caller echoes back at submitDictationOCR time.
+  Future<DictationOCRPreview> dictationOCRPreview({
+    required String attemptId,
+    required int idx,
+    required File image,
+  }) async {
+    final t = _token;
+    if (t == null) {
+      throw AuthException(statusCode: 401, code: 'missing_token', message: 'Not authenticated.');
+    }
+    final uri = Uri.parse('$baseUrl/v1/attempts/$attemptId/dictation-ocr-preview');
+    final request = await HttpClient().openUrl('POST', uri);
+    final boundary = '----flutter${DateTime.now().microsecondsSinceEpoch}';
+    request.headers.set(HttpHeaders.contentTypeHeader, 'multipart/form-data; boundary=$boundary');
+    request.headers.set('Authorization', 'Bearer $t');
+
+    final fileBytes = await image.readAsBytes();
+    final filename = image.path.split(Platform.pathSeparator).last;
+    final mime = _guessImageMime(filename);
+    final idxField = utf8.encode(
+      '--$boundary\r\n'
+      'Content-Disposition: form-data; name="idx"\r\n\r\n'
+      '$idx\r\n',
+    );
+    final fileHead = utf8.encode(
+      '--$boundary\r\n'
+      'Content-Disposition: form-data; name="image"; filename="$filename"\r\n'
+      'Content-Type: $mime\r\n\r\n',
+    );
+    final tail = utf8.encode('\r\n--$boundary--\r\n');
+    request.contentLength = idxField.length + fileHead.length + fileBytes.length + tail.length;
+    request.add(idxField);
+    request.add(fileHead);
+    request.add(fileBytes);
+    request.add(tail);
+
+    final response = await request.close();
+    final text = await response.transform(utf8.decoder).join();
+    Map<String, dynamic> payload = const {};
+    if (text.isNotEmpty) {
+      final decoded = jsonDecode(text);
+      if (decoded is Map<String, dynamic>) payload = decoded;
+    }
+    if (response.statusCode >= 400) {
+      final errMap = (payload['error'] as Map<String, dynamic>?) ?? const {};
+      throw AuthException(
+        statusCode: response.statusCode,
+        code: (errMap['code'] as String?) ?? 'http_${response.statusCode}',
+        message: (errMap['message'] as String?) ?? 'OCR preview failed.',
+      );
+    }
+    final data = (payload['data'] as Map<String, dynamic>?) ?? const {};
+    return DictationOCRPreview(
+      idx: (data['idx'] as num?)?.toInt() ?? idx,
+      text: (data['text'] as String?) ?? '',
+      assetId: (data['asset_id'] as String?) ?? '',
+    );
+  }
+
+  /// Submits a dictation OCR attempt (V18.1 — psani_3_dictation, multipart).
+  ///
+  /// Each [DictationOCRSentenceSubmission] carries the learner-confirmed text,
+  /// the asset_id returned by [dictationOCRPreview], and the optional replay
+  /// counter. Backend re-uses the V18 deterministic Levenshtein scorer so
+  /// scoring parity holds with [submitDictation].
+  Future<void> submitDictationOCR(
+    String attemptId, {
+    required List<DictationOCRSentenceSubmission> sentences,
+  }) async {
+    final t = _token;
+    if (t == null) {
+      throw AuthException(statusCode: 401, code: 'missing_token', message: 'Not authenticated.');
+    }
+    final uri = Uri.parse('$baseUrl/v1/attempts/$attemptId/submit-dictation-ocr');
+    final request = await HttpClient().openUrl('POST', uri);
+    final boundary = '----flutter${DateTime.now().microsecondsSinceEpoch}';
+    request.headers.set(HttpHeaders.contentTypeHeader, 'multipart/form-data; boundary=$boundary');
+    request.headers.set('Authorization', 'Bearer $t');
+
+    final rowsJson = jsonEncode(sentences
+        .map((s) => {
+              'idx': s.idx,
+              'text': s.text,
+              'asset_id': s.assetId,
+              'replay_count': s.replayCount,
+            })
+        .toList());
+    final field = utf8.encode(
+      '--$boundary\r\n'
+      'Content-Disposition: form-data; name="sentences"\r\n'
+      'Content-Type: application/json; charset=utf-8\r\n\r\n'
+      '$rowsJson\r\n',
+    );
+    final tail = utf8.encode('--$boundary--\r\n');
+    request.contentLength = field.length + tail.length;
+    request.add(field);
+    request.add(tail);
+
+    final response = await request.close();
+    final text = await response.transform(utf8.decoder).join();
+    Map<String, dynamic> payload = const {};
+    if (text.isNotEmpty) {
+      final decoded = jsonDecode(text);
+      if (decoded is Map<String, dynamic>) payload = decoded;
+    }
+    if (response.statusCode >= 400) {
+      final errMap = (payload['error'] as Map<String, dynamic>?) ?? const {};
+      throw AuthException(
+        statusCode: response.statusCode,
+        code: (errMap['code'] as String?) ?? 'http_${response.statusCode}',
+        message: (errMap['message'] as String?) ?? 'OCR submit failed.',
+      );
+    }
+  }
+
   /// Requests a short-lived ElevenLabs signed session URL for an interview.
   /// [selectedOption] is the label chosen by the learner (choice_explain type only).
   /// Returns an InterviewTokenResponse with signed_url and expires_in.
@@ -772,5 +893,37 @@ class DictationSentenceSubmission {
 
   final int idx;
   final String text;
+  final int replayCount;
+}
+
+// V18.1: Response from POST /v1/attempts/:id/dictation-ocr-preview.
+// `text` is empty when OCR fails; the learner edits or retakes from the UI.
+class DictationOCRPreview {
+  const DictationOCRPreview({
+    required this.idx,
+    required this.text,
+    required this.assetId,
+  });
+
+  final int idx;
+  final String text;
+  final String assetId;
+}
+
+// V18.1: One sentence in a dictation OCR submission. AssetID + Text are the
+// preview-confirm pair (text is what the learner edited after the OCR
+// returned). For the "both" submission_mode, learners may also submit
+// type-only sentences in the same payload — those rows have empty AssetID.
+class DictationOCRSentenceSubmission {
+  const DictationOCRSentenceSubmission({
+    required this.idx,
+    required this.text,
+    this.assetId = '',
+    this.replayCount = 0,
+  });
+
+  final int idx;
+  final String text;
+  final String assetId;
   final int replayCount;
 }

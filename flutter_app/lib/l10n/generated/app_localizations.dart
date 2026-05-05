@@ -2086,6 +2086,114 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Hoàn thành'**
   String get interviewFinishBtn;
+
+  /// No description provided for @dictationListenInstruction.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nghe và viết lại câu'**
+  String get dictationListenInstruction;
+
+  /// No description provided for @dictationSentenceLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Câu {idx} / {total}'**
+  String dictationSentenceLabel(int idx, int total);
+
+  /// No description provided for @dictationRepeatRemaining.
+  ///
+  /// In vi, this message translates to:
+  /// **'Còn {n} lượt nghe lại'**
+  String dictationRepeatRemaining(int n);
+
+  /// No description provided for @dictationRepeatExhausted.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hết lượt nghe lại'**
+  String get dictationRepeatExhausted;
+
+  /// No description provided for @dictationKeyboardHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bàn phím Czech'**
+  String get dictationKeyboardHint;
+
+  /// No description provided for @dictationNextBtn.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tiếp →'**
+  String get dictationNextBtn;
+
+  /// No description provided for @dictationSubmitBtn.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nộp bài'**
+  String get dictationSubmitBtn;
+
+  /// No description provided for @dictationPrevBtn.
+  ///
+  /// In vi, this message translates to:
+  /// **'← Trước'**
+  String get dictationPrevBtn;
+
+  /// No description provided for @dictationResultPerSentence.
+  ///
+  /// In vi, this message translates to:
+  /// **'Độ chính xác từng câu'**
+  String get dictationResultPerSentence;
+
+  /// No description provided for @dictationLLMUnavailable.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phản hồi chi tiết tạm không khả dụng'**
+  String get dictationLLMUnavailable;
+
+  /// No description provided for @dictationModeTypeLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Gõ'**
+  String get dictationModeTypeLabel;
+
+  /// No description provided for @dictationModeOCRLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'📷 Chụp ảnh'**
+  String get dictationModeOCRLabel;
+
+  /// No description provided for @dictationOCRPreviewTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kiểm tra văn bản đã đọc'**
+  String get dictationOCRPreviewTitle;
+
+  /// No description provided for @dictationOCRPreviewHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Sửa lại nếu cần, rồi xác nhận'**
+  String get dictationOCRPreviewHint;
+
+  /// No description provided for @dictationOCRConfirmBtn.
+  ///
+  /// In vi, this message translates to:
+  /// **'Dùng văn bản này'**
+  String get dictationOCRConfirmBtn;
+
+  /// No description provided for @dictationOCRRetakeBtn.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chụp lại'**
+  String get dictationOCRRetakeBtn;
+
+  /// No description provided for @dictationOCRFailedBanner.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không nhận diện được. Hãy chụp lại hoặc gõ tay'**
+  String get dictationOCRFailedBanner;
+
+  /// No description provided for @dictationOCRUploadingHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang nhận diện…'**
+  String get dictationOCRUploadingHint;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

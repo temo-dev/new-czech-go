@@ -462,5 +462,13 @@
     "dictationSubmitBtn": "Submit",
     "dictationPrevBtn": "← Prev",
     "dictationResultPerSentence": "Per-sentence accuracy",
-    "dictationLLMUnavailable": "Detailed feedback temporarily unavailable"
+    "dictationLLMUnavailable": "Detailed feedback temporarily unavailable",
+    "dictationModeTypeLabel": "Type",
+    "dictationModeOCRLabel": "📷 Take photo",
+    "dictationOCRPreviewTitle": "Review recognized text",
+    "dictationOCRPreviewHint": "Edit if needed, then confirm",
+    "dictationOCRConfirmBtn": "Use this text",
+    "dictationOCRRetakeBtn": "Retake",
+    "dictationOCRFailedBanner": "Could not read. Retake or type instead",
+    "dictationOCRUploadingHint": "Recognizing…"
 }

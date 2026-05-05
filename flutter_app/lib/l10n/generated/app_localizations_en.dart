@@ -1091,4 +1091,62 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get interviewFinishBtn => 'Finish';
+
+  @override
+  String get dictationListenInstruction => 'Listen and write the sentence';
+
+  @override
+  String dictationSentenceLabel(int idx, int total) {
+    return 'Sentence $idx / $total';
+  }
+
+  @override
+  String dictationRepeatRemaining(int n) {
+    return '$n replay(s) left';
+  }
+
+  @override
+  String get dictationRepeatExhausted => 'No replays left';
+
+  @override
+  String get dictationKeyboardHint => 'Czech keyboard';
+
+  @override
+  String get dictationNextBtn => 'Next →';
+
+  @override
+  String get dictationSubmitBtn => 'Submit';
+
+  @override
+  String get dictationPrevBtn => '← Prev';
+
+  @override
+  String get dictationResultPerSentence => 'Per-sentence accuracy';
+
+  @override
+  String get dictationLLMUnavailable => 'Detailed feedback temporarily unavailable';
+
+  @override
+  String get dictationModeTypeLabel => 'Type';
+
+  @override
+  String get dictationModeOCRLabel => '📷 Take photo';
+
+  @override
+  String get dictationOCRPreviewTitle => 'Review recognized text';
+
+  @override
+  String get dictationOCRPreviewHint => 'Edit if needed, then confirm';
+
+  @override
+  String get dictationOCRConfirmBtn => 'Use this text';
+
+  @override
+  String get dictationOCRRetakeBtn => 'Retake';
+
+  @override
+  String get dictationOCRFailedBanner => 'Could not read. Retake or type instead';
+
+  @override
+  String get dictationOCRUploadingHint => 'Recognizing…';
 }

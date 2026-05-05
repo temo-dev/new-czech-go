@@ -1091,4 +1091,62 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get interviewFinishBtn => 'Hoàn thành';
+
+  @override
+  String get dictationListenInstruction => 'Nghe và viết lại câu';
+
+  @override
+  String dictationSentenceLabel(int idx, int total) {
+    return 'Câu $idx / $total';
+  }
+
+  @override
+  String dictationRepeatRemaining(int n) {
+    return 'Còn $n lượt nghe lại';
+  }
+
+  @override
+  String get dictationRepeatExhausted => 'Hết lượt nghe lại';
+
+  @override
+  String get dictationKeyboardHint => 'Bàn phím Czech';
+
+  @override
+  String get dictationNextBtn => 'Tiếp →';
+
+  @override
+  String get dictationSubmitBtn => 'Nộp bài';
+
+  @override
+  String get dictationPrevBtn => '← Trước';
+
+  @override
+  String get dictationResultPerSentence => 'Độ chính xác từng câu';
+
+  @override
+  String get dictationLLMUnavailable => 'Phản hồi chi tiết tạm không khả dụng';
+
+  @override
+  String get dictationModeTypeLabel => 'Gõ';
+
+  @override
+  String get dictationModeOCRLabel => '📷 Chụp ảnh';
+
+  @override
+  String get dictationOCRPreviewTitle => 'Kiểm tra văn bản đã đọc';
+
+  @override
+  String get dictationOCRPreviewHint => 'Sửa lại nếu cần, rồi xác nhận';
+
+  @override
+  String get dictationOCRConfirmBtn => 'Dùng văn bản này';
+
+  @override
+  String get dictationOCRRetakeBtn => 'Chụp lại';
+
+  @override
+  String get dictationOCRFailedBanner => 'Không nhận diện được. Hãy chụp lại hoặc gõ tay';
+
+  @override
+  String get dictationOCRUploadingHint => 'Đang nhận diện…';
 }
