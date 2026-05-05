@@ -385,10 +385,10 @@ Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
   - **Files:** same migration file (extend)
   - **Verify:** shape test pass; cascade verified at SQL level (Postgres apply test deferred to A1.5)
   - **Size:** XS (extend file)
-- [ ] **V17-A1.3** Migration tables `streak_days`, `pro_purchases`, `daily_usage`
-  - **AC:** PK composite (user_id, day) cho streak/usage; unique apple_transaction_id; index user_day
+- [x] **V17-A1.3** Migration tables `streak_days`, `pro_purchases`, `daily_usage` extend 023_users.sql (2026-05-05)
+  - **AC:** PK composite (user_id, day) cho streak/usage ✅; unique apple_transaction_id ✅; index user_day_desc ✅; user_active partial index ✅
   - **Files:** same migration file
-  - **Verify:** insert/upsert round-trip
+  - **Verify:** shape test pass; insert/upsert round-trip deferred to A1.6 store impl
   - **Size:** S
 - [ ] **V17-A1.4** `UserStore` interface + memory + Postgres impl: Create, GetByEmail, GetByID, Update, SoftDelete, MarkVerified, IncrementGrace
   - **AC:** email lookup case-insensitive; soft-deleted không lookup được

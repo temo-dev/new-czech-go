@@ -103,6 +103,57 @@ func TestAuthTokensMigration_FileShapesAuthTokensTable(t *testing.T) {
 	}
 }
 
+// TestStreakProPurchasesDailyUsageMigration_FileShapesTables validates the
+// V17-A1.3 extension of 023_users.sql:
+//   - streak_days   — composite PK (user_id, day) for per-day idempotent upserts
+//   - pro_purchases — Apple IAP receipts, unique apple_transaction_id
+//   - daily_usage   — composite PK (user_id, day) for free-tier rate limit
+//
+// All three tables CASCADE on user delete.
+func TestStreakProPurchasesDailyUsageMigration_FileShapesTables(t *testing.T) {
+	path := findMigration(t, "023_users.sql")
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read migration: %v", err)
+	}
+	sql := string(raw)
+
+	mustContain(t, sql, "CREATE TABLE IF NOT EXISTS streak_days")
+	mustContain(t, sql, "CREATE TABLE IF NOT EXISTS pro_purchases")
+	mustContain(t, sql, "CREATE TABLE IF NOT EXISTS daily_usage")
+
+	// streak_days
+	for _, col := range []string{"day", "completed", "grace_used"} {
+		mustContain(t, sql, col)
+	}
+
+	// pro_purchases
+	for _, col := range []string{
+		"apple_transaction_id",
+		"apple_original_transaction_id",
+		"product_id",
+		"purchased_at",
+		"receipt_payload",
+		"is_active",
+	} {
+		mustContain(t, sql, col)
+	}
+	mustContain(t, sql, "pro_purchases_apple_txn_uniq")
+	mustContain(t, sql, "pro_purchases_user_active_idx")
+
+	// daily_usage
+	for _, col := range []string{"attempts_count", "interviews_count"} {
+		mustContain(t, sql, col)
+	}
+
+	// All three new tables cascade on user delete (in addition to
+	// auth_tokens that landed in A1.2 -> 4 cascades total).
+	if c := strings.Count(sql, "REFERENCES users(id) ON DELETE CASCADE"); c < 4 {
+		t.Errorf("expected ≥4 cascade FKs to users(id), got %d", c)
+	}
+}
+
 func findMigration(t *testing.T, name string) string {
 	t.Helper()
 

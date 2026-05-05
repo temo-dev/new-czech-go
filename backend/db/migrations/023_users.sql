@@ -80,3 +80,71 @@ CREATE INDEX IF NOT EXISTS auth_tokens_user_kind_idx
 CREATE INDEX IF NOT EXISTS auth_tokens_expires_at_idx
     ON auth_tokens (expires_at)
     WHERE revoked_at IS NULL;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- V17-A1.3 — streak_days
+--
+-- One row per learner per local-VN day. `completed=true` means the learner
+-- finished at least one attempt that day; `grace_used=true` means a Pro
+-- learner spent their weekly grace pass to keep the streak alive across an
+-- otherwise-empty day. Composite PK makes the daily upsert idempotent.
+-- ─────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS streak_days (
+    user_id    TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day        DATE        NOT NULL,
+    completed  BOOLEAN     NOT NULL DEFAULT FALSE,
+    grace_used BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, day)
+);
+
+-- Reverse-chronological per-user lookup for streak history calendars.
+CREATE INDEX IF NOT EXISTS streak_days_user_day_idx
+    ON streak_days (user_id, day DESC);
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- V17-A1.3 — pro_purchases
+--
+-- Apple IAP receipts. Each StoreKit transaction lands here exactly once
+-- (apple_transaction_id is globally unique). The webhook handler flips
+-- `is_active` when Apple sends RENEWAL / EXPIRED / REFUND notifications.
+-- ─────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS pro_purchases (
+    id                            TEXT        PRIMARY KEY,
+    user_id                       TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    apple_transaction_id          TEXT        NOT NULL,
+    apple_original_transaction_id TEXT        NOT NULL,
+    product_id                    TEXT        NOT NULL,
+    purchased_at                  TIMESTAMPTZ NOT NULL,
+    expires_at                    TIMESTAMPTZ NOT NULL,
+    receipt_payload               JSONB       NOT NULL,
+    is_active                     BOOLEAN     NOT NULL DEFAULT TRUE,
+    created_at                    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Globally unique transaction id prevents double-credit on receipt replay.
+CREATE UNIQUE INDEX IF NOT EXISTS pro_purchases_apple_txn_uniq
+    ON pro_purchases (apple_transaction_id);
+
+-- Active-subscription lookup per user (renewal sweep, downgrade cron).
+CREATE INDEX IF NOT EXISTS pro_purchases_user_active_idx
+    ON pro_purchases (user_id)
+    WHERE is_active = TRUE;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- V17-A1.3 — daily_usage
+--
+-- Free-tier rate limit ledger. Composite PK on (user_id, day) keeps the
+-- counter idempotent under upsert; daily reset is implicit because each
+-- new day creates a new row. Pro learners bypass this table.
+-- ─────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS daily_usage (
+    user_id          TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day              DATE    NOT NULL,
+    attempts_count   INTEGER NOT NULL DEFAULT 0,
+    interviews_count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, day)
+);
