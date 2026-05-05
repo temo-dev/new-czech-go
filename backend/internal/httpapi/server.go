@@ -45,6 +45,7 @@ type Server struct {
 	emailSender      EmailSender
 	authBaseURL      string
 	authVerifyTTL    time.Duration
+	loginRL          *loginRateLimiter
 
 	voiceRegistry      *processing.VoiceRegistry
 	elevenLabsAPIKey   string // for interview session token creation
@@ -136,7 +137,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/healthz", s.handleHealth)
 	s.mux.HandleFunc("/v1/voices", s.handleVoices)
 	s.mux.HandleFunc("/v1/voices/", s.handleVoicePreview)
-	s.mux.HandleFunc("/v1/auth/login", s.handleLogin)
+	if s.userStore == nil {
+		// Legacy admin/dev-fixture login is only registered when the V17
+		// auth flow is not wired. The V17 path takes over /v1/auth/login
+		// in registerAuthRoutes() and dispatches to admin or learner.
+		s.mux.HandleFunc("/v1/auth/login", s.handleLogin)
+	}
 	s.mux.HandleFunc("/v1/me", s.withAuth(s.handleMe))
 	s.mux.HandleFunc("/v1/course", s.withAuth(s.handleCourse))
 	s.mux.HandleFunc("/v1/plan", s.withAuth(s.handlePlan))

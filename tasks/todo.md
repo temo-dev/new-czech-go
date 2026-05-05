@@ -432,10 +432,10 @@ Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
   - **Files:** `backend/internal/httpapi/{auth_handlers,auth_handlers_test}.go` (new), `server.go` (3 hooks: EmailSender alias, fields, assembleServer split + registerAuthRoutes call), `store/{user_store,auth_token_store}.go` (export NewMemoryUserStore + NewMemoryAuthTokenStore for test wiring)
   - **Verify:** 12/12 signup tests pass (350→362 from A2.2 → 362→374 from A2.3)
   - **Size:** S
-- [ ] **V17-A2.4** `POST /v1/auth/login` + rate limit middleware (5 fails/15min/email): not leak email-existence
-  - **AC:** invalid email vs invalid password → cùng response 401
-  - **Files:** `auth_handlers.go` (extend), `httpapi/rate_limit.go`
-  - **Verify:** `TestLogin_RateLimit`, `TestLogin_InvalidCredentials_NoLeakExistence`
+- [x] **V17-A2.4** `POST /v1/auth/login` + sliding-window rate limit (5 fails/15min/email, success resets); admin path delegated to legacy MemoryStore.Login when V17 wired so CMS keeps working; learner path runs bcrypt.Verify against a sentinel hash on lookup miss to keep timing flat (constant-time-ish leak guard); 6 tests (2026-05-05)
+  - **AC:** 200 + token on happy path ✅; 401 invalid_credentials wrong password ✅; 401 invalid_credentials nonexistent email (same status + same code) ✅; 429 too_many_attempts at 6th fail ✅; success resets counter ✅; 400 invalid JSON ✅
+  - **Files:** `httpapi/auth_rate_limit.go` (new), `auth_handlers.go` (handleAuthLogin + route), `server.go` (legacy login conditional)
+  - **Verify:** 6/6 login tests pass; legacy admin login still works (existing tests intact)
   - **Size:** M
 - [ ] **V17-A2.5** `POST /v1/auth/logout` + `GET /v1/auth/verify-email` (HTML response + deep link redirect) + `POST /v1/auth/resend-verify` (60s cooldown)
   - **AC:** logout 204; verify HTML + redirect `czechgo://verified`; resend 429 trong cooldown

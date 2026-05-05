@@ -241,6 +241,137 @@ func TestSignup_DispatchesVerifyEmail(t *testing.T) {
 	}
 }
 
+// ── login ────────────────────────────────────────────────────────────────
+
+// preSignup creates an account through the public signup endpoint so the
+// login tests don't reach into the store directly.
+func (env *authTestEnv) preSignup(t *testing.T, emailAddr, password string) {
+	t.Helper()
+	resp, body := env.signup(t, map[string]string{
+		"email": emailAddr, "password": password, "display_name": "X",
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("preSignup failed: %d %v", resp.StatusCode, body)
+	}
+	env.emails.Reset() // discard the verify email so login tests start clean
+}
+
+func (env *authTestEnv) login(t *testing.T, emailAddr, password string) (*http.Response, map[string]any) {
+	t.Helper()
+	buf, _ := json.Marshal(map[string]string{"email": emailAddr, "password": password})
+	resp, err := http.Post(env.srv.URL+"/v1/auth/login", "application/json", bytes.NewReader(buf))
+	if err != nil {
+		t.Fatalf("post login: %v", err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	var out map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	return resp, out
+}
+
+func TestLogin_HappyPath_ReturnsSessionToken(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "u@x.com", "Strong1Password!")
+
+	resp, body := env.login(t, "u@x.com", "Strong1Password!")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	if body["session_token"] == nil || body["session_token"] == "" {
+		t.Errorf("missing session_token: %v", body)
+	}
+	user := body["user"].(map[string]any)
+	if user["email"] != "u@x.com" {
+		t.Errorf("unexpected user email: %v", user["email"])
+	}
+}
+
+func TestLogin_WrongPassword_Returns401(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "u@x.com", "Strong1Password!")
+
+	resp, body := env.login(t, "u@x.com", "wrong-password")
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", resp.StatusCode)
+	}
+	if body["error"] != "invalid_credentials" {
+		t.Errorf("expected error=invalid_credentials, got %v", body["error"])
+	}
+}
+
+func TestLogin_NonexistentEmail_Returns401_DoesNotLeakExistence(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "real@x.com", "Strong1Password!")
+
+	respWrongPwd, bodyWrongPwd := env.login(t, "real@x.com", "wrong")
+	respNoUser, bodyNoUser := env.login(t, "nonexistent@x.com", "anything-strong-1!")
+
+	if respWrongPwd.StatusCode != respNoUser.StatusCode {
+		t.Errorf("status divergence leaks existence: %d vs %d",
+			respWrongPwd.StatusCode, respNoUser.StatusCode)
+	}
+	if bodyWrongPwd["error"] != bodyNoUser["error"] {
+		t.Errorf("error code divergence leaks existence: %v vs %v",
+			bodyWrongPwd["error"], bodyNoUser["error"])
+	}
+}
+
+func TestLogin_RateLimit_5FailsLocksOut(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "rl@x.com", "Strong1Password!")
+
+	for i := 0; i < 5; i++ {
+		resp, _ := env.login(t, "rl@x.com", "wrong")
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("fail %d: expected 401, got %d", i+1, resp.StatusCode)
+		}
+	}
+	// 6th attempt — even with the right password — must be blocked.
+	resp, body := env.login(t, "rl@x.com", "Strong1Password!")
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("expected 429 after 5 fails, got %d", resp.StatusCode)
+	}
+	if body["error"] != "too_many_attempts" {
+		t.Errorf("expected error=too_many_attempts, got %v", body["error"])
+	}
+}
+
+func TestLogin_SuccessResetsRateLimit(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "ok@x.com", "Strong1Password!")
+
+	// 3 failures then a success.
+	for i := 0; i < 3; i++ {
+		env.login(t, "ok@x.com", "wrong")
+	}
+	if resp, _ := env.login(t, "ok@x.com", "Strong1Password!"); resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected success, got %d", resp.StatusCode)
+	}
+	// The successful login must have cleared the counter, so 5 more
+	// failures should still not lock out (we only hit 8 total, but only
+	// 5 since the reset).
+	for i := 0; i < 4; i++ {
+		resp, _ := env.login(t, "ok@x.com", "wrong")
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("post-success fail %d: expected 401, got %d", i+1, resp.StatusCode)
+		}
+	}
+}
+
+func TestLogin_InvalidJSON_Returns400(t *testing.T) {
+	env := newAuthTestEnv(t)
+	resp, err := http.Post(env.srv.URL+"/v1/auth/login", "application/json", strings.NewReader("{bad"))
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+// ── existing test ────────────────────────────────────────────────────────
+
 func TestSignup_LegacyServerWithoutAuthDeps_ReturnsNotFound(t *testing.T) {
 	// Old constructor path → no auth routes registered → /v1/auth/signup
 	// must not be served by some accidental fallback.

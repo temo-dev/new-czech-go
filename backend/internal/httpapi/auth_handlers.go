@@ -49,6 +49,9 @@ func (d *AuthDeps) applyTo(s *Server) {
 	if s.authVerifyTTL == 0 {
 		s.authVerifyTTL = 24 * time.Hour
 	}
+	if s.loginRL == nil {
+		s.loginRL = newLoginRateLimiter()
+	}
 }
 
 // NewServerWithAuth is the V17 entry point that wires auth dependencies
@@ -67,6 +70,7 @@ func (s *Server) registerAuthRoutes() {
 		return
 	}
 	s.mux.HandleFunc("/v1/auth/signup", s.handleSignup)
+	s.mux.HandleFunc("/v1/auth/login", s.handleAuthLogin)
 }
 
 // ── POST /v1/auth/signup ─────────────────────────────────────────────────
@@ -247,6 +251,110 @@ func hoursOrDefault(d time.Duration, fallback int) int {
 		hrs = fallback
 	}
 	return hrs
+}
+
+// ── POST /v1/auth/login ──────────────────────────────────────────────────
+
+type loginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// handleAuthLogin authenticates a learner. Admin login still happens
+// through the legacy /v1/auth/login route when V17 deps are absent; when
+// V17 is wired, this handler tries the admin path first (delegating to
+// the legacy MemoryStore.Login) and falls back to the UserStore lookup.
+//
+// The handler MUST NOT leak whether the email exists. Wrong-email and
+// wrong-password both return 401 invalid_credentials with no other
+// distinguishing signal (timing differences are minimized by always
+// running bcrypt.Verify, even when the user lookup misses).
+//
+// Spec: docs/specs/self-serve-learner-spec.md §4.2
+func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+
+	var req loginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeAuthError(w, http.StatusBadRequest, "invalid_body", "request body is not valid JSON")
+		return
+	}
+	req.Email = strings.TrimSpace(req.Email)
+
+	if s.loginRL != nil && s.loginRL.IsBlocked(req.Email) {
+		writeAuthError(w, http.StatusTooManyRequests, "too_many_attempts",
+			"too many failed login attempts; try again in 15 minutes")
+		return
+	}
+
+	// Admin path takes precedence so the existing CMS login keeps
+	// working when V17 deps are wired. The legacy MemoryStore.Login
+	// returns the random session token + user.
+	if token, user, ok := s.repo.Login(req.Email, req.Password); ok && user.Role == "admin" {
+		if s.loginRL != nil {
+			s.loginRL.Reset(req.Email)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"user": map[string]any{
+				"id":           user.ID,
+				"email":        user.Email,
+				"role":         user.Role,
+				"display_name": user.DisplayName,
+			},
+			"session_token": token,
+		})
+		return
+	}
+
+	// Learner path. Always run a bcrypt.Verify even on lookup miss to
+	// keep the timing profile flat — running against a fixed sentinel
+	// hash is the standard mitigation. Do NOT short-circuit on miss.
+	const dummyHash = "$2a$12$abcdefghijklmnopqrstuuvxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" // 60-char-ish
+	storedHash := dummyHash
+	var stored contracts.UserAccount
+	var found bool
+	if u, ok := s.userStore.UserAccountByEmail(req.Email); ok {
+		stored = u
+		storedHash = u.PasswordHash
+		found = true
+	}
+
+	if !auth.VerifyPassword(storedHash, req.Password) || !found {
+		if s.loginRL != nil {
+			s.loginRL.RecordFailure(req.Email)
+		}
+		writeAuthError(w, http.StatusUnauthorized, "invalid_credentials", "email or password is incorrect")
+		return
+	}
+
+	sessionTTL := 30 * 24 * time.Hour
+	rawSession, expiresAt, err := s.issueAuthToken(stored.ID, contracts.AuthTokenKindSession, sessionTTL, r)
+	if err != nil {
+		log.Printf("login: issue session: %v", err)
+		writeAuthError(w, http.StatusInternalServerError, "internal", "could not issue session")
+		return
+	}
+
+	if s.loginRL != nil {
+		s.loginRL.Reset(req.Email)
+	}
+
+	writeJSON(w, http.StatusOK, signupResponse{
+		User: signupUser{
+			ID:                stored.ID,
+			Email:             stored.Email,
+			EmailVerified:     stored.IsEmailVerified(),
+			DisplayName:       stored.DisplayName,
+			ProTier:           stored.ProTier,
+			GraceAttemptsLeft: stored.GraceAttemptsLeft,
+		},
+		SessionToken: rawSession,
+		ExpiresAt:    expiresAt,
+	})
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────
