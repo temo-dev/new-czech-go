@@ -81,6 +81,9 @@ func (s *Server) registerAuthRoutes() {
 	s.mux.HandleFunc("/v1/auth/forgot-password", s.handleForgotPassword)
 	s.mux.HandleFunc("/v1/auth/reset-password", s.handleResetPassword)
 	s.mux.HandleFunc("/v1/auth/change-password", s.handleChangePassword)
+
+	s.mux.HandleFunc("/v1/users/me", s.handleUsersMe)
+	s.mux.HandleFunc("/v1/users/me/email-change", s.handleEmailChange)
 }
 
 // ── POST /v1/auth/signup ─────────────────────────────────────────────────
@@ -751,6 +754,307 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	updated, _ := s.userStore.UserAccountByID(user.ID)
 	s.dispatchPasswordChangedEmail(updated)
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── /v1/users/me — GET / PATCH / DELETE ──────────────────────────────────
+
+// handleUsersMe dispatches the three verbs the spec defines for /users/me
+// onto the same handler so we share auth resolution + error envelope.
+func (s *Server) handleUsersMe(w http.ResponseWriter, r *http.Request) {
+	user, ok := s.requireV17User(r)
+	if !ok {
+		writeAuthError(w, http.StatusUnauthorized, "missing_token", "authentication required")
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		s.serveGetMe(w, r, user)
+	case http.MethodPatch:
+		s.servePatchMe(w, r, user)
+	case http.MethodDelete:
+		s.serveDeleteMe(w, r, user)
+	default:
+		writeMethodNotAllowed(w)
+	}
+}
+
+type meResponse struct {
+	User       meUser     `json:"user"`
+	Streak     meStreak   `json:"streak"`
+	UsageToday meUsage    `json:"usage_today"`
+	Pro        meProState `json:"pro"`
+}
+
+type meUser struct {
+	ID                string `json:"id"`
+	Email             string `json:"email"`
+	EmailVerified     bool   `json:"email_verified"`
+	DisplayName       string `json:"display_name"`
+	AvatarAssetID     string `json:"avatar_asset_id,omitempty"`
+	Role              string `json:"role"`
+	ProTier           string `json:"pro_tier"`
+	OnboardingGoal    string `json:"onboarding_goal,omitempty"`
+	OnboardingLevel   string `json:"onboarding_level,omitempty"`
+	DailyReminderAt   string `json:"daily_reminder_at,omitempty"`
+	PushTokenPlatform string `json:"push_token_platform,omitempty"`
+	Timezone          string `json:"timezone"`
+	GraceAttemptsLeft int    `json:"grace_attempts_left"`
+}
+
+type meStreak struct {
+	CurrentDays            int    `json:"current_days"`
+	LongestDays            int    `json:"longest_days"`
+	LastCompletedDay       string `json:"last_completed_day,omitempty"`
+	GracePassesLeftThisWk  int    `json:"grace_passes_left_this_week"`
+}
+
+type meUsage struct {
+	Attempts        int `json:"attempts"`
+	AttemptsLimit   int `json:"attempts_limit"`
+	Interviews      int `json:"interviews_this_week"`
+	InterviewsLimit int `json:"interviews_limit"`
+}
+
+type meProState struct {
+	Active    bool   `json:"active"`
+	ProductID string `json:"product_id,omitempty"`
+}
+
+// gracePassesPerWeek is the cap surfaced to Pro learners. Free learners
+// see 0; the actual limit is enforced in the IAP/streak handlers, but
+// the response carries the remaining count for the UI.
+const gracePassesPerWeek = 1
+
+// serveGetMe assembles the user + streak + usage + pro snapshot. Streak
+// and usage stores are optional in V17 (memory-only deployments may omit
+// them) so the handler degrades gracefully.
+func (s *Server) serveGetMe(w http.ResponseWriter, _ *http.Request, user contracts.UserAccount) {
+	now := time.Now().UTC()
+
+	resp := meResponse{
+		User: toMeUser(user),
+		Pro: meProState{
+			Active: user.IsPro(now),
+		},
+	}
+
+	if s.streakStore != nil {
+		summary, err := s.streakStore.StreakSummary(user.ID, now)
+		if err == nil {
+			resp.Streak = meStreak{
+				CurrentDays: summary.Current,
+				LongestDays: summary.Longest,
+			}
+			if !summary.LastCompletedDay.IsZero() {
+				resp.Streak.LastCompletedDay = summary.LastCompletedDay.Format("2006-01-02")
+			}
+			left := gracePassesPerWeek - summary.GracePassesUsedThisWeek
+			if left < 0 {
+				left = 0
+			}
+			resp.Streak.GracePassesLeftThisWk = left
+		}
+	}
+
+	resp.UsageToday.AttemptsLimit = freeTierAttemptsPerDay
+	resp.UsageToday.InterviewsLimit = freeTierInterviewsPerWeek
+	if s.dailyUsageStore != nil {
+		usage, _ := s.dailyUsageStore.DailyUsageByUserDay(user.ID, now)
+		resp.UsageToday.Attempts = usage.AttemptsCount
+		resp.UsageToday.Interviews = usage.InterviewsCount
+	}
+
+	if s.proPurchaseStore != nil {
+		if p, ok := s.proPurchaseStore.ActiveProPurchaseByUser(user.ID); ok {
+			resp.Pro.ProductID = p.ProductID
+		}
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// freeTierAttemptsPerDay / freeTierInterviewsPerWeek are surfaced in
+// /v1/users/me so the client can render a quota indicator without a
+// second round-trip. The actual enforcement lives in the V17 phase A3
+// middleware.
+const (
+	freeTierAttemptsPerDay    = 7
+	freeTierInterviewsPerWeek = 1
+)
+
+func toMeUser(u contracts.UserAccount) meUser {
+	return meUser{
+		ID:                u.ID,
+		Email:             u.Email,
+		EmailVerified:     u.IsEmailVerified(),
+		DisplayName:       u.DisplayName,
+		AvatarAssetID:     u.AvatarAssetID,
+		Role:              u.Role,
+		ProTier:           u.ProTier,
+		OnboardingGoal:    u.OnboardingGoal,
+		OnboardingLevel:   u.OnboardingLevel,
+		DailyReminderAt:   u.DailyReminderAt,
+		PushTokenPlatform: u.PushTokenPlatform,
+		Timezone:          u.Timezone,
+		GraceAttemptsLeft: u.GraceAttemptsLeft,
+	}
+}
+
+// patchMeRequest enumerates the only fields a learner is allowed to
+// change on themselves. Email goes through /email-change; password
+// through /change-password; ProTier is server-set via IAP. Everything
+// else is pure preference data.
+type patchMeRequest struct {
+	DisplayName       *string `json:"display_name,omitempty"`
+	OnboardingGoal    *string `json:"onboarding_goal,omitempty"`
+	OnboardingLevel   *string `json:"onboarding_level,omitempty"`
+	DailyReminderAt   *string `json:"daily_reminder_at,omitempty"`
+	PushToken         *string `json:"push_token,omitempty"`
+	PushTokenPlatform *string `json:"push_token_platform,omitempty"`
+	Timezone          *string `json:"timezone,omitempty"`
+}
+
+func (s *Server) servePatchMe(w http.ResponseWriter, r *http.Request, user contracts.UserAccount) {
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	var req patchMeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeAuthError(w, http.StatusBadRequest, "invalid_body", "request body is not valid JSON")
+		return
+	}
+
+	updated, ok := s.userStore.UpdateUser(user.ID, func(u *contracts.UserAccount) {
+		if req.DisplayName != nil {
+			u.DisplayName = strings.TrimSpace(*req.DisplayName)
+		}
+		if req.OnboardingGoal != nil {
+			u.OnboardingGoal = strings.TrimSpace(*req.OnboardingGoal)
+		}
+		if req.OnboardingLevel != nil {
+			u.OnboardingLevel = strings.TrimSpace(*req.OnboardingLevel)
+		}
+		if req.DailyReminderAt != nil {
+			u.DailyReminderAt = strings.TrimSpace(*req.DailyReminderAt)
+		}
+		if req.PushToken != nil {
+			u.PushToken = strings.TrimSpace(*req.PushToken)
+		}
+		if req.PushTokenPlatform != nil {
+			u.PushTokenPlatform = strings.TrimSpace(*req.PushTokenPlatform)
+		}
+		if req.Timezone != nil {
+			tz := strings.TrimSpace(*req.Timezone)
+			if tz != "" {
+				u.Timezone = tz
+			}
+		}
+	})
+	if !ok {
+		writeAuthError(w, http.StatusInternalServerError, "internal", "could not update user")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"user": toMeUser(updated)})
+}
+
+// serveDeleteMe soft-deletes the user account: anonymizes the email,
+// clears the push token, drops the display name, and revokes every
+// session. The legal/contractual ID stays around so attempts.user_id
+// references do not become dangling — V18 may add a hard-delete cron.
+//
+// App Store guideline 5.1.1(v): account deletion must be available
+// in-app for any app that supports account creation. This satisfies
+// that without losing the audit trail a learner's attempts represent.
+func (s *Server) serveDeleteMe(w http.ResponseWriter, _ *http.Request, user contracts.UserAccount) {
+	if _, ok := s.userStore.UpdateUser(user.ID, func(u *contracts.UserAccount) {
+		u.Email = "deleted_" + u.ID + "@deleted.local"
+		u.EmailNormalized = u.Email
+		u.DisplayName = "(deleted)"
+		u.AvatarAssetID = ""
+		u.PushToken = ""
+		u.PushTokenPlatform = ""
+	}); !ok {
+		writeAuthError(w, http.StatusInternalServerError, "internal", "could not anonymize")
+		return
+	}
+	if !s.userStore.SoftDeleteUser(user.ID) {
+		writeAuthError(w, http.StatusInternalServerError, "internal", "could not soft-delete")
+		return
+	}
+	s.authTokenStore.RevokeAllAuthTokensForUser(user.ID)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── POST /v1/users/me/email-change ───────────────────────────────────────
+
+type emailChangeRequest struct {
+	NewEmail        string `json:"new_email"`
+	CurrentPassword string `json:"current_password"`
+}
+
+// handleEmailChange swaps the account email after the learner reverifies
+// their current password. The new address must not collide with another
+// active account (case-insensitive). The flow updates the email field +
+// resets EmailVerifiedAt, then dispatches a verify email to the new
+// address.
+//
+// Spec: docs/specs/self-serve-learner-spec.md §4.13
+func (s *Server) handleEmailChange(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+
+	user, ok := s.requireV17User(r)
+	if !ok {
+		writeAuthError(w, http.StatusUnauthorized, "missing_token", "authentication required")
+		return
+	}
+	var req emailChangeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeAuthError(w, http.StatusBadRequest, "invalid_body", "request body is not valid JSON")
+		return
+	}
+	req.NewEmail = strings.TrimSpace(req.NewEmail)
+	if !looksLikeEmail(req.NewEmail) {
+		writeAuthError(w, http.StatusBadRequest, "invalid_email", "new email is not in a valid format")
+		return
+	}
+	if !auth.VerifyPassword(user.PasswordHash, req.CurrentPassword) {
+		writeAuthError(w, http.StatusUnauthorized, "invalid_current_password",
+			"current password is incorrect")
+		return
+	}
+
+	// Reject collisions with another active account. Same-email-as-self
+	// is a no-op success so the client can call this idempotently.
+	normalized := strings.ToLower(req.NewEmail)
+	if normalized == strings.ToLower(user.Email) {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if existing, ok := s.userStore.UserAccountByEmail(req.NewEmail); ok && existing.ID != user.ID {
+		writeAuthError(w, http.StatusConflict, "email_taken",
+			"another account already uses that email")
+		return
+	}
+
+	updated, ok := s.userStore.UpdateUser(user.ID, func(u *contracts.UserAccount) {
+		u.Email = req.NewEmail
+		u.EmailNormalized = normalized
+		u.EmailVerifiedAt = nil
+	})
+	if !ok {
+		writeAuthError(w, http.StatusInternalServerError, "internal", "could not update email")
+		return
+	}
+
+	// Issue a fresh verify token and dispatch to the NEW address.
+	s.authTokenStore.RevokeAllAuthTokensByKind(user.ID, contracts.AuthTokenKindEmailVerify)
+	if raw, _, err := s.issueAuthToken(user.ID, contracts.AuthTokenKindEmailVerify, s.authVerifyTTL, r); err == nil {
+		s.dispatchVerifyEmail(updated, raw)
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }

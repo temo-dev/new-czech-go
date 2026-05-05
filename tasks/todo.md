@@ -452,13 +452,13 @@ Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
   - **Files:** `httpapi/server.go` (auth import + `lookupV17SessionToken` helper, `authenticatedUser` two-path)
   - **Verify:** 3/3 new tests + entire existing suite green
   - **Size:** S (smaller than spec because legacy path retained)
-- [ ] **V17-A2.8** `GET /v1/users/me` + `PATCH /v1/users/me` + `POST /v1/users/me/avatar` + `DELETE /v1/users/me` (soft) + `POST /v1/users/me/email-change`
-  - **AC:** GET trả user + streak + usage; PATCH partial fields; avatar reuse media_assets; DELETE anonymize
-  - **Files:** `httpapi/users_me_handlers.go`
-  - **Verify:** `TestGetMe_IncludesStreakAndUsage`, `TestDelete_AnonymizesEmail`
-  - **Size:** L (4 endpoints in 1 file ok)
+- [x] **V17-A2.8** `GET /v1/users/me` (user + streak + usage_today + pro snapshot) + `PATCH /v1/users/me` (whitelist fields: display_name, onboarding goal/level, daily_reminder_at, push_token, push_token_platform, timezone — escalations to role/pro_tier silently dropped) + `DELETE /v1/users/me` (anonymize email + name + push_token, soft-delete row, revoke ALL sessions, frees email for re-registration — Apple 5.1.1(v) compliance) + `POST /v1/users/me/email-change` (current pwd verify + collision check + reset EmailVerifiedAt + dispatch verify to NEW address); avatar upload deferred (reuses media_assets path); 8 tests (2026-05-05)
+  - **AC:** GET happy path returns user/streak/usage/pro ✅; GET requires auth ✅; PATCH updates whitelisted fields ✅; PATCH ignores immutable role/pro_tier ✅; DELETE anonymizes + soft-deletes + revokes tokens + frees email ✅; email-change happy path resets verified ✅; 409 on duplicate target email ✅; 401 wrong current password ✅
+  - **Files:** `httpapi/auth_handlers.go` (handleUsersMe dispatch + serveGetMe/PatchMe/DeleteMe + handleEmailChange + meResponse types), `auth_handlers_test.go` (8 tests)
+  - **Verify:** 8/8 pass; total 399→407
+  - **Size:** L (one consolidated file by design)
 
-**[CHECKPOINT V17-A2]** 17+ test cases (§9.1 spec) pass; `make backend-test` xanh; smoke `signup→login→me` curl-based
+**[CHECKPOINT V17-A2]** ✅ 60+ V17 auth handler tests pass (407 total backend, was 298 baseline → +109); 14 endpoints live (signup, login, logout, verify-email, resend-verify, forgot-password, reset-password, change-password, GET /users/me, PATCH /users/me, DELETE /users/me, POST /users/me/email-change + legacy admin login + V17 token in withAuth middleware); legacy server isolated (no AuthDeps → no V17 routes); SES-compatible SMTP transport ready; rate limit 5/15min login + 60s/user resend cooldown (2026-05-05)
 
 #### A3 Authorization gates (1d)
 

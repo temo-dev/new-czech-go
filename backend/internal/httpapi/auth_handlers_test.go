@@ -851,6 +851,213 @@ func TestWithAuth_LegacyDevTokenStillWorks(t *testing.T) {
 	}
 }
 
+// ── A2.8 — /v1/users/me ──────────────────────────────────────────────────
+
+func (env *authTestEnv) getMe(t *testing.T, token string) (*http.Response, map[string]any) {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodGet, env.srv.URL+"/v1/users/me", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("get /me: %v", err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	var out map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	return resp, out
+}
+
+func (env *authTestEnv) patchMe(t *testing.T, token string, body any) (*http.Response, map[string]any) {
+	t.Helper()
+	buf, _ := json.Marshal(body)
+	req, _ := http.NewRequest(http.MethodPatch, env.srv.URL+"/v1/users/me", bytes.NewReader(buf))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("patch /me: %v", err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	var out map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	return resp, out
+}
+
+func TestGetMe_HappyPath(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "me@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "me@x.com", "Strong1Password!")
+
+	resp, body := env.getMe(t, tok)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	user := body["user"].(map[string]any)
+	if user["email"] != "me@x.com" {
+		t.Errorf("email: %v", user["email"])
+	}
+	if user["pro_tier"] != "free" {
+		t.Errorf("pro_tier: %v", user["pro_tier"])
+	}
+	if _, ok := body["streak"]; !ok {
+		t.Error("missing streak block")
+	}
+	if _, ok := body["usage_today"]; !ok {
+		t.Error("missing usage_today block")
+	}
+	if _, ok := body["pro"]; !ok {
+		t.Error("missing pro block")
+	}
+}
+
+func TestGetMe_RequiresAuth(t *testing.T) {
+	env := newAuthTestEnv(t)
+	resp, err := http.Get(env.srv.URL + "/v1/users/me")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func TestPatchMe_UpdatesAllowedFields(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "p@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "p@x.com", "Strong1Password!")
+
+	resp, body := env.patchMe(t, tok, map[string]string{
+		"display_name":      "New Name",
+		"onboarding_goal":   "a2_pobyt",
+		"onboarding_level":  "a1",
+		"daily_reminder_at": "20:00",
+		"timezone":          "Asia/Ho_Chi_Minh",
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%v", resp.StatusCode, body)
+	}
+	user := body["user"].(map[string]any)
+	if user["display_name"] != "New Name" {
+		t.Errorf("display_name not updated: %v", user["display_name"])
+	}
+	if user["onboarding_goal"] != "a2_pobyt" {
+		t.Errorf("onboarding_goal: %v", user["onboarding_goal"])
+	}
+}
+
+func TestPatchMe_IgnoresImmutableFields(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "i@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "i@x.com", "Strong1Password!")
+
+	// Try to escalate role via the patch payload — must be silently
+	// ignored because patchMeRequest does not list it.
+	_, body := env.patchMe(t, tok, map[string]string{
+		"role":          "admin",
+		"pro_tier":      "pro",
+		"display_name":  "OK",
+	})
+	user := body["user"].(map[string]any)
+	if user["role"] == "admin" {
+		t.Error("role escalation must be impossible via PATCH /me")
+	}
+	if user["pro_tier"] != "free" {
+		t.Errorf("pro_tier escalation must be impossible, got %v", user["pro_tier"])
+	}
+}
+
+func TestDeleteMe_AnonymizesAndRevokes(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "d@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "d@x.com", "Strong1Password!")
+
+	req, _ := http.NewRequest(http.MethodDelete, env.srv.URL+"/v1/users/me", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", resp.StatusCode)
+	}
+
+	// Email is anonymized + soft-deleted -> cannot be looked up.
+	if _, ok := env.users.UserAccountByEmail("d@x.com"); ok {
+		t.Error("email lookup must miss after delete")
+	}
+	// Token revoked -> /me is 401.
+	resp2, _ := env.getMe(t, tok)
+	if resp2.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401 after delete, got %d", resp2.StatusCode)
+	}
+	// Email is freed for re-registration.
+	if r, _ := env.signup(t, map[string]string{
+		"email": "d@x.com", "password": "Strong1Password!", "display_name": "X",
+	}); r.StatusCode != http.StatusOK {
+		t.Errorf("expected re-signup 200, got %d", r.StatusCode)
+	}
+}
+
+func TestEmailChange_HappyPath(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "old@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "old@x.com", "Strong1Password!")
+
+	resp, _ := env.postJSONWithAuth(t, "/v1/users/me/email-change", tok, map[string]string{
+		"new_email":        "new@x.com",
+		"current_password": "Strong1Password!",
+	})
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", resp.StatusCode)
+	}
+
+	// Lookup by old email must miss; new email must hit and be unverified.
+	if _, ok := env.users.UserAccountByEmail("old@x.com"); ok {
+		t.Error("old email still findable")
+	}
+	updated, ok := env.users.UserAccountByEmail("new@x.com")
+	if !ok {
+		t.Fatal("new email missing")
+	}
+	if updated.IsEmailVerified() {
+		t.Error("changing email must reset verified status")
+	}
+}
+
+func TestEmailChange_DuplicateEmail_409(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "a@x.com", "Strong1Password!")
+	env.preSignup(t, "b@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "a@x.com", "Strong1Password!")
+
+	resp, body := env.postJSONWithAuth(t, "/v1/users/me/email-change", tok, map[string]string{
+		"new_email":        "b@x.com",
+		"current_password": "Strong1Password!",
+	})
+	if resp.StatusCode != http.StatusConflict {
+		t.Errorf("expected 409, got %d", resp.StatusCode)
+	}
+	if body["error"] != "email_taken" {
+		t.Errorf("expected error=email_taken, got %v", body["error"])
+	}
+}
+
+func TestEmailChange_WrongPassword_401(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "ec@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "ec@x.com", "Strong1Password!")
+
+	resp, _ := env.postJSONWithAuth(t, "/v1/users/me/email-change", tok, map[string]string{
+		"new_email":        "new@x.com",
+		"current_password": "wrong",
+	})
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
 // ── existing test ────────────────────────────────────────────────────────
 
 func TestSignup_LegacyServerWithoutAuthDeps_ReturnsNotFound(t *testing.T) {
