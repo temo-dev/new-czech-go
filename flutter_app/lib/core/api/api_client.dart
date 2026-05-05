@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../auth/auth_models.dart';
 import '../voice/voice_option.dart';
 
 const _kDefaultBaseUrl = String.fromEnvironment(
@@ -186,6 +187,182 @@ class ApiClient {
     final t = _token;
     if (t == null) return const {};
     return {'Authorization': 'Bearer $t'};
+  }
+
+  /// Inject a token issued out-of-band (e.g. AuthService bootstrap from
+  /// SharedPreferences). The legacy [login] method still owns the
+  /// learner@example.com/demo123 dev path; this hook is what V17 uses.
+  void setAuthToken(String? token) {
+    _token = token;
+  }
+
+  /// The currently-attached bearer token. Returned for tests + the
+  /// AuthService snapshotting flow; do NOT log this value.
+  String? get currentToken => _token;
+
+  // ── V17 self-serve learner endpoints ───────────────────────────────────
+
+  Future<AuthSession> signupV17({
+    required String email,
+    required String password,
+    required String displayName,
+  }) async {
+    final payload = await _v17Request(
+      method: 'POST',
+      path: '/v1/auth/signup',
+      body: {
+        'email': email,
+        'password': password,
+        'display_name': displayName,
+      },
+    );
+    final session = AuthSession.fromJson(payload);
+    _token = session.token;
+    return session;
+  }
+
+  Future<AuthSession> loginV17({
+    required String email,
+    required String password,
+  }) async {
+    final payload = await _v17Request(
+      method: 'POST',
+      path: '/v1/auth/login',
+      body: {'email': email, 'password': password},
+    );
+    final session = AuthSession.fromJson(payload);
+    _token = session.token;
+    return session;
+  }
+
+  Future<void> logoutV17() async {
+    if (_token == null) return;
+    try {
+      await _v17Request(method: 'POST', path: '/v1/auth/logout', authed: true);
+    } finally {
+      _token = null;
+    }
+  }
+
+  Future<AuthUser> getMeV17() async {
+    final payload = await _v17Request(
+      method: 'GET',
+      path: '/v1/users/me',
+      authed: true,
+    );
+    return AuthUser.fromJson(payload['user'] as Map<String, dynamic>);
+  }
+
+  Future<AuthUser> patchMeV17(Map<String, dynamic> updates) async {
+    final payload = await _v17Request(
+      method: 'PATCH',
+      path: '/v1/users/me',
+      authed: true,
+      body: updates,
+    );
+    return AuthUser.fromJson(payload['user'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteMeV17() async {
+    await _v17Request(method: 'DELETE', path: '/v1/users/me', authed: true);
+    _token = null;
+  }
+
+  Future<void> resendVerifyV17() => _v17Request(
+        method: 'POST',
+        path: '/v1/auth/resend-verify',
+        authed: true,
+      );
+
+  Future<void> forgotPasswordV17(String email) => _v17Request(
+        method: 'POST',
+        path: '/v1/auth/forgot-password',
+        body: {'email': email},
+      );
+
+  Future<void> resetPasswordV17({
+    required String token,
+    required String newPassword,
+  }) =>
+      _v17Request(
+        method: 'POST',
+        path: '/v1/auth/reset-password',
+        body: {'token': token, 'new_password': newPassword},
+      );
+
+  Future<void> changePasswordV17({
+    required String currentPassword,
+    required String newPassword,
+  }) =>
+      _v17Request(
+        method: 'POST',
+        path: '/v1/auth/change-password',
+        authed: true,
+        body: {
+          'current_password': currentPassword,
+          'new_password': newPassword,
+        },
+      );
+
+  Future<void> changeEmailV17({
+    required String newEmail,
+    required String currentPassword,
+  }) =>
+      _v17Request(
+        method: 'POST',
+        path: '/v1/users/me/email-change',
+        authed: true,
+        body: {
+          'new_email': newEmail,
+          'current_password': currentPassword,
+        },
+      );
+
+  /// V17 endpoints use a flat error envelope `{ error: code, message: text }`
+  /// rather than the legacy `{ error: { message: text } }`. _v17Request
+  /// translates non-2xx responses into [AuthException] so handlers can
+  /// switch on the [AuthException.code].
+  Future<Map<String, dynamic>> _v17Request({
+    required String method,
+    required String path,
+    Map<String, dynamic>? body,
+    bool authed = false,
+  }) async {
+    final headers = <String, String>{};
+    if (authed) {
+      final t = _token;
+      if (t == null) {
+        throw AuthException(statusCode: 401, code: 'missing_token', message: 'Not authenticated.');
+      }
+      headers['Authorization'] = 'Bearer $t';
+    }
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse('$baseUrl$path');
+      final request = await client.openUrl(method, uri);
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json; charset=utf-8');
+      headers.forEach(request.headers.set);
+      if (body != null) {
+        request.write(jsonEncode(body));
+      }
+      final response = await request.close();
+      final text = await response.transform(utf8.decoder).join();
+      Map<String, dynamic> payload = const {};
+      if (text.isNotEmpty) {
+        final decoded = jsonDecode(text);
+        if (decoded is Map<String, dynamic>) payload = decoded;
+      }
+      if (response.statusCode >= 400) {
+        throw AuthException(
+          statusCode: response.statusCode,
+          code: payload['error'] as String? ?? 'http_${response.statusCode}',
+          message: payload['message'] as String? ?? 'Request failed.',
+        );
+      }
+      return payload;
+    } finally {
+      client.close(force: false);
+    }
   }
 
   /// Submit written text for psani_1_formular or psani_2_email.
