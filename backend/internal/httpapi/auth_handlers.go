@@ -321,21 +321,30 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Admin path takes precedence so the existing CMS login keeps
+	// Legacy path takes precedence so the existing CMS admin login + the
+	// dev-fixture learner credentials (learner@example.com/demo123) keep
 	// working when V17 deps are wired. The legacy MemoryStore.Login
-	// returns the random session token + user.
-	if token, user, ok := s.repo.Login(req.Email, req.Password); ok && user.Role == "admin" {
+	// returns the random session token + user; we emit both the V17
+	// shape (`session_token`) AND the legacy shape (`data.access_token`)
+	// so existing smoke scripts that read `data.access_token` keep
+	// passing without code changes.
+	if token, user, ok := s.repo.Login(req.Email, req.Password); ok {
 		if s.loginRL != nil {
 			s.loginRL.Reset(req.Email)
 		}
+		userBlock := map[string]any{
+			"id":           user.ID,
+			"email":        user.Email,
+			"role":         user.Role,
+			"display_name": user.DisplayName,
+		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"user": map[string]any{
-				"id":           user.ID,
-				"email":        user.Email,
-				"role":         user.Role,
-				"display_name": user.DisplayName,
-			},
+			"user":          userBlock,
 			"session_token": token,
+			"data": map[string]any{
+				"access_token": token,
+				"user":         userBlock,
+			},
 		})
 		return
 	}
