@@ -41,6 +41,10 @@ func newMemoryProPurchaseStore() ProPurchaseStore {
 	return &memoryProPurchaseStore{purchases: map[string]*contracts.ProPurchase{}}
 }
 
+// NewMemoryProPurchaseStore returns a fresh in-memory store. Exported for
+// dev/test wiring outside this package.
+func NewMemoryProPurchaseStore() ProPurchaseStore { return newMemoryProPurchaseStore() }
+
 func (s *memoryProPurchaseStore) CreateProPurchase(p contracts.ProPurchase) (contracts.ProPurchase, error) {
 	if p.UserID == "" {
 		return contracts.ProPurchase{}, errors.New("user_id required")

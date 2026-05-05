@@ -29,6 +29,7 @@ type AuthDeps struct {
 	ProPurchases  store.ProPurchaseStore
 	DailyUsage    store.DailyUsageStore
 	EmailSender   email.Sender
+	AppleVerifier AppleVerifier
 	BaseURL       string        // public origin used to build email links, e.g. https://api.czechgo.hadoo.eu
 	VerifyTTL     time.Duration // 0 -> 24h default
 	SessionTTL    time.Duration // 0 -> 30*24h default
@@ -45,6 +46,7 @@ func (d *AuthDeps) applyTo(s *Server) {
 	s.proPurchaseStore = d.ProPurchases
 	s.dailyUsageStore = d.DailyUsage
 	s.emailSender = d.EmailSender
+	s.appleVerifier = d.AppleVerifier
 	s.authBaseURL = strings.TrimRight(d.BaseURL, "/")
 	s.authVerifyTTL = d.VerifyTTL
 	if s.authVerifyTTL == 0 {
@@ -56,6 +58,7 @@ func (d *AuthDeps) applyTo(s *Server) {
 	if s.resendCooldown == nil {
 		s.resendCooldown = newResendCooldownTracker()
 	}
+	s.ensureIAPDefaults()
 }
 
 // NewServerWithAuth is the V17 entry point that wires auth dependencies
@@ -84,6 +87,8 @@ func (s *Server) registerAuthRoutes() {
 
 	s.mux.HandleFunc("/v1/users/me", s.handleUsersMe)
 	s.mux.HandleFunc("/v1/users/me/email-change", s.handleEmailChange)
+
+	s.registerIAPRoutes()
 }
 
 // ── POST /v1/auth/signup ─────────────────────────────────────────────────

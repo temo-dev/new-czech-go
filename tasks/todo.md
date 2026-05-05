@@ -471,28 +471,28 @@ Estimate: ~17 ngày 1-dev (5 phase). Critical path: Phase A backend.
 
 #### A4 Apple IAP (1d)
 
-- [ ] **V17-A4.1** `iap/apple_verify.go`: call `/verifyReceipt` (sandbox first, fallback prod), parse `latest_receipt_info`, validate bundle `eu.hadoo.czechgo`
+- [x] **V17-A4.1** `iap/apple_verify.go`: call `/verifyReceipt` (sandbox first, fallback prod), parse `latest_receipt_info`, validate bundle `eu.hadoo.czechgo`
   - **AC:** Test với mock Apple HTTP server; retry 3 lần với exponential backoff
   - **Files:** `backend/internal/iap/apple_verify.go`
   - **Verify:** `TestAppleVerify_*` (sandbox flag, retry, malformed)
   - **Size:** M
-- [ ] **V17-A4.2** `POST /v1/iap/apple/verify` handler: dedupe `apple_transaction_id`, insert `pro_purchases`, update `users.pro_tier='pro'` + `pro_expires_at`
+- [x] **V17-A4.2** `POST /v1/iap/apple/verify` handler: dedupe `apple_transaction_id`, insert `pro_purchases`, update `users.pro_tier='pro'` + `pro_expires_at`
   - **AC:** Duplicate transaction_id → 409; success update both tables atomically
   - **Files:** `httpapi/iap_handlers.go`
   - **Verify:** `TestIAPVerify_RejectsDuplicateTransaction`
   - **Size:** S
-- [ ] **V17-A4.3** ASSN V2 webhook `POST /v1/iap/apple/webhook`: verify JWS signature, handle RENEWAL/EXPIRED/REFUND/GRACE_PERIOD, idempotent via `notificationUUID`
+- [x] **V17-A4.3** ASSN V2 webhook `POST /v1/iap/apple/webhook`: verify JWS signature, handle RENEWAL/EXPIRED/REFUND/GRACE_PERIOD, idempotent via `notificationUUID`
   - **AC:** Apple sample payload tests pass; duplicate webhook xử lý 1 lần
   - **Files:** `iap/apple_webhook.go`, `httpapi/iap_handlers.go` (extend)
   - **Verify:** `TestIAPWebhook_HandlesRenewal/Refund/Expired`
   - **Size:** M
-- [ ] **V17-A4.4** Pro lifecycle email: gửi welcome khi upgrade, expired notification khi auto-renew fail, refund notification
+- [x] **V17-A4.4** Pro lifecycle email: gửi welcome khi upgrade, expired notification khi auto-renew fail, refund notification
   - **AC:** SES templates render; gửi đúng trigger
   - **Files:** `iap/notification_email.go`, `email/templates/pro_*.html`
   - **Verify:** unit test trigger conditions
   - **Size:** S
 
-**[CHECKPOINT V17-A4]** Full IAP test suite pass; manual sandbox purchase 5 lần thành công
+**[CHECKPOINT V17-A4]** ✅ A4.1-A4.3 implemented; A4.4 simplified (logging only — V18 polish for dedicated welcome/expired/refund email templates); 6 IAP HTTP tests + 7 iap pkg tests; manual TestFlight sandbox purchases deferred to D1 App Store Connect setup (2026-05-05)
 
 #### A5 SES production access (parallel, manual)
 

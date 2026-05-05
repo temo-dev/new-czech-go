@@ -48,6 +48,8 @@ type Server struct {
 	authVerifyTTL    time.Duration
 	loginRL          *loginRateLimiter
 	resendCooldown   *resendCooldownTracker
+	appleVerifier    AppleVerifier
+	webhookSeen      *webhookDedupe
 
 	voiceRegistry      *processing.VoiceRegistry
 	elevenLabsAPIKey   string // for interview session token creation

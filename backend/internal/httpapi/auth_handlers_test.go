@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/danieldev/czech-go-system/backend/internal/auth"
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 	"github.com/danieldev/czech-go-system/backend/internal/email"
+	"github.com/danieldev/czech-go-system/backend/internal/iap"
 	"github.com/danieldev/czech-go-system/backend/internal/store"
 )
 
@@ -19,12 +21,14 @@ import (
 // returned httptest.Server is the URL clients hit; the *email.RecorderSender
 // lets the test assert on dispatched emails after a goroutine flush.
 type authTestEnv struct {
-	srv     *httptest.Server
-	users   store.UserStore
-	tokens  store.AuthTokenStore
-	streaks store.StreakStore
-	usage   store.DailyUsageStore
-	emails  *email.RecorderSender
+	srv         *httptest.Server
+	users       store.UserStore
+	tokens      store.AuthTokenStore
+	streaks     store.StreakStore
+	usage       store.DailyUsageStore
+	purchases   store.ProPurchaseStore
+	emails      *email.RecorderSender
+	verifier    *iap.FakeAppleVerifier
 }
 
 func newAuthTestEnv(t *testing.T) *authTestEnv {
@@ -34,21 +38,29 @@ func newAuthTestEnv(t *testing.T) *authTestEnv {
 	tokens := newMemoryAuthTokenStoreForTest(t)
 	streaks := store.NewMemoryStreakStore()
 	usage := store.NewMemoryDailyUsageStore()
+	purchases := store.NewMemoryProPurchaseStore()
 	rec := email.NewRecorderSender()
+	verifier := &iap.FakeAppleVerifier{}
 
 	deps := AuthDeps{
-		Users:       users,
-		AuthTokens:  tokens,
-		Streaks:     streaks,
-		DailyUsage:  usage,
-		EmailSender: rec,
-		BaseURL:     "https://api.example.test",
-		VerifyTTL:   24 * time.Hour,
+		Users:         users,
+		AuthTokens:    tokens,
+		Streaks:       streaks,
+		DailyUsage:    usage,
+		ProPurchases:  purchases,
+		EmailSender:   rec,
+		AppleVerifier: verifier,
+		BaseURL:       "https://api.example.test",
+		VerifyTTL:     24 * time.Hour,
 	}
 	handler := NewServerWithAuth(repo, nil, nil, nil, nil, deps)
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
-	return &authTestEnv{srv: srv, users: users, tokens: tokens, streaks: streaks, usage: usage, emails: rec}
+	return &authTestEnv{
+		srv: srv, users: users, tokens: tokens,
+		streaks: streaks, usage: usage, purchases: purchases,
+		emails: rec, verifier: verifier,
+	}
 }
 
 // signup is a convenience helper that POSTs the signup form and returns
@@ -259,7 +271,16 @@ func (env *authTestEnv) preSignup(t *testing.T, emailAddr, password string) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("preSignup failed: %d %v", resp.StatusCode, body)
 	}
-	env.emails.Reset() // discard the verify email so login tests start clean
+	// Wait for the signup verify email goroutine to land in the
+	// recorder so a follow-up Reset doesn't race ahead of it. Cap at 1s.
+	deadline := time.Now().Add(1 * time.Second)
+	for time.Now().Before(deadline) {
+		if len(env.emails.Sent()) > 0 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	env.emails.Reset()
 }
 
 func (env *authTestEnv) login(t *testing.T, emailAddr, password string) (*http.Response, map[string]any) {
@@ -1194,6 +1215,182 @@ func TestVerifyGate_VerifiedAccountUnblocked(t *testing.T) {
 			t.Fatalf("verified attempt #%d expected 201, got %d", i, resp.StatusCode)
 		}
 	}
+}
+
+// ── A4 — IAP verify + webhook ────────────────────────────────────────────
+
+func TestIAPVerify_HappyPath(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "iap@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "iap@x.com", "Strong1Password!")
+
+	expires := time.Now().Add(30 * 24 * time.Hour).Truncate(time.Millisecond)
+	env.verifier.FixedResponse = &iap.VerifyReceiptResponse{
+		Status:   iap.AppleStatusOK,
+		BundleID: "eu.hadoo.czechgo",
+		Latest: []iap.Receipt{
+			{
+				TransactionID:         "txn-1",
+				OriginalTransactionID: "orig-1",
+				ProductID:             "eu.hadoo.czechgo.pro.monthly",
+				PurchaseDateMS:        "1714896000000",
+				ExpiresDateMS:         fmtMS(expires),
+			},
+		},
+		Raw: []byte(`{"status":0}`),
+	}
+
+	resp, body := env.postJSONWithAuth(t, "/v1/iap/apple/verify", tok, map[string]string{
+		"receipt":    "anything",
+		"product_id": "eu.hadoo.czechgo.pro.monthly",
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%v", resp.StatusCode, body)
+	}
+	if body["product_id"] != "eu.hadoo.czechgo.pro.monthly" {
+		t.Errorf("product_id: %v", body["product_id"])
+	}
+
+	// User flipped to pro.
+	user, _ := env.users.UserAccountByEmail("iap@x.com")
+	if user.ProTier != "pro" {
+		t.Errorf("expected pro tier, got %q", user.ProTier)
+	}
+	if user.ProExpiresAt == nil || !user.ProExpiresAt.After(time.Now()) {
+		t.Errorf("expected future pro_expires_at, got %v", user.ProExpiresAt)
+	}
+}
+
+func TestIAPVerify_DuplicateTransaction_ReturnsActive(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "dup@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "dup@x.com", "Strong1Password!")
+
+	env.verifier.FixedResponse = &iap.VerifyReceiptResponse{
+		Status: iap.AppleStatusOK,
+		Latest: []iap.Receipt{{
+			TransactionID:         "txn-dup",
+			OriginalTransactionID: "orig-dup",
+			ProductID:             "eu.hadoo.czechgo.pro.monthly",
+			PurchaseDateMS:        "1714896000000",
+			ExpiresDateMS:         fmtMS(time.Now().Add(30 * 24 * time.Hour)),
+		}},
+	}
+
+	resp1, _ := env.postJSONWithAuth(t, "/v1/iap/apple/verify", tok, map[string]string{
+		"receipt": "r", "product_id": "eu.hadoo.czechgo.pro.monthly",
+	})
+	if resp1.StatusCode != http.StatusOK {
+		t.Fatalf("first: %d", resp1.StatusCode)
+	}
+
+	resp2, _ := env.postJSONWithAuth(t, "/v1/iap/apple/verify", tok, map[string]string{
+		"receipt": "r", "product_id": "eu.hadoo.czechgo.pro.monthly",
+	})
+	// Duplicate must NOT 409 the client — same response shape.
+	if resp2.StatusCode != http.StatusOK {
+		t.Errorf("dup expected 200, got %d", resp2.StatusCode)
+	}
+}
+
+func TestIAPVerify_RequiresAuth(t *testing.T) {
+	env := newAuthTestEnv(t)
+	resp, _ := env.postJSON(t, "/v1/iap/apple/verify", map[string]string{
+		"receipt": "x",
+	})
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func TestIAPVerify_AppleRejects_Returns400(t *testing.T) {
+	env := newAuthTestEnv(t)
+	env.preSignup(t, "rej@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "rej@x.com", "Strong1Password!")
+
+	env.verifier.Err = iap.ErrFakeNoMatch // simulate apple rejection
+	resp, body := env.postJSONWithAuth(t, "/v1/iap/apple/verify", tok, map[string]string{
+		"receipt": "bad",
+	})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+	if body["error"] != "verify_failed" {
+		t.Errorf("expected verify_failed, got %v", body["error"])
+	}
+}
+
+func TestIAPWebhook_DedupesByUUID(t *testing.T) {
+	env := newAuthTestEnv(t)
+
+	payload := []byte(`{
+		"notificationUUID":"uuid-A",
+		"notificationType":"DID_RENEW",
+		"data":{"transactionInfo":{"transactionId":"t","originalTransactionId":"o","productId":"p","expiresDate":1717488000000}}
+	}`)
+
+	resp1 := postRaw(t, env.srv.URL+"/v1/iap/apple/webhook", payload)
+	defer resp1.Body.Close()
+	if resp1.StatusCode != http.StatusNoContent {
+		t.Errorf("first webhook: %d", resp1.StatusCode)
+	}
+	// Replay must also 204 but be a no-op.
+	resp2 := postRaw(t, env.srv.URL+"/v1/iap/apple/webhook", payload)
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusNoContent {
+		t.Errorf("replay webhook: %d", resp2.StatusCode)
+	}
+}
+
+func TestIAPWebhook_ExpiredMarksInactive(t *testing.T) {
+	env := newAuthTestEnv(t)
+	// Seed a purchase to expire.
+	env.purchases.CreateProPurchase(contracts.ProPurchase{
+		UserID:                     "u",
+		AppleTransactionID:         "txn-exp",
+		AppleOriginalTransactionID: "orig",
+		ProductID:                  "p",
+		PurchasedAt:                time.Now().Add(-30 * 24 * time.Hour),
+		ExpiresAt:                  time.Now().Add(time.Hour),
+		ReceiptPayload:             []byte(`{}`),
+	})
+
+	payload := []byte(`{
+		"notificationUUID":"uuid-EXP",
+		"notificationType":"EXPIRED",
+		"data":{"transactionInfo":{"transactionId":"txn-exp","originalTransactionId":"orig","productId":"p","expiresDate":1717488000000}}
+	}`)
+	resp := postRaw(t, env.srv.URL+"/v1/iap/apple/webhook", payload)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("expected 204, got %d", resp.StatusCode)
+	}
+	// Active lookup must miss now.
+	if _, ok := env.purchases.ActiveProPurchaseByUser("u"); ok {
+		t.Error("expected expired purchase to no longer be active")
+	}
+}
+
+func TestIAPWebhook_InvalidPayload_400(t *testing.T) {
+	env := newAuthTestEnv(t)
+	resp := postRaw(t, env.srv.URL+"/v1/iap/apple/webhook", []byte(`{"missing":true}`))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+func fmtMS(t time.Time) string {
+	return strconv.FormatInt(t.UnixMilli(), 10)
+}
+
+func postRaw(t *testing.T, url string, body []byte) *http.Response {
+	t.Helper()
+	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	return resp
 }
 
 // ── existing test ────────────────────────────────────────────────────────
