@@ -63,6 +63,20 @@ services:
       REPLICATE_API_KEY: ${REPLICATE_API_KEY:-}
       AUDIO_SIGN_SECRET: ${AUDIO_SIGN_SECRET:-}
       LOCAL_ASSETS_DIR: /tmp/czech-go-system-assets
+      # V17 self-serve learner — opt-in. Backend reads USE_V17_AUTH +
+      # DATABASE_URL (already set above). Other vars enable optional
+      # subsystems (email, IAP, webhook signing).
+      USE_V17_AUTH: ${USE_V17_AUTH:-false}
+      V17_BASE_URL: ${V17_BASE_URL:-http://localhost:8080}
+      EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST:-}
+      EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-587}
+      EMAIL_SMTP_USERNAME: ${EMAIL_SMTP_USERNAME:-}
+      EMAIL_SMTP_PASSWORD: ${EMAIL_SMTP_PASSWORD:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Czech Go}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@czechgo.hadoo.eu}
+      APPLE_SHARED_SECRET: ${APPLE_SHARED_SECRET:-}
+      APPLE_BUNDLE_ID: ${APPLE_BUNDLE_ID:-eu.hadoo.czechgo}
+      IAP_WEBHOOK_SECRET: ${IAP_WEBHOOK_SECRET:-}
     volumes:
       - ${HOME}/.aws:/root/.aws:ro
       - backend_assets:/tmp/czech-go-system-assets
