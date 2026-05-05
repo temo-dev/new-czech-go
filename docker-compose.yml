@@ -60,6 +60,10 @@ services:
       LLM_PROVIDER: ${LLM_PROVIDER:-dev}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-}
+      # V18.1 dictation OCR (Claude Vision). Falls back to NoopOCR (empty
+      # text returned) when LLM_OCR_PROVIDER is unset.
+      LLM_OCR_PROVIDER: ${LLM_OCR_PROVIDER:-}
+      LLM_OCR_MODEL: ${LLM_OCR_MODEL:-}
       REPLICATE_API_KEY: ${REPLICATE_API_KEY:-}
       AUDIO_SIGN_SECRET: ${AUDIO_SIGN_SECRET:-}
       LOCAL_ASSETS_DIR: /tmp/czech-go-system-assets
