@@ -21,7 +21,7 @@ SMOKE_AUDIO_FILE ?=
 	compose-proxy-up compose-proxy-down compose-proxy-logs compose-ec2-config \
 	compose-ec2-pull compose-ec2-up compose-ec2-down compose-ec2-logs release-images ecr-login check-ec2-env \
 	check-ec2-host check-aws-audio-pipeline package-ec2-deploy smoke-attempt-flow \
-	smoke-course-flow smoke-exam-flow smoke-all \
+	smoke-course-flow smoke-exam-flow smoke-v17-auth smoke-all \
 	seed-modelovy-test-2 graph-status verify clean
 
 help:
@@ -69,7 +69,8 @@ help:
 	@echo "                            Add --require-real-transcript in SMOKE_ATTEMPT_ARGS to fail when the backend still returns synthetic transcript data"
 	@echo "  make smoke-course-flow  - Smoke test course browsing: login → courses → modules → skills → exercises"
 	@echo "  make smoke-exam-flow    - Smoke test mock exam session: create → submit all sections → complete → verify score"
-	@echo "  make smoke-all          - Run all three smoke tests in sequence"
+	@echo "  make smoke-v17-auth     - Smoke test V17 self-serve auth: signup/login/me/logout. Backend must run with USE_V17_AUTH=true"
+	@echo "  make smoke-all          - Run all four smoke tests in sequence"
 	@echo "  make graph-status     - Show whether the local code-review graph database exists"
 	@echo "  make verify           - Run backend build, CMS lint/build, Flutter analyze/test"
 
@@ -111,12 +112,14 @@ flutter-test:
 flutter-run-ios:
 	cd $(FLUTTER_DIR) && $(RTK) $(FLUTTER) run -d "$(IOS_DEVICE)" \
 		--dart-define=API_BASE_URL=$(API_BASE_URL) \
+		--dart-define=USE_V17_AUTH=$(USE_V17_AUTH) \
 		--dart-define=SIMLI_API_KEY=$(SIMLI_API_KEY) \
 		--dart-define=SIMLI_FACE_ID=$(SIMLI_FACE_ID)
 
 flutter-build-ipa:
 	cd $(FLUTTER_DIR) && $(RTK) $(FLUTTER) build ipa \
 		--dart-define=API_BASE_URL=https://apicz.hadoo.eu \
+		--dart-define=USE_V17_AUTH=$(USE_V17_AUTH) \
 		--dart-define=SIMLI_API_KEY=$(SIMLI_API_KEY) \
 		--dart-define=SIMLI_FACE_ID=$(SIMLI_FACE_ID) \
 		--release
@@ -226,7 +229,10 @@ smoke-course-flow:
 smoke-exam-flow:
 	$(RTK) python3 scripts/smoke_exam_flow.py --base-url $(SMOKE_BASE_URL) $(if $(SMOKE_AUDIO_FILE),--audio-file $(SMOKE_AUDIO_FILE),)
 
-smoke-all: smoke-attempt-flow smoke-course-flow smoke-exam-flow
+smoke-v17-auth:
+	$(RTK) python3 scripts/smoke_v17_auth.py --base-url $(SMOKE_BASE_URL)
+
+smoke-all: smoke-attempt-flow smoke-course-flow smoke-exam-flow smoke-v17-auth
 
 seed-modelovy-test-2:
 	$(RTK) python3 scripts/seed-modelovy-test-2.py
