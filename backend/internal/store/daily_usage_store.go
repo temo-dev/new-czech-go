@@ -36,6 +36,10 @@ func newMemoryDailyUsageStore() DailyUsageStore {
 	return &memoryDailyUsageStore{buckets: map[string]map[time.Time]*contracts.DailyUsage{}}
 }
 
+// NewMemoryDailyUsageStore returns a fresh in-memory DailyUsageStore.
+// Exported for dev/test wiring outside this package.
+func NewMemoryDailyUsageStore() DailyUsageStore { return newMemoryDailyUsageStore() }
+
 func (s *memoryDailyUsageStore) row(userID string, day time.Time) *contracts.DailyUsage {
 	canonical := vnCivilDay(day)
 	bucket, ok := s.buckets[userID]

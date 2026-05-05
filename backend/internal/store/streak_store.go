@@ -56,6 +56,10 @@ func newMemoryStreakStore() StreakStore {
 	return &memoryStreakStore{days: map[string]map[time.Time]*contracts.StreakDay{}}
 }
 
+// NewMemoryStreakStore returns a fresh in-memory StreakStore. Exported
+// for dev/test wiring outside this package.
+func NewMemoryStreakStore() StreakStore { return newMemoryStreakStore() }
+
 func (s *memoryStreakStore) upsert(userID string, day time.Time, mutate func(*contracts.StreakDay)) {
 	canonical := vnCivilDay(day)
 	s.mu.Lock()

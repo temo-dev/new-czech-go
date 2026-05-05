@@ -19,10 +19,12 @@ import (
 // returned httptest.Server is the URL clients hit; the *email.RecorderSender
 // lets the test assert on dispatched emails after a goroutine flush.
 type authTestEnv struct {
-	srv      *httptest.Server
-	users    store.UserStore
-	tokens   store.AuthTokenStore
-	emails   *email.RecorderSender
+	srv     *httptest.Server
+	users   store.UserStore
+	tokens  store.AuthTokenStore
+	streaks store.StreakStore
+	usage   store.DailyUsageStore
+	emails  *email.RecorderSender
 }
 
 func newAuthTestEnv(t *testing.T) *authTestEnv {
@@ -30,11 +32,15 @@ func newAuthTestEnv(t *testing.T) *authTestEnv {
 	repo := store.NewMemoryStore()
 	users := newMemoryUserStoreForTest(t)
 	tokens := newMemoryAuthTokenStoreForTest(t)
+	streaks := store.NewMemoryStreakStore()
+	usage := store.NewMemoryDailyUsageStore()
 	rec := email.NewRecorderSender()
 
 	deps := AuthDeps{
 		Users:       users,
 		AuthTokens:  tokens,
+		Streaks:     streaks,
+		DailyUsage:  usage,
 		EmailSender: rec,
 		BaseURL:     "https://api.example.test",
 		VerifyTTL:   24 * time.Hour,
@@ -42,7 +48,7 @@ func newAuthTestEnv(t *testing.T) *authTestEnv {
 	handler := NewServerWithAuth(repo, nil, nil, nil, nil, deps)
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
-	return &authTestEnv{srv: srv, users: users, tokens: tokens, emails: rec}
+	return &authTestEnv{srv: srv, users: users, tokens: tokens, streaks: streaks, usage: usage, emails: rec}
 }
 
 // signup is a convenience helper that POSTs the signup form and returns
@@ -1055,6 +1061,138 @@ func TestEmailChange_WrongPassword_401(t *testing.T) {
 	})
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+// ── A3 — authorization gates ─────────────────────────────────────────────
+
+// firstSeededExerciseID returns the id of an exercise the legacy seed
+// stocks the MemoryStore with, so the attempt-creation tests have a
+// real exercise to point at.
+func firstSeededExerciseID(t *testing.T) string {
+	t.Helper()
+	repo := store.NewMemoryStore()
+	exs := repo.ListExercises("")
+	if len(exs) == 0 {
+		t.Fatal("no seeded exercises found")
+	}
+	return exs[0].ID
+}
+
+func (env *authTestEnv) postAttempt(t *testing.T, token, exerciseID string) *http.Response {
+	t.Helper()
+	body := map[string]string{
+		"exercise_id":     exerciseID,
+		"client_platform": "ios",
+		"locale":          "vi",
+	}
+	buf, _ := json.Marshal(body)
+	req, _ := http.NewRequest(http.MethodPost, env.srv.URL+"/v1/attempts", bytes.NewReader(buf))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("post attempt: %v", err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	return resp
+}
+
+func TestAttemptQuota_FreeUserBlockedAfter7thAttempt(t *testing.T) {
+	env := newAuthTestEnv(t)
+	exID := firstSeededExerciseID(t)
+	env.preSignup(t, "q@x.com", "Strong1Password!")
+	user, _ := env.users.UserAccountByEmail("q@x.com")
+	// Verify so the verify-gate does not interfere with quota tests.
+	env.users.MarkUserEmailVerified(user.ID)
+	tok := env.loginToken(t, "q@x.com", "Strong1Password!")
+
+	for i := 1; i <= 7; i++ {
+		resp := env.postAttempt(t, tok, exID)
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("attempt #%d expected 201, got %d", i, resp.StatusCode)
+		}
+	}
+	// 8th -> 429.
+	resp := env.postAttempt(t, tok, exID)
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("8th attempt expected 429, got %d", resp.StatusCode)
+	}
+	if resp.Header.Get("X-Limit-Reset") == "" {
+		t.Error("expected X-Limit-Reset header on 429")
+	}
+}
+
+func TestAttemptQuota_ProUserUnlimited(t *testing.T) {
+	env := newAuthTestEnv(t)
+	exID := firstSeededExerciseID(t)
+	env.preSignup(t, "pro@x.com", "Strong1Password!")
+	user, _ := env.users.UserAccountByEmail("pro@x.com")
+	env.users.MarkUserEmailVerified(user.ID)
+	// Promote to Pro with future expiry.
+	env.users.UpdateUser(user.ID, func(u *contracts.UserAccount) {
+		u.ProTier = "pro"
+		exp := time.Now().Add(30 * 24 * time.Hour)
+		u.ProExpiresAt = &exp
+	})
+	tok := env.loginToken(t, "pro@x.com", "Strong1Password!")
+
+	// 10 attempts > free cap of 7, all must succeed for Pro.
+	for i := 1; i <= 10; i++ {
+		resp := env.postAttempt(t, tok, exID)
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("Pro attempt #%d expected 201, got %d", i, resp.StatusCode)
+		}
+	}
+}
+
+func TestVerifyGate_BlocksAfterGraceExhausted(t *testing.T) {
+	env := newAuthTestEnv(t)
+	exID := firstSeededExerciseID(t)
+	env.preSignup(t, "v@x.com", "Strong1Password!")
+	tok := env.loginToken(t, "v@x.com", "Strong1Password!")
+	user, _ := env.users.UserAccountByEmail("v@x.com")
+	if user.GraceAttemptsLeft != 3 {
+		t.Fatalf("expected fresh account grace=3, got %d", user.GraceAttemptsLeft)
+	}
+
+	// First 3 attempts succeed (each burns one grace credit).
+	for i := 1; i <= 3; i++ {
+		resp := env.postAttempt(t, tok, exID)
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("grace #%d expected 201, got %d", i, resp.StatusCode)
+		}
+	}
+
+	// 4th attempt -> 403 email_verify_required because grace is at 0
+	// and the user is still unverified.
+	resp := env.postAttempt(t, tok, exID)
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("expected 403 after grace, got %d", resp.StatusCode)
+	}
+	var body map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&body)
+	if body["error"] != "email_verify_required" {
+		t.Errorf("expected email_verify_required, got %v", body["error"])
+	}
+}
+
+func TestVerifyGate_VerifiedAccountUnblocked(t *testing.T) {
+	env := newAuthTestEnv(t)
+	exID := firstSeededExerciseID(t)
+	env.preSignup(t, "vv@x.com", "Strong1Password!")
+	user, _ := env.users.UserAccountByEmail("vv@x.com")
+	env.users.MarkUserEmailVerified(user.ID)
+	tok := env.loginToken(t, "vv@x.com", "Strong1Password!")
+
+	// Verified account -> unlimited burns of "grace" because the gate is
+	// a no-op once IsEmailVerified is true. Run 5 attempts well past the
+	// initial grace=3 ceiling.
+	for i := 1; i <= 5; i++ {
+		resp := env.postAttempt(t, tok, exID)
+		if resp.StatusCode != http.StatusCreated {
+			t.Fatalf("verified attempt #%d expected 201, got %d", i, resp.StatusCode)
+		}
 	}
 }
 

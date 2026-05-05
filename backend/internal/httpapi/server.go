@@ -475,6 +475,21 @@ func (s *Server) handleAttempts(w http.ResponseWriter, r *http.Request, user con
 			writeError(w, http.StatusBadRequest, "invalid_locale", "Unsupported locale.", false)
 			return
 		}
+		// V17 authorization gates — verify-after-grace + free-tier cap.
+		// Both are no-ops when V17 stores are absent, so the legacy
+		// dev-fixture path keeps working unchanged.
+		if err := s.checkVerifyGate(user); err != nil {
+			if ge, ok := asGateBlocked(err); ok {
+				writeGateBlocked(w, ge)
+				return
+			}
+		}
+		if err := s.checkAndIncrAttemptQuota(user); err != nil {
+			if ge, ok := asGateBlocked(err); ok {
+				writeGateBlocked(w, ge)
+				return
+			}
+		}
 		attempt, err := s.repo.CreateAttempt(user.ID, req.ExerciseID, clientPlatform, req.AppVersion, locale)
 		if err != nil {
 			writeError(w, http.StatusNotFound, "not_found", "Exercise not found.", false)
@@ -1310,6 +1325,16 @@ func (s *Server) handleInterviewSessionToken(w http.ResponseWriter, r *http.Requ
 	if attempt.ExerciseID != req.ExerciseID {
 		writeError(w, http.StatusForbidden, "forbidden", "Exercise does not match attempt.", false)
 		return
+	}
+
+	// V17: free-tier weekly interview cap. No-op when V17 stores are
+	// absent, when the user is admin, or when the user has an active
+	// Pro entitlement.
+	if err := s.checkAndIncrInterviewQuota(user); err != nil {
+		if ge, ok := asGateBlocked(err); ok {
+			writeGateBlocked(w, ge)
+			return
+		}
 	}
 
 	exercise, ok := s.repo.Exercise(req.ExerciseID)
