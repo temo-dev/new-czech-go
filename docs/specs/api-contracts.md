@@ -1068,19 +1068,30 @@ Returns the full review payload, including transcript and learner-visible feedba
 
 ## POST /v1/attempts/:attempt_id/submit-text
 
-Submit written text for a writing attempt (`psani_1_formular` or `psani_2_email`).
-Triggers async LLM scoring — poll `GET /v1/attempts/:attempt_id` until `status=completed`.
+Submit written text for a writing attempt. Handler dispatches on
+`exercise_type`:
+- `psani_1_formular` → `answers[]`
+- `psani_2_email` → `text`
+- `psani_3_dictation` → `sentences[]` (V18)
+
+Triggers async LLM scoring — poll `GET /v1/attempts/:attempt_id` until
+`status=completed`.
 
 ### Request
 ```json
 {
   "answers": ["câu trả lời 1", "câu trả lời 2", "câu trả lời 3"],
-  "text": "full email text"
+  "text": "full email text",
+  "sentences": [
+    { "idx": 0, "text": "Pavel jde do kavárny.", "replay_count": 1 },
+    { "idx": 1, "text": "Děkuji.", "replay_count": 0 }
+  ]
 }
 ```
-- `answers`: array of 3 strings — dùng cho `psani_1_formular`. Mỗi string ≥10 từ (validated server-side, trả 400 nếu thiếu).
-- `text`: single string — dùng cho `psani_2_email`. ≥35 từ (validated server-side).
-- Chỉ một trong hai field được dùng tùy `exercise_type`.
+- `answers`: 3 strings for `psani_1_formular`. Each ≥10 words (server-side validation, 400 otherwise).
+- `text`: single string for `psani_2_email`. ≥35 words.
+- `sentences`: V18 dictation — count must match exercise sentence count, each text ≤200 runes. `replay_count` is telemetry only (never affects score).
+- Only one field is used per `exercise_type`.
 
 ### Response
 ```json
@@ -1088,8 +1099,90 @@ Triggers async LLM scoring — poll `GET /v1/attempts/:attempt_id` until `status
 ```
 
 ### Errors
-- `400 invalid_word_count` — text chưa đủ từ tối thiểu
-- `409 attempt_not_pending` — attempt không ở trạng thái `created`
+- `400 invalid_word_count` — writing text below minimum
+- `400 invalid_sentence_count` — dictation sentence count mismatch
+- `400 sentence_too_long` — dictation sentence > 200 runes
+- `409 attempt_not_pending` — attempt not in `created` state
+
+---
+
+## POST /v1/attempts/:attempt_id/dictation-ocr-preview *(V18.1)*
+
+Single-image preview for dictation OCR submissions. Learner uploads
+one handwritten-sentence photo; backend runs Claude Vision and returns
+the recognized text + the persisted asset_id the client echoes back at
+submit time.
+
+**OCR is fail-soft**: any provider error returns 200 with `text: ""`
+so the learner can retake the photo or type instead. The endpoint
+never returns 5xx because of OCR.
+
+### Request (multipart/form-data)
+| Field | Type | Notes |
+|-------|------|-------|
+| `idx` | int form field | 0..7 — sentence index |
+| `image` | file field | jpeg/png/webp, ≤5 MB |
+
+### Response 200
+```json
+{
+  "data": {
+    "idx": 0,
+    "text": "Včera jsem byl v kavárně.",
+    "asset_id": "dictation-ocr/<attempt_id>/img-<nanos>.jpg"
+  },
+  "meta": {}
+}
+```
+
+### Errors
+- `400 validation_error` — non-dictation attempt, missing `idx` field, missing `image` file
+- `400 invalid_idx` — idx outside 0..7
+- `403 forbidden` — caller doesn't own the attempt
+- `415 image_invalid_type` — MIME not in {jpeg, png, webp}
+- `413 image_too_large` — image > 5 MB
+- `429 rate_limited` — > 30 preview calls per minute per user
+
+### Notes
+- Image persisted under `LOCAL_ASSETS_DIR/dictation-ocr/<attempt_id>/img-<nanos>.<ext>` for audit
+- `asset_id` returned is the storage key; learner echoes it back at submit time
+- Backend env: `LLM_OCR_PROVIDER=claude` + `ANTHROPIC_API_KEY` required for non-empty OCR; otherwise NoopOCR returns empty text
+
+---
+
+## POST /v1/attempts/:attempt_id/submit-dictation-ocr *(V18.1)*
+
+Final submit for dictation OCR (or mixed type/OCR via
+`submission_mode="both"`). Each row carries the learner-confirmed text
++ the asset_id from the preview step. Backend reuses the V18
+deterministic Levenshtein scorer — score parity with submit-text.
+
+### Request (multipart/form-data)
+| Field | Type | Notes |
+|-------|------|-------|
+| `sentences` | JSON form field | array of `{idx, text, asset_id, replay_count}` |
+
+```json
+[
+  {"idx": 0, "text": "Pavel jde do kavárny.", "asset_id": "dictation-ocr/.../img-1.jpg", "replay_count": 1},
+  {"idx": 1, "text": "Děkuji.", "asset_id": "", "replay_count": 0}
+]
+```
+- For `submission_mode="both"`, type-mode rows have empty `asset_id`.
+- `replay_count` is telemetry only.
+
+### Response 202
+```json
+{ "data": { "attempt_id": "...", "status": "scoring" }, "meta": {} }
+```
+
+### Errors
+- `400 validation_error` — non-dictation attempt, missing `sentences` field
+- `400 invalid_sentence_count` — count doesn't match exercise
+- `400 sentence_too_long` — any text > 200 runes
+- `403 forbidden` — caller doesn't own the attempt
+- `409 attempt_not_pending` — attempt not in `created` state
+- `413 payload_too_large` — body > 64 KB
 
 ---
 
@@ -1216,6 +1309,157 @@ Bearer token (learner, owner của attempt).
 ```
 
 Poll `GET /v1/attempts/:id` cho đến `status=completed`.
+
+---
+
+## Learner Profile Identity (V17.2)
+
+Học viên đã đăng nhập có thể đặt biệt danh + ảnh đại diện. Tất cả endpoint dùng V17 session Bearer token.
+
+## POST /v1/users/me/avatar
+
+Upload ảnh đại diện. Multipart/form-data với field `file`.
+
+### Limits
+- Max body 5 MB
+- MIME whitelist: `image/jpeg`, `image/png`, `image/webp`
+
+### Response 200
+```json
+{
+  "data": {
+    "image_asset_id": "avatars/u_e330f213007ba960/img-1714912088123456789.png",
+    "mime_type": "image/png"
+  },
+  "meta": {}
+}
+```
+
+`image_asset_id` chính là storage key dùng cho `GET /v1/media/file?key=...` để load ảnh. Backend tự cập nhật `users.avatar_asset_id`; client không cần PATCH thêm.
+
+### Errors
+- `413 payload_too_large` — > 5 MB
+- `415 unsupported_media_type` — MIME không trong whitelist
+- `400 validation_error` — multipart parse fail
+- `401` — không có Bearer token
+
+---
+
+## DELETE /v1/users/me/avatar
+
+Xoá avatar hiện tại. File trên disk bị remove + `users.avatar_asset_id` reset về rỗng.
+
+Response: `204 No Content`
+
+---
+
+## PATCH /v1/users/me (V17.2 extension)
+
+Endpoint cũ thêm 2 field optional:
+- `avatar_asset_id` — storage key để set/clear avatar (UI thường dùng `/avatar` endpoint trên thay vì gọi trực tiếp)
+- `display_name` — biệt danh, validate ≤ 60 runes (UTF-8 aware, đếm ký tự tiếng Việt đúng)
+
+### Errors (mới)
+- `400 display_name_too_long` — `display_name` > 60 ký tự
+
+---
+
+## Admin User Management (V17.1)
+
+Tất cả endpoint dưới đây yêu cầu `withRole("admin")` — Bearer token của legacy `dev-admin-token` hoặc V17 admin session.
+
+## GET /v1/admin/users
+
+List tài khoản học viên đang active (chưa soft-delete), paginate + optional search.
+
+### Query
+- `limit` (default 50, max 200)
+- `offset` (default 0)
+- `search` — case-insensitive substring match trên `email` + `display_name`
+- `role` — exact match (e.g. `learner`)
+
+### Response 200
+```json
+{
+  "data": [
+    {
+      "id": "u_e330f213007ba960",
+      "email": "anh.ngt18@gmail.com",
+      "email_verified": false,
+      "display_name": "tuan anh",
+      "role": "learner",
+      "pro_tier": "free",
+      "grace_attempts_left": 3,
+      "created_at": "2026-05-05T12:12:06Z",
+      "updated_at": "2026-05-05T12:12:06Z"
+    }
+  ],
+  "meta": { "total": 12, "limit": 50, "offset": 0 }
+}
+```
+
+### Errors
+- `401` — không có Bearer token
+- `403` — không phải admin
+- `503 users_unavailable` — V17 user store chưa wired
+
+---
+
+## DELETE /v1/admin/users/:id
+
+Soft-delete học viên: anonymise PII, revoke mọi auth_token, free email cho re-register.
+
+### Auth
+Admin Bearer.
+
+### Response
+`204 No Content`
+
+### Side Effects
+1. `users.email = "deleted_<id>@deleted.local"`, `display_name = "(deleted)"`, `avatar_asset_id = ""`, `push_token = ""`, `push_token_platform = ""`
+2. `users.deleted_at = now()`
+3. Tất cả `auth_tokens` (session + verify + reset) bị `RevokeAllAuthTokensForUser`
+4. Email gốc giải phóng cho re-registration (unique index `WHERE deleted_at IS NULL`)
+5. Lịch sử `attempts.user_id` không bị xoá để giữ audit trail
+
+### Errors
+- `400 self_delete_forbidden` — `caller.ID == target.ID`
+- `403 admin_delete_forbidden` — `target.Role == "admin"`
+- `404` — user không tồn tại hoặc đã soft-deleted
+
+---
+
+## POST /v1/admin/users/:id/reset-password
+
+Admin đặt password mới trực tiếp cho học viên. Dùng khi học viên mất quyền truy cập email và không tự reset được.
+
+### Auth
+Admin Bearer.
+
+### Request
+```json
+{ "new_password": "BrandNew123!" }
+```
+Body cap 4 KiB. Password phải đạt strength rule của `auth.ValidatePassword`:
+- Min 8 ký tự
+- Có ít nhất 1 chữ số hoặc ký tự đặc biệt
+- Không có trong common-password block list
+
+### Response
+`204 No Content`
+
+### Side Effects
+1. `users.password_hash` cập nhật (bcrypt cost 12)
+2. Tất cả session token của target bị revoke → mọi thiết bị logout
+3. Login rate limiter cho `target.Email` được reset → user có thể login ngay với password mới
+
+### Errors
+- `400 invalid_body` — JSON không hợp lệ
+- `400 weak_password` / `400 weak_password_common` — password không đạt strength
+- `403 admin_reset_forbidden` — `target.Role == "admin"` (admin tự rotate cred ngoài endpoint này)
+- `404` — user không tồn tại
+
+**Lưu ý vận hành:** Admin nhập password trong CMS modal rồi gửi cho học viên qua kênh tin cậy (chat/sms), KHÔNG bao giờ gửi qua email vì email có thể đã bị compromise.
 
 ---
 

@@ -270,3 +270,92 @@ TRUNCATE TABLE attempt_review_artifacts, attempt_feedback, attempt_audio,
 ```
 
 > **Lưu ý V9:** Bảng `full_exam_sessions` đã được xóa — không còn tồn tại trong schema.
+
+---
+
+## 6. Quản lý tài khoản học viên (V17.1)
+
+Sidebar → **Tài khoản** (route `/users`).
+
+### Xem danh sách
+
+- Search theo email hoặc tên hiển thị; paginate 50 row/trang
+- Cột: Email · Tên · Vai trò · Pro · Verified · Tạo lúc · Action
+- Admin row chỉ hiển thị `—` (không thao tác được qua CMS — phải rotate cred bằng tay)
+
+### Đặt lại mật khẩu cho học viên
+
+Dùng khi học viên báo quên mật khẩu và không tự reset qua email được.
+
+1. Tìm tài khoản → click **Đặt lại MK**
+2. Nhập mật khẩu mới + nhập lại để xác nhận (≥8 ký tự + 1 số hoặc ký tự đặc biệt; không nằm trong common-password block list)
+3. Submit → backend revoke mọi session, học viên bị logout khỏi mọi thiết bị
+4. Gửi mật khẩu mới cho học viên qua **kênh tin cậy**: chat (Telegram/Zalo), SMS, gọi điện. **KHÔNG gửi qua email** — email có thể đã bị compromise.
+
+Học viên login với mật khẩu mới ngay được (login rate limit cho email đó được reset đồng thời).
+
+### Xoá tài khoản
+
+Dùng khi học viên yêu cầu xoá tài khoản hoặc tài khoản spam.
+
+1. Tìm tài khoản → click **Xóa** → confirm modal
+2. Backend soft-delete:
+   - Anonymise email (`deleted_<id>@deleted.local`), tên (`(deleted)`), avatar, push token
+   - Set `deleted_at`, revoke mọi auth token
+   - **Email gốc được giải phóng** — học viên có thể đăng ký lại với cùng email
+3. Lịch sử `attempts` của user_id đó vẫn giữ trong DB phục vụ audit trail; CMS `/learners` analytics dashboard vẫn đếm các attempt cũ này.
+
+Không có hard-delete trong V17.1. Nếu cần xoá hẳn vì compliance (GDPR right-to-erasure), đợi V18 cron hoặc xoá tay qua psql.
+
+---
+
+## Tạo bài Chính tả (`psani_3_dictation`) — V18 + V18.1
+
+Loại bài viết mới trong skill `viet`. Học viên nghe Polly TTS đọc từng câu Czech rồi gõ lại (V18) hoặc chụp ảnh chữ viết tay rồi xác nhận OCR (V18.1).
+
+### Bước cơ bản (V18 — gõ bằng bàn phím)
+
+1. CMS `/exercises` → **+ Tạo** → chọn:
+   - Pool: `course` (bắt buộc — dictation không vào MockTest)
+   - Skill: `viet`
+   - Type: `Chính tả (psani_3_dictation)` (chỉ hiện khi pool=course + skill=viet)
+2. Form chính:
+   - **Chủ đề** (≤80 ký tự, ví dụ "Trong quán cafe")
+   - **Transcript**: dán đoạn văn 3–8 câu Czech rồi bấm "Tách câu tự động". Trình tách giữ nguyên `Mgr.`/`Dr.`/`Bc.`/`Ph.D.`/`pan.`/`ing.`/`Ing.`/`p.`/`tj.`/`např.` (không tách nhầm chấm trong tên/danh xưng)
+   - Edit từng câu nếu cần (≤200 ký tự/câu)
+3. **Lưu nháp** trước khi tạo audio (nút Polly cần `editingId`)
+4. Mỗi câu → **🔊 Tạo audio (Polly)** → chờ vài giây → preview play (mỗi câu 1 file MP3 riêng, lưu vào `LOCAL_ASSETS_DIR/dictation-audio/...`)
+5. Settings:
+   - **Số lần nghe lại** (0 = không giới hạn, mặc định 3)
+   - **Điểm tối đa** (mặc định 10)
+   - **Ngưỡng đạt** (% — mặc định 60)
+   - **Voice ID** (Polly voice; để trống dùng `POLLY_VOICE_ID` mặc định)
+6. Đổi status → **published** → submit. Validation chặn publish khi câu chưa có audio.
+
+### Chế độ nộp bài (V18.1)
+
+Section "Chế độ nộp bài" trong form (giữa Settings và Validation banner):
+
+| Mode | Học viên thấy | Khi nào dùng |
+|------|---------------|--------------|
+| **Gõ bằng bàn phím** (mặc định) | TextField + chips diacritic Czech | Mặc định, học viên gõ |
+| **Chụp ảnh chữ viết tay (OCR)** | Nút "📷 Chụp ảnh" → preview ảnh + text OCR pre-fill → confirm | Drill chính tả tay (motor memory) |
+| **Cả hai** | Toggle pill từng câu giữa Gõ ↔ Chụp ảnh | Cho học viên tự chọn |
+
+OCR provider: **Claude Vision** qua `ANTHROPIC_API_KEY` đã có (cùng key V14 interview). Backend env yêu cầu:
+- `LLM_OCR_PROVIDER=claude` (compose-up sẽ thread vào container)
+- `LLM_OCR_MODEL=claude-opus-4-7` (mặc định, không cần set)
+
+Khi OCR fail (Claude lỗi/ảnh không đọc được), backend trả 200 với text rỗng → học viên thấy banner "Không nhận diện được. Hãy chụp lại hoặc gõ tay" → vẫn submit được. **Không có 5xx vì OCR.**
+
+Score parity: cùng câu trả lời gõ vs OCR → cùng `overall_score`. OCR chỉ thay input, không đổi cách chấm (Levenshtein có trọng số 0.5 cho diacritic).
+
+### Backward-compat
+
+Bài cũ chưa có `submission_mode` mặc định = `"type"`. Mở form, đổi dropdown sang OCR/Both, lưu để cập nhật.
+
+### Dependencies
+
+- iPhone thật (camera không hoạt động trên Simulator)
+- iOS đã có `NSCameraUsageDescription` từ V14 interview
+- Image cap 5 MB; MIME jpeg/png/webp; per-user RL 30 preview/phút
