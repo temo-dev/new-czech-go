@@ -232,7 +232,10 @@ smoke-exam-flow:
 smoke-v17-auth:
 	$(RTK) python3 scripts/smoke_v17_auth.py --base-url $(SMOKE_BASE_URL)
 
-smoke-all: smoke-attempt-flow smoke-course-flow smoke-exam-flow smoke-v17-auth
+smoke-dictation-flow:
+	$(RTK) python3 scripts/smoke_dictation_flow.py --base-url $(SMOKE_BASE_URL)
+
+smoke-all: smoke-attempt-flow smoke-course-flow smoke-exam-flow smoke-v17-auth smoke-dictation-flow
 
 seed-modelovy-test-2:
 	$(RTK) python3 scripts/seed-modelovy-test-2.py
