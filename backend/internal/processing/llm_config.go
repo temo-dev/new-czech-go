@@ -23,6 +23,7 @@ const (
 	// Claude (Anthropic) — text feedback + content generation
 	DefaultFeedbackModel = "claude-haiku-4-5-20251001" // real-time, per-attempt
 	DefaultContentModel  = "claude-haiku-4-5-20251001" // batch, admin-triggered
+	DefaultOCRModel      = "claude-opus-4-7"           // V18.1 dictation handwriting OCR (vision)
 
 	// Replicate (Flux) — admin AI image generation
 	DefaultReplicateImageModel = "black-forest-labs/flux-schnell"
@@ -58,6 +59,7 @@ type LLMModels struct {
 	Feedback            string // ClaudeLLMFeedbackProvider
 	Review              string // ClaudeLLMReviewProvider
 	Dictation           string // ClaudeDictationFeedbackProvider (V18)
+	OCR                 string // ClaudeVisionOCR (V18.1)
 	Content             string // ClaudeContentGenerator
 	ReplicateImage      string // Replicate Flux (admin AI image)
 	ElevenLabsTTS       string // ElevenLabsTTSProvider
@@ -71,6 +73,7 @@ func LoadLLMModels() LLMModels {
 		Feedback:            env("LLM_MODEL", DefaultFeedbackModel),
 		Review:              env("LLM_REVIEW_MODEL", env("LLM_MODEL", DefaultFeedbackModel)),
 		Dictation:           env("LLM_DICTATION_MODEL", env("LLM_MODEL", DefaultFeedbackModel)),
+		OCR:                 env("LLM_OCR_MODEL", DefaultOCRModel),
 		Content:             env("LLM_CONTENT_MODEL", DefaultContentModel),
 		ReplicateImage:      env("REPLICATE_IMAGE_MODEL", DefaultReplicateImageModel),
 		ElevenLabsTTS:       env("ELEVENLABS_MODEL_ID", DefaultElevenLabsTTSModel),

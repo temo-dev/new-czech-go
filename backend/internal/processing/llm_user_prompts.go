@@ -433,3 +433,15 @@ func buildDictationUserPrompt(inputs []DictationLLMInput) string {
 	b.WriteString("Output format: [{\"idx\":N,\"error_tags\":[...],\"feedback_vi\":\"...\",\"feedback_en\":\"...\",\"diff_chunks\":[...]}, ...]")
 	return b.String()
 }
+
+// buildDictationOCRUserPrompt renders the user-message text that accompanies
+// the image content block sent to Claude Vision. The image itself is added
+// as a separate content block by the caller.
+func buildDictationOCRUserPrompt() string {
+	return strings.Join([]string{
+		"Read the handwritten Czech sentence in the photo above.",
+		"Return ONLY a JSON object: {\"text\": \"...\"}.",
+		"Preserve all diacritics and capitalization.",
+		"If unreadable, return {\"text\": \"\"}.",
+	}, " ")
+}

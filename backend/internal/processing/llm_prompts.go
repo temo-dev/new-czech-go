@@ -123,6 +123,24 @@ func DictationSystemPrompt() string {
 	}, "\n")
 }
 
+// ── Dictation OCR (V18.1) ─────────────────────────────────────────────────────
+
+// DictationOCRSystemPrompt instructs Claude Vision to read a single
+// handwritten Czech sentence photo and return ONLY the text it sees.
+// The output is a JSON object with one field `text`. Empty string when
+// the image is illegible — never explanations, never apologies.
+func DictationOCRSystemPrompt() string {
+	return strings.Join([]string{
+		"You are an OCR engine for handwritten Czech text.",
+		"Read the photo and return ONLY the text exactly as written,",
+		"including all diacritics (č, š, ž, ě, ř, ý, á, í, ú, ů, ň, ť, ď),",
+		"punctuation, and capitalization.",
+		`Output a single JSON object: {"text": "<read text or empty string>"}.`,
+		"If the image is unreadable, blank, or not handwriting, return an empty string for `text`.",
+		"Never explain. Never add commentary. Never wrap in markdown fences.",
+	}, "\n")
+}
+
 // ── Interview Scoring ────────────────────────────────────────────────────────
 
 // InterviewSystemPrompt returns the system prompt for interview-skill scoring.
