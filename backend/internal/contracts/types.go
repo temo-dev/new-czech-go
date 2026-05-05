@@ -409,10 +409,21 @@ type WritingSubmission struct {
 
 // --- Dictation (V18: psani_3_dictation) ---
 
+// Dictation submission mode (V18.1). "type" is the V18 default;
+// "ocr" enables Claude Vision handwriting submission; "both" lets the
+// learner pick per sentence at runtime.
+const (
+	DictationModeType = "type"
+	DictationModeOCR  = "ocr"
+	DictationModeBoth = "both"
+)
+
 // DictationDetail is the details_json shape for a psani_3_dictation exercise.
 // Sentences are 3..8 Czech utterances; each one has its own Polly-generated MP3
 // referenced by AudioAssetID. MaxReplaysPerSentence=0 means unlimited (client-only cap).
 // PassThresholdPercent reuses the V7 mock-test pass threshold semantics.
+// SubmissionMode (V18.1) is empty/missing on legacy V18 exercises and defaults
+// to DictationModeType via the Mode() helper.
 type DictationDetail struct {
 	Topic                 string              `json:"topic"`
 	ContextImageAssetID   string              `json:"context_image_asset_id,omitempty"`
@@ -421,6 +432,17 @@ type DictationDetail struct {
 	VoiceID               string              `json:"voice_id,omitempty"`
 	MaxPoints             int                 `json:"max_points,omitempty"`
 	PassThresholdPercent  int                 `json:"pass_threshold_percent,omitempty"`
+	SubmissionMode        string              `json:"submission_mode,omitempty"`
+}
+
+// Mode returns SubmissionMode normalized: empty defaults to DictationModeType
+// (V18 backward-compat). Unknown values pass through so callers can detect
+// malformed input.
+func (d DictationDetail) Mode() string {
+	if d.SubmissionMode == "" {
+		return DictationModeType
+	}
+	return d.SubmissionMode
 }
 
 // DictationSentence is one sentence row in a dictation exercise.
@@ -469,6 +491,26 @@ type DictationSentenceScore struct {
 	FeedbackVI       string      `json:"feedback_vi,omitempty"`
 	FeedbackEN       string      `json:"feedback_en,omitempty"`
 	DiffChunks       []DiffChunk `json:"diff_chunks,omitempty"`
+}
+
+// DictationOCRPreviewResponse is returned by
+// POST /v1/attempts/:id/dictation-ocr-preview after Claude Vision reads
+// a single handwritten sentence photo. Text is empty when OCR fails (fail-soft).
+// AssetID is the persisted media_assets key the learner echoes back at Submit.
+type DictationOCRPreviewResponse struct {
+	Idx     int    `json:"idx"`
+	Text    string `json:"text"`
+	AssetID string `json:"asset_id,omitempty"`
+}
+
+// DictationOCRSentenceSubmission is one row in the multipart submit payload
+// for POST /v1/attempts/:id/submit-dictation-ocr. Empty Text + present AssetID
+// triggers server-side lazy OCR; Text + AssetID pair is used as-is (preview path).
+type DictationOCRSentenceSubmission struct {
+	Idx         int    `json:"idx"`
+	Text        string `json:"text,omitempty"`
+	AssetID     string `json:"asset_id,omitempty"`
+	ReplayCount int    `json:"replay_count,omitempty"`
 }
 
 // --- Objective scoring (V3/V4) ---

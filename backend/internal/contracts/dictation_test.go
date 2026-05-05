@@ -116,6 +116,104 @@ func TestDictationFeedback_JSONShape(t *testing.T) {
 	}
 }
 
+// V18.1 — submission_mode + OCR DTOs
+
+func TestDictationDetail_SubmissionMode_DefaultType(t *testing.T) {
+	// Backward-compat: V18 JSON without submission_mode key
+	// must deserialize and Mode() must return "type".
+	rawV18 := []byte(`{"topic":"x","sentences":[{"idx":0,"text":"Ahoj."}],"max_replays_per_sentence":3}`)
+	var d DictationDetail
+	if err := json.Unmarshal(rawV18, &d); err != nil {
+		t.Fatalf("unmarshal V18 payload: %v", err)
+	}
+	if d.SubmissionMode != "" {
+		t.Errorf("expected empty submission_mode in raw struct: got %q", d.SubmissionMode)
+	}
+	if got := d.Mode(); got != DictationModeType {
+		t.Errorf("Mode() default: want %q got %q", DictationModeType, got)
+	}
+}
+
+func TestDictationDetail_SubmissionMode_RoundTrip(t *testing.T) {
+	for _, mode := range []string{DictationModeType, DictationModeOCR, DictationModeBoth} {
+		d := DictationDetail{
+			Topic:          "x",
+			Sentences:      []DictationSentence{{Idx: 0, Text: "Ahoj."}},
+			SubmissionMode: mode,
+		}
+		raw, err := json.Marshal(d)
+		if err != nil {
+			t.Fatalf("marshal %s: %v", mode, err)
+		}
+		var got DictationDetail
+		if err := json.Unmarshal(raw, &got); err != nil {
+			t.Fatalf("unmarshal %s: %v", mode, err)
+		}
+		if got.SubmissionMode != mode {
+			t.Errorf("round-trip %s: got %q", mode, got.SubmissionMode)
+		}
+		if got.Mode() != mode {
+			t.Errorf("Mode() %s: got %q", mode, got.Mode())
+		}
+	}
+}
+
+func TestDictationDetail_SubmissionMode_OmitEmpty(t *testing.T) {
+	d := DictationDetail{
+		Topic:     "x",
+		Sentences: []DictationSentence{{Idx: 0, Text: "Ahoj."}},
+	}
+	raw, _ := json.Marshal(d)
+	if containsField(string(raw), "submission_mode") {
+		t.Errorf("empty submission_mode must be omitted: %s", string(raw))
+	}
+}
+
+func TestDictationOCRPreviewResponse_JSONShape(t *testing.T) {
+	resp := DictationOCRPreviewResponse{
+		Idx:     2,
+		Text:    "Včera jsem byl v kavárně.",
+		AssetID: "dictation-ocr/att-1/img-1.jpg",
+	}
+	raw, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"idx", "text", "asset_id"} {
+		if !containsField(string(raw), f) {
+			t.Errorf("missing tag %q in %s", f, string(raw))
+		}
+	}
+	var got DictationOCRPreviewResponse
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Text != resp.Text {
+		t.Errorf("text round-trip: got %q", got.Text)
+	}
+}
+
+func TestDictationOCRSentenceSubmission_JSONRoundTrip(t *testing.T) {
+	want := []DictationOCRSentenceSubmission{
+		{Idx: 0, Text: "Ahoj.", AssetID: "a-0", ReplayCount: 0},
+		{Idx: 1, Text: "", AssetID: "a-1", ReplayCount: 2}, // empty text → server lazy-OCR
+	}
+	raw, err := json.Marshal(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []DictationOCRSentenceSubmission
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("len: %d", len(got))
+	}
+	if got[1].AssetID != "a-1" || got[1].ReplayCount != 2 {
+		t.Errorf("row[1] lost fields: %+v", got[1])
+	}
+}
+
 func containsField(s, field string) bool {
 	return len(s) > 0 && (containsSub(s, "\""+field+"\":"))
 }
