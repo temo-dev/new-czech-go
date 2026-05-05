@@ -336,6 +336,25 @@ class ApiClient {
         },
       );
 
+  /// Submits an Apple StoreKit receipt to the V17 backend for
+  /// validation. Returns the parsed response payload that includes
+  /// `pro_expires_at` + `product_id`. The handler is idempotent —
+  /// duplicate transactions return the existing entitlement rather
+  /// than 409 — so retries are safe.
+  Future<Map<String, dynamic>> verifyAppleReceiptV17({
+    required String receipt,
+    String? productId,
+  }) =>
+      _v17Request(
+        method: 'POST',
+        path: '/v1/iap/apple/verify',
+        authed: true,
+        body: {
+          'receipt': receipt,
+          if (productId != null) 'product_id': productId,
+        },
+      );
+
   /// V17 endpoints use a flat error envelope `{ error: code, message: text }`
   /// rather than the legacy `{ error: { message: text } }`. _v17Request
   /// translates non-2xx responses into [AuthException] so handlers can
