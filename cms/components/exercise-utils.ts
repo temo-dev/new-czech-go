@@ -1089,7 +1089,15 @@ export type DictationFormState = {
   voiceId: string;
   maxPoints: number;
   passThresholdPercent: number;
+  // V18.1: how the learner submits each sentence.
+  //   "type" — keyboard only (V18 default, backward-compat)
+  //   "ocr"  — handwriting photo only (Claude Vision)
+  //   "both" — learner picks per-sentence at runtime
+  submissionMode: DictationSubmissionMode;
 };
+
+export type DictationSubmissionMode = 'type' | 'ocr' | 'both';
+export const DICTATION_SUBMISSION_MODES: DictationSubmissionMode[] = ['type', 'ocr', 'both'];
 
 export const DICTATION_MIN_SENTENCES = 3;
 export const DICTATION_MAX_SENTENCES = 8;
@@ -1125,6 +1133,7 @@ export function emptyDictationFormState(): DictationFormState {
     voiceId: '',
     maxPoints: 10,
     passThresholdPercent: 60,
+    submissionMode: 'type',
   };
 }
 
@@ -1146,7 +1155,15 @@ export function formStateFromDictation(detail: Record<string, unknown>): Dictati
     voiceId: String(detail.voice_id ?? ''),
     maxPoints: typeof detail.max_points === 'number' ? detail.max_points : 10,
     passThresholdPercent: typeof detail.pass_threshold_percent === 'number' ? detail.pass_threshold_percent : 60,
+    submissionMode: parseDictationSubmissionMode(detail.submission_mode),
   };
+}
+
+function parseDictationSubmissionMode(raw: unknown): DictationSubmissionMode {
+  if (typeof raw === 'string' && (DICTATION_SUBMISSION_MODES as string[]).includes(raw)) {
+    return raw as DictationSubmissionMode;
+  }
+  return 'type';
 }
 
 export function buildDictationPayload(form: DictationFormState): Record<string, unknown> {
@@ -1162,6 +1179,7 @@ export function buildDictationPayload(form: DictationFormState): Record<string, 
     voice_id: form.voiceId,
     max_points: form.maxPoints,
     pass_threshold_percent: form.passThresholdPercent,
+    submission_mode: form.submissionMode,
   };
 }
 
@@ -1202,6 +1220,9 @@ export function validateDictation(form: DictationFormState, opts?: { requireAudi
   }
   if (form.passThresholdPercent < 1 || form.passThresholdPercent > 100) {
     errors.push('Ngưỡng đạt phải trong khoảng 1–100%.');
+  }
+  if (!(DICTATION_SUBMISSION_MODES as string[]).includes(form.submissionMode)) {
+    errors.push('Chế độ nộp bài (submission_mode) không hợp lệ.');
   }
 
   return { ok: errors.length === 0, errors };

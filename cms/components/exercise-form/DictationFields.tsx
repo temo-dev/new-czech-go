@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import {
   type DictationFormState,
   type DictationSentenceForm,
+  type DictationSubmissionMode,
   formStateFromDictation,
   buildDictationPayload,
   splitTranscriptIntoSentences,
@@ -13,6 +14,12 @@ import {
   DICTATION_MAX_SENTENCES,
   DICTATION_MAX_SENTENCE_CHARS,
 } from '../exercise-utils';
+
+const SUBMISSION_MODE_HINTS: Record<DictationSubmissionMode, string> = {
+  type: 'Học viên gõ bằng bàn phím (mặc định, V18).',
+  ocr: 'Học viên chụp ảnh chữ viết tay; AI nhận diện và học viên xác nhận trước khi nộp.',
+  both: 'Học viên chọn gõ hoặc chụp ảnh cho từng câu.',
+};
 
 type Props = {
   initialData: Record<string, unknown>;
@@ -69,6 +76,7 @@ export function DictationFields({ initialData, onChange, editingId }: Props) {
   function setMaxPoints(n: number) { emit({ ...state, maxPoints: n }); }
   function setThreshold(n: number) { emit({ ...state, passThresholdPercent: n }); }
   function setVoiceId(v: string) { emit({ ...state, voiceId: v }); }
+  function setSubmissionMode(m: DictationSubmissionMode) { emit({ ...state, submissionMode: m }); }
 
   function setSentenceText(i: number, text: string) {
     const sentences = state.sentences.map((s, idx) => idx === i ? { ...s, text } : s);
@@ -361,6 +369,23 @@ export function DictationFields({ initialData, onChange, editingId }: Props) {
             placeholder="Tomas"
           />
         </div>
+      </div>
+
+      {/* V18.1 — submission mode */}
+      <div style={sectionStyle}>
+        <span style={labelStyle}>Chế độ nộp bài (V18.1)</span>
+        <select
+          value={state.submissionMode}
+          onChange={(e) => setSubmissionMode(e.target.value as DictationSubmissionMode)}
+          style={{ ...inputStyle, width: '100%' }}
+        >
+          <option value="type">Gõ bằng bàn phím (mặc định)</option>
+          <option value="ocr">Chụp ảnh chữ viết tay (OCR)</option>
+          <option value="both">Cả hai (học viên chọn từng câu)</option>
+        </select>
+        <p style={{ fontSize: 12, color: 'var(--ink-3)', margin: 0 }}>
+          {SUBMISSION_MODE_HINTS[state.submissionMode]}
+        </p>
       </div>
 
       {/* Validation banner */}

@@ -64,6 +64,7 @@ function fixtureValidForm(): DictationFormState {
     voiceId: 'Tomas',
     maxPoints: 10,
     passThresholdPercent: 60,
+    submissionMode: 'type',
   };
 }
 
@@ -210,5 +211,49 @@ describe('formStateFromDictation', () => {
     expect(empty.maxPoints).toBe(10);
     expect(empty.passThresholdPercent).toBe(60);
     expect(empty.maxReplaysPerSentence).toBe(3);
+  });
+});
+
+// ─── V18.1 submissionMode ─────────────────────────────────────────────────────
+
+describe('submissionMode (V18.1)', () => {
+  it('defaults to "type" for empty form', () => {
+    const empty = emptyDictationFormState();
+    expect(empty.submissionMode).toBe('type');
+  });
+
+  it('defaults to "type" when detail JSON omits the field (V18 backward-compat)', () => {
+    const v18Detail = buildDictationPayload(fixtureValidForm());
+    delete (v18Detail as Record<string, unknown>).submission_mode;
+    const back = formStateFromDictation(v18Detail);
+    expect(back.submissionMode).toBe('type');
+  });
+
+  it('round-trips each enum value', () => {
+    for (const mode of ['type', 'ocr', 'both'] as const) {
+      const f = fixtureValidForm();
+      f.submissionMode = mode;
+      const payload = buildDictationPayload(f) as Record<string, unknown>;
+      expect(payload.submission_mode).toBe(mode);
+      const back = formStateFromDictation(payload);
+      expect(back.submissionMode).toBe(mode);
+    }
+  });
+
+  it('validateDictation accepts all 3 modes', () => {
+    for (const mode of ['type', 'ocr', 'both'] as const) {
+      const f = fixtureValidForm();
+      f.submissionMode = mode;
+      const r = validateDictation(f);
+      expect(r.ok).toBe(true);
+    }
+  });
+
+  it('validateDictation rejects an invalid mode value', () => {
+    const f = fixtureValidForm();
+    (f as { submissionMode: string }).submissionMode = 'bogus';
+    const r = validateDictation(f);
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(' ')).toMatch(/submission_mode|chế độ/i);
   });
 });
