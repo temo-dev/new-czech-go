@@ -4,12 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/api/api_client.dart';
+import 'core/auth/auth_models.dart';
+import 'core/auth/auth_service.dart';
+import 'core/auth/auth_storage.dart';
 import 'core/interview/interview_preference_service.dart';
 import 'core/locale/locale_provider.dart';
 import 'core/locale/locale_scope.dart';
 import 'core/voice/voice_preference_service.dart';
 import 'core/theme/app_theme.dart';
 import 'l10n/generated/app_localizations.dart';
+import 'features/auth/screens/signup_screen.dart' show AuthServiceProvider;
+import 'features/auth/screens/welcome_screen.dart';
 import 'features/exercise/screens/exercise_screen.dart' as exercise_feature;
 import 'features/exercise/screens/listening_exercise_screen.dart';
 import 'features/exercise/screens/reading_exercise_screen.dart';
@@ -22,19 +27,41 @@ import 'features/profile/screens/profile_screen.dart';
 import 'models/models.dart';
 import 'shared/widgets/app_bottom_nav.dart';
 
+/// V17 self-serve auth is opt-in via the build flag so the legacy
+/// dev-fixture login path keeps working unchanged for development +
+/// existing widget tests. Production cutover flips this to true via
+/// `--dart-define=USE_V17_AUTH=true`.
+const bool kUseV17Auth = bool.fromEnvironment('USE_V17_AUTH');
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final localeProvider = await LocaleProvider.load();
-  runApp(MluveniSprintApp(localeProvider: localeProvider));
+
+  // When the V17 flag is enabled, build the AuthService eagerly so the
+  // bootstrap (read token from storage + validate via /v1/users/me)
+  // races with the first frame instead of behind it.
+  AuthService? authService;
+  if (kUseV17Auth) {
+    final storage = await AuthStorage.create();
+    authService = AuthService(apiClient: ApiClient(), storage: storage);
+    unawaited(authService.bootstrap());
+  }
+
+  runApp(MluveniSprintApp(localeProvider: localeProvider, authService: authService));
 }
 
 class MluveniSprintApp extends StatelessWidget {
-  const MluveniSprintApp({super.key, required this.localeProvider});
+  const MluveniSprintApp({super.key, required this.localeProvider, this.authService});
 
   final LocaleProvider localeProvider;
+  final AuthService? authService;
 
   @override
   Widget build(BuildContext context) {
+    final home = authService != null ? _V17AuthGate(service: authService!) : const LearnerShell();
+    final wrappedHome = authService != null
+        ? AuthServiceProvider(service: authService!, child: home)
+        : home;
     return LocaleScope(
       notifier: localeProvider,
       child: AnimatedBuilder(
@@ -43,7 +70,7 @@ class MluveniSprintApp extends StatelessWidget {
             (context, _) => MaterialApp(
               title: 'A2 Mluveni Sprint',
               theme: AppTheme.light,
-              home: const LearnerShell(),
+              home: wrappedHome,
               locale: Locale(localeProvider.code),
               supportedLocales: AppLocalizations.supportedLocales,
               localizationsDelegates: const [
@@ -58,6 +85,34 @@ class MluveniSprintApp extends StatelessWidget {
   }
 }
 
+/// V17 router. Listens to [AuthService] and shows the right screen for
+/// the current state. Only mounted when the build flag is on.
+class _V17AuthGate extends StatelessWidget {
+  const _V17AuthGate({required this.service});
+
+  final AuthService service;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: service,
+      builder: (context, _) {
+        switch (service.state) {
+          case AuthState.loading:
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          case AuthState.unauthenticated:
+            return const WelcomeScreen();
+          case AuthState.needsVerify:
+          case AuthState.authenticated:
+            return const LearnerShell();
+        }
+      },
+    );
+  }
+}
+
 class LearnerShell extends StatefulWidget {
   const LearnerShell({super.key});
 
@@ -66,7 +121,21 @@ class LearnerShell extends StatefulWidget {
 }
 
 class _LearnerShellState extends State<LearnerShell> {
-  final ApiClient _client = ApiClient();
+  late final ApiClient _client = _resolveClient();
+
+  /// In V17 mode the AuthService already owns an [ApiClient] with the
+  /// current bearer token attached; share it so the LearnerShell does
+  /// not silently authenticate via the legacy dev-fixture credentials.
+  ApiClient _resolveClient() {
+    if (kUseV17Auth) {
+      try {
+        return AuthServiceProvider.of(context).apiClientForScreens;
+      } catch (_) {
+        // No provider in tree (legacy build); fall through.
+      }
+    }
+    return ApiClient();
+  }
   VoicePreferenceService? _voiceService;
   InterviewPreferenceService? _interviewService;
   bool _loading = true;
@@ -88,7 +157,13 @@ class _LearnerShellState extends State<LearnerShell> {
     try {
       _voiceService ??= await VoicePreferenceService.create();
       _interviewService ??= await InterviewPreferenceService.create();
-      await _client.login(email: 'learner@example.com', password: 'demo123');
+      // V17 mode: the AuthService bootstrap already attached the
+      // session token to the shared ApiClient before LearnerShell
+      // mounted. Legacy mode: hit the dev-fixture endpoint to seed the
+      // token map.
+      if (!kUseV17Auth) {
+        await _client.login(email: 'learner@example.com', password: 'demo123');
+      }
       final attemptsPayload = await _client.getAttempts();
       final recentAttempts =
           attemptsPayload
