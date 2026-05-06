@@ -10,6 +10,7 @@ package processing
 // docs/specs/skill-mastery-progress.md § "Configuration".
 
 import (
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -17,9 +18,18 @@ import (
 
 // MasteryConfig captures every tunable consumed by the user_skill_mastery
 // aggregate and the GET /v1/users/me/progress handler.
+//
+// Naming note: each Band* field is the *floor* (lower inclusive bound) of the
+// band it names — `BandLearning = 0.40` means "mastery in [0.40, 0.70) is the
+// learning band". The wire shape (`bands.needs_work`) reverses this convention
+// and labels each value by the band that ENDS at it, so the API mapping in
+// progress_handler.bandsFromConfig deliberately renames fields.
 type MasteryConfig struct {
-	// Band thresholds. mastery < BandLearning → "needs_work";
-	// < BandSolid → "learning"; < BandReady → "solid"; ≥ BandReady → "ready".
+	// Band floors. mastery < BandLearning → "needs_work";
+	// [BandLearning, BandSolid) → "learning"; [BandSolid, BandReady) → "solid";
+	// ≥ BandReady → "ready". Values must satisfy 0 ≤ BandLearning ≤ BandSolid
+	// ≤ BandReady ≤ 1; LoadMasteryConfig clamps and re-orders if a misconfig
+	// produces a violation.
 	BandLearning float64
 	BandSolid    float64
 	BandReady    float64
@@ -74,26 +84,70 @@ func (c MasteryConfig) BandFromMastery(mastery float64) string {
 // LoadMasteryConfig resolves MasteryConfig from environment variables with
 // fallback defaults. Call once at server boot; pass the result to consumers
 // rather than calling this in hot paths.
+//
+// Hardening:
+//   - Band floors are clamped to [0, 1] and re-ordered if a misconfig leaves
+//     them non-monotonic (so a typo can't return NaN bands or break
+//     BandFromMastery).
+//   - Weights are clamped to [0, 100]; negative weights would otherwise
+//     corrupt weightedOverall in the progress handler.
+//   - Env parse errors fall back to the default but log a warning so the
+//     operator can spot the typo instead of silently shipping defaults.
 func LoadMasteryConfig() MasteryConfig {
-	return MasteryConfig{
-		BandLearning: envFloat("MASTERY_BAND_LEARNING", 0.40),
-		BandSolid:    envFloat("MASTERY_BAND_SOLID", 0.70),
-		BandReady:    envFloat("MASTERY_BAND_READY", 0.85),
+	cfg := MasteryConfig{
+		BandLearning: clampUnit(envFloat("MASTERY_BAND_LEARNING", 0.40)),
+		BandSolid:    clampUnit(envFloat("MASTERY_BAND_SOLID", 0.70)),
+		BandReady:    clampUnit(envFloat("MASTERY_BAND_READY", 0.85)),
 
 		EarlyAttemptCap: 3,
 		EarlyAlpha:      0.5,
 		SteadyAlpha:     0.3,
 
 		weights: map[string]int{
-			"noi":       envInt("MASTERY_OVERALL_NOI", 25),
-			"viet":      envInt("MASTERY_OVERALL_VIET", 20),
-			"nghe":      envInt("MASTERY_OVERALL_NGHE", 20),
-			"doc":       envInt("MASTERY_OVERALL_DOC", 20),
-			"ngu_phap":  envInt("MASTERY_OVERALL_NGU_PHAP", 10),
-			"tu_vung":   envInt("MASTERY_OVERALL_TU_VUNG", 5),
-			"interview": envInt("MASTERY_OVERALL_INTERVIEW", 0),
+			"noi":       clampWeight(envInt("MASTERY_OVERALL_NOI", 25)),
+			"viet":      clampWeight(envInt("MASTERY_OVERALL_VIET", 20)),
+			"nghe":      clampWeight(envInt("MASTERY_OVERALL_NGHE", 20)),
+			"doc":       clampWeight(envInt("MASTERY_OVERALL_DOC", 20)),
+			"ngu_phap":  clampWeight(envInt("MASTERY_OVERALL_NGU_PHAP", 10)),
+			"tu_vung":   clampWeight(envInt("MASTERY_OVERALL_TU_VUNG", 5)),
+			"interview": clampWeight(envInt("MASTERY_OVERALL_INTERVIEW", 0)),
 		},
 	}
+
+	// Restore monotonic order if the operator entered floors out of sequence;
+	// BandFromMastery relies on BandLearning ≤ BandSolid ≤ BandReady to
+	// classify correctly.
+	if cfg.BandLearning > cfg.BandSolid {
+		log.Printf("warning: MASTERY_BAND_LEARNING (%v) > MASTERY_BAND_SOLID (%v); swapping",
+			cfg.BandLearning, cfg.BandSolid)
+		cfg.BandLearning, cfg.BandSolid = cfg.BandSolid, cfg.BandLearning
+	}
+	if cfg.BandSolid > cfg.BandReady {
+		log.Printf("warning: MASTERY_BAND_SOLID (%v) > MASTERY_BAND_READY (%v); swapping",
+			cfg.BandSolid, cfg.BandReady)
+		cfg.BandSolid, cfg.BandReady = cfg.BandReady, cfg.BandSolid
+	}
+	return cfg
+}
+
+func clampUnit(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
+}
+
+func clampWeight(n int) int {
+	if n < 0 {
+		return 0
+	}
+	if n > 100 {
+		return 100
+	}
+	return n
 }
 
 func envFloat(key string, fallback float64) float64 {
@@ -103,6 +157,7 @@ func envFloat(key string, fallback float64) float64 {
 	}
 	f, err := strconv.ParseFloat(v, 64)
 	if err != nil {
+		log.Printf("warning: %s=%q is not a valid float; using default %v", key, v, fallback)
 		return fallback
 	}
 	return f
@@ -115,6 +170,7 @@ func envInt(key string, fallback int) int {
 	}
 	n, err := strconv.Atoi(v)
 	if err != nil {
+		log.Printf("warning: %s=%q is not a valid int; using default %d", key, v, fallback)
 		return fallback
 	}
 	return n

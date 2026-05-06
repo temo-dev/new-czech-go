@@ -102,6 +102,62 @@ func TestLoadMasteryConfig_OverallWeightUnknownSkill(t *testing.T) {
 	}
 }
 
+func TestLoadMasteryConfig_ClampsBandsToUnit(t *testing.T) {
+	clearMasteryEnv(t)
+	t.Setenv("MASTERY_BAND_LEARNING", "-0.5")
+	t.Setenv("MASTERY_BAND_READY", "1.5")
+	cfg := LoadMasteryConfig()
+	if cfg.BandLearning != 0 {
+		t.Errorf("negative band floor not clamped: BandLearning=%v", cfg.BandLearning)
+	}
+	if cfg.BandReady != 1 {
+		t.Errorf(">1 band floor not clamped: BandReady=%v", cfg.BandReady)
+	}
+}
+
+func TestLoadMasteryConfig_ClampsWeightsToRange(t *testing.T) {
+	clearMasteryEnv(t)
+	t.Setenv("MASTERY_OVERALL_NOI", "-10")
+	t.Setenv("MASTERY_OVERALL_VIET", "250")
+	cfg := LoadMasteryConfig()
+	if got := cfg.OverallWeight("noi"); got != 0 {
+		t.Errorf("negative weight not clamped: noi=%d", got)
+	}
+	if got := cfg.OverallWeight("viet"); got != 100 {
+		t.Errorf(">100 weight not clamped: viet=%d", got)
+	}
+}
+
+func TestLoadMasteryConfig_RestoresMonotonicBands(t *testing.T) {
+	clearMasteryEnv(t)
+	// Operator entered floors out of order — solid below learning.
+	t.Setenv("MASTERY_BAND_LEARNING", "0.80")
+	t.Setenv("MASTERY_BAND_SOLID", "0.60")
+	t.Setenv("MASTERY_BAND_READY", "0.90")
+	cfg := LoadMasteryConfig()
+	if cfg.BandLearning > cfg.BandSolid {
+		t.Errorf("non-monotonic bands not swapped: learning=%v solid=%v",
+			cfg.BandLearning, cfg.BandSolid)
+	}
+	if cfg.BandSolid > cfg.BandReady {
+		t.Errorf("non-monotonic bands: solid=%v ready=%v",
+			cfg.BandSolid, cfg.BandReady)
+	}
+}
+
+func TestLoadMasteryConfig_FallsBackOnInvalidEnv(t *testing.T) {
+	clearMasteryEnv(t)
+	t.Setenv("MASTERY_BAND_LEARNING", "0,40") // comma decimal — invalid
+	t.Setenv("MASTERY_OVERALL_NOI", "twenty-five")
+	cfg := LoadMasteryConfig()
+	if cfg.BandLearning != 0.40 {
+		t.Errorf("invalid band float should fall back to default 0.40, got %v", cfg.BandLearning)
+	}
+	if got := cfg.OverallWeight("noi"); got != 25 {
+		t.Errorf("invalid weight int should fall back to default 25, got %d", got)
+	}
+}
+
 // clearMasteryEnv unsets every MASTERY_* env var that LoadMasteryConfig reads,
 // so a test starts from documented defaults regardless of host environment.
 func clearMasteryEnv(t *testing.T) {
