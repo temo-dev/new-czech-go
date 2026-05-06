@@ -1,13 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/api/progress_api.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../progress/widgets/home_progress_card.dart';
 import 'course_detail_screen.dart';
+
+// Resolves a skill_kind token to its VI display name. Inline pending the
+// V20 UI-6 ARB pass; the call site will switch to AppLocalizations then.
+String _skillLabel(String kind) => switch (kind) {
+      'noi' => 'Nói',
+      'viet' => 'Viết',
+      'nghe' => 'Nghe',
+      'doc' => 'Đọc',
+      'tu_vung' => 'Từ vựng',
+      'ngu_phap' => 'Ngữ pháp',
+      'interview' => 'Phỏng vấn',
+      _ => kind,
+    };
 
 // Card color palette — cycles through these per course index
 const _cardColors = [
@@ -30,9 +46,22 @@ class _CourseListScreenState extends State<CourseListScreen> {
   List<Course> _courses = [];
   bool _loading = true;
   String? _error;
+  ProgressApi? _progressApi;
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+    _initProgressApi();
+  }
+
+  Future<void> _initProgressApi() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _progressApi = ProgressApi(client: widget.client, prefs: prefs);
+    });
+  }
 
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
@@ -105,7 +134,27 @@ class _CourseListScreenState extends State<CourseListScreen> {
           'Lộ trình học tập chuyên sâu cho người Việt tại Séc.',
           style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant),
         ),
-        const SizedBox(height: AppSpacing.x5),
+        const SizedBox(height: AppSpacing.x4),
+
+        // ── Progress card (V20) — strings inline pending UI-6 ARB keys ──────
+        if (_progressApi != null) ...[
+          HomeProgressCard(
+            fetcher: _progressApi!.fetch,
+            labels: const HomeProgressCardLabels(
+              cardTitle: 'Tiến độ học tập',
+              overallLabel: 'Tổng',
+              emptyTitle: 'Chưa có tiến độ',
+              emptyMessage: 'Hoàn thành 1 bài để xem điểm mạnh/yếu của bạn.',
+              emptyCtaLabel: 'Bắt đầu học',
+              errorTitle: 'Không tải được tiến độ',
+              errorMessage: 'Kiểm tra mạng và thử lại.',
+              retryLabel: 'Thử lại',
+              offlineLabel: 'Đang offline',
+              skillLabelFor: _skillLabel,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.x5),
+        ],
 
         // ── Course cards ────────────────────────────────────────────────────
         if (_courses.isEmpty)

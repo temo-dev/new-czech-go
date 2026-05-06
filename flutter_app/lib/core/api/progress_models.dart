@@ -13,8 +13,8 @@ class UserProgress {
   });
 
   factory UserProgress.fromApiJson(Map<String, dynamic> json) {
-    final skillsRaw = json['skills'] as List<dynamic>? ?? const [];
-    final weightsRaw = json['weights'] as Map<String, dynamic>? ?? const {};
+    final skillsRaw = (json['skills'] as List?) ?? const [];
+    final weightsRaw = (json['weights'] as Map?) ?? const {};
     return UserProgress(
       overallProgress: _asDouble(json['overall_progress']),
       overallBand: (json['overall_band'] as String?) ?? 'needs_work',
@@ -23,11 +23,13 @@ class UserProgress {
           .map(SkillProgress.fromApiJson)
           .toList(growable: false),
       bands: ProgressBands.fromApiJson(
-        json['bands'] as Map<String, dynamic>? ?? const {},
+        _asMap(json['bands']),
       ),
-      weights: weightsRaw.map(
-        (k, v) => MapEntry(k, (v as num?)?.toInt() ?? 0),
-      ),
+      weights: {
+        for (final entry in weightsRaw.entries)
+          if (entry.key is String)
+            entry.key as String: (entry.value as num?)?.toInt() ?? 0,
+      },
     );
   }
 
@@ -67,7 +69,7 @@ class SkillProgress {
   });
 
   factory SkillProgress.fromApiJson(Map<String, dynamic> json) {
-    final modulesRaw = json['modules'] as List<dynamic>? ?? const [];
+    final modulesRaw = (json['modules'] as List?) ?? const [];
     return SkillProgress(
       skillKind: (json['skill_kind'] as String?) ?? '',
       mastery: _asDouble(json['mastery']),
@@ -160,6 +162,16 @@ class ProgressBands {
 double _asDouble(Object? v) {
   if (v is num) return v.toDouble();
   return 0.0;
+}
+
+Map<String, dynamic> _asMap(Object? v) {
+  if (v is Map) {
+    return {
+      for (final entry in v.entries)
+        if (entry.key is String) entry.key as String: entry.value,
+    };
+  }
+  return const {};
 }
 
 DateTime? _parseDate(Object? v) {
