@@ -84,7 +84,12 @@ def is_same_origin(upload_url, base_url):
 
 
 def discover_speaking_exercise(base_url, auth_headers):
-    """Walk courses → /modules → skills(noi) → first exercise. Returns exercise_id or raises."""
+    """Walk courses → /modules → /exercises?skill_kind=noi → first published exercise.
+
+    V8 schema dropped the standalone `skills` table; SkillSummary now only
+    carries `skill_kind` + `exercise_count`. Discovery filters exercises
+    by skill_kind on the module endpoint instead.
+    """
     courses_resp = request_json("GET", f"{base_url}/v1/courses", headers=auth_headers)
     courses = (courses_resp.get("data") or [])
     if not courses:
@@ -92,16 +97,17 @@ def discover_speaking_exercise(base_url, auth_headers):
     mods_resp = request_json("GET", f"{base_url}/v1/courses/{courses[0]['id']}/modules", headers=auth_headers)
     modules = mods_resp.get("data") or []
     for module in modules:
-        skills_resp = request_json("GET", f"{base_url}/v1/modules/{module['id']}/skills", headers=auth_headers)
-        skills = skills_resp.get("data") or []
-        for skill in skills:
-            if skill.get("skill_kind") == "noi":
-                exs_resp = request_json("GET", f"{base_url}/v1/skills/{skill['id']}/exercises", headers=auth_headers)
-                exercises = exs_resp.get("data") or []
-                if exercises:
-                    eid = exercises[0]["id"]
-                    print(f"[exercise] auto-discovered id={eid}", file=sys.stderr, flush=True)
-                    return eid
+        exs_resp = request_json(
+            "GET",
+            f"{base_url}/v1/modules/{module['id']}/exercises?skill_kind=noi",
+            headers=auth_headers,
+        )
+        exercises = exs_resp.get("data") or []
+        for ex in exercises:
+            if ex.get("status") == "published":
+                eid = ex["id"]
+                print(f"[exercise] auto-discovered id={eid}", file=sys.stderr, flush=True)
+                return eid
     raise RuntimeError("No published speaking (noi) exercise found. Run `make seed-modelovy-test-2` first.")
 
 
@@ -295,7 +301,8 @@ def main():
         print(f"HTTP {exc.code}: {body}", file=sys.stderr)
         sys.exit(1)
     except Exception as exc:
-        print(str(exc), file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         sys.exit(1)
     finally:
         if created_dummy and os.path.exists(audio_file):

@@ -72,21 +72,26 @@ def main():
     module = modules[0]
     ok(f"course modules — {len(modules)} module(s)")
 
-    # 4. Module → skills
+    # 4. Module → skills (V8 SkillSummary: skill_kind + exercise_count, no id)
     resp = request_json("GET", f"{base}/v1/modules/{module['id']}/skills", headers=auth)
     skills = resp.get("data") or []
     if not skills:
         fail("module skills", "no skills in response")
     skill = skills[0]
-    ok(f"module skills — {len(skills)} skill(s), using skill_kind={skill.get('skill_kind')}")
+    skill_kind = skill.get("skill_kind") or ""
+    ok(f"module skills — {len(skills)} skill(s), using skill_kind={skill_kind}")
 
-    # 5. Skill → exercises
-    resp = request_json("GET", f"{base}/v1/skills/{skill['id']}/exercises", headers=auth)
+    # 5. Module → exercises filtered by skill_kind (V8 routing)
+    resp = request_json(
+        "GET",
+        f"{base}/v1/modules/{module['id']}/exercises?skill_kind={skill_kind}",
+        headers=auth,
+    )
     exercises = resp.get("data") or []
     if not exercises:
-        fail("skill exercises", "no exercises in response")
+        fail("module exercises", f"no exercises for skill_kind={skill_kind}")
     exercise = exercises[0]
-    ok(f"skill exercises — {len(exercises)} exercise(s)")
+    ok(f"module exercises — {len(exercises)} exercise(s) for skill_kind={skill_kind}")
 
     # 6. Exercise detail
     resp = request_json("GET", f"{base}/v1/exercises/{exercise['id']}", headers=auth)

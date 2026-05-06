@@ -115,9 +115,29 @@ func main() {
 	authDeps, useAuth := buildV17AuthDeps()
 
 	processorInst := processing.NewProcessor(repo, transcriber, ttsProvider, llmProvider, reviewProvider)
+
+	// V19: skill mastery aggregate is independent of V17 auth — wire it
+	// whenever Postgres is available so the dev fixture login path also
+	// records progress. We piggyback on AuthDeps (only SkillMastery set)
+	// and route through NewServerWithAuth; registerAuthRoutes stays inert
+	// because Users == nil, so no V17 routes leak.
+	if !useAuth {
+		if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+			masteryStore, err := store.NewPostgresSkillMasteryStore(databaseURL)
+			if err != nil {
+				log.Fatalf("V19 skill_mastery store: %v", err)
+			}
+			authDeps = httpapi.AuthDeps{SkillMastery: masteryStore}
+			useAuth = true
+			log.Printf("V19 skill_mastery wired without V17 auth (dev fixture path)")
+		}
+	}
+
 	var handler http.Handler
 	if useAuth {
-		log.Printf("V17 self-serve auth enabled (signup/login/IAP/quota gates)")
+		if authDeps.Users != nil {
+			log.Printf("V17 self-serve auth enabled (signup/login/IAP/quota gates)")
+		}
 		handler = httpapi.NewServerWithAuth(repo, processorInst, uploadProvider, audioURLProvider, audioSignSecret, authDeps)
 	} else {
 		handler = httpapi.NewServerWithAudio(repo, processorInst, uploadProvider, audioURLProvider, audioSignSecret)
