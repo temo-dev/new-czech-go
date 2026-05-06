@@ -3699,3 +3699,17 @@ Per SPEC.md § V18.1 Verification table. Manual — không code.
 | **Total** | **18** | **~4 ngày** dev |
 
 Single dev tuần tự A → B → C → D → E. C + D parallelizable với B nếu 2 dev. Pilot E2 start khi MAN-2 verified.
+
+---
+
+## V21 — CEFR Level Progression (A0 → B1)
+
+Detail in `tasks/cefr-level-progression-plan.md`. Todo
+`tasks/cefr-level-progression-todo.md`. Spec
+`docs/specs/cefr-level-progression.md` + UX
+`docs/specs/cefr-level-progression-ux.md` + idea
+`docs/ideas/cefr-level-progression.md`. SPEC entry: `SPEC.md` § V21.
+
+Phases A → B → C → D → E. Critical path A → B → D → E; C parallelizable
+after A. ~9 dev days serial. Targets: backend +45 tests, Flutter +32,
+CMS +6.

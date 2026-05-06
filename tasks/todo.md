@@ -941,3 +941,16 @@ Estimated: ~4 ngày dev
 - [ ] Pilot CER ≤10% verdict documented
 - [ ] No regression: V18 type-mode dictation submissions still work
 - [ ] Backward-compat: pre-V18.1 dictation exercises (no `submission_mode`) default to `"type"`
+
+---
+
+## V21 — CEFR Level Progression (A0 → B1)
+
+Detail in `tasks/cefr-level-progression-todo.md`. Plan
+`tasks/cefr-level-progression-plan.md`. Spec
+`docs/specs/cefr-level-progression.md`.
+
+Phases A (schema + config) → B (gating service + 4 endpoints + course
+mods + atomic promotion hook) → C (CMS form fields) → D (Flutter
+onboarding + home + lock states + promotion flow) → E (smoke + manual
++ verify). Targets: backend +45, Flutter +32, CMS +6.

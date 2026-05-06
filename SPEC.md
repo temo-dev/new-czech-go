@@ -1705,3 +1705,141 @@ DB: inline `addColumnIfMissing("media_assets", "attempt_id", "UUID NULL")`
 | MAN-7 | Old V18 exercise (no submission_mode) | Behaves identically |
 | MAN-8 | Pilot gold set (20×6 photos, 5 learners) | CER ≤10% averaged |
 | CHECKPOINT | `make verify` | Full pass |
+
+---
+
+## V21 — CEFR Level Progression (A0 → B1)
+
+> Detail: `docs/specs/cefr-level-progression.md` + UX:
+> `docs/specs/cefr-level-progression-ux.md` + idea:
+> `docs/ideas/cefr-level-progression.md`. Decided 2026-05-06.
+
+### V21 Scope
+
+Pivot from "A2-only sprint" to a **level-gated CEFR ladder** (A0 / A1 /
+A2 / B1). Each learner has `users.current_level`. Content above level
+is locked behind a **2-gate promotion**: skill mastery threshold
+unlocks a **promotion exam** (a `MockTest` flagged `is_promotion=true`,
+`target_level=<lvl>`); passing promotes the learner.
+
+MVP ships **A2 + B1** only. Schema accommodates A0/A1 without
+re-architecture. Existing users backfilled to `current_level='a2'`,
+`unlocked_levels={a0,a1,a2}`.
+
+### V21 Schema
+
+| Table | Change |
+|---|---|
+| `courses` | `+level enum(a0,a1,a2,b1) NOT NULL DEFAULT 'a2'`, index on level |
+| `users` | `+current_level enum DEFAULT 'a0'`, `+unlocked_levels TEXT[] DEFAULT {a0}`, `+placement_taken_at TIMESTAMPTZ NULL` |
+| `mock_tests` | `+is_promotion BOOL`, `+is_placement BOOL`, `+target_level enum NULL`, CHECK promotion → target required |
+| `promotion_attempts` | NEW: id, user_id, mock_test_id, source_level, target_level, full_session_id, passed, score_pct, per_skill_pct JSONB, created_at |
+
+All migrations via `addColumnIfMissing()` per backend convention.
+
+### V21 Configuration
+
+| Env | Default | Use |
+|---|---|---|
+| `LEVEL_MASTERY_THRESHOLD_PCT` | 70.0 | Per-skill mastery to unlock |
+| `LEVEL_COVERAGE_THRESHOLD_PCT` | 80.0 | Module coverage to unlock |
+| `LEVEL_PROMOTION_PASS_PCT` | 60.0 | Pass score per section |
+| `LEVEL_PROMOTION_COOLDOWN_HOURS` | 24 | Cooldown between failed attempts |
+| `LEVEL_DEMO_EXERCISE_PER_LEVEL` | 1 | Demo exercises shown per locked upper level |
+
+Loader: `backend/internal/config/level.go`.
+
+### V21 Endpoints
+
+| Route | Purpose |
+|---|---|
+| `GET /v1/users/me/level-progress` | Per-skill mastery vs threshold + unlock state |
+| `POST /v1/users/me/placement-test/start` | Returns placement MockTest + session |
+| `POST /v1/users/me/placement-test/complete` | Maps score → assigned level, writes user |
+| `POST /v1/promotion-attempts` | Create promotion attempt; rejects if locked or in cooldown |
+| `GET /v1/courses` (modify) | Adds `?level=` filter + per-item `unlock_state` |
+| `GET /v1/courses/:id` (modify) | Adds `unlock_state`, `demo_exercise_id`, `level` |
+
+Existing `GET /v1/users/me/progress` (V19) **payload unchanged**.
+
+### V21 Backend Layout
+
+| File | Owns |
+|---|---|
+| `backend/internal/level/service.go` | Gating math, threshold logic |
+| `backend/internal/level/repository.go` | DB reads/writes for users + promotion_attempts |
+| `backend/internal/level/handlers.go` | HTTP wiring |
+| `backend/internal/level/deps.go` | `LevelDeps` struct (mirrors V19 `MasteryDeps`) |
+| `backend/internal/config/level.go` | Env loader |
+
+`LevelService` consumes `MasteryDeps` (V19) — **no duplicate
+aggregation logic.**
+
+### V21 CMS
+
+| File | Change |
+|---|---|
+| `cms/components/course-form/*` | `Level` select + `DemoExerciseField` |
+| `cms/components/mock-test-form/*` | `is_promotion`, `is_placement`, `target_level` (mutex on placement+promotion) |
+
+CMS keeps inline VI strings (per AGENTS.md).
+
+### V21 Flutter
+
+| Path | Change |
+|---|---|
+| `flutter_app/lib/core/api/level_api.dart` | NEW client |
+| `flutter_app/lib/features/onboarding/welcome_screen.dart` | NEW |
+| `flutter_app/lib/features/onboarding/placement_result_screen.dart` | NEW |
+| `flutter_app/lib/features/home/widgets/level_badge.dart` | NEW |
+| `flutter_app/lib/features/home/widgets/level_progress_ring.dart` | NEW |
+| `flutter_app/lib/features/home/widgets/promotion_banner.dart` | NEW |
+| `flutter_app/lib/features/courses/widgets/locked_course_sheet.dart` | NEW |
+| `flutter_app/lib/features/promotion/pre_exam_screen.dart` | NEW |
+| `flutter_app/lib/features/promotion/promotion_result_screen.dart` | NEW (pass + fail variants) |
+| `flutter_app/lib/features/home/home_screen.dart` | MODIFY — embed badge + ring + banner |
+| `flutter_app/lib/features/courses/course_list_screen.dart` | MODIFY — lock + demo states |
+| `flutter_app/lib/l10n/app_vi.arb` + `app_en.arb` | NEW keys (count must match) |
+
+**Reuse `AppColors` / `AppSpacing` / `AppTypography`. NO new style
+system.** Icons via Lucide vector pack.
+
+### V21 Behavior Rules
+
+- Onboarding routes every new user through placement (skippable; skip
+  → `a0`).
+- Existing users: backfilled to `a2`, all lower levels unlocked,
+  `placement_taken_at NULL`. Settings exposes opt-in re-test.
+- Locked exercise reads return `403 level_locked` except the demo
+  exercise per upper-level course (`Course.demo_exercise_id`).
+- Demo attempts **do not** write mastery aggregates.
+- Server is sole authority for `unlock_state`. Client never decides.
+- Promotion fail does **not** decrement mastery — only writes a
+  `promotion_attempts` row + 24h cooldown.
+- Promotion pass is atomic: scoring write + level promotion in one
+  transaction. Idempotent.
+
+### Avoid in V21
+
+- ❌ Skill-wise CEFR per learner (defer to future slice)
+- ❌ Adaptive promotion exam generation
+- ❌ A0 / A1 content authoring inside this slice
+- ❌ Auto-demotion / level expiry
+- ❌ Certificate / badge sharing
+- ❌ Per-screen ad-hoc colors (must use `AppColors`)
+- ❌ Emoji icons (Lucide SVG only)
+- ❌ Client-side gate computation
+- ❌ Inlining LLM prompt/model strings (per AGENTS.md)
+- ❌ Decrementing mastery on promotion fail
+- ❌ A new `PromotionTest` entity (use `MockTest` flags)
+
+### V21 Verification
+
+| Layer | Lệnh | Pass |
+|---|---|---|
+| BE-unit | `make backend-test` | +20 tests min — gating, cooldown, placement bands, atomic promotion, V19 mastery still passing |
+| BE-int | `tests/level_flow_test.go` (new) | Signup → skip placement → A0 → seed mastery → attempt → fail → cooldown → retry → pass → B1 unlocked |
+| CMS | `make cms-lint && make cms-build && cd cms && npm test` | +6 Vitest min |
+| Flutter | `make flutter-analyze && make flutter-test` | +12 widget tests min (`LevelBadge`, `LevelProgressRing`, `LockedCourseSheet`, `PromotionResultScreen` pass + fail) |
+| Smoke | `make smoke-promotion-flow` (new) | E2E: placement → mastery seed → promotion pass |
+| CHECKPOINT | `make verify` | Full pass |
