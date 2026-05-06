@@ -21,7 +21,7 @@ SMOKE_AUDIO_FILE ?=
 	compose-proxy-up compose-proxy-down compose-proxy-logs compose-ec2-config \
 	compose-ec2-pull compose-ec2-up compose-ec2-down compose-ec2-logs release-images ecr-login check-ec2-env \
 	check-ec2-host check-aws-audio-pipeline package-ec2-deploy smoke-attempt-flow \
-	smoke-course-flow smoke-exam-flow smoke-v17-auth smoke-all \
+	smoke-course-flow smoke-exam-flow smoke-v17-auth smoke-progress-flow smoke-all \
 	seed-modelovy-test-2 graph-status verify clean
 
 help:
@@ -70,7 +70,9 @@ help:
 	@echo "  make smoke-course-flow  - Smoke test course browsing: login → courses → modules → skills → exercises"
 	@echo "  make smoke-exam-flow    - Smoke test mock exam session: create → submit all sections → complete → verify score"
 	@echo "  make smoke-v17-auth     - Smoke test V17 self-serve auth: signup/login/me/logout. Backend must run with USE_V17_AUTH=true"
-	@echo "  make smoke-all          - Run all four smoke tests in sequence"
+	@echo "  make smoke-progress-flow - Smoke test V19/V20 GET /v1/users/me/progress contract (auth, shape, bands, idempotency)"
+	@echo "                            Add --require-rows in SMOKE_PROGRESS_ARGS to assert at least one persisted skill row"
+	@echo "  make smoke-all          - Run all smoke tests in sequence"
 	@echo "  make graph-status     - Show whether the local code-review graph database exists"
 	@echo "  make verify           - Run backend build, CMS lint/build, Flutter analyze/test"
 
@@ -235,7 +237,10 @@ smoke-v17-auth:
 smoke-dictation-flow:
 	$(RTK) python3 scripts/smoke_dictation_flow.py --base-url $(SMOKE_BASE_URL)
 
-smoke-all: smoke-attempt-flow smoke-course-flow smoke-exam-flow smoke-v17-auth smoke-dictation-flow
+smoke-progress-flow:
+	$(RTK) python3 scripts/smoke_progress_flow.py --base-url $(SMOKE_BASE_URL) $(SMOKE_PROGRESS_ARGS)
+
+smoke-all: smoke-attempt-flow smoke-course-flow smoke-exam-flow smoke-v17-auth smoke-dictation-flow smoke-progress-flow
 
 seed-modelovy-test-2:
 	$(RTK) python3 scripts/seed-modelovy-test-2.py

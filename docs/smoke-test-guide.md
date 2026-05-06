@@ -9,7 +9,10 @@ End-to-end API smoke tests cho AI Agents và developers. Tất cả scripts dùn
 | `smoke-attempt-flow` | `scripts/smoke_test_attempt_flow.py` | Speaking attempt: login → create → upload audio → poll → completed |
 | `smoke-course-flow` | `scripts/smoke_course_flow.py` | Course browsing: login → courses → modules → skills → exercises |
 | `smoke-exam-flow` | `scripts/smoke_exam_flow.py` | Mock exam session: create → submit all sections → complete → score |
-| `smoke-all` | (chạy 3 cái trên theo thứ tự) | Full regression |
+| `smoke-v17-auth` | `scripts/smoke_v17_auth.py` | V17 self-serve auth: signup/login/me/logout |
+| `smoke-dictation-flow` | `scripts/smoke_dictation_flow.py` | Writing dictation: per-sentence Levenshtein scoring |
+| `smoke-progress-flow` | `scripts/smoke_progress_flow.py` | V19/V20 `/v1/users/me/progress`: auth gate, wire shape, bands monotonic, band classification, weights, per-skill validation, idempotency |
+| `smoke-all` | (chạy tất cả theo thứ tự) | Full regression |
 
 ## Prereq
 
