@@ -12,9 +12,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** all columns + index + table + CHECK added; existing courses backfilled `a2`; idempotent
   - **Verify:** `go build ./...` clean; `TestV21LevelsMigration_*` pass (2 tests + 4 subtests); full suite `581` tests
   - **Size:** M
-- [ ] **V21-A2** `LoadLevelConfig()` env loader (`config/level.go`)
-  - **AC:** sole owner of `LEVEL_*` env reads; defaults per spec; `LEVEL_PLACEMENT_BANDS_JSON` parsed
-  - **Verify:** +3 unit tests
+- [x] **V21-A2** `LoadLevelConfig()` env loader (`processing/level_config.go` — placed alongside V19 `processing_config.go` per repo convention; spec said `config/level.go` but no such package exists, processing/ already owns mastery + LLM config)
+  - **AC:** sole owner of `LEVEL_*` env reads; defaults per spec; `LEVEL_PLACEMENT_BANDS_JSON` parsed; values clamp to [0,100] / ≥0; `LevelConfig.LevelFromPlacementScore` exposes band logic; B1 cap when `AllowB1Placement=false`
+  - **Verify:** +5 unit tests (defaults, env override, custom bands JSON, malformed/empty JSON fallback, OOB clamp)
   - **Size:** S
 
 **[CHECKPOINT V21-A]** `make backend-build && make backend-test` pass; +3 tests
