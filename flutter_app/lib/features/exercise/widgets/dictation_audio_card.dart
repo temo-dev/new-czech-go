@@ -56,7 +56,7 @@ class _DictationAudioCardState extends State<DictationAudioCard> {
     _replayCount = widget.initialReplayCount;
     _stateSub = _player.playerStateStream.listen((s) {
       if (!mounted) return;
-      setState(() => _playing = s.playing);
+      setState(() => _playing = dictationAudioShowsPause(s));
     });
     _load();
   }
@@ -128,13 +128,15 @@ class _DictationAudioCardState extends State<DictationAudioCard> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final pillBg = _isCapped
-        ? AppColors.error.withValues(alpha: 0.12)
-        : AppColors.primary.withValues(alpha: 0.12);
+    final pillBg =
+        _isCapped
+            ? AppColors.error.withValues(alpha: 0.12)
+            : AppColors.primary.withValues(alpha: 0.12);
     final pillColor = _isCapped ? AppColors.error : AppColors.primary;
-    final pillText = _isCapped
-        ? l.dictationRepeatExhausted
-        : widget.maxReplays > 0
+    final pillText =
+        _isCapped
+            ? l.dictationRepeatExhausted
+            : widget.maxReplays > 0
             ? l.dictationRepeatRemaining(widget.maxReplays - _replayCount)
             : '∞';
 
@@ -179,8 +181,8 @@ class _DictationAudioCardState extends State<DictationAudioCard> {
                   _error
                       ? l.audioError
                       : _loading
-                          ? l.audioLoading
-                          : l.dictationListenInstruction,
+                      ? l.audioLoading
+                      : l.dictationListenInstruction,
                   style: AppTypography.bodySmall.copyWith(
                     color: _error ? AppColors.error : AppColors.onSurface,
                   ),
@@ -209,6 +211,11 @@ class _DictationAudioCardState extends State<DictationAudioCard> {
   }
 }
 
+@visibleForTesting
+bool dictationAudioShowsPause(PlayerState state) {
+  return state.playing && state.processingState != ProcessingState.completed;
+}
+
 class _PlayButton extends StatelessWidget {
   const _PlayButton({
     required this.playing,
@@ -230,9 +237,10 @@ class _PlayButton extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: disabled
-                ? AppColors.onSurface.withValues(alpha: 0.16)
-                : AppColors.primary,
+            color:
+                disabled
+                    ? AppColors.onSurface.withValues(alpha: 0.16)
+                    : AppColors.primary,
             shape: BoxShape.circle,
           ),
           child: Icon(

@@ -1622,3 +1622,86 @@ Thêm exercise type mới `psani_3_dictation` vào skill `viet`. Admin author 3�
 | MAN-7 | Tab Sửa bài | Diff highlight green/red |
 | MAN-8 | LLM mock fail | Result vẫn render với deterministic-only diff |
 | CHECKPOINT | `make verify` | Full pass |
+
+---
+
+## V18.1 — Dictation OCR Submission
+
+> Status: spec frozen, implementation pending
+> Spec: `docs/specs/dictation-ocr.md`
+> Idea: `docs/ideas/dictation-ocr.md`
+> Parent: V18 (`psani_3_dictation`)
+
+### Tóm tắt
+
+Mở rộng `psani_3_dictation` với handwriting submission qua **Claude Vision OCR** (existing `ANTHROPIC_API_KEY`, không vendor mới). Field mới `DictationDetail.submission_mode: "type" | "ocr" | "both"` (default `"type"` — backward-compat V18). Learner chụp ảnh từng câu → preview OCR text trong editable TextField → confirm → submit. OCR text feed vào `dictation_processor` cũ — same Levenshtein scorer, same `DictationFeedback` shape.
+
+### Decisions locked (xem spec § 0)
+
+| # | Decision | Value |
+|---|---|---|
+| O1 | Provider | Claude Vision (zero new SDK/secret) |
+| O2 | Model | `LLM_OCR_MODEL` env (default `claude-opus-4-7`) |
+| O3 | Mode toggle | `submission_mode` field, default `"type"` |
+| O4 | Granularity | 1 photo per sentence |
+| O5 | Preview-confirm | OCR returns to editable TextField; learner edits + confirms |
+| O6 | Score path | Reuse V18 `dictation_processor` Levenshtein |
+| O7 | Endpoints | `POST /v1/attempts/:id/dictation-ocr-preview` + `submit-dictation-ocr` |
+| O8 | Storage | `media_assets.attempt_id` column (new), `dictation-ocr/` prefix |
+| O9 | Image cap | 8 max, 5MB each, JPEG/PNG/HEIC |
+| O10 | Pilot threshold | CER ≤10% trên 20×6 photo gold set trước khi promote default |
+
+### Acceptance Criteria
+
+12 AC (xem spec § 2.2): từ "admin toggle submission_mode" → "score parity type vs OCR" → "fail-soft empty text on OCR error" → "≥ 18 new tests".
+
+### File changes
+
+Backend new: `processing/dictation_ocr.go` + test, `httpapi/attempt_dictation_ocr.go` + test
+Backend edits: `contracts/types.go` (SubmissionMode field), `processing/llm_config.go` (LLM_OCR_MODEL), `processing/llm_prompts.go` (DictationOCRSystemPrompt), `processing/llm_user_prompts.go` (buildDictationOCRUserPrompt), `processing/dictation_processor.go` (path branch), `store/postgres_media_assets.go` (attempt_id column), `httpapi/server.go` (route reg)
+CMS edits: `DictationFields.tsx` (mode dropdown), `exercise-utils.ts` (validation), `lib/i18n.tsx` (3 admin keys), `__tests__/dictation-fields.test.ts`
+Flutter new: `widgets/dictation_ocr_preview_card.dart` + test
+Flutter edits: `screens/dictation_exercise_screen.dart` (branch), `models/models.dart` (parser), `core/api/api_client.dart` (2 methods), `l10n/app_{vi,en}.arb` (8 keys), tests
+DB: inline `addColumnIfMissing("media_assets", "attempt_id", "UUID NULL")`
+
+### V18.1 New i18n keys
+
+| Key | VI | EN |
+|---|---|---|
+| `dictationModeTypeLabel` | Gõ | Type |
+| `dictationModeOCRLabel` | 📷 Chụp ảnh | 📷 Take photo |
+| `dictationOCRPreviewTitle` | Kiểm tra văn bản đã đọc | Review recognized text |
+| `dictationOCRPreviewHint` | Sửa lại nếu cần, rồi xác nhận | Edit if needed, then confirm |
+| `dictationOCRConfirmBtn` | Dùng văn bản này | Use this text |
+| `dictationOCRRetakeBtn` | Chụp lại | Retake |
+| `dictationOCRFailedBanner` | Không nhận diện được. Hãy chụp lại hoặc gõ tay | Could not read. Retake or type instead |
+| `dictationOCRUploadingHint` | Đang nhận diện… | Recognizing… |
+
+### Avoid in V18.1
+
+- ❌ New OCR vendor (Google Vision, Azure, Tesseract) — Claude Vision đủ
+- ❌ On-device OCR (Vision Framework iOS, ML Kit Android) — defer V18.2+
+- ❌ Auto-submit OCR text (preview-confirm là safety net)
+- ❌ 500 on OCR fail (must fail-soft empty text)
+- ❌ Score penalty for OCR misread
+- ❌ Multi-sentence single photo (1 photo per sentence)
+- ❌ Image post-processing (deskew, rotate, contrast)
+- ❌ OCR cho exercise type khác psani_3_dictation
+- ❌ OCR vào MockTest exam pool
+
+### V18.1 Verification
+
+| Step | Lệnh | Manual check |
+|---|---|---|
+| BE-1 | `make backend-test` | +8 tests min — `TestClaudeVisionOCR_*`, `TestSubmitDictationOCR_*`, `TestDictationOCRPreview_*` |
+| FE-1 | `make flutter-analyze && make flutter-test` | +6 widget tests min |
+| CMS-1 | `make cms-lint && cd cms && npm test && make cms-build` | +4 Vitest min |
+| MAN-1 | Admin toggle `submission_mode="ocr"`, publish | Learner thấy chỉ camera button |
+| MAN-2 | Learner photo perfect handwriting | OCR đúng, score 10/10 |
+| MAN-3 | Photo illegible | Empty text + banner Retry, image không mất |
+| MAN-4 | Photo có č/š/ž/ě/ř | OCR ≥90% chars; learner edit 10% còn lại; PASS |
+| MAN-5 | Network off mid-OCR | Banner Retry, image preserved |
+| MAN-6 | Mixed mode `"both"` | Per-sentence toggle works |
+| MAN-7 | Old V18 exercise (no submission_mode) | Behaves identically |
+| MAN-8 | Pilot gold set (20×6 photos, 5 learners) | CER ≤10% averaged |
+| CHECKPOINT | `make verify` | Full pass |

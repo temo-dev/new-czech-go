@@ -365,7 +365,7 @@ Illustrative categories:
 - AWS region and bucket names
 - Transcribe config (e.g. `TRANSCRIBE_TIMEOUT`, default 3m)
 - Polly config
-- scoring provider config (`LLM_PROVIDER`, `LLM_REVIEW_PROVIDER`, `ANTHROPIC_API_KEY`, `LLM_MODEL`, `LLM_REVIEW_MODEL`, `LLM_CONTENT_MODEL`)
+- scoring provider config (`LLM_PROVIDER`, `LLM_REVIEW_PROVIDER`, `ANTHROPIC_API_KEY`, `LLM_MODEL`, `LLM_REVIEW_MODEL`, `LLM_CONTENT_MODEL`, `REPLICATE_IMAGE_MODEL`, `ELEVENLABS_MODEL_ID`, `ELEVENLABS_OUTPUT_FORMAT`)
 - audio signing secret (`AUDIO_SIGN_SECRET`) — **required**; backend will fatal-exit at startup if unset. Generate with `openssl rand -hex 32`. Signed URLs are HMAC-protected; without a stable secret, URLs issued before a restart will fail to verify after it.
 
 Do not hard-code:
@@ -375,18 +375,31 @@ Do not hard-code:
 
 LLM provider degrades gracefully: when `LLM_PROVIDER=claude` but `ANTHROPIC_API_KEY` is missing, the backend logs a warning and continues with the rule-based feedback/review path instead of exiting.
 
-**LLM configuration is centralized** in `backend/internal/processing/`:
-- `llm_config.go` — all constants (API endpoint, timeouts, default models) + `LoadLLMModels()` reads env vars
-- `llm_prompts.go` — all prompt templates (feedback system prompt, vocab generation, grammar generation)
+**LLM configuration is centralized** in `backend/internal/processing/` across 4 files. **Do not add new prompt strings or model IDs anywhere else.**
+
+| File | Owns |
+|------|------|
+| `llm_config.go` | API endpoint, version, timeouts, **all default model IDs** (Claude, Replicate, ElevenLabs) + `LoadLLMModels()` reads env vars |
+| `llm_prompts.go` | All **system prompts**: `FeedbackSystemPrompt`, `ReviewSystemPrompt`, `InterviewSystemPrompt`, `VocabGenerationPrompt`, `GrammarGenerationPrompt` |
+| `llm_user_prompts.go` | All **user-prompt builders** (per-attempt context) + `describeExercisePrompt` + exercise detail extractors |
+| `llm_fallbacks.go` | Rule-based feedback strings used when LLM unavailable (`writingFallbackFeedback`, `interviewFallbackFeedback`) |
 
 | Env var | Purpose | Default |
 |---------|---------|---------|
-| `LLM_MODEL` | Feedback model (per-attempt, real-time) | `claude-haiku-4-5-20251001` |
-| `LLM_REVIEW_MODEL` | Review artifact model | → `LLM_MODEL` |
-| `LLM_CONTENT_MODEL` | Vocab/grammar batch generation | `claude-haiku-4-5-20251001` |
+| `LLM_MODEL` | Claude feedback model (per-attempt, real-time) | `claude-haiku-4-5-20251001` |
+| `LLM_REVIEW_MODEL` | Claude review artifact model | → `LLM_MODEL` |
+| `LLM_CONTENT_MODEL` | Claude vocab/grammar batch generation | `claude-haiku-4-5-20251001` |
+| `REPLICATE_IMAGE_MODEL` | Replicate image-gen model (admin AI image) | `black-forest-labs/flux-schnell` |
+| `ELEVENLABS_MODEL_ID` | ElevenLabs TTS model | `eleven_multilingual_v2` |
+| `ELEVENLABS_OUTPUT_FORMAT` | ElevenLabs output format | `mp3_22050_32` |
 
-To change a model: set the env var — no code change needed.
-To change a prompt: edit `llm_prompts.go` — single file, all templates together.
+How to edit:
+- Change a model → set the env var, or update the `Default*Model` constant in `llm_config.go`. No other code change.
+- Change a system prompt (rubric/tone) → edit `llm_prompts.go` only.
+- Change per-attempt context layout (what data is fed in) → edit `llm_user_prompts.go` only.
+- Change fallback feedback copy → edit `llm_fallbacks.go` only.
+
+**Rule:** never inline a prompt string, model ID, or fallback feedback in scorer/handler/provider files. New LLM call sites must consume from `llm_prompts.go` + `LoadLLMModels()`. Code review should reject any inline prompt or magic model string.
 
 ## Non-Goals for V1 Infrastructure
 - zero-downtime deployments

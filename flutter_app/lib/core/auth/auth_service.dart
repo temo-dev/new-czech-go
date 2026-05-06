@@ -127,10 +127,16 @@ class AuthService extends ChangeNotifier {
 
   void _adoptUser(AuthUser user) {
     _user = user;
-    if (!user.emailVerified && user.graceAttemptsLeft <= 0) {
-      _setState(AuthState.needsVerify);
+    final next = (!user.emailVerified && user.graceAttemptsLeft <= 0)
+        ? AuthState.needsVerify
+        : AuthState.authenticated;
+    if (_state == next) {
+      // State unchanged but user fields (display_name, avatar_asset_id, …)
+      // may have been mutated by /v1/users/me refresh. Always notify so
+      // listeners pick up the new payload.
+      notifyListeners();
     } else {
-      _setState(AuthState.authenticated);
+      _setState(next);
     }
   }
 

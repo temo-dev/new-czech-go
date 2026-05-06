@@ -461,6 +461,8 @@
     "dictationNextBtn": "Next →",
     "dictationSubmitBtn": "Submit",
     "dictationPrevBtn": "← Prev",
+    "dictationResultTitle": "Dictation result",
+    "dictationFinishBtn": "Finish",
     "dictationResultPerSentence": "Per-sentence accuracy",
     "dictationLLMUnavailable": "Detailed feedback temporarily unavailable",
     "dictationModeTypeLabel": "Type",

@@ -44,55 +44,9 @@ func buildInterviewTranscriptText(turns []interviewTurn) string {
 	return strings.TrimRight(sb.String(), "\n")
 }
 
-// interviewSystemPrompt returns the system prompt for interview scoring.
-// readiness_level values match normalizeReadinessLevel: not_ready/almost_ready/ready_for_mock/exam_ready.
-func interviewSystemPrompt(locale string) string {
-	lang := "Vietnamese"
-	if locale == contracts.LocaleEN {
-		lang = "English"
-	}
-	return fmt.Sprintf(
-		"You are an expert Czech A2 language coach evaluating a practice interview session for the Czech \"trvaly pobyt A2\" oral exam. "+
-			"You will receive a multi-turn conversation transcript between a Czech examiner and a learner. "+
-			"Evaluate the LEARNER's responses ONLY — ignore examiner turns. "+
-			"Assess: vocabulary range (A2-appropriate words), grammar accuracy (case endings, verb conjugation, tense), conversational fluency (natural responses, cohesion). "+
-			"CRITICAL LANGUAGE RULE: overall_summary, strengths, improvements, retry_advice MUST be written entirely in %s. "+
-			"Only sample_answer may contain Czech. "+
-			"Address the learner directly (you/your / bạn/của bạn). "+
-			"readiness_level MUST be one of: not_ready, almost_ready, ready_for_mock, exam_ready. "+
-			"strengths, improvements, retry_advice: arrays of 1-3 concise %s strings (one idea per string, under 200 characters each). "+
-			"overall_summary: one concise paragraph under 400 characters. "+
-			"sample_answer: one or two natural Czech sentences demonstrating a better version of a key learner response. "+
-			`Return ONLY valid JSON. Output schema: {"readiness_level":"...","overall_summary":"...","strengths":["..."],"improvements":["..."],"retry_advice":["..."],"sample_answer":"..."}`,
-		lang, lang,
-	)
-}
-
-// buildInterviewUserPrompt constructs the user prompt for interview scoring.
-func buildInterviewUserPrompt(exerciseType, topic string, turns []interviewTurn, durationSec int) string {
-	transcriptText := buildInterviewTranscriptText(turns)
-	topicLine := ""
-	if topic != "" {
-		topicLine = fmt.Sprintf("Topic: %s\n", topic)
-	}
-	return fmt.Sprintf(
-		"Exercise type: %s\n%sDuration: %d seconds\n\nTranscript:\n%s",
-		exerciseType, topicLine, durationSec, transcriptText,
-	)
-}
-
-// interviewFallbackFeedback returns minimal rule-based feedback when LLM is unavailable.
-func interviewFallbackFeedback() contracts.AttemptFeedback {
-	return contracts.AttemptFeedback{
-		ReadinessLevel: "ok",
-		OverallSummary: "Phiên phỏng vấn đã được ghi nhận. Phản hồi chi tiết sẽ có khi AI sẵn sàng.",
-		Strengths:      []string{"Bạn đã hoàn thành buổi luyện tập"},
-		Improvements:   []string{"Hãy luyện thêm câu trả lời đầy đủ và chi tiết"},
-		RetryAdvice:    []string{"Thử lại với câu văn hoàn chỉnh hơn"},
-		TaskCompletion: contracts.TaskCompletion{ScoreBand: "ok"},
-		GrammarFeedback: contracts.GrammarFeedback{ScoreBand: "ok"},
-	}
-}
+// InterviewSystemPrompt + buildInterviewUserPrompt live in llm_prompts.go and
+// llm_user_prompts.go respectively. interviewFallbackFeedback lives in
+// llm_fallbacks.go.
 
 // ProcessInterviewAttempt scores a completed interview session using LLM feedback.
 // turns is passed directly from the submit handler (not read from store) so no

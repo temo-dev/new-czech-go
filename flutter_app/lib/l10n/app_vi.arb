@@ -506,6 +506,8 @@
     "dictationNextBtn": "Tiếp →",
     "dictationSubmitBtn": "Nộp bài",
     "dictationPrevBtn": "← Trước",
+    "dictationResultTitle": "Kết quả chính tả",
+    "dictationFinishBtn": "Hoàn thành",
     "dictationResultPerSentence": "Độ chính xác từng câu",
     "dictationLLMUnavailable": "Phản hồi chi tiết tạm không khả dụng",
     "dictationModeTypeLabel": "Gõ",

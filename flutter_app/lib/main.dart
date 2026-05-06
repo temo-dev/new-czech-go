@@ -59,10 +59,7 @@ class MluveniSprintApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final home = authService != null ? _V17AuthGate(service: authService!) : const LearnerShell();
-    final wrappedHome = authService != null
-        ? AuthServiceProvider(service: authService!, child: home)
-        : home;
-    return LocaleScope(
+    final app = LocaleScope(
       notifier: localeProvider,
       child: AnimatedBuilder(
         animation: localeProvider,
@@ -70,7 +67,13 @@ class MluveniSprintApp extends StatelessWidget {
             (context, _) => MaterialApp(
               title: 'A2 Mluveni Sprint',
               theme: AppTheme.light,
-              home: wrappedHome,
+              home: home,
+              builder: (context, child) {
+                if (child == null) return const SizedBox.shrink();
+                return authService != null
+                    ? AuthServiceProvider(service: authService!, child: child)
+                    : child;
+              },
               locale: Locale(localeProvider.code),
               supportedLocales: AppLocalizations.supportedLocales,
               localizationsDelegates: const [
@@ -82,6 +85,7 @@ class MluveniSprintApp extends StatelessWidget {
             ),
       ),
     );
+    return app;
   }
 }
 

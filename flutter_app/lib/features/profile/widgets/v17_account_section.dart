@@ -1,5 +1,9 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
 
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../../core/auth/auth_models.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/screens/signup_screen.dart' show AuthServiceProvider;
@@ -35,61 +39,72 @@ class V17AccountSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLowest,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user.displayName.isEmpty ? user.email : user.displayName,
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.secondary),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              user.email,
-                              style: const TextStyle(color: AppColors.onSurfaceVariant),
-                            ),
-                          ],
+            // Hero block: avatar 96pt centered + name + edit + email + chips
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _AvatarTile(user: user, service: service, size: 96),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        user.displayName.isEmpty ? _emailLocalPart(user.email) : user.displayName,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.onSurface,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      _ProChip(isPro: user.isPro),
-                    ],
-                  ),
-                  if (!user.emailVerified) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.warningContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: const [
-                          Icon(Icons.warning_amber_outlined, color: AppColors.warning, size: 18),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Email chưa được xác minh. Mở email để click link xác minh.',
-                              style: TextStyle(fontSize: 13, color: AppColors.onSurface),
-                            ),
-                          ),
-                        ],
+                    ),
+                    const SizedBox(width: 4),
+                    _EditNicknameButton(user: user, service: service),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  user.email,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.onSurfaceVariant, fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    _ProChip(isPro: user.isPro),
+                    _VerifiedChip(verified: user.emailVerified),
+                  ],
+                ),
+              ],
+            ),
+            if (!user.emailVerified) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.warningContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.warning_amber_outlined, color: AppColors.warning, size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Email chưa xác minh. Mở email để click link xác minh.',
+                        style: TextStyle(fontSize: 13, color: AppColors.onSurface),
                       ),
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
+            ],
             const SizedBox(height: 12),
             _ActionTile(
               icon: Icons.lock_outline,
@@ -184,6 +199,312 @@ class V17AccountSection extends StatelessWidget {
       }
       await service.logout();
     }
+  }
+}
+
+class _AvatarTile extends StatefulWidget {
+  const _AvatarTile({required this.user, required this.service, this.size = 56});
+  final AuthUser user;
+  final AuthService service;
+  final double size;
+
+  @override
+  State<_AvatarTile> createState() => _AvatarTileState();
+}
+
+class _AvatarTileState extends State<_AvatarTile> {
+  bool _busy = false;
+
+  Future<void> _openSheet() async {
+    if (_busy) return;
+    final hasAvatar = widget.user.avatarAssetId != null && widget.user.avatarAssetId!.isNotEmpty;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Chụp ảnh'),
+              onTap: () => Navigator.pop(ctx, 'camera'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Chọn từ thư viện'),
+              onTap: () => Navigator.pop(ctx, 'gallery'),
+            ),
+            if (hasAvatar)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: AppColors.error),
+                title: const Text('Xoá ảnh đại diện', style: TextStyle(color: AppColors.error)),
+                onTap: () => Navigator.pop(ctx, 'remove'),
+              ),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('Huỷ'),
+              onTap: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+    if (action == 'remove') {
+      await _remove();
+    } else {
+      await _pick(action == 'camera' ? ImageSource.camera : ImageSource.gallery);
+    }
+  }
+
+  Future<void> _pick(ImageSource source) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await widget.service.apiClientForScreens.uploadAvatarV17(File(picked.path));
+      await widget.service.refresh();
+    } catch (e) {
+      if (mounted) _showError('Không tải lên được: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _remove() async {
+    setState(() => _busy = true);
+    try {
+      await widget.service.apiClientForScreens.deleteAvatarV17();
+      await widget.service.refresh();
+    } catch (e) {
+      if (mounted) _showError('Không xoá được: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final assetId = widget.user.avatarAssetId;
+    final hasAvatar = assetId != null && assetId.isNotEmpty;
+    final avatarUrl = hasAvatar
+        ? widget.service.apiClientForScreens.mediaUri(assetId)
+        : null;
+    final initials = _initialsFor(widget.user);
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: _busy ? null : _openSheet,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: widget.size,
+          height: widget.size,
+          child: Stack(
+            fit: StackFit.expand,
+            clipBehavior: Clip.none,
+            children: [
+              // Background circle (visible only behind initials fallback;
+              // covered by image when avatar is set).
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                ),
+              ),
+              if (avatarUrl == null)
+                Center(
+                  child: Text(
+                    initials,
+                    style: TextStyle(
+                      fontSize: widget.size * 0.36,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                )
+              else
+                ClipOval(
+                  child: Image.network(
+                    avatarUrl.toString(),
+                    headers: {
+                      if (widget.service.apiClientForScreens.currentToken != null)
+                        'Authorization': 'Bearer ${widget.service.apiClientForScreens.currentToken}',
+                    },
+                    width: widget.size,
+                    height: widget.size,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Center(
+                      child: Text(
+                        initials,
+                        style: TextStyle(
+                          fontSize: widget.size * 0.36,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  width: widget.size * 0.32,
+                  height: widget.size * 0.32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primary,
+                    border: Border.all(color: AppColors.surfaceContainerLowest, width: 2),
+                  ),
+                  child: Icon(Icons.camera_alt, size: widget.size * 0.18, color: AppColors.onPrimary),
+                ),
+              ),
+              if (_busy)
+                ClipOval(
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    alignment: Alignment.center,
+                    child: SizedBox(
+                      width: widget.size * 0.4,
+                      height: widget.size * 0.4,
+                      child: const CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _emailLocalPart(String email) {
+  final at = email.indexOf('@');
+  return at <= 0 ? email : email.substring(0, at);
+}
+
+class _VerifiedChip extends StatelessWidget {
+  const _VerifiedChip({required this.verified});
+  final bool verified;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = verified ? AppColors.primary : AppColors.onSurfaceVariant;
+    final bg = verified
+        ? AppColors.primary.withValues(alpha: 0.12)
+        : AppColors.surfaceContainerHigh;
+    final label = verified ? 'Đã xác minh' : 'Chưa xác minh';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            verified ? Icons.verified_rounded : Icons.error_outline,
+            size: 14,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _initialsFor(AuthUser u) {
+  final source = u.displayName.trim().isNotEmpty ? u.displayName.trim() : u.email;
+  if (source.isEmpty) return '?';
+  final parts = source.split(RegExp(r'\s+|@'));
+  if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return source.substring(0, source.length >= 2 ? 2 : 1).toUpperCase();
+}
+
+class _EditNicknameButton extends StatelessWidget {
+  const _EditNicknameButton({required this.user, required this.service});
+  final AuthUser user;
+  final AuthService service;
+
+  Future<void> _open(BuildContext context) async {
+    final controller = TextEditingController(text: user.displayName);
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Đổi biệt danh'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 60,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            hintText: 'Tên hiển thị',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Huỷ')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Lưu'),
+          ),
+        ],
+      ),
+    );
+    if (saved == null || saved == user.displayName) return;
+    try {
+      await service.apiClientForScreens.patchMeV17({'display_name': saved});
+      await service.refresh();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không lưu được: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        iconSize: 16,
+        icon: const Icon(Icons.edit_outlined, color: AppColors.onSurfaceVariant),
+        tooltip: 'Đổi biệt danh',
+        onPressed: () => _open(context),
+      ),
+    );
   }
 }
 

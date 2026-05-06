@@ -2135,6 +2135,18 @@ abstract class AppLocalizations {
   /// **'← Trước'**
   String get dictationPrevBtn;
 
+  /// No description provided for @dictationResultTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Kết quả chính tả'**
+  String get dictationResultTitle;
+
+  /// No description provided for @dictationFinishBtn.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hoàn thành'**
+  String get dictationFinishBtn;
+
   /// No description provided for @dictationResultPerSentence.
   ///
   /// In vi, this message translates to:

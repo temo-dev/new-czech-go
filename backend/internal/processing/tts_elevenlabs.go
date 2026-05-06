@@ -47,14 +47,10 @@ func NewElevenLabsVoiceBProvider() TTSProvider {
 }
 
 func newElevenLabsProvider(apiKey, voiceID string) *ElevenLabsTTSProvider {
-	modelID := strings.TrimSpace(os.Getenv("ELEVENLABS_MODEL_ID"))
-	if modelID == "" {
-		modelID = "eleven_multilingual_v2"
-	}
 	return &ElevenLabsTTSProvider{
 		apiKey:  apiKey,
 		voiceID: voiceID,
-		modelID: modelID,
+		modelID: LoadLLMModels().ElevenLabsTTS,
 		client:  &http.Client{},
 	}
 }
@@ -73,12 +69,10 @@ func (p *ElevenLabsTTSProvider) Generate(attemptID, text string) (*contracts.Rev
 		return nil, fmt.Errorf("elevenlabs marshal: %w", err)
 	}
 
-	// output_format=mp3_22050_32 matches Amazon Polly's default 22050 Hz sample rate
-	// so concatenated dialog audio plays correctly without sample-rate mismatch.
-	outputFmt := strings.TrimSpace(os.Getenv("ELEVENLABS_OUTPUT_FORMAT"))
-	if outputFmt == "" {
-		outputFmt = "mp3_22050_32"
-	}
+	// Default output format (mp3_22050_32) matches Amazon Polly's default sample
+	// rate so concatenated dialog audio plays correctly without sample-rate
+	// mismatch. Override via ELEVENLABS_OUTPUT_FORMAT env (see LLMModels).
+	outputFmt := LoadLLMModels().ElevenLabsOutputFmt
 	url := fmt.Sprintf("%s/text-to-speech/%s?output_format=%s", elevenLabsBaseURL, p.voiceID, outputFmt)
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(reqBody))
 	if err != nil {

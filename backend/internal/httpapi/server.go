@@ -28,13 +28,13 @@ import (
 type EmailSender = email.Sender
 
 type Server struct {
-	repo               *store.MemoryStore
-	processor          *processing.Processor
-	uploadProvider     UploadTargetProvider
-	audioURLProvider   AudioURLProvider
-	audioSignSecret    []byte
-	audioGenerator     processing.ExerciseAudioGenerator
-	contentGenerator   processing.ContentGenerator
+	repo             *store.MemoryStore
+	processor        *processing.Processor
+	uploadProvider   UploadTargetProvider
+	audioURLProvider AudioURLProvider
+	audioSignSecret  []byte
+	audioGenerator   processing.ExerciseAudioGenerator
+	contentGenerator processing.ContentGenerator
 
 	// V17 self-serve learner — populated by NewServerWithAuth, nil for
 	// the legacy dev-fixture path.
@@ -1288,7 +1288,7 @@ func (s *Server) handleAdminGenerateAudio(w http.ResponseWriter, r *http.Request
 func localExerciseAudioPath(storageKey string) string {
 	base := strings.TrimSpace(os.Getenv("LOCAL_ASSETS_DIR"))
 	if base == "" {
-		base = "/tmp/czech-go-assets"
+		base = filepath.Join(os.TempDir(), "czech-go-system-assets")
 	}
 	return filepath.Join(base, storageKey)
 }
@@ -1956,6 +1956,10 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 		}
 		exercise.ModuleID = req.ModuleID
 		exercise.SkillKind = req.SkillKind
+		if err := s.validateDictationPublish("", exercise); err != nil {
+			writeError(w, http.StatusBadRequest, "validation_error", err.Error(), false)
+			return
+		}
 		created := s.repo.CreateExercise(exercise)
 		writeJSON(w, http.StatusCreated, map[string]any{"data": created, "meta": map[string]any{}})
 	default:
@@ -2028,6 +2032,25 @@ func (s *Server) handleAdminExerciseByID(w http.ResponseWriter, r *http.Request,
 			}
 			if req.SkillKind == "" && req.ExerciseType != "" {
 				req.SkillKind = skillKindForExerciseType(req.ExerciseType)
+			}
+			current, ok := s.repo.Exercise(id)
+			if !ok {
+				writeNotFound(w)
+				return
+			}
+			candidate := current
+			if req.ExerciseType != "" {
+				candidate.ExerciseType = req.ExerciseType
+			}
+			if req.Status != "" {
+				candidate.Status = req.Status
+			}
+			if req.Detail != nil {
+				candidate.Detail = req.Detail
+			}
+			if err := s.validateDictationPublish(id, candidate); err != nil {
+				writeError(w, http.StatusBadRequest, "validation_error", err.Error(), false)
+				return
 			}
 			exercise, ok := s.repo.UpdateExercise(id, req)
 			if !ok {

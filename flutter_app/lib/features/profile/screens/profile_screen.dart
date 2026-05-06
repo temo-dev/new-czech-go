@@ -35,12 +35,11 @@ class ProfileScreen extends StatelessWidget {
     return ListView(
       padding: EdgeInsets.symmetric(horizontal: h, vertical: AppSpacing.x5),
       children: [
-        _Avatar(),
         if (v17Section != null) ...[
-          const SizedBox(height: AppSpacing.x6),
-          _SectionLabel('Tài khoản'),
-          const SizedBox(height: AppSpacing.x2),
           v17Section,
+        ] else ...[
+          // Legacy build (no V17 auth wired): show generic placeholder.
+          _LegacyAvatarPlaceholder(),
         ],
         const SizedBox(height: AppSpacing.x6),
         _SectionLabel(l.profileLanguageSection),
@@ -473,7 +472,9 @@ class _VoiceCard extends StatelessWidget {
 // Avatar + supporting widgets
 // ---------------------------------------------------------------------------
 
-class _Avatar extends StatelessWidget {
+/// Fallback header for legacy builds where V17 AuthService is not wired.
+/// Production / V17 builds replace this with [V17AccountSection]'s hero.
+class _LegacyAvatarPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -489,18 +490,6 @@ class _Avatar extends StatelessWidget {
             Icons.person,
             size: 40,
             color: AppColors.onPrimaryContainer,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.x3),
-        Text(
-          'Học viên',
-          style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: AppSpacing.x1),
-        Text(
-          'learner@example.com',
-          style: AppTypography.bodySmall.copyWith(
-            color: AppColors.onSurfaceVariant,
           ),
         ),
       ],

@@ -92,6 +92,35 @@ export function validateExercise(exerciseType: ExerciseType, payload: AnyPayload
     if (topics.length !== 5) errors.push(`Psaní 2 cần đúng 5 chủ đề ảnh (hiện có ${topics.length}).`);
   }
 
+  // Psaní 3: dictation needs complete sentence rows. Audio is required only
+  // when publishing so admins can save a draft before calling Polly per row.
+  if (exerciseType === 'psani_3_dictation') {
+    const d = detail as Record<string, unknown>;
+    const topic = String(d.topic ?? '').trim();
+    if (!topic) errors.push('Chủ đề chính tả không được để trống.');
+    const sentences = Array.isArray(d.sentences)
+      ? (d.sentences as Array<Record<string, unknown>>)
+      : [];
+    if (sentences.length < 3) errors.push(`Chính tả cần ít nhất 3 câu (hiện có ${sentences.length}).`);
+    if (sentences.length > 8) errors.push(`Chính tả tối đa 8 câu (hiện có ${sentences.length}).`);
+    const requireAudio = String(payload.status ?? '') === 'published';
+    sentences.forEach((s, i) => {
+      const text = String(s.text ?? '').trim();
+      if (!text) {
+        errors.push(`Câu ${i + 1}: thiếu nội dung.`);
+      } else if (Array.from(text).length > 200) {
+        errors.push(`Câu ${i + 1}: quá 200 ký tự.`);
+      }
+      if (requireAudio && !String(s.audio_asset_id ?? '').trim()) {
+        errors.push(`Câu ${i + 1}: chưa tạo audio.`);
+      }
+    });
+    const mode = String(d.submission_mode ?? 'type');
+    if (!['type', 'ocr', 'both'].includes(mode)) {
+      errors.push('Chế độ nộp bài (submission_mode) không hợp lệ.');
+    }
+  }
+
   return errors;
 }
 

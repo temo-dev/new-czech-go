@@ -3459,3 +3459,243 @@ Theo SPEC.md § V18 Verification table.
 | **Total** | **23** | **~5.5 ngày** dev |
 
 Phase A + C + D có thể chạy song song nếu ≥ 2 dev. Single dev: tuần tự A → B → C → D → E.
+
+---
+
+# V18.1 — Dictation OCR Submission
+
+> Spec: `docs/specs/dictation-ocr.md` · Idea: `docs/ideas/dictation-ocr.md` · SPEC.md: § V18.1
+> Parent: V18 (`psani_3_dictation`)
+> Estimated total: ~4 ngày dev
+
+## Dependency graph
+
+```
+[A1 Contracts]──┬──[A2 OCR provider]──┐
+                ├──[A3 Storage column]┼──[A4 Preview endpoint]──[B1 Submit + processor branch]──[B2 Integration tests]
+                │                     │
+                └──[C1 CMS dropdown]──[C2 Validation]──[C3 i18n+Vitest]
+                
+                [D1 Models]──[D2 PreviewCard]──[D3 Mode pill]──[D4 Screen branch]──[D5 API client]──[D6 i18n ARB]
+
+                                                                                    [E1 Manual MAN-1..MAN-8]──[E2 Pilot gold set]──[E3 make verify]
+```
+
+A* must precede B*. C* and D* parallelizable with B*. E* requires all prior.
+
+---
+
+### V18.1-A1 — Contracts + SubmissionMode
+
+**Files:** `backend/internal/contracts/types.go`
+
+**Changes:** Add `SubmissionMode string` JSON field to `DictationDetail` (default `"type"` via `Mode()` helper). Add `DictationOCRPreviewResponse` + `DictationOCRSentenceSubmission` structs.
+
+**AC:** `make backend-build` clean; backward-compat — existing V18 deserialize works.
+**Verify:** unit test parse + Mode() default.
+**Size:** S
+
+---
+
+### V18.1-A2 — Claude Vision OCR provider
+
+**Files:** `processing/dictation_ocr.go` (new), `dictation_ocr_test.go` (new), `processing/llm_config.go`, `processing/llm_prompts.go`, `processing/llm_user_prompts.go`
+
+**Changes:** `OCRProvider` interface; `ClaudeVisionOCR` impl posts to Anthropic messages API with `image` content block (base64). `NoopOCR` fallback. Env `LLM_OCR_MODEL` (default `claude-opus-4-7`). Prompts in SoT files only.
+
+**AC:** Mock provider deterministic; HTTP error → empty string + warn (no panic); JSON parse fail → empty.
+**Verify:** test happy / 4xx / malformed JSON.
+**Size:** M
+
+---
+
+### V18.1-A3 — Storage column attempt_id
+
+**Files:** `store/postgres_media_assets.go`
+
+**Changes:** Inline `addColumnIfMissing("media_assets", "attempt_id", "UUID NULL")`. No new table.
+
+**AC:** Idempotent at startup; existing media rows untouched.
+**Verify:** start backend twice, no error.
+**Size:** S
+
+---
+
+### V18.1-A4 — Preview endpoint
+
+**Files:** `httpapi/attempt_dictation_ocr.go` (new), `httpapi/server.go`
+
+**Changes:** `POST /v1/attempts/:id/dictation-ocr-preview` multipart: ownership check, `MaxBytesReader(5MB+overhead)`, MIME whitelist (jpeg/png/heic), idx 0..7, persist via `media_assets` with `attempt_id`, return `{idx, text, asset_id}`. Per-user RL 30/min. OCR fail → 200 with empty text.
+
+**AC:** image >5MB → 400 `image_too_large`; wrong MIME → 400 `image_invalid_type`; idx OOR → 400 `invalid_idx`; non-owner → 403; non-dictation → 400.
+**Verify:** integration test 6 cases.
+**Size:** M
+
+**[CHECKPOINT V18.1-A]** `make backend-build && make backend-test` pass +5 tests; manual `curl` preview returns OCR text.
+
+---
+
+### V18.1-B1 — Submit endpoint + processor branch
+
+**Files:** `httpapi/attempt_dictation_ocr.go`, `processing/dictation_processor.go`
+
+**Changes:** `POST /v1/attempts/:id/submit-dictation-ocr` multipart with `sentences` JSON form field; for empty-text-with-image rows lazy-OCR; for text+asset_id pairs use as-is. Dispatch into existing `ProcessDictationAttempt` (no scorer change). `submission_mode: "ocr"` written to feedback_json.
+
+**AC:** count mismatch → 400 `invalid_sentence_count`; payload >40MB → 413; goroutine `defer recover()` + FailAttempt on panic.
+**Verify:** unit test handler branching for asset-present and asset-missing rows.
+**Size:** M
+
+---
+
+### V18.1-B2 — Integration tests
+
+**Files:** `httpapi/attempt_dictation_ocr_test.go`
+
+**Changes:** 4 tests — preview happy, submit happy, submit lazy-OCR fallback, score parity (typed vs OCR'd same text → identical OverallScore).
+
+**AC:** `make backend-test` ≥+8 net; smoke curl green.
+**Size:** M
+
+**[CHECKPOINT V18.1-B]** Backend test count ≥+8.
+
+---
+
+### V18.1-C1 — CMS submission_mode dropdown
+
+**Files:** `cms/components/exercise-form/DictationFields.tsx`
+
+**Changes:** `<select>` cho submission_mode (Type/OCR/Both) với i18n labels + inline hint per choice.
+
+**AC:** Renders; selecting OCR shows hint; saves into payload.
+**Size:** S
+
+---
+
+### V18.1-C2 — Validation + payload
+
+**Files:** `cms/components/exercise-form/exercise-utils.ts`
+
+**Changes:** `validateDictation` accept enum; `formStateFromExercise` reads existing; `dictationPayload` includes field; default `"type"` when missing.
+
+**AC:** Invalid mode → error; missing → defaults to type; round-trip preserves.
+**Size:** S
+
+---
+
+### V18.1-C3 — i18n + Vitest
+
+**Files:** `cms/lib/i18n.tsx`, `cms/components/__tests__/dictation-fields.test.ts`
+
+**Changes:** 4 admin i18n keys (label + 3 hints). 4 Vitest cases.
+
+**AC:** `cd cms && npm test` +4 tests pass.
+**Size:** S
+
+**[CHECKPOINT V18.1-C]** `make cms-lint && cd cms && npm test && make cms-build` pass.
+
+---
+
+### V18.1-D1 — Flutter models parser
+
+**Files:** `flutter_app/lib/models/models.dart`, `test/dictation_models_test.dart`
+
+**Changes:** Add `submissionMode` field to `DictationDetail` parser, default `"type"` when missing. Convenience getters.
+
+**AC:** Parses 3 modes; defaults to "type"; +1 test.
+**Size:** S
+
+---
+
+### V18.1-D2 — DictationOCRPreviewCard widget
+
+**Files:** `flutter_app/lib/features/exercise/widgets/dictation_ocr_preview_card.dart` (new), `test/dictation_ocr_preview_card_test.dart` (new)
+
+**Changes:** Stateful — thumbnail 16:9 + editable TextField + 2 buttons (Retake/Confirm). `isUploading` swap to spinner. Callbacks `onRetake` + `onConfirm(text)`.
+
+**AC:** Renders; Confirm fires with edited text; Loading hides buttons.
+**Verify:** +3 widget tests.
+**Size:** M
+
+---
+
+### V18.1-D3 — Mode-toggle pill (for "both")
+
+**Files:** Inline widget trong `dictation_exercise_screen.dart`
+
+**Changes:** Segmented pill (Type/Camera) used khi `submissionMode == "both"`. Per-sentence selection persisted in screen state map.
+
+**AC:** Toggle re-renders affordances; persists across Prev/Next.
+**Verify:** +1 widget test.
+**Size:** S
+
+---
+
+### V18.1-D4 — DictationExerciseScreen branch
+
+**Files:** `flutter_app/lib/features/exercise/screens/dictation_exercise_screen.dart`
+
+**Changes:** Branch on submissionMode. OCR path: hide TextField → "📷 Chụp ảnh" → `image_picker.pickImage(camera, maxWidth:1024, quality:85)` → upload preview → render `DictationOCRPreviewCard` → confirm locks sentence (asset_id + text) → Next. Both path: per-sentence toggle. Submit dispatches `submitDictationOCR` if any OCR sentences present, else V18 `submitDictation`.
+
+**AC:** All 3 modes correct affordances; existing V18 widget tests pass.
+**Verify:** +4 widget tests.
+**Size:** L
+
+---
+
+### V18.1-D5 — API client methods
+
+**Files:** `flutter_app/lib/core/api/api_client.dart`
+
+**Changes:** `dictationOCRPreview(attemptId, idx, file)` + `submitDictationOCR(attemptId, sentences, files)` multipart. Reuse V17.2 multipart helper.
+
+**AC:** UTF-8 round-trips; ApiException on error.
+**Verify:** +1 unit test mock client.
+**Size:** M
+
+---
+
+### V18.1-D6 — Flutter i18n ARB
+
+**Files:** `flutter_app/lib/l10n/app_vi.arb`, `app_en.arb`
+
+**Changes:** 8 keys per spec § 5.
+
+**AC:** `make flutter-analyze` no missing-l10n; VI=EN count.
+**Size:** S
+
+**[CHECKPOINT V18.1-D]** `make flutter-analyze && make flutter-test` pass +6 widget tests; manual TestFlight OCR end-to-end.
+
+---
+
+### V18.1-E1 — Manual MAN-1..MAN-8
+
+Per SPEC.md § V18.1 Verification table. Manual — không code.
+
+---
+
+### V18.1-E2 — Pilot gold set
+
+**Files:** `scripts/dictation_ocr_pilot.py` (new) hoặc spreadsheet
+
+**Changes:** 20 photos × 6 sentences × 5 learners; compute CER vs reference; aggregate ≤10% gates V18.2 default-mode promotion.
+
+**AC:** Result saved to `docs/pilot/dictation-ocr-results.md`.
+
+---
+
+### V18.1-E3 — make verify
+
+**AC:** Backend +8, Flutter +6, CMS +4; `make verify` xanh; TestFlight build green.
+
+### Sizing summary V18.1
+
+| Phase | Tasks | Effort |
+|---|---|---|
+| A (BE foundation) | 4 | 1 ngày |
+| B (BE integration) | 2 | 0.5 ngày |
+| C (CMS) | 3 | 0.5 ngày |
+| D (Flutter) | 6 | 1.5 ngày |
+| E (E2E + pilot) | 3 | 0.5 ngày |
+| **Total** | **18** | **~4 ngày** dev |
+
+Single dev tuần tự A → B → C → D → E. C + D parallelizable với B nếu 2 dev. Pilot E2 start khi MAN-2 verified.

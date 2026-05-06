@@ -99,8 +99,9 @@ class _SignupScreenState extends State<SignupScreen> {
       if (!mounted) return;
       setState(() => _serverError = _humanize(e));
     } catch (e) {
+      debugPrint('signup failed: $e');
       if (!mounted) return;
-      setState(() => _serverError = 'Đăng ký thất bại. Vui lòng thử lại.');
+      setState(() => _serverError = 'Đăng ký thất bại: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }

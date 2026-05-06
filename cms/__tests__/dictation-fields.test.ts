@@ -8,6 +8,7 @@ import {
   type DictationFormState,
   DICTATION_MAX_SENTENCES,
 } from '../components/exercise-utils';
+import { validateExercise } from '../components/exercise-form/validation';
 
 // ─── splitTranscriptIntoSentences ─────────────────────────────────────────────
 
@@ -146,6 +147,35 @@ describe('validateDictation', () => {
     const r = validateDictation(f);
     expect(r.ok).toBe(false);
     expect(r.errors.join(' ')).toMatch(/1–100%/);
+  });
+});
+
+describe('validateExercise psani_3_dictation', () => {
+  it('blocks published dictation exercises when a sentence lacks audio', () => {
+    const f = fixtureValidForm();
+    f.sentences[1].audioAssetId = null;
+    const errors = validateExercise('psani_3_dictation', {
+      title: 'Viết chính tả',
+      module_id: 'mod-viet',
+      status: 'published',
+      detail: buildDictationPayload(f),
+    });
+
+    expect(errors.join(' ')).toMatch(/Câu 2/);
+    expect(errors.join(' ')).toMatch(/audio/i);
+  });
+
+  it('allows draft dictation exercises before audio is generated', () => {
+    const f = fixtureValidForm();
+    f.sentences[1].audioAssetId = null;
+    const errors = validateExercise('psani_3_dictation', {
+      title: 'Viết chính tả',
+      module_id: 'mod-viet',
+      status: 'draft',
+      detail: buildDictationPayload(f),
+    });
+
+    expect(errors).toEqual([]);
   });
 });
 

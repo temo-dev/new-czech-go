@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -84,6 +85,195 @@ func TestAdminDictationSentenceAudio_PostMultipleIdx(t *testing.T) {
 	}
 	if rows[0].SentenceIdx != 0 || rows[2].SentenceIdx != 2 {
 		t.Errorf("rows not sorted by idx: %+v", rows)
+	}
+}
+
+func TestLearnerDictationDetailHydratesTypedSentenceAudio(t *testing.T) {
+	t.Setenv("LOCAL_ASSETS_DIR", t.TempDir())
+	repo := store.NewMemoryStore()
+	created := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "psani_3_dictation",
+		SkillKind:    "viet",
+		ModuleID:     "mod-viet",
+		Status:       "published",
+		Detail: contracts.DictationDetail{
+			Topic: "Cafe",
+			Sentences: []contracts.DictationSentence{
+				{Idx: 0, Text: "Pavel jde do kavárny."},
+				{Idx: 1, Text: "Děkuji."},
+				{Idx: 2, Text: "Na shledanou."},
+			},
+			MaxReplaysPerSentence: 3,
+		},
+	})
+	for idx := 0; idx < 3; idx++ {
+		repo.SetSentenceAudio(created.ID, idx, contracts.ExerciseAudio{
+			StorageKey: fmt.Sprintf("exercise-audio/%s/sentence-%d.mp3", created.ID, idx),
+			MimeType:   "audio/mpeg",
+		})
+	}
+	srv := httptest.NewServer(NewServer(repo, nil, nil))
+	t.Cleanup(srv.Close)
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/v1/exercises/"+created.ID, nil)
+	req.Header.Set("Authorization", "Bearer dev-learner-token")
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatalf("get exercise: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status: %d", resp.StatusCode)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	data, _ := body["data"].(map[string]any)
+	detail, _ := data["detail"].(map[string]any)
+	sentences, _ := detail["sentences"].([]any)
+	if len(sentences) != 3 {
+		t.Fatalf("sentences: %+v", detail["sentences"])
+	}
+	got, _ := sentences[0].(map[string]any)["audio_asset_id"].(string)
+	want := "exercise-audio/" + created.ID + "/sentence-0.mp3"
+	if got != want {
+		t.Fatalf("audio_asset_id not hydrated: got %q want %q", got, want)
+	}
+}
+
+func TestAdminCreateDictationPublishedRequiresSentenceAudio(t *testing.T) {
+	t.Setenv("LOCAL_ASSETS_DIR", t.TempDir())
+	repo := store.NewMemoryStore()
+	srv := httptest.NewServer(NewServer(repo, nil, nil))
+	t.Cleanup(srv.Close)
+
+	body := `{
+		"module_id":"mod-viet",
+		"skill_kind":"viet",
+		"exercise_type":"psani_3_dictation",
+		"title":"Viết chính tả",
+		"short_instruction":"Nghe và viết lại.",
+		"learner_instruction":"Nghe từng câu rồi viết lại.",
+		"estimated_duration_sec":600,
+		"sample_answer_enabled":false,
+		"status":"published",
+		"detail":{
+			"topic":"Cafe",
+			"sentences":[
+				{"idx":0,"text":"Pavel jde do kavárny.","audio_asset_id":""},
+				{"idx":1,"text":"Děkuji.","audio_asset_id":"exercise-audio/ex/sentence-1.mp3"},
+				{"idx":2,"text":"Na shledanou.","audio_asset_id":"exercise-audio/ex/sentence-2.mp3"}
+			],
+			"max_replays_per_sentence":3
+		}
+	}`
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/v1/admin/exercises", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer dev-admin-token")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatalf("create exercise: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.StatusCode)
+	}
+	var payload map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	errObj, _ := payload["error"].(map[string]any)
+	if errObj["code"] != "validation_error" {
+		t.Fatalf("expected validation_error, got %+v", errObj)
+	}
+	if !strings.Contains(fmt.Sprint(errObj["message"]), "audio") {
+		t.Fatalf("expected audio validation message, got %+v", errObj)
+	}
+}
+
+func TestAdminPatchDictationPublishedRequiresSentenceAudio(t *testing.T) {
+	t.Setenv("LOCAL_ASSETS_DIR", t.TempDir())
+	repo := store.NewMemoryStore()
+	created := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "psani_3_dictation",
+		SkillKind:    "viet",
+		ModuleID:     "mod-viet",
+		Status:       "draft",
+		Detail: contracts.DictationDetail{
+			Topic: "Cafe",
+			Sentences: []contracts.DictationSentence{
+				{Idx: 0, Text: "Pavel jde do kavárny."},
+				{Idx: 1, Text: "Děkuji."},
+				{Idx: 2, Text: "Na shledanou."},
+			},
+			MaxReplaysPerSentence: 3,
+		},
+	})
+	srv := httptest.NewServer(NewServer(repo, nil, nil))
+	t.Cleanup(srv.Close)
+
+	req, _ := http.NewRequest(http.MethodPatch, srv.URL+"/v1/admin/exercises/"+created.ID, strings.NewReader(`{"status":"published"}`))
+	req.Header.Set("Authorization", "Bearer dev-admin-token")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatalf("patch exercise: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminPatchDictationPublishedAllowsSentenceAudioRows(t *testing.T) {
+	t.Setenv("LOCAL_ASSETS_DIR", t.TempDir())
+	repo := store.NewMemoryStore()
+	created := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "psani_3_dictation",
+		SkillKind:    "viet",
+		ModuleID:     "mod-viet",
+		Status:       "draft",
+		Detail: contracts.DictationDetail{
+			Topic: "Cafe",
+			Sentences: []contracts.DictationSentence{
+				{Idx: 0, Text: "Pavel jde do kavárny."},
+				{Idx: 1, Text: "Děkuji."},
+				{Idx: 2, Text: "Na shledanou."},
+			},
+			MaxReplaysPerSentence: 3,
+		},
+	})
+	for idx := 0; idx < 3; idx++ {
+		repo.SetSentenceAudio(created.ID, idx, contracts.ExerciseAudio{
+			StorageKey: fmt.Sprintf("exercise-audio/%s/sentence-%d.mp3", created.ID, idx),
+			MimeType:   "audio/mpeg",
+		})
+	}
+	srv := httptest.NewServer(NewServer(repo, nil, nil))
+	t.Cleanup(srv.Close)
+
+	req, _ := http.NewRequest(http.MethodPatch, srv.URL+"/v1/admin/exercises/"+created.ID, strings.NewReader(`{"status":"published"}`))
+	req.Header.Set("Authorization", "Bearer dev-admin-token")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatalf("patch exercise: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestLocalExerciseAudioAndMediaAssetDefaultDirsMatch(t *testing.T) {
+	t.Setenv("LOCAL_ASSETS_DIR", "")
+	key := "exercise-audio/ex-1/sentence-0.mp3"
+	if localExerciseAudioPath(key) != localExerciseAssetPath(key) {
+		t.Fatalf("default storage dirs differ: audio=%q media=%q", localExerciseAudioPath(key), localExerciseAssetPath(key))
+	}
+	if filepath.Join(localAssetsDir(), key) != localExerciseAssetPath(key) {
+		t.Fatalf("dictation delete dir differs: delete=%q media=%q", filepath.Join(localAssetsDir(), key), localExerciseAssetPath(key))
 	}
 }
 
@@ -179,10 +369,10 @@ func TestAdminDictationSentenceAudio_BadIdx(t *testing.T) {
 
 func TestParseDictationSentencePath(t *testing.T) {
 	cases := []struct {
-		in       string
-		wantEx   string
-		wantIdx  int
-		wantOK   bool
+		in      string
+		wantEx  string
+		wantIdx int
+		wantOK  bool
 	}{
 		{"ex-1/dictation/sentences/0/audio", "ex-1", 0, true},
 		{"ex-1/dictation/sentences/12/audio", "ex-1", 12, true},

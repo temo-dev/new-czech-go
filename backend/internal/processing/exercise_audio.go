@@ -371,7 +371,7 @@ func (g *PollyExerciseAudioGenerator) GenerateSentenceAudio(exerciseID string, s
 func localExerciseAudioPath(storageKey string) string {
 	base := strings.TrimSpace(os.Getenv("LOCAL_ASSETS_DIR"))
 	if base == "" {
-		base = "/tmp/czech-go-assets"
+		base = filepath.Join(os.TempDir(), "czech-go-system-assets")
 	}
 	return filepath.Join(base, storageKey)
 }

@@ -10,6 +10,7 @@ import (
 	"net/mail"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/danieldev/czech-go-system/backend/internal/auth"
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
@@ -90,6 +91,7 @@ func (s *Server) registerAuthRoutes() {
 	s.mux.HandleFunc("/v1/auth/change-password", s.handleChangePassword)
 
 	s.mux.HandleFunc("/v1/users/me", s.handleUsersMe)
+	s.mux.HandleFunc("/v1/users/me/avatar", s.handleUsersMeAvatar)
 	s.mux.HandleFunc("/v1/users/me/email-change", s.handleEmailChange)
 
 	s.registerIAPRoutes()
@@ -942,6 +944,7 @@ func toMeUser(u contracts.UserAccount) meUser {
 // else is pure preference data.
 type patchMeRequest struct {
 	DisplayName       *string `json:"display_name,omitempty"`
+	AvatarAssetID     *string `json:"avatar_asset_id,omitempty"`
 	OnboardingGoal    *string `json:"onboarding_goal,omitempty"`
 	OnboardingLevel   *string `json:"onboarding_level,omitempty"`
 	DailyReminderAt   *string `json:"daily_reminder_at,omitempty"`
@@ -958,9 +961,21 @@ func (s *Server) servePatchMe(w http.ResponseWriter, r *http.Request, user contr
 		return
 	}
 
+	if req.DisplayName != nil {
+		trimmed := strings.TrimSpace(*req.DisplayName)
+		if rc := utf8.RuneCountInString(trimmed); rc > 60 {
+			writeAuthError(w, http.StatusBadRequest, "display_name_too_long",
+				"display name must be 60 characters or fewer")
+			return
+		}
+	}
+
 	updated, ok := s.userStore.UpdateUser(user.ID, func(u *contracts.UserAccount) {
 		if req.DisplayName != nil {
 			u.DisplayName = strings.TrimSpace(*req.DisplayName)
+		}
+		if req.AvatarAssetID != nil {
+			u.AvatarAssetID = strings.TrimSpace(*req.AvatarAssetID)
 		}
 		if req.OnboardingGoal != nil {
 			u.OnboardingGoal = strings.TrimSpace(*req.OnboardingGoal)

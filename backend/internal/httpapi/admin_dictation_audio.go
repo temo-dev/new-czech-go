@@ -80,12 +80,13 @@ func (s *Server) handleAdminDictationSentenceAudioPost(w http.ResponseWriter, r 
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"exercise_id":  exerciseID,
-			"sentence_idx": sentenceIdx,
-			"storage_key":  audio.StorageKey,
-			"mime_type":    audio.MimeType,
-			"source_type":  audio.SourceType,
-			"generated_at": audio.GeneratedAt,
+			"exercise_id":    exerciseID,
+			"sentence_idx":   sentenceIdx,
+			"audio_asset_id": audio.StorageKey,
+			"storage_key":    audio.StorageKey,
+			"mime_type":      audio.MimeType,
+			"source_type":    audio.SourceType,
+			"generated_at":   audio.GeneratedAt,
 		},
 		"meta": map[string]any{},
 	})
@@ -114,7 +115,7 @@ func localAssetsDir() string {
 	if v := strings.TrimSpace(os.Getenv("LOCAL_ASSETS_DIR")); v != "" {
 		return v
 	}
-	return "/tmp/czech-go-assets"
+	return filepath.Join(os.TempDir(), "czech-go-system-assets")
 }
 
 // parseDictationSentencePath extracts (exerciseID, sentenceIdx) from a path

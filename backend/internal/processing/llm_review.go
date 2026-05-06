@@ -72,7 +72,7 @@ type llmReviewJSON struct {
 }
 
 func (c *ClaudeLLMReviewProvider) GenerateReview(exercise contracts.Exercise, transcript contracts.Transcript, feedback contracts.AttemptFeedback, locale string) (LLMReviewResult, error) {
-	systemPrompt := buildLLMReviewSystemPrompt()
+	systemPrompt := ReviewSystemPrompt()
 	userPrompt := buildLLMReviewUserPrompt(exercise, transcript, feedback, locale)
 
 	reqBody := claudeMessageRequest{
@@ -136,46 +136,5 @@ func (c *ClaudeLLMReviewProvider) GenerateReview(exercise contracts.Exercise, tr
 	return LLMReviewResult{CorrectedTranscript: corrected, ModelAnswer: model}, nil
 }
 
-func buildLLMReviewSystemPrompt() string {
-	return strings.Join([]string{
-		"You are an expert Czech language coach for the \"trvaly pobyt A2\" oral exam.",
-		"You produce TWO Czech texts for review of a learner's spoken answer:",
-		"1. corrected_transcript: the learner's SAME content and intent, but grammatically correct A2 Czech. Keep the learner's chosen facts, names, places, and opinions. Fix case endings, verb conjugation, reflexive se/si, prepositions, word order, agreement, diacritics. Remove filler syllables the transcript picked up. Keep it at A2 level — do NOT upgrade to B1.",
-		"2. model_answer: an exam-appropriate natural A2 Czech answer that DIRECTLY addresses the exercise prompt/topic/scenario. It may be longer and more complete than the learner's attempt. It should include concrete details a Vietnamese A2 learner could realistically say (short simple sentences, connectors like 'protože', 'ale', 'a', 'pak').",
-		"The two texts MUST differ: corrected_transcript is a faithful repair of what the learner said; model_answer is a fresh exemplar for the same task.",
-		"Both texts in natural Czech with proper diacritics. No English. No Vietnamese. No markdown. Return ONLY valid JSON.",
-		"Output schema: {\"corrected_transcript\":\"...\",\"model_answer\":\"...\"}",
-	}, "\n")
-}
-
-func buildLLMReviewUserPrompt(exercise contracts.Exercise, transcript contracts.Transcript, feedback contracts.AttemptFeedback, locale string) string {
-	_ = locale
-	var b strings.Builder
-	fmt.Fprintf(&b, "Exercise type: %s\n", exercise.ExerciseType)
-	if exercise.Title != "" {
-		fmt.Fprintf(&b, "Exercise title: %s\n", exercise.Title)
-	}
-	if exercise.LearnerInstruction != "" {
-		fmt.Fprintf(&b, "Learner instruction: %s\n", exercise.LearnerInstruction)
-	}
-	b.WriteString(describeExercisePrompt(exercise))
-	b.WriteString("\n")
-	fmt.Fprintf(&b, "Learner transcript (Czech, may contain errors): %q\n", strings.TrimSpace(transcript.FullText))
-	if transcript.Confidence > 0 {
-		fmt.Fprintf(&b, "Transcript confidence: %.2f\n", transcript.Confidence)
-	}
-	if transcript.IsSynthetic {
-		b.WriteString("Note: transcript was synthesized for testing.\n")
-	}
-	if feedback.OverallSummary != "" {
-		fmt.Fprintf(&b, "Coach summary of attempt: %s\n", feedback.OverallSummary)
-	}
-	if len(feedback.Improvements) > 0 {
-		b.WriteString("Issues already identified:\n")
-		for _, s := range feedback.Improvements {
-			fmt.Fprintf(&b, "- %s\n", s)
-		}
-	}
-	b.WriteString("\nReturn the JSON only. Both fields must be non-empty A2 Czech.")
-	return b.String()
-}
+// ReviewSystemPrompt + buildLLMReviewUserPrompt live in llm_prompts.go and
+// llm_user_prompts.go respectively.

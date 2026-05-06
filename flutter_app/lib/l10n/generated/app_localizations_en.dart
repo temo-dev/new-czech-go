@@ -1121,6 +1121,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dictationPrevBtn => '← Prev';
 
   @override
+  String get dictationResultTitle => 'Dictation result';
+
+  @override
+  String get dictationFinishBtn => 'Finish';
+
+  @override
   String get dictationResultPerSentence => 'Per-sentence accuracy';
 
   @override

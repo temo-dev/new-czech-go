@@ -314,20 +314,54 @@ func (s *Server) handleMediaFile(w http.ResponseWriter, r *http.Request, _ contr
 func serveLocalAssetFile(w http.ResponseWriter, r *http.Request, storageKey string) {
 	filePath := localExerciseAssetPath(storageKey)
 	f, err := os.Open(filePath)
+	if err != nil && strings.HasPrefix(storageKey, "exercise-audio/") && strings.TrimSpace(os.Getenv("LOCAL_ASSETS_DIR")) == "" {
+		legacyPath := filepath.Join(os.TempDir(), "czech-go-assets", filepath.FromSlash(storageKey))
+		if legacyFile, legacyErr := os.Open(legacyPath); legacyErr == nil {
+			f = legacyFile
+			filePath = legacyPath
+			err = nil
+		}
+	}
 	if err != nil {
 		writeNotFound(w)
 		return
 	}
 	defer f.Close()
-
-	ext := strings.ToLower(filepath.Ext(filePath))
-	ct := mime.TypeByExtension(ext)
-	if ct == "" {
-		ct = "application/octet-stream"
+	stat, err := f.Stat()
+	if err != nil {
+		writeNotFound(w)
+		return
 	}
-	w.Header().Set("Content-Type", ct)
+
+	w.Header().Set("Content-Type", assetContentType(storageKey, filePath))
+	w.Header().Set("Accept-Ranges", "bytes")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
-	io.Copy(w, f)
+	http.ServeContent(w, r, filePath, stat.ModTime(), f)
+}
+
+func assetContentType(storageKey, filePath string) string {
+	ext := strings.ToLower(filepath.Ext(storageKey))
+	if ext == "" {
+		ext = strings.ToLower(filepath.Ext(filePath))
+	}
+	switch ext {
+	case ".mp3":
+		return "audio/mpeg"
+	case ".m4a":
+		return "audio/mp4"
+	case ".wav":
+		return "audio/wav"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	case ".webp":
+		return "image/webp"
+	}
+	if ct := mime.TypeByExtension(ext); ct != "" {
+		return ct
+	}
+	return "application/octet-stream"
 }
 
 // isSafeAssetKey returns true only when the resolved path stays within the

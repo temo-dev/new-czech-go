@@ -5,6 +5,8 @@ PODS:
   - flutter_webrtc (0.12.6):
     - Flutter
     - WebRTC-SDK (= 125.6422.06)
+  - image_picker_ios (0.0.1):
+    - Flutter
   - just_audio (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -22,6 +24,7 @@ DEPENDENCIES:
   - audio_session (from `.symlinks/plugins/audio_session/ios`)
   - Flutter (from `Flutter`)
   - flutter_webrtc (from `.symlinks/plugins/flutter_webrtc/ios`)
+  - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - just_audio (from `.symlinks/plugins/just_audio/darwin`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - record_ios (from `.symlinks/plugins/record_ios/ios`)
@@ -38,6 +41,8 @@ EXTERNAL SOURCES:
     :path: Flutter
   flutter_webrtc:
     :path: ".symlinks/plugins/flutter_webrtc/ios"
+  image_picker_ios:
+    :path: ".symlinks/plugins/image_picker_ios/ios"
   just_audio:
     :path: ".symlinks/plugins/just_audio/darwin"
   path_provider_foundation:
@@ -51,6 +56,7 @@ SPEC CHECKSUMS:
   audio_session: 9bb7f6c970f21241b19f5a3658097ae459681ba0
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   flutter_webrtc: 57f32415b8744e806f9c2a96ccdb60c6a627ba33
+  image_picker_ios: 7fe1ff8e34c1790d6fff70a32484959f563a928a
   just_audio: 4e391f57b79cad2b0674030a00453ca5ce817eed
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
   record_ios: 412daca2350b228e698fffcd08f1f94ceb1e3844

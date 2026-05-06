@@ -188,6 +188,19 @@ func EnrichDictationDetail(detail any, audios []contracts.ExerciseSentenceAudio)
 	if len(audios) == 0 {
 		return detail
 	}
+	byIdx := make(map[int]string, len(audios))
+	for _, a := range audios {
+		byIdx[a.SentenceIdx] = a.StorageKey
+	}
+	if d, ok := detail.(contracts.DictationDetail); ok {
+		for i := range d.Sentences {
+			idx := d.Sentences[i].Idx
+			if key, ok := byIdx[idx]; ok && key != "" {
+				d.Sentences[i].AudioAssetID = key
+			}
+		}
+		return d
+	}
 	m, ok := detail.(map[string]any)
 	if !ok {
 		return detail
@@ -195,10 +208,6 @@ func EnrichDictationDetail(detail any, audios []contracts.ExerciseSentenceAudio)
 	rawSentences, ok := m["sentences"].([]any)
 	if !ok {
 		return detail
-	}
-	byIdx := make(map[int]string, len(audios))
-	for _, a := range audios {
-		byIdx[a.SentenceIdx] = a.StorageKey
 	}
 	for i, s := range rawSentences {
 		sm, ok := s.(map[string]any)

@@ -7,6 +7,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -338,6 +340,66 @@ func TestMediaAssets_MediaFile_AbsentFile_Returns404(t *testing.T) {
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404 for absent file, got %d", resp.StatusCode)
+	}
+}
+
+func TestMediaAssets_MediaFile_LegacyExerciseAudioFallback(t *testing.T) {
+	t.Setenv("LOCAL_ASSETS_DIR", "")
+	key := "exercise-audio/legacy-ex/sentence-0.mp3"
+	legacyPath := filepath.Join(os.TempDir(), "czech-go-assets", filepath.FromSlash(key))
+	t.Cleanup(func() {
+		os.RemoveAll(filepath.Join(os.TempDir(), "czech-go-assets", "exercise-audio", "legacy-ex"))
+	})
+	if err := os.MkdirAll(filepath.Dir(legacyPath), 0o755); err != nil {
+		t.Fatalf("mkdir legacy audio: %v", err)
+	}
+	if err := os.WriteFile(legacyPath, []byte("legacy mp3"), 0o644); err != nil {
+		t.Fatalf("write legacy audio: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/media/file?key="+key, nil)
+	serveLocalAssetFile(rr, req, key)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 from legacy fallback, got %d", rr.Code)
+	}
+	if rr.Body.String() != "legacy mp3" {
+		t.Fatalf("unexpected body: %q", rr.Body.String())
+	}
+}
+
+func TestMediaAssets_MediaFile_SupportsByteRanges(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LOCAL_ASSETS_DIR", dir)
+	key := "exercise-audio/ex-1/sentence-0.mp3"
+	path := filepath.Join(dir, filepath.FromSlash(key))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir media file: %v", err)
+	}
+	if err := os.WriteFile(path, []byte("0123456789"), 0o644); err != nil {
+		t.Fatalf("write media file: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/media/file?key="+key, nil)
+	req.Header.Set("Range", "bytes=0-4")
+	serveLocalAssetFile(rr, req, key)
+
+	if rr.Code != http.StatusPartialContent {
+		t.Fatalf("expected 206 for range request, got %d", rr.Code)
+	}
+	if rr.Header().Get("Accept-Ranges") != "bytes" {
+		t.Fatalf("expected byte-range support, got %q", rr.Header().Get("Accept-Ranges"))
+	}
+	if got := rr.Header().Get("Content-Type"); got != "audio/mpeg" {
+		t.Fatalf("expected mp3 content type, got %q", got)
+	}
+	if got := rr.Header().Get("Content-Range"); got != "bytes 0-4/10" {
+		t.Fatalf("Content-Range: got %q", got)
+	}
+	if rr.Body.String() != "01234" {
+		t.Fatalf("unexpected body: %q", rr.Body.String())
 	}
 }
 

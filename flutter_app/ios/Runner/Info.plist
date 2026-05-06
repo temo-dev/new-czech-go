@@ -34,7 +34,9 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>App can ghi am de ban luyen phan thi noi A2 va nhan feedback sau moi lan tap.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>App dung camera de hien thi avatar AI trong phan luyen phan thi phong van.</string>
+	<string>App dung camera de chup anh dai dien va hien thi avatar AI trong phan luyen phan thi phong van.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>App can quyen truy cap thu vien anh de chon anh dai dien.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

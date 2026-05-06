@@ -93,8 +93,8 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
     _controllers = List.generate(n, (_) => TextEditingController());
     _replayCounts = List.filled(n, 0);
     _ocrStage = List.filled(n, _OCRStage.idle);
-    // For OCR-only mode, default every sentence to the OCR path. For Both
-    // mode, default to type unless the learner toggles. Type-only ignores.
+    // OCR-only mode starts on the camera path. Other dictation exercises
+    // start on typing but still expose OCR as a learner-selectable fallback.
     _useOCR = List.filled(n, widget.detail.dictationIsOCRMode);
     _assetIds = List.filled(n, '');
     _photoUrls = List.filled(n, '');
@@ -112,9 +112,10 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
 
   bool _isOCRSentence(int i) {
     if (widget.detail.dictationIsOCRMode) return true;
-    if (widget.detail.dictationIsBothMode) return _useOCR[i];
-    return false;
+    return _useOCR[i];
   }
+
+  bool get _showsModeToggle => !widget.detail.dictationIsOCRMode;
 
   bool _isSentenceReady(int i) {
     if (_isOCRSentence(i)) return _ocrStage[i] == _OCRStage.confirmed;
@@ -123,7 +124,8 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
 
   bool get _canAdvance => _isSentenceReady(_currentIdx) && !_submitting;
 
-  bool get _isLast => _currentIdx == widget.detail.dictationSentences.length - 1;
+  bool get _isLast =>
+      _currentIdx == widget.detail.dictationSentences.length - 1;
 
   // V18.1: kicks off the preview flow. Picks an image, posts to the preview
   // endpoint, fills the editable card. All errors flip the row back to idle
@@ -232,27 +234,33 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
       // V18.1: route to OCR endpoint when any sentence used the photo path
       // (OCR-only mode or any toggled `both` row). Otherwise stay on the
       // V18 JSON submit-text path so backward-compat tests keep passing.
-      final anyOCR = List.generate(_controllers.length, (i) => _isOCRSentence(i))
-          .any((v) => v);
+      final anyOCR = List.generate(
+        _controllers.length,
+        (i) => _isOCRSentence(i),
+      ).any((v) => v);
       if (anyOCR) {
         final rows = <DictationOCRSentenceSubmission>[];
         for (int i = 0; i < _controllers.length; i++) {
-          rows.add(DictationOCRSentenceSubmission(
-            idx: i,
-            text: _controllers[i].text.trim(),
-            assetId: _isOCRSentence(i) ? _assetIds[i] : '',
-            replayCount: _replayCounts[i],
-          ));
+          rows.add(
+            DictationOCRSentenceSubmission(
+              idx: i,
+              text: _controllers[i].text.trim(),
+              assetId: _isOCRSentence(i) ? _assetIds[i] : '',
+              replayCount: _replayCounts[i],
+            ),
+          );
         }
         await widget.client.submitDictationOCR(attemptId, sentences: rows);
       } else {
         final sentences = <DictationSentenceSubmission>[];
         for (int i = 0; i < _controllers.length; i++) {
-          sentences.add(DictationSentenceSubmission(
-            idx: i,
-            text: _controllers[i].text.trim(),
-            replayCount: _replayCounts[i],
-          ));
+          sentences.add(
+            DictationSentenceSubmission(
+              idx: i,
+              text: _controllers[i].text.trim(),
+              replayCount: _replayCounts[i],
+            ),
+          );
         }
         await widget.client.submitDictation(attemptId, sentences: sentences);
       }
@@ -260,18 +268,20 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
       if (!mounted) return;
       final completed = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
-          builder: (_) => _DictationResultPoller(
-            client: widget.client,
-            attemptId: attemptId,
-            showResultOnCompletion: widget.showResultOnCompletion,
-          ),
+          builder:
+              (_) => _DictationResultPoller(
+                client: widget.client,
+                attemptId: attemptId,
+                showResultOnCompletion: widget.showResultOnCompletion,
+              ),
         ),
       );
       if (mounted && (completed ?? widget.showResultOnCompletion)) {
         await widget.onAttemptCompleted?.call(attemptId);
       }
-      if (mounted && !widget.showResultOnCompletion && (completed ?? false)) {
+      if (mounted && completed == true) {
         Navigator.of(context).pop();
+        return;
       }
     } catch (e) {
       if (!mounted) return;
@@ -338,10 +348,12 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
                     child: LinearProgressIndicator(
                       value: progress,
                       minHeight: 6,
-                      backgroundColor:
-                          AppColors.onSurface.withValues(alpha: 0.08),
-                      valueColor:
-                          const AlwaysStoppedAnimation(AppColors.primary),
+                      backgroundColor: AppColors.onSurface.withValues(
+                        alpha: 0.08,
+                      ),
+                      valueColor: const AlwaysStoppedAnimation(
+                        AppColors.primary,
+                      ),
                     ),
                   ),
                 ),
@@ -361,7 +373,7 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
               },
             ),
             const SizedBox(height: AppSpacing.x3),
-            if (d.dictationIsBothMode) ...[
+            if (_showsModeToggle) ...[
               _ModeTogglePill(
                 useOCR: _useOCR[_currentIdx],
                 onChanged: (v) => _toggleBothMode(_currentIdx, v),
@@ -390,8 +402,7 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed:
-                        _currentIdx == 0 || _submitting ? null : _goPrev,
+                    onPressed: _currentIdx == 0 || _submitting ? null : _goPrev,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.secondary,
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -416,18 +427,21 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: _submitting
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
+                    child:
+                        _submitting
+                            ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                            : Text(
+                              _isLast
+                                  ? l.dictationSubmitBtn
+                                  : l.dictationNextBtn,
                             ),
-                          )
-                        : Text(
-                            _isLast ? l.dictationSubmitBtn : l.dictationNextBtn,
-                          ),
                   ),
                 ),
               ],
@@ -493,10 +507,7 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                _controllers[i].text,
-                style: AppTypography.bodyLarge,
-              ),
+              Text(_controllers[i].text, style: AppTypography.bodyLarge),
               const SizedBox(height: AppSpacing.x2),
               TextButton.icon(
                 onPressed: () => _retakeOCR(i),
@@ -694,9 +705,34 @@ class _DictationResultPollerState extends State<_DictationResultPoller> {
     }
     final dict = _result?.feedback?.dictationResult;
     if (_result != null && _result!.status == 'completed' && dict != null) {
+      final l = AppLocalizations.of(context);
       return Scaffold(
         backgroundColor: AppColors.surface,
+        appBar: AppBar(
+          backgroundColor: AppColors.surface,
+          elevation: 0,
+          title: Text(l.dictationResultTitle, style: AppTypography.titleMedium),
+        ),
         body: SafeArea(child: DictationResultCard(result: dict)),
+        bottomNavigationBar: SafeArea(
+          minimum: const EdgeInsets.fromLTRB(
+            AppSpacing.x4,
+            AppSpacing.x2,
+            AppSpacing.x4,
+            AppSpacing.x4,
+          ),
+          child: FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: Text(l.dictationFinishBtn),
+          ),
+        ),
       );
     }
     return Scaffold(

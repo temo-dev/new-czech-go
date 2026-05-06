@@ -155,15 +155,4 @@ func buildWritingReviewArtifact(learnerText string, feedback contracts.AttemptFe
 	}
 }
 
-// writingFallbackFeedback returns a minimal rule-based feedback when LLM is unavailable.
-func writingFallbackFeedback() contracts.AttemptFeedback {
-	return contracts.AttemptFeedback{
-		ReadinessLevel: "ok",
-		OverallSummary: "Bài viết đã được ghi nhận. Phản hồi chi tiết sẽ có khi AI sẵn sàng.",
-		Strengths:      []string{"Bạn đã hoàn thành bài viết"},
-		Improvements:   []string{"Hãy kiểm tra lại ngữ pháp và từ vựng"},
-		TaskCompletion: contracts.TaskCompletion{ScoreBand: "ok"},
-		GrammarFeedback: contracts.GrammarFeedback{ScoreBand: "ok"},
-		RetryAdvice:    []string{"Thử lại với câu văn đầy đủ và rõ ràng hơn"},
-	}
-}
+// writingFallbackFeedback lives in llm_fallbacks.go.

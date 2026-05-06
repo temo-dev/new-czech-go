@@ -12,6 +12,7 @@ __pycache__/
 *.pyc
 /example.m4a
 /sample.m4a
+.md
 
 # Node / Next.js
 cms/node_modules/

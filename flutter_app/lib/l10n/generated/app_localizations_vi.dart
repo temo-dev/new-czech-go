@@ -1121,6 +1121,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get dictationPrevBtn => '← Trước';
 
   @override
+  String get dictationResultTitle => 'Kết quả chính tả';
+
+  @override
+  String get dictationFinishBtn => 'Hoàn thành';
+
+  @override
   String get dictationResultPerSentence => 'Độ chính xác từng câu';
 
   @override
