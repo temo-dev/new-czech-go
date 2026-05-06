@@ -179,7 +179,7 @@ func (p *Processor) ProcessObjectiveAttempt(attemptID string, sub contracts.Answ
 	}
 
 	p.repo.SetAttemptStatus(attemptID, "scoring")
-	p.repo.CompleteAttempt(attemptID, transcript, feedback)
+	p.completeAttempt(attemptID, exercise, transcript, feedback)
 
 	completed, ok := p.repo.Attempt(attemptID)
 	if !ok {

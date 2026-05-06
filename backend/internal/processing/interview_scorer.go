@@ -108,7 +108,7 @@ func (p *Processor) ProcessInterviewAttempt(attemptID string, turns []contracts.
 		feedback = interviewFallbackFeedback()
 	}
 
-	p.repo.CompleteAttempt(attemptID, transcript, feedback)
+	p.completeAttempt(attemptID, exercise, transcript, feedback)
 	log.Printf("interview attempt %s completed (readiness=%s, turns=%d)", attemptID, feedback.ReadinessLevel, len(turns))
 }
 

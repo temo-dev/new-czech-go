@@ -229,6 +229,42 @@ def main():
             interval_sec=args.poll_interval_sec,
         )
 
+        # V19: confirm the user_skill_mastery aggregate received the attempt.
+        # Tolerated when the deployment hasn't enabled mastery yet (404/501).
+        progress_check = {"enabled": False}
+        try:
+            progress_resp = request_json(
+                "GET", f"{base_url}/v1/users/me/progress", headers=auth_headers,
+            )
+            progress = progress_resp.get("data") or {}
+            skills = progress.get("skills") or []
+            noi_attempts = 0
+            noi_mastery = 0.0
+            for s in skills:
+                if s.get("skill_kind") == "noi":
+                    noi_attempts = int(s.get("attempts_count") or 0)
+                    noi_mastery = float(s.get("mastery") or 0.0)
+                    break
+            progress_check = {
+                "enabled": True,
+                "overall_progress": progress.get("overall_progress"),
+                "noi_attempts_count": noi_attempts,
+                "noi_mastery": noi_mastery,
+            }
+            if final_attempt.get("status") == "completed" and noi_attempts < 1:
+                raise RuntimeError(
+                    "completed attempt did not increment user_skill_mastery for noi"
+                )
+            if final_attempt.get("status") == "completed" and noi_mastery <= 0:
+                raise RuntimeError(
+                    "completed attempt left mastery at zero for noi"
+                )
+        except urllib.error.HTTPError as exc:
+            if exc.code in (404, 501):
+                progress_check = {"enabled": False, "note": f"progress endpoint returned {exc.code}"}
+            else:
+                raise
+
         summary = {
             "attempt_id": attempt_id,
             "status": final_attempt.get("status"),
@@ -240,6 +276,7 @@ def main():
             "transcript_is_synthetic": (final_attempt.get("transcript") or {}).get("is_synthetic"),
             "transcript_preview": ((final_attempt.get("transcript") or {}).get("full_text") or "")[:120],
             "feedback_summary": ((final_attempt.get("feedback") or {}).get("overall_summary") or "")[:120],
+            "progress": progress_check,
         }
         print(json.dumps(summary, ensure_ascii=True, indent=2))
 

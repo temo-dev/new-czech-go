@@ -99,7 +99,7 @@ func (p *Processor) ProcessDictationAttempt(attemptID string, sub contracts.Dict
 		Provider:    "learner_text",
 		IsSynthetic: true,
 	}
-	p.repo.CompleteAttempt(attemptID, transcript, wrapped)
+	p.completeAttempt(attemptID, exercise, transcript, wrapped)
 
 	log.Printf("dictation attempt %s completed (score=%d/%d passed=%v)", attemptID, feedback.OverallScore, feedback.MaxPoints, feedback.Passed)
 }

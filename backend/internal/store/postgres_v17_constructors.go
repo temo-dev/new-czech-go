@@ -60,3 +60,18 @@ func NewPostgresDailyUsageStore(databaseURL string) (DailyUsageStore, error) {
 	}
 	return store, nil
 }
+
+// NewPostgresSkillMasteryStore opens a fresh pool + ensures the V19
+// user_skill_mastery schema.
+func NewPostgresSkillMasteryStore(databaseURL string) (SkillMasteryStore, error) {
+	db, err := openPostgresPool(databaseURL, "user_skill_mastery")
+	if err != nil {
+		return nil, err
+	}
+	store, err := NewPostgresSkillMasteryStoreWithDB(db)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	return store, nil
+}

@@ -110,7 +110,7 @@ func (p *Processor) ProcessWritingAttempt(attemptID string, sub contracts.Writin
 		feedback = writingFallbackFeedback()
 	}
 
-	p.repo.CompleteAttempt(attemptID, transcript, feedback)
+	p.completeAttempt(attemptID, exercise, transcript, feedback)
 
 	artifact := buildWritingReviewArtifact(text, feedback)
 	if artifact.Status == "ready" {

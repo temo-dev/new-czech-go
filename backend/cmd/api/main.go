@@ -172,6 +172,10 @@ func buildV17AuthDeps() (httpapi.AuthDeps, bool) {
 	if err != nil {
 		log.Fatalf("V17 daily_usage store: %v", err)
 	}
+	mastery, err := store.NewPostgresSkillMasteryStore(databaseURL)
+	if err != nil {
+		log.Fatalf("V19 skill_mastery store: %v", err)
+	}
 
 	var sender email.Sender
 	if smtpHost := strings.TrimSpace(os.Getenv("EMAIL_SMTP_HOST")); smtpHost != "" {
@@ -203,6 +207,7 @@ func buildV17AuthDeps() (httpapi.AuthDeps, bool) {
 		Streaks:       streaks,
 		ProPurchases:  purchases,
 		DailyUsage:    usage,
+		SkillMastery:  mastery,
 		EmailSender:   sender,
 		AppleVerifier: appleVerifier,
 		BaseURL:       baseURL,

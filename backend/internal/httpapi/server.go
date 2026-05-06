@@ -61,7 +61,12 @@ type Server struct {
 	interviewPreviewRL *interviewPreviewLimiter
 	ocrProvider        processing.OCRProvider // V18.1 dictation handwriting OCR
 	dictationOCRRL     *dictationOCRRateLimiter
-	mux                *http.ServeMux
+
+	// V19 user_skill_mastery aggregate. nil disables the progress endpoint.
+	masteryStore  store.SkillMasteryStore
+	masteryConfig processing.MasteryConfig
+
+	mux *http.ServeMux
 }
 
 func NewServer(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider) http.Handler {
@@ -204,6 +209,7 @@ func (s *Server) routes() {
 		s.mux.HandleFunc("/v1/auth/login", s.handleLogin)
 	}
 	s.mux.HandleFunc("/v1/me", s.withAuth(s.handleMe))
+	s.mux.HandleFunc("/v1/users/me/progress", s.withAuth(s.handleUserProgress))
 	s.mux.HandleFunc("/v1/course", s.withAuth(s.handleCourse))
 	s.mux.HandleFunc("/v1/plan", s.withAuth(s.handlePlan))
 	s.mux.HandleFunc("/v1/modules", s.withAuth(s.handleModules))

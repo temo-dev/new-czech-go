@@ -1,6 +1,7 @@
 package processing
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -26,6 +27,7 @@ type Processor struct {
 	llmProvider       LLMFeedbackProvider
 	reviewProvider    LLMReviewProvider
 	dictationProvider DictationFeedbackProvider // V18 — lazy fallback to Dev when nil
+	masteryUpdater    *MasteryUpdater           // V19 — nil disables per-attempt mastery aggregation
 }
 
 func NewProcessor(repo attemptRepository, transcriber Transcriber, ttsProvider TTSProvider, llmProvider LLMFeedbackProvider, reviewProvider LLMReviewProvider) *Processor {
@@ -49,6 +51,31 @@ func NewProcessor(repo attemptRepository, transcriber Transcriber, ttsProvider T
 func (p *Processor) WithVoiceRegistry(r *VoiceRegistry) *Processor {
 	p.voiceRegistry = r
 	return p
+}
+
+// WithMasteryUpdater wires the V19 user_skill_mastery aggregate side-effect.
+// Pass nil (or skip the call entirely) to disable mastery aggregation; the
+// attempt path remains identical otherwise.
+func (p *Processor) WithMasteryUpdater(u *MasteryUpdater) *Processor {
+	p.masteryUpdater = u
+	return p
+}
+
+// completeAttempt persists the attempt and runs the mastery side-effect.
+// All ProcessXxxAttempt entry points funnel through here so the aggregate
+// hook is impossible to forget at a new call site.
+func (p *Processor) completeAttempt(attemptID string, exercise contracts.Exercise, transcript contracts.Transcript, feedback contracts.AttemptFeedback) {
+	p.repo.CompleteAttempt(attemptID, transcript, feedback)
+	if p.masteryUpdater == nil {
+		return
+	}
+	completed, ok := p.repo.Attempt(attemptID)
+	if !ok || completed == nil {
+		return
+	}
+	if err := p.masteryUpdater.Update(context.Background(), *completed, exercise); err != nil {
+		log.Printf("attempt %s mastery update failed: %v", attemptID, err)
+	}
 }
 
 // WithDictationFeedbackProvider wires the V18 dictation LLM annotator.
@@ -120,7 +147,7 @@ func (p *Processor) ProcessAttempt(attemptID, preferredVoiceID string) error {
 		return nil
 	}
 
-	p.repo.CompleteAttempt(attemptID, transcript, feedback)
+	p.completeAttempt(attemptID, exercise, transcript, feedback)
 	artifact, artifactOk := buildReviewArtifact(exercise, transcript, feedback)
 	if !artifactOk {
 		artifact = contracts.AttemptReviewArtifact{

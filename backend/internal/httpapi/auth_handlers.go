@@ -30,6 +30,7 @@ type AuthDeps struct {
 	Streaks       store.StreakStore
 	ProPurchases  store.ProPurchaseStore
 	DailyUsage    store.DailyUsageStore
+	SkillMastery  store.SkillMasteryStore // V19 — nil disables /v1/users/me/progress
 	EmailSender   email.Sender
 	AppleVerifier AppleVerifier
 	BaseURL       string        // public origin used to build email links, e.g. https://api.czechgo.hadoo.eu
@@ -47,6 +48,10 @@ func (d *AuthDeps) applyTo(s *Server) {
 	s.streakStore = d.Streaks
 	s.proPurchaseStore = d.ProPurchases
 	s.dailyUsageStore = d.DailyUsage
+	if d.SkillMastery != nil {
+		s.SetMasteryDeps(d.SkillMastery, processing.LoadMasteryConfig())
+		s.processor.WithMasteryUpdater(processing.NewMasteryUpdater(d.SkillMastery, s.masteryConfig, nil))
+	}
 	s.emailSender = d.EmailSender
 	s.appleVerifier = d.AppleVerifier
 	s.authBaseURL = strings.TrimRight(d.BaseURL, "/")
