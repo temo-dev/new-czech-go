@@ -43,6 +43,16 @@ CREATE TABLE IF NOT EXISTS courses (
 		db.Close()
 		return nil, fmt.Errorf("migrate courses banner_image_id: %w", err)
 	}
+	// Migration 025 (V21): CEFR level + demo_exercise_id + index. Existing
+	// rows backfill to 'a2' so the current product keeps working.
+	if _, err := db.ExecContext(ctx, `
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS level TEXT NOT NULL DEFAULT 'a2';
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS demo_exercise_id TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS courses_level_idx ON courses (level);
+`); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate courses level: %w", err)
+	}
 	return &postgresCourseStore{db: db}, nil
 }
 

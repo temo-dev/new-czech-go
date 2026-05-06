@@ -69,8 +69,45 @@ ALTER TABLE mock_test_sections
 
 -- V9: drop obsolete full exam sessions table (was added in V5, replaced by exam_mode model)
 DROP TABLE IF EXISTS full_exam_sessions;
+
+-- Migration 025 (V21): CEFR level promotion + placement flags.
+ALTER TABLE mock_tests ADD COLUMN IF NOT EXISTS is_promotion BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE mock_tests ADD COLUMN IF NOT EXISTS is_placement BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE mock_tests ADD COLUMN IF NOT EXISTS target_level TEXT;
 `)
-	return err
+	if err != nil {
+		return err
+	}
+	// V21 CHECK constraints — guarded by pg_constraint lookup so re-running
+	// this DDL against an already-migrated DB is a no-op.
+	for _, ddl := range []string{
+		`DO $$ BEGIN
+			IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'mock_tests_target_level_check') THEN
+				ALTER TABLE mock_tests
+					ADD CONSTRAINT mock_tests_target_level_check
+					CHECK (target_level IS NULL OR target_level IN ('a0','a1','a2','b1'));
+			END IF;
+		END$$;`,
+		`DO $$ BEGIN
+			IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'mock_tests_promotion_target_required') THEN
+				ALTER TABLE mock_tests
+					ADD CONSTRAINT mock_tests_promotion_target_required
+					CHECK (is_promotion = FALSE OR target_level IS NOT NULL);
+			END IF;
+		END$$;`,
+		`DO $$ BEGIN
+			IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'mock_tests_promotion_placement_mutex') THEN
+				ALTER TABLE mock_tests
+					ADD CONSTRAINT mock_tests_promotion_placement_mutex
+					CHECK (NOT (is_promotion AND is_placement));
+			END IF;
+		END$$;`,
+	} {
+		if _, err := s.db.ExecContext(ctx, ddl); err != nil {
+			return fmt.Errorf("apply mock_tests v21 check constraint: %w", err)
+		}
+	}
+	return nil
 }
 
 func (s *postgresMockTestStore) CreateMockTest(t contracts.MockTest) (contracts.MockTest, error) {

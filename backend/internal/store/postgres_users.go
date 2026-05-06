@@ -84,8 +84,18 @@ CREATE INDEX IF NOT EXISTS users_role_idx
 CREATE INDEX IF NOT EXISTS users_pro_expires_at_idx
     ON users (pro_expires_at)
     WHERE pro_tier = 'pro' AND deleted_at IS NULL;
+
+-- Migration 025 (V21): CEFR level columns. Existing rows are backfilled
+-- on the next read in the user repository (V21-B1) so this DDL only
+-- needs to ensure the columns exist with new-user defaults.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS current_level TEXT NOT NULL DEFAULT 'a0';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS unlocked_levels TEXT[] NOT NULL DEFAULT ARRAY['a0'];
+ALTER TABLE users ADD COLUMN IF NOT EXISTS placement_taken_at TIMESTAMPTZ;
 `)
-	return err
+	if err != nil {
+		return err
+	}
+	return ensurePromotionAttemptsSchema(ctx, s.db)
 }
 
 // userColumns is the ordered list returned by every SELECT in this file.
