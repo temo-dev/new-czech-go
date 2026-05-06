@@ -692,6 +692,13 @@ class ApiClient {
     return payload['data'] as List<dynamic>? ?? const [];
   }
 
+  /// V19/V20: GET /v1/users/me/progress — per-skill mastery aggregate.
+  /// Returns the raw `data` map; ProgressApi handles typed parsing + caching.
+  Future<Map<String, dynamic>> getProgress() async {
+    final payload = await _authed('GET', '/v1/users/me/progress');
+    return (payload['data'] as Map<String, dynamic>?) ?? const {};
+  }
+
   Future<List<dynamic>> listMockTests() async {
     final payload = await _authed('GET', '/v1/mock-tests');
     return payload['data'] as List<dynamic>? ?? const [];
