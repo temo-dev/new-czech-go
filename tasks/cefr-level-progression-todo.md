@@ -27,9 +27,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** legacy backfill moved to migration 026 (one-shot UPDATE guarded by `current_level='a0' AND placement_taken_at IS NULL` so it is no-op on re-run and on greenfield); `SetUserLevel` uses single SQL `array_append` w/ `ANY` guard for race-safe idempotency; `MarkPlacementTaken` sets level + timestamp atomically; memory + Postgres impls share `appendUniqueSorted` helper
   - **Verify:** +5 memory unit tests + 1 migration shape test
   - **Size:** M
-- [ ] **V21-B2** `PromotionAttemptsStore` extension
-  - **AC:** create / latest-failed lookup / mark result idempotent
-  - **Verify:** +4 unit tests
+- [x] **V21-B2** `PromotionAttemptsStore` (`contracts/promotion_attempt.go`, `store/promotion_attempts_store.go`)
+  - **AC:** `Create` (auto ID + zero-time), `GetLatestFailedAttempt(userID, targetLevel)` ignores passed + other-user + other-target rows, `MarkResult` updates passed/score/per-skill idempotent, returns not-found on unknown ID; per-skill JSONB round-trip in Postgres
+  - **Verify:** +4 memory unit tests
   - **Size:** M
 - [ ] **V21-B3** `LevelService` gating math (`processing/level_service.go`, `contracts/level.go`)
   - **AC:** `ComputeLevelProgress`, `MapPlacementScoreToLevel` (B1 cap when content flag false); pure orchestration
