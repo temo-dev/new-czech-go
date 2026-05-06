@@ -29,14 +29,23 @@ Idea: `docs/ideas/skill-mastery-progress.md`
 
 ---
 
-## Phase 2 — Validation Window (no code — gate before V20)
+## Phase 2 — Validation Window (gate before V21 spaced repetition)
 
-- [ ] V19 deployed to staging
-- [ ] 30-attempt teacher review of `readiness_level` agreement
-- [ ] p95 attempt-persist latency snapshot before/after V19
-- [ ] Notebook simulation of 20 attempt sequences against production formula
+Tooling shipped (run-and-record):
 
-If any gate fails, fix Phase 1 before starting Phase 3.
+- [ ] **Gate 1 — Staging deploy.** Runbook: `docs/validation/v19-staging-deploy.md`.
+- [ ] **Gate 2 — 30-attempt teacher review** of `readiness_level` agreement.
+      Template: `docs/validation/v19-teacher-review-template.md` (≥ 70 % exact
+      agreement, ≥ 90 % off-by-1).
+- [ ] **Gate 3 — p95 attempt-persist latency** before/after V19.
+      `make mastery-latency` (post/pre p95 ratio ≤ 1.20).
+- [x] **Gate 4 — Notebook simulation** of 20 attempt sequences.
+      `make mastery-sim` (20/20 sane on production constants —
+      `early_alpha=0.5 / steady_alpha=0.3 / cap=3`, bands
+      `0.40/0.70/0.85`).
+
+If any gate fails, capture findings in Phase 4 below and tune before
+starting V21.
 
 ---
 

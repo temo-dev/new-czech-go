@@ -240,6 +240,12 @@ smoke-dictation-flow:
 smoke-progress-flow:
 	$(RTK) python3 scripts/smoke_progress_flow.py --base-url $(SMOKE_BASE_URL) $(SMOKE_PROGRESS_ARGS)
 
+mastery-sim:
+	$(RTK) python3 scripts/mastery_sim.py $(MASTERY_SIM_ARGS)
+
+mastery-latency:
+	$(RTK) python3 scripts/mastery_latency_snapshot.py --base-url $(SMOKE_BASE_URL) $(MASTERY_LATENCY_ARGS)
+
 smoke-all: smoke-attempt-flow smoke-course-flow smoke-exam-flow smoke-v17-auth smoke-dictation-flow smoke-progress-flow
 
 seed-modelovy-test-2:
