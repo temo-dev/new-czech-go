@@ -131,7 +131,7 @@ class _ResultViewState extends State<_ResultView> {
   @override
   Widget build(BuildContext context) {
     final feedback = widget.result.feedback;
-    final readiness = feedback?.readinessLevel ?? 'ok';
+    final readiness = feedback?.readinessLevel ?? 'needs_work';
     final score = _readinessToScore(readiness);
     final l = widget.l;
 
@@ -240,11 +240,23 @@ class _ResultViewState extends State<_ResultView> {
   }
 
   static int _readinessToScore(String r) {
-    return switch (r) { 'strong' => 85, 'ok' => 65, _ => 40 };
+    return switch (r) {
+      'ready_for_mock' || 'exam_ready' || 'strong' => 90,
+      'almost_ready' => 70,
+      'needs_work' || 'ok' => 45,
+      'not_ready' || 'weak' => 20,
+      _ => 40,
+    };
   }
 
   static String _readinessLabel(String r) {
-    return switch (r) { 'strong' => 'Tốt · Sẵn sàng thi', 'ok' => 'Khá · Cần luyện thêm', _ => 'Yếu · Cần cố gắng hơn' };
+    return switch (r) {
+      'ready_for_mock' || 'exam_ready' || 'strong' => 'Tốt · Sẵn sàng thi',
+      'almost_ready' => 'Gần đủ · Sắp sẵn sàng',
+      'needs_work' || 'ok' => 'Khá · Cần luyện thêm',
+      'not_ready' || 'weak' => 'Yếu · Cần cố gắng hơn',
+      _ => 'Cần cố gắng hơn',
+    };
   }
 }
 

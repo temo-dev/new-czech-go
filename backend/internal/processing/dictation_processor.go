@@ -280,6 +280,9 @@ func ExtractDictationDetail(v any) (contracts.DictationDetail, bool) {
 	return d, true
 }
 
+// readinessFromDictationScore maps the dictation Levenshtein-derived percentage
+// to the canonical 4-band readiness vocab. `Passed` short-circuits to
+// ready_for_mock so the deterministic threshold stays the source of truth.
 func readinessFromDictationScore(fb contracts.DictationFeedback) string {
 	if fb.Passed {
 		return "ready_for_mock"
@@ -289,8 +292,10 @@ func readinessFromDictationScore(fb contracts.DictationFeedback) string {
 	}
 	pct := float64(fb.OverallScore) / float64(fb.MaxPoints)
 	switch {
-	case pct >= 0.4:
+	case pct >= 0.60:
 		return "almost_ready"
+	case pct >= 0.30:
+		return "needs_work"
 	default:
 		return "not_ready"
 	}

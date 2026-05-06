@@ -10,7 +10,7 @@ import "github.com/danieldev/czech-go-system/backend/internal/contracts"
 // attempts when the LLM is unavailable.
 func writingFallbackFeedback() contracts.AttemptFeedback {
 	return contracts.AttemptFeedback{
-		ReadinessLevel:  "ok",
+		ReadinessLevel:  "needs_work",
 		OverallSummary:  "Bài viết đã được ghi nhận. Phản hồi chi tiết sẽ có khi AI sẵn sàng.",
 		Strengths:       []string{"Bạn đã hoàn thành bài viết"},
 		Improvements:    []string{"Hãy kiểm tra lại ngữ pháp và từ vựng"},
@@ -40,7 +40,7 @@ func dictationFallbackFeedback(idx int, accuracy float64) string {
 // sessions when the LLM is unavailable.
 func interviewFallbackFeedback() contracts.AttemptFeedback {
 	return contracts.AttemptFeedback{
-		ReadinessLevel:  "ok",
+		ReadinessLevel:  "needs_work",
 		OverallSummary:  "Phiên phỏng vấn đã được ghi nhận. Phản hồi chi tiết sẽ có khi AI sẵn sàng.",
 		Strengths:       []string{"Bạn đã hoàn thành buổi luyện tập"},
 		Improvements:    []string{"Hãy luyện thêm câu trả lời đầy đủ và chi tiết"},

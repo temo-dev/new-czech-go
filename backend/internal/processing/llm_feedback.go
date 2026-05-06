@@ -190,13 +190,46 @@ func (c *ClaudeLLMFeedbackProvider) GenerateInterviewFeedback(turns []contracts.
 }
 
 
+// normalizeReadinessLevel collapses any historical or LLM-emitted readiness
+// token into the canonical 4-band vocabulary used by the mastery aggregate
+// (see docs/specs/skill-mastery-progress.md § "Readiness Vocabulary").
+//
+// Canonical bands: not_ready, needs_work, almost_ready, ready_for_mock.
+// Legacy mappings:
+//   - exam_ready (LLM)             → ready_for_mock
+//   - weak / ok / strong (objective scorer V18 and earlier) → 4-band peers
+//   - empty / unknown              → needs_work (safe middle-low default)
 func normalizeReadinessLevel(raw string) string {
 	v := strings.ToLower(strings.TrimSpace(raw))
 	switch v {
-	case "not_ready", "almost_ready", "ready_for_mock", "exam_ready":
+	case "not_ready", "needs_work", "almost_ready", "ready_for_mock":
 		return v
+	case "exam_ready", "strong":
+		return "ready_for_mock"
+	case "ok":
+		return "needs_work"
+	case "weak":
+		return "not_ready"
 	default:
-		return "almost_ready"
+		return "needs_work"
+	}
+}
+
+// ReadinessToScore maps a canonical readiness band to the numeric value fed
+// into the mastery EMA. Anything off-scale collapses to the safe middle-low
+// default so a stray token cannot inflate or destroy mastery.
+func ReadinessToScore(level string) float64 {
+	switch level {
+	case "not_ready":
+		return 0.20
+	case "needs_work":
+		return 0.45
+	case "almost_ready":
+		return 0.70
+	case "ready_for_mock":
+		return 0.90
+	default:
+		return 0.40
 	}
 }
 

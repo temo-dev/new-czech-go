@@ -211,8 +211,8 @@ func TestBuildWritingReviewArtifact_EmptySampleAnswer(t *testing.T) {
 
 func TestWritingFallbackFeedback_Fields(t *testing.T) {
 	fb := writingFallbackFeedback()
-	if fb.ReadinessLevel != "ok" {
-		t.Errorf("ReadinessLevel = %q, want ok", fb.ReadinessLevel)
+	if fb.ReadinessLevel != "needs_work" {
+		t.Errorf("ReadinessLevel = %q, want needs_work", fb.ReadinessLevel)
 	}
 	if fb.OverallSummary == "" {
 		t.Error("expected non-empty OverallSummary in fallback feedback")

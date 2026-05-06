@@ -76,23 +76,66 @@ func TestScoreObjectiveAnswers_AllCorrect(t *testing.T) {
 }
 
 func TestReadinessLevelFromObjective(t *testing.T) {
+	// New 4-band vocab thresholds: 0.85 ready_for_mock, 0.60 almost_ready,
+	// 0.30 needs_work, else not_ready. See docs/specs/skill-mastery-progress.md.
 	cases := []struct {
 		score    int
 		maxScore int
 		want     string
 	}{
-		{5, 5, "strong"},
-		{4, 5, "strong"},  // ≥80%
-		{3, 5, "ok"},   // 60% ≥ 0.5
-		{2, 5, "weak"}, // 40% < 0.5
-		{1, 5, "weak"},
-		{0, 5, "weak"},
+		{0, 0, "not_ready"},   // empty exercise → safe floor
+		{20, 20, "ready_for_mock"},
+		{17, 20, "ready_for_mock"}, // 85%
+		{16, 20, "almost_ready"},   // 80%
+		{12, 20, "almost_ready"},   // 60%
+		{11, 20, "needs_work"},     // 55%
+		{6, 20, "needs_work"},      // 30%
+		{5, 20, "not_ready"},       // 25%
+		{0, 20, "not_ready"},
 	}
 	for _, c := range cases {
 		got := ReadinessFromObjective(c.score, c.maxScore)
 		if got != c.want {
 			t.Errorf("ReadinessFromObjective(%d,%d) = %q, want %q", c.score, c.maxScore, got, c.want)
 		}
+	}
+}
+
+func TestObjectiveScoreBand(t *testing.T) {
+	// ScoreBand vocab stays weak/ok/strong; only ReadinessLevel adopts the
+	// 4-band scale. Thresholds unchanged: >=0.8 strong, >=0.5 ok, else weak.
+	cases := []struct {
+		score    int
+		maxScore int
+		want     string
+	}{
+		{0, 0, "weak"},
+		{5, 5, "strong"},
+		{4, 5, "strong"},
+		{3, 5, "ok"},
+		{2, 5, "weak"},
+		{0, 5, "weak"},
+	}
+	for _, c := range cases {
+		got := objectiveScoreBand(c.score, c.maxScore)
+		if got != c.want {
+			t.Errorf("objectiveScoreBand(%d,%d) = %q, want %q", c.score, c.maxScore, got, c.want)
+		}
+	}
+}
+
+func TestBuildObjectiveFeedback_VocabSplit(t *testing.T) {
+	// ReadinessLevel uses the new 4-band vocab; TaskCompletion.ScoreBand keeps
+	// weak/ok/strong; GrammarFeedback.ScoreBand stays n/a for objective.
+	fb := BuildObjectiveFeedback(contracts.ObjectiveResult{Score: 4, MaxScore: 5})
+	if fb.ReadinessLevel != "almost_ready" {
+		t.Errorf("ReadinessLevel = %q, want almost_ready", fb.ReadinessLevel)
+	}
+	if fb.TaskCompletion.ScoreBand != "strong" {
+		t.Errorf("TaskCompletion.ScoreBand = %q, want strong", fb.TaskCompletion.ScoreBand)
+	}
+	if fb.GrammarFeedback.ScoreBand != "n/a" {
+		t.Errorf("GrammarFeedback.ScoreBand = %q, want n/a", fb.GrammarFeedback.ScoreBand)
 	}
 }
 

@@ -97,8 +97,31 @@ func sortBreakdown(breakdown []contracts.QuestionResult) {
 	}
 }
 
-// ReadinessFromObjective maps score fraction to weak/ok/strong.
+// ReadinessFromObjective maps score fraction to the canonical 4-band
+// readiness vocabulary used by the mastery aggregate.
+// Thresholds: 0.85 ready_for_mock, 0.60 almost_ready, 0.30 needs_work,
+// else not_ready. See docs/specs/skill-mastery-progress.md.
 func ReadinessFromObjective(score, maxScore int) string {
+	if maxScore == 0 {
+		return "not_ready"
+	}
+	frac := float64(score) / float64(maxScore)
+	switch {
+	case frac >= 0.85:
+		return "ready_for_mock"
+	case frac >= 0.60:
+		return "almost_ready"
+	case frac >= 0.30:
+		return "needs_work"
+	default:
+		return "not_ready"
+	}
+}
+
+// objectiveScoreBand maps score fraction to the legacy weak/ok/strong vocab
+// used by TaskCompletion.ScoreBand. Kept independent from ReadinessLevel so
+// the mastery vocab change does not ripple into ScoreBand consumers.
+func objectiveScoreBand(score, maxScore int) string {
 	if maxScore == 0 {
 		return "weak"
 	}
@@ -115,13 +138,12 @@ func ReadinessFromObjective(score, maxScore int) string {
 
 // BuildObjectiveFeedback builds AttemptFeedback for objective (listening/reading) attempts.
 func BuildObjectiveFeedback(result contracts.ObjectiveResult) contracts.AttemptFeedback {
-	readiness := ReadinessFromObjective(result.Score, result.MaxScore)
 	return contracts.AttemptFeedback{
-		ReadinessLevel:  readiness,
+		ReadinessLevel:  ReadinessFromObjective(result.Score, result.MaxScore),
 		OverallSummary:  fmt.Sprintf("Bạn trả lời đúng %d/%d câu.", result.Score, result.MaxScore),
 		Strengths:       []string{},
 		Improvements:    []string{},
-		TaskCompletion:  contracts.TaskCompletion{ScoreBand: readiness},
+		TaskCompletion:  contracts.TaskCompletion{ScoreBand: objectiveScoreBand(result.Score, result.MaxScore)},
 		GrammarFeedback: contracts.GrammarFeedback{ScoreBand: "n/a"},
 		RetryAdvice:     []string{},
 		ObjectiveResult: &result,

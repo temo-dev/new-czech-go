@@ -49,7 +49,7 @@ func FeedbackSystemPrompt(locale string) string {
 		"Evaluate the learner's response and return ONLY valid JSON — no markdown, no explanation, no prose outside the JSON object.",
 		languageClause,
 		pointOfViewClause,
-		"readiness_level MUST be one of: not_ready, almost_ready, ready_for_mock, exam_ready.",
+		"readiness_level MUST be one of: not_ready, needs_work, almost_ready, ready_for_mock.",
 		fmt.Sprintf("strengths, improvements, retry_advice: arrays of 1-3 CONCISE %s strings each (one actionable idea per string, keep each string under 200 characters).", targetLanguage),
 		"overall_summary: one concise paragraph, under 400 characters.",
 		"sample_answer: one or two natural Czech sentences demonstrating the correct, exam-appropriate response.",
@@ -144,7 +144,7 @@ func DictationOCRSystemPrompt() string {
 // ── Interview Scoring ────────────────────────────────────────────────────────
 
 // InterviewSystemPrompt returns the system prompt for interview-skill scoring.
-// readiness_level values match normalizeReadinessLevel: not_ready/almost_ready/ready_for_mock/exam_ready.
+// readiness_level values match normalizeReadinessLevel: not_ready/needs_work/almost_ready/ready_for_mock.
 func InterviewSystemPrompt(locale string) string {
 	lang := "Vietnamese"
 	if locale == contracts.LocaleEN {
@@ -158,7 +158,7 @@ func InterviewSystemPrompt(locale string) string {
 			"CRITICAL LANGUAGE RULE: overall_summary, strengths, improvements, retry_advice MUST be written entirely in %s. "+
 			"Only sample_answer may contain Czech. "+
 			"Address the learner directly (you/your / bạn/của bạn). "+
-			"readiness_level MUST be one of: not_ready, almost_ready, ready_for_mock, exam_ready. "+
+			"readiness_level MUST be one of: not_ready, needs_work, almost_ready, ready_for_mock. "+
 			"strengths, improvements, retry_advice: arrays of 1-3 concise %s strings (one idea per string, under 200 characters each). "+
 			"overall_summary: one concise paragraph under 400 characters. "+
 			"sample_answer: one or two natural Czech sentences demonstrating a better version of a key learner response. "+
