@@ -77,15 +77,25 @@ func NewServer(repo *store.MemoryStore, processor *processing.Processor, uploadP
 // AudioURLProvider and signing secret. NewServer delegates here with defaults
 // sourced from env. V17 callers that also need self-serve auth should use
 // NewServerWithAuth (in auth_handlers.go) which wires the same setup plus
-// the UserStore/AuthTokenStore/EmailSender dependency bundle.
+// the UserStore/AuthTokenStore/EmailSender dependency bundle. Callers that
+// want V19 mastery without V17 auth use NewServerWithMastery.
 func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider, audioURLProvider AudioURLProvider, audioSignSecret []byte) http.Handler {
-	return assembleServer(repo, processor, uploadProvider, audioURLProvider, audioSignSecret, nil)
+	return assembleServer(repo, processor, uploadProvider, audioURLProvider, audioSignSecret, nil, nil)
+}
+
+// NewServerWithMastery wires the V19 user_skill_mastery aggregate (progress
+// endpoint + per-attempt updater) without enabling the V17 self-serve auth
+// flow. Use this on dev fixture builds where MemoryStore.Login still issues
+// tokens but the mastery aggregate must persist via Postgres.
+func NewServerWithMastery(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider, audioURLProvider AudioURLProvider, audioSignSecret []byte, mastery MasteryDeps) http.Handler {
+	return assembleServer(repo, processor, uploadProvider, audioURLProvider, audioSignSecret, nil, &mastery)
 }
 
 // assembleServer is the shared builder for the public constructors. Pass a
 // nil authDeps to keep the legacy dev-fixture token path; supply a populated
-// AuthDeps to wire the V17 self-serve auth handlers.
-func assembleServer(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider, audioURLProvider AudioURLProvider, audioSignSecret []byte, authDeps *AuthDeps) http.Handler {
+// AuthDeps to wire the V17 self-serve auth handlers. masteryDeps is wired
+// independently so dev fixture + V17 callers share the same mastery path.
+func assembleServer(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider, audioURLProvider AudioURLProvider, audioSignSecret []byte, authDeps *AuthDeps, masteryDeps *MasteryDeps) http.Handler {
 	if processor == nil {
 		processor = processing.NewProcessor(repo, nil, nil, nil, nil)
 	}
@@ -145,6 +155,16 @@ func assembleServer(repo *store.MemoryStore, processor *processing.Processor, up
 	}
 	if authDeps != nil {
 		authDeps.applyTo(s)
+	}
+	// Mastery wires after authDeps so an explicit MasteryDeps wins when both
+	// are supplied (mostly relevant in tests). authDeps.applyTo already wires
+	// mastery internally when AuthDeps.SkillMastery is set, so most production
+	// builds only fill one of these.
+	if masteryDeps != nil && masteryDeps.Store != nil {
+		s.SetMasteryDeps(masteryDeps.Store, masteryDeps.Config)
+		s.processor.WithMasteryUpdater(processing.NewMasteryUpdater(
+			masteryDeps.Store, masteryDeps.Config, nil,
+		))
 	}
 	// Recover any jobs stuck in "running" from a previous server crash.
 	repo.MarkAllRunningJobsFailed("Server restarted while generation was running")

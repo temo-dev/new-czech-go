@@ -15,6 +15,19 @@ import (
 	"github.com/danieldev/czech-go-system/backend/internal/store"
 )
 
+// MasteryDeps bundles the V19 user_skill_mastery dependencies that the
+// progress endpoint and the per-attempt updater need. It exists so
+// non-V17 callers can wire mastery without piggy-backing on AuthDeps —
+// the previous shape forced main.go to allocate a half-empty AuthDeps
+// struct just to reach the progress wiring path.
+//
+// Pass to NewServerWithMastery (legacy fixture path) or to AuthDeps.SkillMastery
+// (V17 path). Both end up funneled through Server.SetMasteryDeps.
+type MasteryDeps struct {
+	Store  store.SkillMasteryStore
+	Config processing.MasteryConfig
+}
+
 // SetMasteryDeps wires the V19 user_skill_mastery store + config. The progress
 // route is only registered when both are present; passing nil is treated as
 // "feature disabled" and the route returns 404.

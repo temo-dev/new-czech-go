@@ -129,30 +129,33 @@ func main() {
 
 	processorInst := processing.NewProcessor(repo, transcriber, ttsProvider, llmProvider, reviewProvider)
 
-	// V19: skill mastery aggregate is independent of V17 auth — wire it
-	// whenever Postgres is available so the dev fixture login path also
-	// records progress. We piggyback on AuthDeps (only SkillMastery set)
-	// and route through NewServerWithAuth; registerAuthRoutes stays inert
-	// because Users == nil, so no V17 routes leak.
-	if !useAuth {
-		if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
-			masteryStore, err := store.NewPostgresSkillMasteryStore(databaseURL)
-			if err != nil {
-				log.Fatalf("V19 skill_mastery store: %v", err)
-			}
-			authDeps = httpapi.AuthDeps{SkillMastery: masteryStore}
-			useAuth = true
-			log.Printf("V19 skill_mastery wired without V17 auth (dev fixture path)")
+	// V19: skill mastery aggregate runs independently of V17 self-serve auth.
+	// Build the store + config once and let either constructor (V17 path or
+	// dev fixture path) wire it through.
+	var masteryDeps httpapi.MasteryDeps
+	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+		masteryStore, err := store.NewPostgresSkillMasteryStore(databaseURL)
+		if err != nil {
+			log.Fatalf("V19 skill_mastery store: %v", err)
 		}
+		masteryDeps = httpapi.MasteryDeps{
+			Store:  masteryStore,
+			Config: processing.LoadMasteryConfig(),
+		}
+		log.Printf("V19 skill_mastery aggregate wired (mastery_updater + GET /v1/users/me/progress)")
 	}
 
 	var handler http.Handler
-	if useAuth {
-		if authDeps.Users != nil {
-			log.Printf("V17 self-serve auth enabled (signup/login/IAP/quota gates)")
-		}
+	switch {
+	case useAuth:
+		log.Printf("V17 self-serve auth enabled (signup/login/IAP/quota gates)")
+		// V17 callers populate AuthDeps.SkillMastery so applyTo wires the
+		// updater; passing masteryDeps too would be redundant.
+		authDeps.SkillMastery = masteryDeps.Store
 		handler = httpapi.NewServerWithAuth(repo, processorInst, uploadProvider, audioURLProvider, audioSignSecret, authDeps)
-	} else {
+	case masteryDeps.Store != nil:
+		handler = httpapi.NewServerWithMastery(repo, processorInst, uploadProvider, audioURLProvider, audioSignSecret, masteryDeps)
+	default:
 		handler = httpapi.NewServerWithAudio(repo, processorInst, uploadProvider, audioURLProvider, audioSignSecret)
 	}
 
@@ -205,10 +208,9 @@ func buildV17AuthDeps() (httpapi.AuthDeps, bool) {
 	if err != nil {
 		log.Fatalf("V17 daily_usage store: %v", err)
 	}
-	mastery, err := store.NewPostgresSkillMasteryStore(databaseURL)
-	if err != nil {
-		log.Fatalf("V19 skill_mastery store: %v", err)
-	}
+	// V19 mastery is built once at the top of main() and passed via
+	// AuthDeps.SkillMastery (see SkillMastery field on the returned struct
+	// being filled in by the caller, not here).
 
 	var sender email.Sender
 	if smtpHost := strings.TrimSpace(os.Getenv("EMAIL_SMTP_HOST")); smtpHost != "" {
@@ -240,7 +242,6 @@ func buildV17AuthDeps() (httpapi.AuthDeps, bool) {
 		Streaks:       streaks,
 		ProPurchases:  purchases,
 		DailyUsage:    usage,
-		SkillMastery:  mastery,
 		EmailSender:   sender,
 		AppleVerifier: appleVerifier,
 		BaseURL:       baseURL,

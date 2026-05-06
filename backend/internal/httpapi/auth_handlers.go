@@ -75,7 +75,7 @@ func (d *AuthDeps) applyTo(s *Server) {
 // alongside the existing audio + admin setup. Mirrors NewServerWithAudio
 // signature plus an AuthDeps bundle.
 func NewServerWithAuth(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider, audioURLProvider AudioURLProvider, audioSignSecret []byte, deps AuthDeps) http.Handler {
-	return assembleServer(repo, processor, uploadProvider, audioURLProvider, audioSignSecret, &deps)
+	return assembleServer(repo, processor, uploadProvider, audioURLProvider, audioSignSecret, &deps, nil)
 }
 
 // registerAuthRoutes is invoked from Server.routes() when the V17 deps
