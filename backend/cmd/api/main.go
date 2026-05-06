@@ -33,6 +33,19 @@ func main() {
 	var exerciseAudioStore store.ExerciseAudioStore
 	var exerciseSentenceAudioStore store.ExerciseSentenceAudioStore
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+		// Dev fixture users (learner@example.com etc.) must exist in the
+		// Postgres `users` table before any V17/V19 store FK fires, otherwise
+		// dev logins silently fail every downstream INSERT (mastery,
+		// streaks, pro_purchases, ...). Production builds skip this — real
+		// users come through the V17 signup flow.
+		if strings.ToLower(strings.TrimSpace(os.Getenv("ENV"))) != "production" {
+			if err := store.EnsureDevFixtureUsers(databaseURL); err != nil {
+				log.Printf("warning: dev fixture users seed failed: %v", err)
+			} else {
+				log.Printf("dev fixture users ensured in Postgres (learner/learner2/admin)")
+			}
+		}
+
 		attemptStore = mustPostgresStore("attempt", store.NewPostgresAttemptStore, databaseURL)
 		exerciseStore = mustPostgresStore("exercise", store.NewPostgresExerciseStore, databaseURL)
 		mockExamStore = mustPostgresStore("mock exam", store.NewPostgresMockExamStore, databaseURL)
