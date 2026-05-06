@@ -57,7 +57,7 @@ Read before any structural change:
 
 | File | Owns |
 |------|------|
-| `SPEC.md` | Per-slice spec summaries (V2..V18.1) — all decisions frozen |
+| `SPEC.md` | Per-slice spec summaries (V2..V20) — all decisions frozen |
 | `tasks/plan.md` | Per-slice implementation plans with design decisions |
 | `tasks/todo.md` | Task checklist with tick state |
 | `CHANGELOG.md` | Per-slice history with file changes + final test counts |
@@ -227,12 +227,17 @@ silently expanding scope.
 
 ## Current Status
 
-All planned slices V2 → V18.1 shipped. See [CHANGELOG.md](CHANGELOG.md)
+All planned slices V2 → V20 shipped. See [CHANGELOG.md](CHANGELOG.md)
 for per-slice file changes, decisions, and final test counts.
 `tasks/todo.md` tracks active backlog.
 
-**Latest** (2026-05-05): V18.1 dictation OCR submission via Claude
-Vision; backend 532 tests, Flutter 222, CMS 121.
+**Latest** (2026-05-06): V19 skill mastery aggregate + `GET
+/v1/users/me/progress` (EMA-smoothed per-skill / per-module mastery,
+weighted overall, 4-band readiness vocab unified across LLM +
+objective scorers); V20 Flutter UI (HomeProgressCard above course
+grid + ProgressDetailScreen w/ pull-to-refresh, profile entry tile,
+24 ARB keys VI=EN parity at 376=376). Backend 570 tests, Flutter
+265, CMS 121.
 
 **Remaining backlog (low priority)**:
 1. Seed sample content via CMS — at least 1 exercise per type for

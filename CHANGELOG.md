@@ -10,6 +10,163 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V20 — Flutter Skill Mastery UI — 2026-05-06
+
+- Renders the V19 progress aggregate as a home-screen card + drill-down
+  detail screen, plus a profile entry tile. Strings flow through ARB
+  (24 new keys, VI=EN parity at 376=376) so the UI stays free of
+  hardcoded VI copy outside the call sites.
+- Wire layer: `core/api/progress_models.dart` (typed `UserProgress`,
+  `SkillProgress`, `ModuleProgress`, `ProgressBands` with permissive
+  `fromApiJson` that accepts `Map<dynamic,dynamic>` const fixtures);
+  `core/api/progress_api.dart` (typed wrapper + 24 h cache via
+  in-memory `_Cached` + `SharedPreferences`; on network error returns
+  the prior cache with `isStale=true`); `ApiClient.getProgress()` raw
+  fetch.
+- Widgets under `features/progress/widgets/`:
+  - `MasteryBar` — 8 dp track + animated fill via `TweenAnimationBuilder`,
+    band → colour from `AppColors.score{Poor|Fair|Good|Excellent}`,
+    collapses tween to zero duration when
+    `MediaQuery.disableAnimations` so reduced-motion paints final value
+    immediately. Optional `Semantics(label, value)`.
+  - `SkillMasteryRow` — 56 dp min-height row, label + bar +
+    tabular-figure percent. `MergeSemantics` + `Semantics(button: true,
+    onTap)` + `InkWell(excludeFromSemantics: true)` so screen readers
+    announce one node, not three.
+  - `ProgressEmptyState` / `ProgressErrorState` — icon + title +
+    optional message + optional FilledButton/OutlinedButton CTA.
+- Screens under `features/progress/screens/`:
+  - `HomeProgressCard` (mounted above the course grid in
+    `course_list_screen.dart`) — loading → populated / empty / error
+    states; offline chip when stale; optional onSkillTap pushes the
+    drilldown filtered to that `skill_kind`.
+  - `ProgressDetailScreen` (`skillKind` nullable) — `RefreshIndicator`
+    pull-to-refresh re-runs the fetcher with `forceRefresh: true`;
+    AppBar offline chip mirrors `HomeProgressCard`.
+- Profile: new "Tiến độ học tập" tile on `ProfileScreen` pushes
+  `ProgressDetailScreen(skillKind: null)` (all-skills view) by lazy-
+  building `ProgressApi` from `SharedPreferences` on tap.
+- Shared util: `features/progress/skill_labels.dart#skillKindLabel(l, kind)`
+  resolves the 7 skill_kind tokens to their localised display name —
+  consumed by both the home card and detail screen.
+- ARB: 24 new keys per spec — `homeProgressCardTitle`,
+  `progressOverallTitle`, `progressOverallPercent({percent})`,
+  `progressSkill{Noi,Viet,Nghe,Doc,TuVung,NguPhap,Interview}`,
+  `progressBand{NeedsWork,Learning,Solid,Ready}`,
+  `progressEmpty{Title,Cta}`, `progressError{Title,Retry}`,
+  `progressOfflineChip`, `progressDetailTitle`,
+  `progressDetailAttemptsLabel({count})`,
+  `progressDetailLastAttemptLabel`,
+  `progressLastAttemptRelativeFormat({when})`, `profileProgressEntry`.
+- Spec: `docs/specs/skill-mastery-progress.md` (covers V19 + V20)
+  · plan: `tasks/skill-mastery-progress-plan.md`
+  · todo: `tasks/skill-mastery-progress-todo.md`.
+- Tests: Flutter +43 widget/unit (222 → 265): `test/api/progress_api_test.dart`
+  (10 — parse, round-trip, empty, network hit, memory cache, force
+  refresh, prefs cold start, 24 h expiry, stale fallback, offline
+  rethrow); `test/widgets/mastery_bar_test.dart` (12 — 4 band colours
+  + unknown fallback + clamp + semantics + reduced-motion + row
+  layout + tap + merged semantics + tabular figures);
+  `test/widgets/progress_states_test.dart` (6 — render + tap +
+  null-callback hide); `test/widgets/home_progress_card_test.dart`
+  (5 — loading→populated, empty + CTA, error + retry refetch, offline
+  chip, tap-row); `test/screens/progress_detail_screen_test.dart`
+  (6 — all-skills, single-skill filter, empty, error + retry,
+  pull-to-refresh forceRefresh, offline chip). `flutter analyze`
+  clean.
+- Manual UI verify (Checkpoint 3) outstanding: iPhone SE 375 +
+  iPhone 14 Pro × light/dark × reduced-motion + largest Dynamic Type.
+
+---
+
+## V19 — Skill Mastery Aggregate + Progress Endpoint — 2026-05-06
+
+- Turns the per-attempt `AttemptFeedback.readiness_level` stream into a
+  durable per-skill / per-module mastery signal keyed by
+  `(user_id, skill_kind, module_id)`. Updated synchronously after each
+  feedback persists; failures log at error level, never roll back the
+  attempt.
+- Schema (Postgres, idempotent via `CREATE TABLE IF NOT EXISTS`):
+  `user_skill_mastery (id, user_id, skill_kind, module_id,
+  mastery_score, attempts_count, last_attempt_id, last_attempt_at,
+  created_at, updated_at)` with `UNIQUE (user_id, skill_kind,
+  module_id)` and `INDEX (user_id, updated_at DESC)`. `module_id=""`
+  reserved for exam-pool attempts so the unique index still holds.
+- Vocabulary unify (Phase 0, separate commit `f20fbee` shipped
+  alongside): the 4-band scale `not_ready / needs_work /
+  almost_ready / ready_for_mock` is now used by both the LLM scorer
+  (`exam_ready` collapsed into `ready_for_mock`, explicit
+  `needs_work` token added to the prompt) and the objective scorer
+  (`frac` thresholds 0.85 / 0.60 / 0.30). `normalizeReadinessLevel`
+  preserves backwards compat for legacy persisted feedback
+  (`weak → needs_work`, `ok → almost_ready`, `strong → ready_for_mock`,
+  `exam_ready → ready_for_mock`). New `ReadinessToScore` returns the
+  numeric mastery contribution: 0.20 / 0.45 / 0.70 / 0.90.
+- EMA update rule (`processing/mastery_updater.go`):
+  - First attempt sets `mastery = score` directly.
+  - `attempts_count ≤ EarlyAttemptCap (3)` → `0.5*old + 0.5*score`.
+  - Otherwise → `0.7*old + 0.3*score`.
+  - Idempotent on `last_attempt_id`: if the same attempt is replayed
+    (e.g. retried persist), the upsert is skipped.
+- Config (`processing/processing_config.go`, sibling to `llm_config.go`
+  per AGENTS.md SoT rule): `MasteryConfig{BandLearning, BandSolid,
+  BandReady, EarlyAttemptCap, EarlyAlpha, SteadyAlpha, weights}`.
+  Env-overridable via `MASTERY_BAND_{LEARNING,SOLID,READY}` and
+  `MASTERY_OVERALL_{NOI,VIET,NGHE,DOC,NGU_PHAP,TU_VUNG,INTERVIEW}`.
+  `LoadMasteryConfig` clamps band floors to [0, 1], weights to [0,
+  100], swaps non-monotonic floors, and warns on env parse errors so
+  operator typos (e.g. comma-decimal) are visible in logs.
+- Endpoint: `GET /v1/users/me/progress` (auth required via
+  `withAuth`, 401 without bearer, 200 always for authenticated users
+  even with zero rows). Returns
+  `{overall_progress, overall_band, skills[], bands{needs_work,
+  solid, ready}, weights{...}}`. Per-skill mastery is the unweighted
+  mean across the skill's modules; `overall_progress` is the
+  weighted mean across non-zero-weight skills with fallback to
+  equal-weight when every weight is zero.
+- Wiring: `Processor.completeAttempt` (processor.go) is the single
+  funnel — all 5 `CompleteAttempt` call sites (speaking, writing,
+  interview, objective, dictation) route through it so adding a new
+  attempt path can't accidentally skip the mastery hook.
+  `httpapi.MasteryDeps{Store, Config}` + `NewServerWithMastery`
+  decouples mastery wiring from the V17 self-serve auth bundle so the
+  dev fixture build path also records progress.
+- Dev fixtures: `EnsureDevFixtureUsers(databaseURL)` runs at server
+  boot when `ENV != "production"`, idempotently INSERTs the 3
+  fixture user IDs (`user-learner-1`, `user-learner-2`,
+  `user-admin-1`) into Postgres `users` with `email_verified_at =
+  now()` and a high `grace_attempts_left` so the V17 verify gate
+  doesn't fire after 3 attempts. Without this, mastery (and every
+  other V17 store FK on `users(id)`) silently rolled back every
+  insert from the dev fixture path.
+- Smoke: `scripts/smoke_progress_flow.py` + `make smoke-progress-flow`
+  cover auth gate (401), wire shape, monotonic bands, band
+  classification mirroring backend, weights non-negative,
+  per-skill + per-module ranges, idempotent re-read, optional
+  `--require-rows` assertion. Folded into `make smoke-all`.
+  `smoke_test_attempt_flow.py` + `smoke_course_flow.py` migrated to
+  the V8 `/v1/modules/{id}/exercises?skill_kind=...` path so they
+  no longer reference the dropped `skills` table.
+- Spec: `docs/specs/skill-mastery-progress.md`
+  · idea: `docs/ideas/skill-mastery-progress.md`.
+- Tests: backend +27 (532 → 570 inc. processing config clamp/swap +
+  smoke add): `processing_config_test.go` (8 — defaults, env override,
+  band classification, unknown skill, clamp band, clamp weight,
+  monotonic swap, parse fallback); `mastery_updater_test.go` (7 —
+  first attempt, EMA convergence, decay, idempotency,
+  exam-pool empty `module_id`, missing user-skill-feedback no-op,
+  `last_attempt_at` from `CompletedAt`); `skill_mastery_store_test.go`
+  (7 — insert, composite-key update, get, list ordering, empty user,
+  exam-pool empty `module_id`, missing user-skill rejection);
+  `progress_handler_test.go` (4 — 401, empty user, populated weighted
+  overall, env-overridden weights). All tests green; smoke E2E PASS.
+- Validation gates (post-ship, blocks V21): 30-attempt teacher
+  agreement ≥ 70 %, 5-learner pilot interview, 20-sequence notebook
+  curve check, p95 attempt-persist latency within current SLO.
+  Recorded in `tasks/skill-mastery-progress-todo.md § Phase 4`.
+
+---
+
 ## V18.1 — Dictation OCR Submission — 2026-05-05
 
 - Extends `psani_3_dictation` with handwriting-photo input via
