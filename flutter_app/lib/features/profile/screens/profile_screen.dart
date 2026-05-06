@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/api/progress_api.dart';
 import '../../../core/interview/interview_preference_service.dart';
 import '../../../core/locale/locale_scope.dart';
 import '../../../core/locale/supported_locales.dart';
@@ -12,6 +14,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/voice/voice_option.dart';
 import '../../../core/voice/voice_preference_service.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../progress/screens/progress_detail_screen.dart';
 import '../widgets/v17_account_section.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -42,6 +45,8 @@ class ProfileScreen extends StatelessWidget {
           _LegacyAvatarPlaceholder(),
         ],
         const SizedBox(height: AppSpacing.x6),
+        _ProgressEntryTile(client: client),
+        const SizedBox(height: AppSpacing.x5),
         _SectionLabel(l.profileLanguageSection),
         const SizedBox(height: AppSpacing.x2),
         _LanguageTile(),
@@ -659,3 +664,84 @@ class _AboutCard extends StatelessWidget {
     );
   }
 }
+
+// V20: profile entry that pushes the all-skills ProgressDetailScreen.
+// Strings remain inline VI pending UI-6 ARB pass.
+class _ProgressEntryTile extends StatelessWidget {
+  const _ProgressEntryTile({required this.client});
+
+  final ApiClient client;
+
+  static const _labels = ProgressDetailLabels(
+    titleAll: 'Tiến độ học tập',
+    titleForSkill: _titleForSkill,
+    moduleLabelFor: _moduleLabel,
+    skillLabelFor: _skillLabel,
+    attemptsCountLabel: _attemptsLabel,
+    emptyTitle: 'Chưa có tiến độ',
+    emptyMessage: 'Hoàn thành 1 bài để xem điểm mạnh/yếu của bạn.',
+    emptyCtaLabel: 'Bắt đầu học',
+    errorTitle: 'Không tải được tiến độ',
+    errorMessage: 'Kiểm tra mạng và thử lại.',
+    retryLabel: 'Thử lại',
+    offlineLabel: 'Đang offline',
+  );
+
+  Future<void> _open(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!context.mounted) return;
+    final api = ProgressApi(client: client, prefs: prefs);
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ProgressDetailScreen(
+        fetcher: api.fetch,
+        labels: _labels,
+        skillKind: null,
+      ),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surfaceContainerLow,
+      borderRadius: AppRadius.lgAll,
+      child: InkWell(
+        onTap: () => _open(context),
+        borderRadius: AppRadius.lgAll,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.x4,
+            vertical: AppSpacing.x3,
+          ),
+          child: Row(
+            children: const [
+              Icon(Icons.bar_chart_rounded, size: 22),
+              SizedBox(width: AppSpacing.x3),
+              Expanded(
+                child: Text(
+                  'Tiến độ học tập',
+                  style: AppTypography.titleSmall,
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _titleForSkill(String kind) => 'Tiến độ ${_skillLabel(kind)}';
+String _skillLabel(String kind) => switch (kind) {
+      'noi' => 'Nói',
+      'viet' => 'Viết',
+      'nghe' => 'Nghe',
+      'doc' => 'Đọc',
+      'tu_vung' => 'Từ vựng',
+      'ngu_phap' => 'Ngữ pháp',
+      'interview' => 'Phỏng vấn',
+      _ => kind,
+    };
+String _moduleLabel(String id) => id;
+String _attemptsLabel(int n) => '$n lượt';

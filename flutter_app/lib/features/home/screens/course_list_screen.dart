@@ -9,6 +9,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../progress/screens/progress_detail_screen.dart';
 import '../../progress/widgets/home_progress_card.dart';
 import 'course_detail_screen.dart';
 
@@ -24,6 +25,9 @@ String _skillLabel(String kind) => switch (kind) {
       'interview' => 'Phỏng vấn',
       _ => kind,
     };
+String _titleForSkill(String kind) => 'Tiến độ ${_skillLabel(kind)}';
+String _moduleLabel(String id) => id;
+String _attemptsLabel(int n) => '$n lượt';
 
 // Card color palette — cycles through these per course index
 const _cardColors = [
@@ -61,6 +65,31 @@ class _CourseListScreenState extends State<CourseListScreen> {
     setState(() {
       _progressApi = ProgressApi(client: widget.client, prefs: prefs);
     });
+  }
+
+  void _openProgressDetail({String? skillKind}) {
+    final api = _progressApi;
+    if (api == null) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ProgressDetailScreen(
+        fetcher: api.fetch,
+        labels: const ProgressDetailLabels(
+          titleAll: 'Tiến độ học tập',
+          titleForSkill: _titleForSkill,
+          moduleLabelFor: _moduleLabel,
+          skillLabelFor: _skillLabel,
+          attemptsCountLabel: _attemptsLabel,
+          emptyTitle: 'Chưa có tiến độ',
+          emptyMessage: 'Hoàn thành 1 bài để xem điểm mạnh/yếu của bạn.',
+          emptyCtaLabel: 'Bắt đầu học',
+          errorTitle: 'Không tải được tiến độ',
+          errorMessage: 'Kiểm tra mạng và thử lại.',
+          retryLabel: 'Thử lại',
+          offlineLabel: 'Đang offline',
+        ),
+        skillKind: skillKind,
+      ),
+    ));
   }
 
   Future<void> _load() async {
@@ -152,6 +181,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
               offlineLabel: 'Đang offline',
               skillLabelFor: _skillLabel,
             ),
+            onSkillTap: (kind) => _openProgressDetail(skillKind: kind),
           ),
           const SizedBox(height: AppSpacing.x5),
         ],
