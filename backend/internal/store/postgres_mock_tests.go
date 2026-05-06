@@ -129,9 +129,15 @@ func (s *postgresMockTestStore) CreateMockTest(t contracts.MockTest) (contracts.
 	if threshold <= 0 || threshold > 100 {
 		threshold = 60
 	}
+	var targetLevel any
+	if t.TargetLevel != "" {
+		targetLevel = t.TargetLevel
+	}
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO mock_tests (id, title, description, estimated_duration_minutes, status, pass_threshold_percent, exam_mode) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		`INSERT INTO mock_tests (id, title, description, estimated_duration_minutes, status, pass_threshold_percent, exam_mode, is_promotion, is_placement, target_level)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
 		id, t.Title, t.Description, t.EstimatedDurationMinutes, t.Status, threshold, t.ExamMode,
+		t.IsPromotion, t.IsPlacement, targetLevel,
 	); err != nil {
 		return contracts.MockTest{}, fmt.Errorf("insert mock test: %w", err)
 	}
@@ -157,15 +163,24 @@ func (s *postgresMockTestStore) MockTestByID(id string) (contracts.MockTest, boo
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	var t contracts.MockTest
+	var (
+		t           contracts.MockTest
+		targetLevel sql.NullString
+	)
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, title, description, estimated_duration_minutes, status, pass_threshold_percent, exam_mode, banner_image_id FROM mock_tests WHERE id = $1`, id,
-	).Scan(&t.ID, &t.Title, &t.Description, &t.EstimatedDurationMinutes, &t.Status, &t.PassThresholdPercent, &t.ExamMode, &t.BannerImageID)
+		`SELECT id, title, description, estimated_duration_minutes, status, pass_threshold_percent, exam_mode, banner_image_id,
+                is_promotion, is_placement, target_level
+         FROM mock_tests WHERE id = $1`, id,
+	).Scan(&t.ID, &t.Title, &t.Description, &t.EstimatedDurationMinutes, &t.Status, &t.PassThresholdPercent, &t.ExamMode, &t.BannerImageID,
+		&t.IsPromotion, &t.IsPlacement, &targetLevel)
 	if err == sql.ErrNoRows {
 		return contracts.MockTest{}, false
 	}
 	if err != nil {
 		return contracts.MockTest{}, false
+	}
+	if targetLevel.Valid {
+		t.TargetLevel = targetLevel.String
 	}
 
 	rows, err := s.db.QueryContext(ctx,
@@ -189,7 +204,9 @@ func (s *postgresMockTestStore) ListMockTests(statusFilter string) []contracts.M
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	query := `SELECT id, title, description, estimated_duration_minutes, status, pass_threshold_percent, exam_mode, banner_image_id FROM mock_tests`
+	query := `SELECT id, title, description, estimated_duration_minutes, status, pass_threshold_percent, exam_mode, banner_image_id,
+                     is_promotion, is_placement, target_level
+              FROM mock_tests`
 	args := []interface{}{}
 	if statusFilter != "" {
 		query += ` WHERE status = $1`
@@ -205,9 +222,16 @@ func (s *postgresMockTestStore) ListMockTests(statusFilter string) []contracts.M
 
 	var tests []contracts.MockTest
 	for rows.Next() {
-		var t contracts.MockTest
-		if err := rows.Scan(&t.ID, &t.Title, &t.Description, &t.EstimatedDurationMinutes, &t.Status, &t.PassThresholdPercent, &t.ExamMode, &t.BannerImageID); err != nil {
+		var (
+			t           contracts.MockTest
+			targetLevel sql.NullString
+		)
+		if err := rows.Scan(&t.ID, &t.Title, &t.Description, &t.EstimatedDurationMinutes, &t.Status, &t.PassThresholdPercent, &t.ExamMode, &t.BannerImageID,
+			&t.IsPromotion, &t.IsPlacement, &targetLevel); err != nil {
 			continue
+		}
+		if targetLevel.Valid {
+			t.TargetLevel = targetLevel.String
 		}
 		tests = append(tests, t)
 	}
@@ -247,9 +271,17 @@ func (s *postgresMockTestStore) UpdateMockTest(id string, update contracts.MockT
 	if updateThreshold <= 0 || updateThreshold > 100 {
 		updateThreshold = 60
 	}
+	var updateTarget any
+	if update.TargetLevel != "" {
+		updateTarget = update.TargetLevel
+	}
 	res, err := tx.ExecContext(ctx,
-		`UPDATE mock_tests SET title=$1, description=$2, estimated_duration_minutes=$3, status=$4, pass_threshold_percent=$5, exam_mode=$6, updated_at=now() WHERE id=$7`,
-		update.Title, update.Description, update.EstimatedDurationMinutes, update.Status, updateThreshold, update.ExamMode, id,
+		`UPDATE mock_tests SET title=$1, description=$2, estimated_duration_minutes=$3, status=$4, pass_threshold_percent=$5, exam_mode=$6,
+		    is_promotion=$7, is_placement=$8, target_level=$9,
+		    updated_at=now()
+		 WHERE id=$10`,
+		update.Title, update.Description, update.EstimatedDurationMinutes, update.Status, updateThreshold, update.ExamMode,
+		update.IsPromotion, update.IsPlacement, updateTarget, id,
 	)
 	if err != nil {
 		return contracts.MockTest{}, false
@@ -302,4 +334,35 @@ func (s *postgresMockTestStore) SetMockTestBannerImage(id, storageKey string) bo
 	}
 	n, _ := res.RowsAffected()
 	return n > 0
+}
+
+// LatestPlacementMockTest returns the placement-flagged MockTest with the
+// most recent created_at. Drives the V21 placement-test/start endpoint.
+func (s *postgresMockTestStore) LatestPlacementMockTest() (contracts.MockTest, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var (
+		t           contracts.MockTest
+		targetLevel sql.NullString
+	)
+	err := s.db.QueryRowContext(ctx, `
+SELECT id, title, description, estimated_duration_minutes, status, pass_threshold_percent, exam_mode, banner_image_id,
+       is_promotion, is_placement, target_level
+FROM mock_tests
+WHERE is_placement = TRUE
+ORDER BY created_at DESC
+LIMIT 1
+`).Scan(&t.ID, &t.Title, &t.Description, &t.EstimatedDurationMinutes, &t.Status, &t.PassThresholdPercent, &t.ExamMode, &t.BannerImageID,
+		&t.IsPromotion, &t.IsPlacement, &targetLevel)
+	if err == sql.ErrNoRows {
+		return contracts.MockTest{}, false
+	}
+	if err != nil {
+		return contracts.MockTest{}, false
+	}
+	if targetLevel.Valid {
+		t.TargetLevel = targetLevel.String
+	}
+	return t, true
 }

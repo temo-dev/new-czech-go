@@ -67,7 +67,8 @@ type Server struct {
 	masteryConfig processing.MasteryConfig
 
 	// V21 CEFR level gating. nil disables the level-progress endpoint.
-	levelService *processing.LevelService
+	levelService   *processing.LevelService
+	userLevelStore store.UserLevelStore
 
 	mux *http.ServeMux
 }
@@ -234,6 +235,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/me", s.withAuth(s.handleMe))
 	s.mux.HandleFunc("/v1/users/me/progress", s.withAuth(s.handleUserProgress))
 	s.mux.HandleFunc("/v1/users/me/level-progress", s.withAuth(s.handleUserLevelProgress))
+	s.mux.HandleFunc("/v1/users/me/placement-test/start", s.withAuth(s.handlePlacementTestStart))
+	s.mux.HandleFunc("/v1/users/me/placement-test/complete", s.withAuth(s.handlePlacementTestComplete))
 	s.mux.HandleFunc("/v1/course", s.withAuth(s.handleCourse))
 	s.mux.HandleFunc("/v1/plan", s.withAuth(s.handlePlan))
 	s.mux.HandleFunc("/v1/modules", s.withAuth(s.handleModules))

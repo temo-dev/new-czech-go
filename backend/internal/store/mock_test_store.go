@@ -17,6 +17,10 @@ type MockTestStore interface {
 	UpdateMockTest(id string, update contracts.MockTest) (contracts.MockTest, bool)
 	DeleteMockTest(id string) bool
 	SetMockTestBannerImage(id, storageKey string) bool
+	// LatestPlacementMockTest returns the most-recently-authored placement
+	// MockTest (is_placement=true). Used by the V21 placement-test/start
+	// endpoint to pick the test for an onboarding learner.
+	LatestPlacementMockTest() (contracts.MockTest, bool)
 }
 
 // defaultMaxPoints maps exercise_type → max speaking score per real A2 exam rubric.
@@ -231,4 +235,26 @@ func (s *memoryMockTestStore) SetMockTestBannerImage(id, storageKey string) bool
 	}
 	t.BannerImageID = storageKey
 	return true
+}
+
+// LatestPlacementMockTest returns the placement-flagged mock test most
+// recently added to the store. The memory backend has no created_at, so
+// "most recently added" maps to the highest-sorted ID — IDs are
+// monotonically increasing in the memory CreateMockTest path.
+func (s *memoryMockTestStore) LatestPlacementMockTest() (contracts.MockTest, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var best *contracts.MockTest
+	for _, t := range s.tests {
+		if !t.IsPlacement {
+			continue
+		}
+		if best == nil || t.ID > best.ID {
+			best = t
+		}
+	}
+	if best == nil {
+		return contracts.MockTest{}, false
+	}
+	return *best, true
 }

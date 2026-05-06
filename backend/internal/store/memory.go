@@ -472,9 +472,33 @@ func (s *MemoryStore) DeleteMockTest(id string) bool {
 func (s *MemoryStore) SetMockTestBannerImage(id, storageKey string) bool {
 	return s.mockTests.SetMockTestBannerImage(id, storageKey)
 }
+func (s *MemoryStore) LatestPlacementMockTest() (contracts.MockTest, bool) {
+	return s.mockTests.LatestPlacementMockTest()
+}
 
 func (s *MemoryStore) MockExamByID(id string) (contracts.MockExamSession, bool) {
 	return s.mockExams.MockExamByID(id)
+}
+
+// SetMockExamOverallScoreForTesting overrides the OverallScore + Status on
+// an existing mock-exam session. Test-only — production code paths must
+// land scores via CompleteMockExam (which derives scores from real
+// attempts). Used by placement-handler tests so they can seed a completed
+// session without spinning up the full scoring pipeline.
+func (s *MemoryStore) SetMockExamOverallScoreForTesting(id string, score int) bool {
+	mes, ok := s.mockExams.(*memoryMockExamStore)
+	if !ok {
+		return false
+	}
+	mes.mu.Lock()
+	defer mes.mu.Unlock()
+	session, exists := mes.sessions[id]
+	if !exists {
+		return false
+	}
+	session.OverallScore = score
+	session.Status = "completed"
+	return true
 }
 
 func (s *MemoryStore) AdvanceMockExam(id, attemptID string) (contracts.MockExamSession, error) {

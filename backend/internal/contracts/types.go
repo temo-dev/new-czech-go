@@ -679,7 +679,12 @@ type MockTest struct {
 	ExamMode                 string            `json:"exam_mode"`                 // "real" | "practice" | "" (default practice)
 	PassThresholdPercent     int               `json:"pass_threshold_percent"`    // 0 = use default 60
 	BannerImageID            string            `json:"banner_image_id,omitempty"` // storage key for exam card banner
-	Sections                 []MockTestSection `json:"sections"`
+	// V21 CEFR level progression flags. Mutually exclusive (enforced by
+	// mock_tests_promotion_placement_mutex CHECK in migration 025).
+	IsPromotion bool   `json:"is_promotion,omitempty"`
+	IsPlacement bool   `json:"is_placement,omitempty"`
+	TargetLevel string `json:"target_level,omitempty"` // a0|a1|a2|b1; required when IsPromotion=true
+	Sections    []MockTestSection `json:"sections"`
 }
 
 type MockTestSection struct {

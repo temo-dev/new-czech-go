@@ -13,21 +13,24 @@ import (
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 	"github.com/danieldev/czech-go-system/backend/internal/processing"
+	"github.com/danieldev/czech-go-system/backend/internal/store"
 )
 
-// LevelDeps bundles the V21 gating service so callers can wire the handler
-// from either the V17 auth bootstrap path or the legacy dev-fixture path
-// (mirrors MasteryDeps for V19). Only Service is required; everything else
-// the service needs is closed over inside the *processing.LevelService.
+// LevelDeps bundles the V21 gating dependencies so callers can wire the
+// handlers from either the V17 auth bootstrap path or the legacy
+// dev-fixture path (mirrors MasteryDeps for V19). Only Service is required
+// for the read-only level-progress endpoint; mutation handlers (placement,
+// promotion) additionally require UserLevels.
 type LevelDeps struct {
-	Service *processing.LevelService
+	Service    *processing.LevelService
+	UserLevels store.UserLevelStore
 }
 
-// SetLevelDeps wires the V21 level gating service. The level-progress route
-// is only registered when Service is non-nil; passing nil disables the
-// feature and the route returns 404.
+// SetLevelDeps wires the V21 level gating service + stores. Endpoints that
+// require a missing dependency return 404 feature_disabled.
 func (s *Server) SetLevelDeps(d LevelDeps) {
 	s.levelService = d.Service
+	s.userLevelStore = d.UserLevels
 }
 
 func (s *Server) handleUserLevelProgress(w http.ResponseWriter, r *http.Request, user contracts.User) {

@@ -39,9 +39,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** returns `LevelProgressResponse` payload via `LevelService`; 401 when unauth; 404 when service nil (feature disabled); `Cache-Control: no-store` set on success
   - **Verify:** +4 integration tests (auth required, fresh user, ready-to-promote unlock, cooldown active locks with `promotion_cooldown_until`)
   - **Size:** M
-- [ ] **V21-B5** Placement endpoints (`httpapi/placement_handler.go`)
-  - **AC:** start (409 already-taken w/o `?force`), complete (atomic write user level)
-  - **Verify:** +5 integration tests
+- [x] **V21-B5** Placement endpoints (`httpapi/placement_handler.go` + test, `contracts/types.go` MockTest extension, `store/mock_test_store.go` `LatestPlacementMockTest`, Postgres scan/insert/update for new flag columns, `store/memory.go` test seeder, route wiring)
+  - **AC:** start picks latest `is_placement=true` MockTest, creates `mock_exam_session`, returns `{mock_test_id, full_session_id}`; 409 `placement_already_taken` w/o `?force=true`; 404 `placement_not_configured` when no placement mock seeded; complete trusts session `OverallScore`, maps via `LevelService.MapPlacementScoreToLevel`, writes `current_level + placement_taken_at`; 404 hides wrong-owner and missing-session identically; 400 `missing_full_session_id`
+  - **Verify:** +7 integration tests (auth required, fresh start, no config 404, already-taken 409 + force ok, complete happy, complete wrong-owner 404, complete missing body 400)
   - **Size:** L
 - [ ] **V21-B6** `POST /v1/promotion-attempts` (`httpapi/promotion_handler.go`)
   - **AC:** error precedence per spec (404 → 400 not_promotion → 409 already_unlocked → 400 promotion_locked → 400 cooldown_active); creates session + attempt
