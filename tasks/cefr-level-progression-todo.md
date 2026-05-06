@@ -35,9 +35,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** `ComputeLevelProgress` returns full payload incl. server-derived `PromotionUnlocked`; `MapPlacementScoreToLevel` delegates to config; coverage = % of expected skills with ≥1 attempt (anti-farming proxy in lieu of module-count lookup); `nextLevelAfter` central ladder; cooldown expiry computed from latest failed attempt; pure orchestration (no HTTP/DB writes); read-only deps via `LevelMasteryReader` / `LevelUserReader` / `LevelPromoReader`
   - **Verify:** +10 unit tests (fresh user, all-pass, one-below, coverage gap, cooldown active, cooldown expired, top-level, band edges + B1 cap, ladder helper, key set exhaustive)
   - **Size:** L
-- [ ] **V21-B4** `GET /v1/users/me/level-progress` (`httpapi/level_handler.go`)
-  - **AC:** returns spec payload; 401 unauth; `Cache-Control: no-store`
-  - **Verify:** +4 integration tests
+- [x] **V21-B4** `GET /v1/users/me/level-progress` (`httpapi/level_handler.go`, `server.go` field + route)
+  - **AC:** returns `LevelProgressResponse` payload via `LevelService`; 401 when unauth; 404 when service nil (feature disabled); `Cache-Control: no-store` set on success
+  - **Verify:** +4 integration tests (auth required, fresh user, ready-to-promote unlock, cooldown active locks with `promotion_cooldown_until`)
   - **Size:** M
 - [ ] **V21-B5** Placement endpoints (`httpapi/placement_handler.go`)
   - **AC:** start (409 already-taken w/o `?force`), complete (atomic write user level)
