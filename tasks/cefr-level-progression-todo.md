@@ -31,9 +31,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** `Create` (auto ID + zero-time), `GetLatestFailedAttempt(userID, targetLevel)` ignores passed + other-user + other-target rows, `MarkResult` updates passed/score/per-skill idempotent, returns not-found on unknown ID; per-skill JSONB round-trip in Postgres
   - **Verify:** +4 memory unit tests
   - **Size:** M
-- [ ] **V21-B3** `LevelService` gating math (`processing/level_service.go`, `contracts/level.go`)
-  - **AC:** `ComputeLevelProgress`, `MapPlacementScoreToLevel` (B1 cap when content flag false); pure orchestration
-  - **Verify:** +8 unit tests (gating, cooldown, band edges, B1 cap)
+- [x] **V21-B3** `LevelService` gating math (`processing/level_service.go`, `contracts/level.go`)
+  - **AC:** `ComputeLevelProgress` returns full payload incl. server-derived `PromotionUnlocked`; `MapPlacementScoreToLevel` delegates to config; coverage = % of expected skills with ≥1 attempt (anti-farming proxy in lieu of module-count lookup); `nextLevelAfter` central ladder; cooldown expiry computed from latest failed attempt; pure orchestration (no HTTP/DB writes); read-only deps via `LevelMasteryReader` / `LevelUserReader` / `LevelPromoReader`
+  - **Verify:** +10 unit tests (fresh user, all-pass, one-below, coverage gap, cooldown active, cooldown expired, top-level, band edges + B1 cap, ladder helper, key set exhaustive)
   - **Size:** L
 - [ ] **V21-B4** `GET /v1/users/me/level-progress` (`httpapi/level_handler.go`)
   - **AC:** returns spec payload; 401 unauth; `Cache-Control: no-store`
