@@ -82,6 +82,7 @@ ProgressDetailLabels _labels() {
       _ => kind,
     },
     attemptsCountLabel: (n) => '$n lượt',
+    overallLabel: 'Tổng',
     emptyTitle: 'Chưa có tiến độ',
     emptyMessage: 'Hoàn thành 1 bài để xem',
     emptyCtaLabel: 'Bắt đầu học',

@@ -477,4 +477,44 @@ void main() {
       expect(find.text('Q2:'), findsOneWidget);
     });
   });
+
+  group('ObjectiveResultCard sprint queue (B3)', () {
+    testWidgets('renders "Bài tiếp theo →" CTA when onNext non-null', (tester) async {
+      var nextTaps = 0;
+      await tester.pumpWidget(_wrap(
+        // ObjectiveResultCard is rendered by ReadingExerciseScreen but we exercise
+        // the same widget via the public ObjectiveResultCard import so we don't
+        // need to spin up the full screen + http stubs.
+        // Use SectionResultCard's nghe path which embeds ObjectiveResultCard.
+        SectionResultCard(
+          client: client,
+          result: _objectiveResult(),
+          skillKind: 'nghe',
+          maxPoints: 10,
+          onRetry: () {},
+          onNext: () => nextTaps++,
+        ),
+      ));
+
+      expect(find.text('Bài tiếp theo →'), findsOneWidget);
+      await tester.tap(find.text('Bài tiếp theo →'));
+      await tester.pumpAndSettle();
+      expect(nextTaps, 1);
+    });
+
+    testWidgets('hides "Bài tiếp theo →" when onNext is null (standalone mode)',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        SectionResultCard(
+          client: client,
+          result: _objectiveResult(),
+          skillKind: 'nghe',
+          maxPoints: 10,
+          onRetry: () {},
+        ),
+      ));
+
+      expect(find.text('Bài tiếp theo →'), findsNothing);
+    });
+  });
 }

@@ -871,7 +871,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get exerciseListFlowBadge => 'FLOW';
 
   @override
-  String get exerciseListSubtitle => 'Focus on fluency and correct pronunciation in real situations.';
+  String get exerciseListSubtitle => 'Choose an exercise to start practicing.';
 
   @override
   String get exerciseListDailySprintLabel => 'RECOMMENDED MODE';

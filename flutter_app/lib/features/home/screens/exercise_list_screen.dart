@@ -69,25 +69,50 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
     }
     if (!mounted) return;
 
+    // Compute the next exercise in the filtered list so daily-sprint queue
+    // can chain across types. Done early so all branches below can reuse it.
+    final idxOuter = _exercises.indexOf(exercise);
+    final nextOuter = (idxOuter >= 0 && idxOuter + 1 < _exercises.length) ? _exercises[idxOuter + 1] : null;
+
     // Route reading exercises to ReadingExerciseScreen.
     if (detail.isCteni) {
       // ignore: use_build_context_synchronously
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ReadingExerciseScreen(client: widget.client, detail: detail),
+      final route = MaterialPageRoute(
+        builder: (ctx) => ReadingExerciseScreen(
+          client: widget.client,
+          detail: detail,
+          onOpenNext: nextOuter == null ? null : () => _openExercise(ctx, nextOuter, replace: true),
         ),
       );
+      // ignore: use_build_context_synchronously
+      if (replace) {
+        // ignore: use_build_context_synchronously
+        await Navigator.of(context).pushReplacement(route);
+      } else {
+        // ignore: use_build_context_synchronously
+        await Navigator.of(context).push(route);
+      }
       return;
     }
 
     // Route listening exercises to ListeningExerciseScreen.
     if (detail.isPoslech) {
       // ignore: use_build_context_synchronously
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ListeningExerciseScreen(client: widget.client, detail: detail),
+      final route = MaterialPageRoute(
+        builder: (ctx) => ListeningExerciseScreen(
+          client: widget.client,
+          detail: detail,
+          onOpenNext: nextOuter == null ? null : () => _openExercise(ctx, nextOuter, replace: true),
         ),
       );
+      // ignore: use_build_context_synchronously
+      if (replace) {
+        // ignore: use_build_context_synchronously
+        await Navigator.of(context).pushReplacement(route);
+      } else {
+        // ignore: use_build_context_synchronously
+        await Navigator.of(context).push(route);
+      }
       return;
     }
 

@@ -25,12 +25,15 @@ class ListeningExerciseScreen extends StatefulWidget {
     required this.detail,
     this.onAttemptCompleted,
     this.showResultOnCompletion = true,
+    this.onOpenNext,
   });
 
   final ApiClient client;
   final ExerciseDetail detail;
   final FutureOr<void> Function(String attemptId)? onAttemptCompleted;
   final bool showResultOnCompletion;
+  // Daily-sprint queue advance — see ReadingExerciseScreen for shape.
+  final VoidCallback? onOpenNext;
 
   @override
   State<ListeningExerciseScreen> createState() =>
@@ -154,6 +157,7 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
             child: ObjectiveResultCard(
               result: _result!,
               onRetry: () => Navigator.of(context).pop(),
+              onNext: widget.onOpenNext,
             ),
           ),
         ),

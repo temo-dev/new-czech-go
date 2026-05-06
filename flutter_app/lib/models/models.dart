@@ -1101,14 +1101,25 @@ class PoslechItemView {
 }
 
 class FillQuestionView {
-  const FillQuestionView({required this.questionNo, required this.prompt});
+  const FillQuestionView({
+    required this.questionNo,
+    required this.prompt,
+    this.options = const [],
+  });
   final int questionNo;
   final String prompt;
+  // Per-question options (cteni_4: ReadingQuestion.options A-D). Empty for
+  // fill-in types (cteni_5) and for exercises that share global options.
+  final List<PoslechOptionView> options;
 
   factory FillQuestionView.fromJson(Map<String, dynamic> json) {
     return FillQuestionView(
       questionNo: (json['question_no'] as num?)?.toInt() ?? 0,
       prompt: json['prompt'] as String? ?? '',
+      options: (json['options'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(PoslechOptionView.fromJson)
+          .toList(),
     );
   }
 }

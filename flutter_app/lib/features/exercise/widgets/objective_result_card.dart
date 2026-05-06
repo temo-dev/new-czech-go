@@ -16,6 +16,7 @@ class ObjectiveResultCard extends StatelessWidget {
     super.key,
     required this.result,
     required this.onRetry,
+    this.onNext,
     this.showPassage = false,
     this.exerciseId = '',
     this.client,
@@ -23,6 +24,10 @@ class ObjectiveResultCard extends StatelessWidget {
 
   final AttemptResult result;
   final VoidCallback onRetry;
+  // When non-null, render a primary "Bài tiếp theo →" CTA in addition to
+  // retry. Used by daily-sprint queue ("Bắt đầu tất cả") so learners chain
+  // exercises without backing out to the list screen between each one.
+  final VoidCallback? onNext;
   final bool showPassage;
   final String exerciseId;
   final ApiClient? client;
@@ -91,7 +96,26 @@ class ObjectiveResultCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.x4),
         ],
 
-        // ── Retry button ─────────────────────────────────────────────────────
+        // ── Action buttons ───────────────────────────────────────────────────
+        // Queue mode (sprint): primary "Next" + outlined "Retry"
+        // Standalone:          single outlined "Retry"
+        if (onNext != null) ...[
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: onNext,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text('Bài tiếp theo →'),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.x2),
+        ],
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(

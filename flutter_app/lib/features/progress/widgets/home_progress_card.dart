@@ -68,10 +68,10 @@ class HomeProgressCard extends StatefulWidget {
   final VoidCallback? onEmptyCta;
 
   @override
-  State<HomeProgressCard> createState() => _HomeProgressCardState();
+  State<HomeProgressCard> createState() => HomeProgressCardState();
 }
 
-class _HomeProgressCardState extends State<HomeProgressCard> {
+class HomeProgressCardState extends State<HomeProgressCard> {
   ProgressFetchResult? _result;
   Object? _error;
   bool _loading = true;
@@ -81,6 +81,12 @@ class _HomeProgressCardState extends State<HomeProgressCard> {
     super.initState();
     _load();
   }
+
+  /// Re-fetches progress with cache bypass. Call this from a parent (via
+  /// GlobalKey) after a navigator.pop returns from a screen that may have
+  /// changed mastery — e.g. an exercise attempt — so the home card reflects
+  /// the new state without waiting for the next app launch.
+  Future<void> refresh() => _load(forceRefresh: true);
 
   Future<void> _load({bool forceRefresh = false}) async {
     setState(() {

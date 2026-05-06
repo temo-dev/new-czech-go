@@ -5,22 +5,22 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
 import 'progress_models.dart';
 
-/// V20: typed wrapper around `ApiClient.getProgress()` with a 24 h cache.
+/// V20: typed wrapper around `ApiClient.getProgress()` with an offline cache.
 ///
-/// In-memory cache serves repeat reads in the same session; SharedPreferences
-/// holds the same payload across app restarts so a cold launch can render the
-/// last-known progress while the network call is in flight. On network
-/// failure we serve whatever cache is available with `isStale=true` so the UI
-/// can show an "Đang offline" chip.
+/// On every call we hit the network so a learner who just finished an attempt
+/// sees fresh mastery numbers. SharedPreferences holds the last successful
+/// payload only as an offline fallback: when the network call fails we serve
+/// whatever cache is available with `isStale=true` so the UI can show an
+/// "Đang offline" chip. The previous TTL-gated read returned cached empty
+/// payloads after the first cold launch, which made the home card look broken
+/// until pull-to-refresh.
 class ProgressApi {
   ProgressApi({
     required ApiClient client,
     required SharedPreferences prefs,
-    Duration ttl = const Duration(hours: 24),
     DateTime Function() now = _defaultNow,
   })  : _client = client,
         _prefs = prefs,
-        _ttl = ttl,
         _now = now;
 
   static const _cacheKey = 'v20.progress.cache';
@@ -28,24 +28,11 @@ class ProgressApi {
 
   final ApiClient _client;
   final SharedPreferences _prefs;
-  final Duration _ttl;
   final DateTime Function() _now;
 
   _Cached? _memory;
 
   Future<ProgressFetchResult> fetch({bool forceRefresh = false}) async {
-    if (!forceRefresh) {
-      final cached = _readCache();
-      if (cached != null && !_isExpired(cached.fetchedAt)) {
-        return ProgressFetchResult(
-          progress: cached.progress,
-          fromCache: true,
-          isStale: false,
-          fetchedAt: cached.fetchedAt,
-        );
-      }
-    }
-
     try {
       final raw = await _client.getProgress();
       final progress = UserProgress.fromApiJson(raw);
@@ -76,9 +63,6 @@ class ProgressApi {
     _memory = null;
     await _prefs.remove(_cacheKey);
   }
-
-  bool _isExpired(DateTime fetchedAt) =>
-      _now().difference(fetchedAt) > _ttl;
 
   _Cached? _readCache() {
     if (_memory != null) return _memory;

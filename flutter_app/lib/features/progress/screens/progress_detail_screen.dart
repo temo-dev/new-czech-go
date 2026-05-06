@@ -21,6 +21,7 @@ class ProgressDetailLabels {
     required this.moduleLabelFor,
     required this.skillLabelFor,
     required this.attemptsCountLabel,
+    required this.overallLabel,
     required this.emptyTitle,
     required this.emptyMessage,
     required this.emptyCtaLabel,
@@ -35,6 +36,7 @@ class ProgressDetailLabels {
   final String Function(String moduleId) moduleLabelFor;
   final String Function(String skillKind) skillLabelFor;
   final String Function(int attempts) attemptsCountLabel;
+  final String overallLabel;
   final String emptyTitle;
   final String emptyMessage;
   final String emptyCtaLabel;
@@ -187,11 +189,81 @@ class _ProgressDetailScreenState extends State<ProgressDetailScreen> {
 
     return ListView.builder(
       padding: const EdgeInsets.all(AppSpacing.x4),
-      itemCount: progress.skills.length,
-      itemBuilder: (_, i) =>
-          _SkillSection(skill: progress.skills[i], labels: widget.labels),
+      itemCount: progress.skills.length + 1,
+      itemBuilder: (_, i) {
+        if (i == 0) {
+          return _OverallSection(progress: progress, labels: widget.labels);
+        }
+        return _SkillSection(
+          skill: progress.skills[i - 1],
+          labels: widget.labels,
+        );
+      },
     );
   }
+}
+
+class _OverallSection extends StatelessWidget {
+  const _OverallSection({required this.progress, required this.labels});
+
+  final UserProgress progress;
+  final ProgressDetailLabels labels;
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = (progress.overallProgress.clamp(0.0, 1.0) * 100).round();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.x5),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLow,
+          borderRadius: AppRadius.lgAll,
+        ),
+        padding: const EdgeInsets.all(AppSpacing.x4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    labels.overallLabel,
+                    style: AppTypography.titleMedium,
+                  ),
+                ),
+                Text(
+                  '$pct%',
+                  style: AppTypography.titleMedium.copyWith(
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.x2),
+            MasteryBar(
+              mastery: progress.overallProgress,
+              band: progress.overallBand,
+              height: 10,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Resolution order for the per-module row label:
+//   1. Server-provided moduleTitle (V20 progress payload)
+//   2. Caller-supplied moduleLabelFor (legacy fallback / tests)
+//   3. Skill label (exam-pool aggregate, ModuleID is empty)
+String _moduleRowLabel(
+  SkillProgress skill,
+  ModuleProgress m,
+  ProgressDetailLabels labels,
+) {
+  if (m.moduleId.isEmpty) return labels.skillLabelFor(skill.skillKind);
+  if (m.moduleTitle.isNotEmpty) return m.moduleTitle;
+  return labels.moduleLabelFor(m.moduleId);
 }
 
 class _SkillSection extends StatelessWidget {
@@ -241,9 +313,7 @@ class _SkillSection extends StatelessWidget {
             const SizedBox(height: AppSpacing.x3),
             for (final m in skill.modules)
               SkillMasteryRow(
-                label: m.moduleId.isEmpty
-                    ? labels.skillLabelFor(skill.skillKind)
-                    : labels.moduleLabelFor(m.moduleId),
+                label: _moduleRowLabel(skill, m, labels),
                 mastery: m.mastery,
                 band: m.band,
               ),

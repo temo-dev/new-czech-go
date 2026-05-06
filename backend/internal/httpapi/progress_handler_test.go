@@ -197,3 +197,67 @@ func TestProgressHandler_RespectsEnvWeightOverride(t *testing.T) {
 		t.Errorf("overall = %v, want ~0.40 (noi only)", overall)
 	}
 }
+
+// TestProgressHandler_AnnotatesModuleTitle ensures that modules in the
+// response carry the human-readable title resolved from the modules table.
+// Empty module_id (exam-pool aggregate) and unknown module_id stay
+// title-less so the Flutter client can fall back to a skill-level label.
+func TestProgressHandler_AnnotatesModuleTitle(t *testing.T) {
+	unsetMasteryEnv(t)
+	repo := store.NewMemoryStore()
+	masteryStore := store.NewMemorySkillMasteryStore()
+
+	created, err := repo.CreateModule(contracts.Module{
+		Slug:       "giao-tiep-co-ban",
+		Title:      "Giao tiếp cơ bản",
+		ModuleKind: "noi",
+	})
+	if err != nil {
+		t.Fatalf("seed module: %v", err)
+	}
+
+	srv := NewServerForTest(repo, nil)
+	srv.SetMasteryDeps(masteryStore, processing.LoadMasteryConfig())
+	httpSrv := httptest.NewServer(srv.Handler())
+	defer httpSrv.Close()
+
+	now := time.Date(2026, 5, 6, 12, 0, 0, 0, time.UTC)
+	rows := []contracts.SkillMasteryRow{
+		{UserID: "user-learner-1", SkillKind: "noi", ModuleID: created.ID, MasteryScore: 0.55, AttemptsCount: 4, LastAttemptAt: now, UpdatedAt: now},
+		{UserID: "user-learner-1", SkillKind: "noi", ModuleID: "missing-module", MasteryScore: 0.20, AttemptsCount: 1, LastAttemptAt: now, UpdatedAt: now},
+		{UserID: "user-learner-1", SkillKind: "doc", ModuleID: "", MasteryScore: 0.50, AttemptsCount: 1, LastAttemptAt: now, UpdatedAt: now},
+	}
+	for _, r := range rows {
+		if _, err := masteryStore.Upsert(r); err != nil {
+			t.Fatalf("seed mastery: %v", err)
+		}
+	}
+
+	status, body := progressGet(t, httpSrv, "dev-learner-token")
+	if status != http.StatusOK {
+		t.Fatalf("status = %d, want 200", status)
+	}
+	data := body["data"].(map[string]any)
+	skills := data["skills"].([]any)
+
+	titlesByModuleID := map[string]string{}
+	for _, s := range skills {
+		mods := s.(map[string]any)["modules"].([]any)
+		for _, m := range mods {
+			row := m.(map[string]any)
+			id, _ := row["module_id"].(string)
+			title, _ := row["module_title"].(string)
+			titlesByModuleID[id] = title
+		}
+	}
+
+	if got := titlesByModuleID[created.ID]; got != "Giao tiếp cơ bản" {
+		t.Errorf("module_title for known id = %q, want %q", got, "Giao tiếp cơ bản")
+	}
+	if got, ok := titlesByModuleID["missing-module"]; ok && got != "" {
+		t.Errorf("module_title for unknown id = %q, want empty", got)
+	}
+	if got, ok := titlesByModuleID[""]; ok && got != "" {
+		t.Errorf("module_title for exam-pool aggregate = %q, want empty", got)
+	}
+}

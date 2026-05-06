@@ -177,4 +177,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(tappedKind, 'noi');
   });
+
+  testWidgets('HomeProgressCard.refresh() re-fetches with forceRefresh=true',
+      (tester) async {
+    final calls = <bool>[];
+    final key = GlobalKey<HomeProgressCardState>();
+    await tester.pumpWidget(_wrap(HomeProgressCard(
+      key: key,
+      fetcher: ({bool forceRefresh = false}) async {
+        calls.add(forceRefresh);
+        return _resultFromShape(
+          fromCache: false,
+          isStale: false,
+          shape: _populatedShape,
+        );
+      },
+      labels: _labels(),
+    )));
+    await tester.pumpAndSettle();
+    expect(calls, [false]);
+
+    await key.currentState!.refresh();
+    await tester.pumpAndSettle();
+    expect(calls, [false, true]);
+  });
 }

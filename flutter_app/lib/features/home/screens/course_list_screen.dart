@@ -36,6 +36,10 @@ class _CourseListScreenState extends State<CourseListScreen> {
   bool _loading = true;
   String? _error;
   ProgressApi? _progressApi;
+  // Lets us refresh the progress card after returning from a course detail
+  // screen — attempts completed inside push() change mastery and the home
+  // card must reflect that without an app relaunch.
+  final GlobalKey<HomeProgressCardState> _progressKey = GlobalKey<HomeProgressCardState>();
 
   @override
   void initState() {
@@ -65,6 +69,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
           moduleLabelFor: (id) => id,
           skillLabelFor: (kind) => skillKindLabel(l, kind),
           attemptsCountLabel: (n) => l.progressDetailAttemptsLabel(n),
+          overallLabel: l.progressOverallTitle,
           emptyTitle: l.progressEmptyTitle,
           emptyMessage: '',
           emptyCtaLabel: l.progressEmptyCta,
@@ -154,6 +159,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
         // ── Progress card (V20) ────────────────────────────────────────────
         if (_progressApi != null) ...[
           HomeProgressCard(
+            key: _progressKey,
             fetcher: _progressApi!.fetch,
             labels: HomeProgressCardLabels(
               cardTitle: l.homeProgressCardTitle,
@@ -192,9 +198,14 @@ class _CourseListScreenState extends State<CourseListScreen> {
                 textColor: colors.text,
                 badgeColor: colors.badge,
                 isFeatured: i == 0,
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => CourseDetailScreen(client: widget.client, course: c),
-                )),
+                onTap: () async {
+                  await Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => CourseDetailScreen(client: widget.client, course: c),
+                  ));
+                  // Refresh progress card on return — learner may have just
+                  // completed an attempt deeper in the navigation stack.
+                  await _progressKey.currentState?.refresh();
+                },
               ),
             );
           }),

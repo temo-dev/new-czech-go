@@ -10,6 +10,107 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V20.1 — Hotfixes from learner-flow simulation — 2026-05-06
+
+End-to-end MobAI simulation through the demo course surfaced 7 bugs in
+the V20 learner flow. All fixed in this slice. No new product scope.
+
+- **B5+B6 (P0): `cteni_4` answers never persist.** `_buildAnswerWidgets`
+  in `features/exercise/screens/reading_exercise_screen.dart` was
+  pulling options from the global `cteniOptions` (empty for cteni_4
+  where each question carries its own option set) and keying answers by
+  1-based loop index. Backend `extractCorrectAnswers` keys
+  `correct_answers` by `question_no` (15..20 for cteni_4), so every
+  submission scored 0/N. Fix: extend `FillQuestionView`
+  (`models/models.dart`) with `options: List<PoslechOptionView>`; rewrite
+  `_buildAnswerWidgets` + `_hasAllAnswers` to use per-question options
+  and `q.questionNo` as the answer-map key. Per-question prompts now
+  render via the caller; `MultipleChoiceWidget` skips its own number
+  prefix when `questionNo == 0`.
+- **Cast crash (P0): `String?['message']` on flat error.** Backend
+  returns two error envelopes — `{"error":{"code","message"}}` (most
+  endpoints) and `{"error":"<code>","message":"..."}` (auth gates like
+  `email_verify_required`, `attempts_quota_exceeded`). `api_client.dart`
+  assumed Map and crashed `type 'String' is not a subtype of type 'int'
+  of 'index'` when `payload['error']` was a String. Now checks shape and
+  falls back to top-level `message` field.
+- **B7 (P1): `HomeProgressCard` stale after attempts.** Cache only
+  refreshed on app launch / pull on detail screen. Fix: promote
+  `_HomeProgressCardState` → `HomeProgressCardState` and expose
+  `refresh()`; `CourseListScreen` holds a
+  `GlobalKey<HomeProgressCardState>` and awaits the course-detail push
+  before calling `refresh()` so mastery accrued inside an attempt is
+  visible on return.
+- **B8 (P1): Vocab flashcard never logged an attempt** → `tu_vung`
+  mastery stayed at zero. `deck_session_screen.dart` now fires a
+  background `createAttempt` + `submitAnswers({'1': choice})` per
+  flashcard mark for `quizcard_basic` only. The backend's existing
+  `QuizcardBasicDetail.correct_answers = {"1": "known"}` makes "known"
+  score 1/1 and "again" 0/1 through the standard objective scorer →
+  V19 EMA pipeline. Errors are swallowed (logged) so the local Anki UX
+  does not stall.
+- **B4 (P3): Course-detail stat row lied.** "KỸ NĂNG" was
+  `modules.length * 4` and "PHÚT" was `modules.length * 45` — both
+  arbitrary multipliers. `CourseDetailScreen` now fans out
+  `listModuleSkills` per module in parallel and shows real totals
+  (KỸ NĂNG = sum of returned skill summaries; PHÚT replaced with
+  BÀI TẬP = sum of `exercise_count`).
+- **B3 (P2): "Bắt đầu tất cả" did not actually queue.** Reading +
+  listening result screens only had "Làm lại" — pressing the sprint CTA
+  opened the first exercise then dropped the learner back to the list.
+  `ObjectiveResultCard` gains an optional `onNext` (renders primary
+  "Bài tiếp theo →" + outlined retry); `ReadingExerciseScreen` and
+  `ListeningExerciseScreen` accept `onOpenNext`; `_openExercise` in
+  `exercise_list_screen.dart` computes the next item and routes via
+  `pushReplacement` so the navigation stack stays flat (matches the
+  pre-existing vocab/uloha pattern).
+- **B1 (P2): Wrong subtitle for non-speaking skills.**
+  `exerciseListSubtitle` ARB key was hard-coded to a speaking-specific
+  string ("Tập trung vào sự trôi chảy và phát âm…") and shown on every
+  skill detail. Replaced with the skill-neutral
+  "Chọn bài tập để bắt đầu luyện ngay." in both VI and EN ARBs.
+
+Tests: Flutter 265 → 266 (+1: `HomeProgressCard.refresh()` re-fetches
+with `forceRefresh=true`, plus +2 inside `section_result_card_test.dart`
+covering ObjectiveResultCard sprint queue render/hide). Backend test
+suite unchanged (no contract changes).
+
+Files touched:
+- `flutter_app/lib/core/api/api_client.dart` — error envelope handling.
+- `flutter_app/lib/models/models.dart` — `FillQuestionView.options`.
+- `flutter_app/lib/features/exercise/screens/reading_exercise_screen.dart`
+  — per-question options + question_no keys + onOpenNext.
+- `flutter_app/lib/features/exercise/screens/listening_exercise_screen.dart`
+  — onOpenNext.
+- `flutter_app/lib/features/exercise/screens/deck_session_screen.dart`
+  — flashcard attempt logging.
+- `flutter_app/lib/features/exercise/widgets/multiple_choice_widget.dart`
+  — skip "0." when caller renders prompt.
+- `flutter_app/lib/features/exercise/widgets/objective_result_card.dart`
+  — onNext CTA.
+- `flutter_app/lib/features/mock_exam/widgets/section_result_card.dart`
+  — thread onNext.
+- `flutter_app/lib/features/home/screens/exercise_list_screen.dart`
+  — sprint queue routing for cteni/poslech.
+- `flutter_app/lib/features/home/screens/course_list_screen.dart`
+  — GlobalKey + refresh on push return.
+- `flutter_app/lib/features/home/screens/course_detail_screen.dart`
+  — real skill / exercise totals.
+- `flutter_app/lib/features/progress/widgets/home_progress_card.dart`
+  — public state + `refresh()`.
+- `flutter_app/lib/l10n/app_{vi,en}.arb` — `exerciseListSubtitle`
+  rewrite.
+- `flutter_app/test/widgets/home_progress_card_test.dart`,
+  `flutter_app/test/section_result_card_test.dart` — coverage for the
+  new APIs.
+
+Out of scope (open):
+- B9 — `cteni_5` exercise listed twice in seed; `cteni_6` exercise has
+  empty `module_id` in the API response. Both are seed-data issues, not
+  app code; CMS reseed needed.
+
+---
+
 ## V20 — Flutter Skill Mastery UI — 2026-05-06
 
 - Renders the V19 progress aggregate as a home-screen card + drill-down

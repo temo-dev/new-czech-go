@@ -164,7 +164,7 @@ void main() {
     expect(prefs.getString('v20.progress.cache'), isNotNull);
   });
 
-  test('ProgressApi.fetch returns memory cache when fresh', () async {
+  test('ProgressApi.fetch always hits network for fresh data', () async {
     final fake = await _spawnServer();
     addTearDown(fake.close);
     final client = ApiClient(baseUrl: fake.baseUrl);
@@ -174,25 +174,15 @@ void main() {
 
     await api.fetch();
     final second = await api.fetch();
-    expect(second.fromCache, isTrue);
+    expect(second.fromCache, isFalse);
     expect(second.isStale, isFalse);
-    expect(fake.hits(), 1, reason: 'fresh memory cache should not refetch');
+    expect(fake.hits(), 2,
+        reason:
+            'cache must not mask fresh server data — every fetch hits network');
   });
 
-  test('ProgressApi.fetch forceRefresh bypasses cache', () async {
-    final fake = await _spawnServer();
-    addTearDown(fake.close);
-    final client = ApiClient(baseUrl: fake.baseUrl);
-    await client.login(email: 'a@b.com', password: 'pw');
-    final prefs = await SharedPreferences.getInstance();
-    final api = ProgressApi(client: client, prefs: prefs);
-
-    await api.fetch();
-    await api.fetch(forceRefresh: true);
-    expect(fake.hits(), 2);
-  });
-
-  test('ProgressApi.fetch loads SharedPreferences cache on cold start', () async {
+  test('ProgressApi.fetch ignores SharedPreferences cache when network OK',
+      () async {
     final fake = await _spawnServer();
     addTearDown(fake.close);
     final client = ApiClient(baseUrl: fake.baseUrl);
@@ -203,34 +193,13 @@ void main() {
     await warmer.fetch();
     expect(fake.hits(), 1);
 
-    // New instance — memory cache empty, but prefs populated.
+    // New instance — memory cache empty, prefs populated. Must still
+    // refetch because cache is offline-only.
     final fresh = ProgressApi(client: client, prefs: prefs);
     final result = await fresh.fetch();
-    expect(result.fromCache, isTrue);
-    expect(fake.hits(), 1, reason: 'persisted cache should serve cold start');
-  });
-
-  test('ProgressApi.fetch refetches when cache older than 24h', () async {
-    final fake = await _spawnServer();
-    addTearDown(fake.close);
-    final client = ApiClient(baseUrl: fake.baseUrl);
-    await client.login(email: 'a@b.com', password: 'pw');
-    final prefs = await SharedPreferences.getInstance();
-
-    final clockStart = DateTime.utc(2026, 1, 1, 12);
-    var now = clockStart;
-    final api = ProgressApi(
-      client: client,
-      prefs: prefs,
-      now: () => now,
-    );
-
-    await api.fetch();
-    expect(fake.hits(), 1);
-    // Advance 25 hours.
-    now = clockStart.add(const Duration(hours: 25));
-    await api.fetch();
-    expect(fake.hits(), 2);
+    expect(result.fromCache, isFalse);
+    expect(fake.hits(), 2,
+        reason: 'cache is offline fallback only, not a freshness gate');
   });
 
   test('ProgressApi.fetch falls back to stale cache on network error',

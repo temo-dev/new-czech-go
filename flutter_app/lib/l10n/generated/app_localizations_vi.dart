@@ -871,7 +871,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get exerciseListFlowBadge => 'LIÊN TỤC';
 
   @override
-  String get exerciseListSubtitle => 'Tập trung vào sự trôi chảy và phát âm đúng trong các tình huống thực tế.';
+  String get exerciseListSubtitle => 'Chọn bài tập để bắt đầu luyện ngay.';
 
   @override
   String get exerciseListDailySprintLabel => 'CHẾ ĐỘ ĐỀ XUẤT';

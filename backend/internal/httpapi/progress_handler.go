@@ -51,6 +51,7 @@ func (s *Server) handleUserProgress(w http.ResponseWriter, r *http.Request, user
 
 	rows := s.masteryStore.ListForUser(user.ID)
 	progress := buildProgress(rows, s.masteryConfig)
+	annotateModuleTitles(&progress, s.repo)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": progress,
 		"meta": map[string]any{},
@@ -148,6 +149,27 @@ func weightedOverall(skills []contracts.SkillProgress, cfg processing.MasteryCon
 		return sum / float64(len(skills))
 	}
 	return num / float64(denom)
+}
+
+// annotateModuleTitles fills in ModuleTitle on each module row by looking up
+// the module via the MemoryStore. Empty ModuleID (exam-pool aggregate) and
+// missing modules are left with empty titles — the Flutter client falls back
+// to a skill-level label in that case.
+func annotateModuleTitles(p *contracts.Progress, repo *store.MemoryStore) {
+	if repo == nil {
+		return
+	}
+	for i := range p.Skills {
+		for j := range p.Skills[i].Modules {
+			id := p.Skills[i].Modules[j].ModuleID
+			if id == "" {
+				continue
+			}
+			if mod, ok := repo.ModuleByID(id); ok {
+				p.Skills[i].Modules[j].ModuleTitle = mod.Title
+			}
+		}
+	}
 }
 
 func bandsFromConfig(cfg processing.MasteryConfig) contracts.ProgressBands {

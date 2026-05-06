@@ -78,6 +78,7 @@ class SectionResultCard extends StatelessWidget {
       return ObjectiveResultCard(
         result: result,
         onRetry: onRetry,
+        onNext: onNext,
         showPassage: kind == 'doc',
         exerciseId: result.exerciseId,
         client: client,

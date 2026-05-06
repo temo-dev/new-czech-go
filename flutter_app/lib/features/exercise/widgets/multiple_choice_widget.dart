@@ -37,8 +37,12 @@ class MultipleChoiceWidget extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('$questionNo.', style: AppTypography.labelLarge),
-        const SizedBox(height: 6),
+        // questionNo == 0 means caller already rendered the question label
+        // (e.g. "15. Text: …") above this widget — skip the bare number.
+        if (questionNo > 0) ...[
+          Text('$questionNo.', style: AppTypography.labelLarge),
+          const SizedBox(height: 6),
+        ],
         _allHaveImages ? _buildImageGrid() : _buildTextList(),
       ],
     );

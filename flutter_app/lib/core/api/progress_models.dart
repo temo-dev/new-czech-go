@@ -104,6 +104,7 @@ class SkillProgress {
 class ModuleProgress {
   const ModuleProgress({
     required this.moduleId,
+    required this.moduleTitle,
     required this.mastery,
     required this.band,
     required this.attemptsCount,
@@ -113,6 +114,7 @@ class ModuleProgress {
   factory ModuleProgress.fromApiJson(Map<String, dynamic> json) =>
       ModuleProgress(
         moduleId: (json['module_id'] as String?) ?? '',
+        moduleTitle: (json['module_title'] as String?) ?? '',
         mastery: _asDouble(json['mastery']),
         band: (json['band'] as String?) ?? 'needs_work',
         attemptsCount: (json['attempts_count'] as num?)?.toInt() ?? 0,
@@ -120,6 +122,7 @@ class ModuleProgress {
       );
 
   final String moduleId;
+  final String moduleTitle;
   final double mastery;
   final String band;
   final int attemptsCount;
@@ -127,6 +130,7 @@ class ModuleProgress {
 
   Map<String, dynamic> toJson() => {
         'module_id': moduleId,
+        if (moduleTitle.isNotEmpty) 'module_title': moduleTitle,
         'mastery': mastery,
         'band': band,
         'attempts_count': attemptsCount,

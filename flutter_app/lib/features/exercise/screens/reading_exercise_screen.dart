@@ -24,12 +24,17 @@ class ReadingExerciseScreen extends StatefulWidget {
     required this.detail,
     this.onAttemptCompleted,
     this.showResultOnCompletion = true,
+    this.onOpenNext,
   });
 
   final ApiClient client;
   final ExerciseDetail detail;
   final FutureOr<void> Function(String attemptId)? onAttemptCompleted;
   final bool showResultOnCompletion;
+  // When set, the result screen exposes a "Bài tiếp theo →" CTA that
+  // advances the daily-sprint queue instead of dropping the learner back to
+  // the exercise list.
+  final VoidCallback? onOpenNext;
 
   @override
   State<ReadingExerciseScreen> createState() => _ReadingExerciseScreenState();
@@ -49,15 +54,14 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
         (s) => _answers[s.questionNo.toString()]?.isNotEmpty == true,
       );
     }
-    if (d.isCteni5) {
-      return d.cteniQuestions.every(
-        (q) => _answers[q.questionNo.toString()]?.isNotEmpty == true,
-      );
+    if (d.cteniQuestions.isNotEmpty) {
+      // cteni_4 / cteni_5: keyed by backend question_no
+      return d.cteniQuestions.every((q) {
+        final k = q.questionNo > 0 ? q.questionNo.toString() : '';
+        return k.isNotEmpty && _answers[k]?.isNotEmpty == true;
+      });
     }
-    final count =
-        d.cteniQuestions.isNotEmpty
-            ? d.cteniQuestions.length
-            : (d.cteniItems.isNotEmpty ? d.cteniItems.length : 5);
+    final count = d.cteniItems.isNotEmpty ? d.cteniItems.length : 5;
     return List.generate(
       count,
       (i) => (i + 1).toString(),
@@ -112,6 +116,7 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
             child: ObjectiveResultCard(
               result: _result!,
               onRetry: () => Navigator.of(context).pop(),
+              onNext: widget.onOpenNext,
             ),
           ),
         ),
@@ -499,38 +504,55 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
     // For cteni_1 (match image → option): one selection per item
     // For cteni_2/4 (multiple choice): one per question with options
     // For cteni_3 (match text → person): one per item with person options
-    final questionCount =
-        d.cteniQuestions.isNotEmpty
-            ? d.cteniQuestions.length
-            : d.cteniItems.isNotEmpty
-            ? d.cteniItems.length
-            : 5;
+    if (d.cteniQuestions.isNotEmpty) {
+      return List.generate(d.cteniQuestions.length, (i) {
+        final q = d.cteniQuestions[i];
+        // The answer key MUST be the backend question_no (e.g. 15..20 for
+        // cteni_4). Backend extractCorrectAnswers compares learner[qno] to
+        // correct_answers keyed by question_no — using a 1-based loop index
+        // would mismatch every answer.
+        final keyStr = q.questionNo > 0 ? q.questionNo.toString() : (i + 1).toString();
+        final perQuestionOpts = q.options.isNotEmpty
+            ? q.options
+            : (d.cteniOptions.isNotEmpty ? d.cteniOptions : _defaultABCD());
+        final hasPrompt = q.prompt.isNotEmpty;
+        final displayNo = q.questionNo > 0 ? q.questionNo : (i + 1);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.x4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (hasPrompt) ...[
+                Text('$displayNo. ${q.prompt}', style: AppTypography.labelMedium),
+                const SizedBox(height: 4),
+              ],
+              MultipleChoiceWidget(
+                questionNo: hasPrompt ? 0 : displayNo,
+                options: perQuestionOpts,
+                selected: _answers[keyStr],
+                onSelect: (k) => setState(() => _answers[keyStr] = k),
+                mediaUri: widget.client.mediaUri,
+                authHeaders: widget.client.authHeaders,
+              ),
+            ],
+          ),
+        );
+      });
+    }
 
+    final questionCount = d.cteniItems.isNotEmpty ? d.cteniItems.length : 5;
     return List.generate(questionCount, (i) {
       final qno = i + 1;
       final opts = d.cteniOptions.isNotEmpty ? d.cteniOptions : _defaultABCD();
-      final prompt =
-          d.cteniQuestions.isNotEmpty && i < d.cteniQuestions.length
-              ? d.cteniQuestions[i].prompt
-              : null;
       return Padding(
         padding: const EdgeInsets.only(bottom: AppSpacing.x4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (prompt != null && prompt.isNotEmpty) ...[
-              Text('$qno. $prompt', style: AppTypography.labelMedium),
-              const SizedBox(height: 4),
-            ],
-            MultipleChoiceWidget(
-              questionNo: prompt == null ? qno : 0,
-              options: opts,
-              selected: _answers[qno.toString()],
-              onSelect: (k) => setState(() => _answers[qno.toString()] = k),
-              mediaUri: widget.client.mediaUri,
-              authHeaders: widget.client.authHeaders,
-            ),
-          ],
+        child: MultipleChoiceWidget(
+          questionNo: qno,
+          options: opts,
+          selected: _answers[qno.toString()],
+          onSelect: (k) => setState(() => _answers[qno.toString()] = k),
+          mediaUri: widget.client.mediaUri,
+          authHeaders: widget.client.authHeaders,
         ),
       );
     });

@@ -231,17 +231,26 @@ All planned slices V2 → V20 shipped. See [CHANGELOG.md](CHANGELOG.md)
 for per-slice file changes, decisions, and final test counts.
 `tasks/todo.md` tracks active backlog.
 
-**Latest** (2026-05-06): V19 skill mastery aggregate + `GET
-/v1/users/me/progress` (EMA-smoothed per-skill / per-module mastery,
-weighted overall, 4-band readiness vocab unified across LLM +
-objective scorers); V20 Flutter UI (HomeProgressCard above course
-grid + ProgressDetailScreen w/ pull-to-refresh, profile entry tile,
-24 ARB keys VI=EN parity at 376=376). Backend 570 tests, Flutter
-265, CMS 121.
+**Latest** (2026-05-06): V20.1 hotfixes from end-to-end MobAI learner
+simulation — `cteni_4` per-question options + `question_no` answer
+keys (B5+B6, P0); api_client tolerates flat `{"error":"<code>"}`
+envelopes (cast crash); `HomeProgressCard.refresh()` on pop-back to
+home (B7); flashcard "Đã biết" / "Ôn lại" fires background attempt so
+`tu_vung` mastery accrues (B8); course-detail stats use real
+skill/exercise totals instead of `modules.length * 4` (B4); reading
++ listening result screens chain "Bài tiếp theo →" CTA when invoked
+from "Bắt đầu tất cả" (B3); `exerciseListSubtitle` ARB rewritten to a
+skill-neutral copy (B1). Backend 570 tests (unchanged — no contract
+changes), Flutter 266, CMS 121.
+
+V19 skill mastery aggregate + `GET /v1/users/me/progress` and V20
+Flutter UI ship as in CHANGELOG.
 
 **Remaining backlog (low priority)**:
 1. Seed sample content via CMS — at least 1 exercise per type for
-   Flutter end-to-end (interview included).
+   Flutter end-to-end (interview included). Includes B9 reseed:
+   demo `cteni_5` exercise listed twice; demo `cteni_6` returned
+   with empty `module_id`.
 2. Vocab item per-item Polly TTS (deferred from V11).
 3. V18.1 pilot: 20×6 photo gold set across 5 learners measuring
    handwriting OCR CER ≤10% before promoting OCR to default mode.

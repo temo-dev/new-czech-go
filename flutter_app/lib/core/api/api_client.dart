@@ -808,9 +808,16 @@ class ApiClient {
       final text = await response.transform(utf8.decoder).join();
       final payload = jsonDecode(text) as Map<String, dynamic>;
       if (response.statusCode >= 400) {
-        throw HttpException(
-          payload['error']?['message'] as String? ?? 'Request failed.',
-        );
+        // Two backend error shapes:
+        //   {"error":{"code":..,"message":..}}      (writeError envelope)
+        //   {"error":"<code>","message":"<text>"}   (auth gates: email_verify_required, etc.)
+        final err = payload['error'];
+        String? msg;
+        if (err is Map) {
+          msg = err['message'] as String?;
+        }
+        msg ??= payload['message'] as String?;
+        throw HttpException(msg ?? 'Request failed.');
       }
       return payload;
     } finally {

@@ -17,7 +17,10 @@ import '../widgets/quizcard_widget.dart';
 /// Sequential deck session for vocab/grammar exercises.
 /// quizcard_basic: Anki-style (Đã biết removes, Ôn lại pushes back).
 /// choice_word / fill_blank / matching: local scoring, always advance after answer.
-/// No attempt API calls — fully local.
+///
+/// Attempts: each card mark fires a fire-and-forget attempt+submit so the
+/// tu_vung mastery aggregate accrues. Network errors are swallowed (logged
+/// only) — the local Anki UX must not stall on slow / failing requests.
 class DeckSessionScreen extends StatefulWidget {
   const DeckSessionScreen({
     super.key,
@@ -79,6 +82,7 @@ class _DeckSessionScreenState extends State<DeckSessionScreen> {
     } else {
       _queue.addLast(current);
     }
+    _logFlashcardAttempt(current.id, choice);
     if (_queue.isEmpty) {
       setState(() => _sessionComplete = true);
     } else {
@@ -88,12 +92,37 @@ class _DeckSessionScreenState extends State<DeckSessionScreen> {
 
   void _advanceKnown() {
     HapticFeedback.lightImpact();
-    _knownIds.add(_queue.removeFirst().id);
+    final current = _queue.removeFirst();
+    _knownIds.add(current.id);
+    _logFlashcardAttempt(current.id, 'known');
     if (_queue.isEmpty) {
       setState(() => _sessionComplete = true);
     } else {
       _loadCurrentDetail();
     }
+  }
+
+  /// Fire-and-forget attempt+submit for a single flashcard mark. Backend
+  /// QuizcardBasicDetail.correct_answers = {"1":"known"} so a "known" mark
+  /// scores 1/1 and "again" scores 0/1, both feeding into tu_vung mastery
+  /// via the standard objective scorer pipeline. Only quizcard_basic uses
+  /// this — matching/fill_blank/choice_word still skip remote logging until
+  /// the larger deck-session aggregate exists.
+  void _logFlashcardAttempt(String exerciseId, String choice) {
+    if (widget.exerciseType != 'quizcard_basic') return;
+    () async {
+      try {
+        final attempt = await widget.client.createAttempt(exerciseId, locale: 'vi');
+        final attemptId = attempt['id'] as String?;
+        if (attemptId == null) return;
+        await widget.client.submitAnswers(attemptId, {'1': choice});
+      } catch (e) {
+        // Mastery accrual is best-effort; surface to console for triage but
+        // do not block the learner's flashcard flow on backend availability.
+        // ignore: avoid_print
+        print('flashcard attempt log failed for $exerciseId: $e');
+      }
+    }();
   }
 
   Future<bool> _onWillPop() async {

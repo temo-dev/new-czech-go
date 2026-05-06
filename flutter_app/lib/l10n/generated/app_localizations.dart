@@ -1658,7 +1658,7 @@ abstract class AppLocalizations {
   /// No description provided for @exerciseListSubtitle.
   ///
   /// In vi, this message translates to:
-  /// **'Tập trung vào sự trôi chảy và phát âm đúng trong các tình huống thực tế.'**
+  /// **'Chọn bài tập để bắt đầu luyện ngay.'**
   String get exerciseListSubtitle;
 
   /// No description provided for @exerciseListDailySprintLabel.

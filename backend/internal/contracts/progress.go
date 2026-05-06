@@ -29,9 +29,12 @@ type SkillProgress struct {
 
 // ModuleProgress is one persisted user_skill_mastery row in wire form. ModuleID
 // is the empty string for the exam-pool aggregate row; the Flutter client
-// surfaces those under a virtual "exam" group.
+// surfaces those under a virtual "exam" group. ModuleTitle is the human-readable
+// title resolved from the modules table at read time; empty when ModuleID is
+// empty (exam aggregate) or when the module row no longer exists.
 type ModuleProgress struct {
 	ModuleID      string    `json:"module_id"`
+	ModuleTitle   string    `json:"module_title,omitempty"`
 	Mastery       float64   `json:"mastery"`
 	Band          string    `json:"band"`
 	AttemptsCount int       `json:"attempts_count"`

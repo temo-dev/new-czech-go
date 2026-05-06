@@ -20,6 +20,11 @@ class CourseDetailScreen extends StatefulWidget {
 
 class _CourseDetailScreenState extends State<CourseDetailScreen> {
   List<ModuleSummary> _modules = [];
+  // Real totals computed from /v1/modules/:id/skills — replaces the previous
+  // hardcoded "modules.length * 4" stat that lied when modules had a different
+  // skill count than the magic number.
+  int _totalSkills = 0;
+  int _totalExercises = 0;
   bool _loading = true;
   String? _error;
 
@@ -31,10 +36,37 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     try {
       final raw = await widget.client.listCourseModules(widget.course.id);
       if (!mounted) return;
+      final modules = raw.map((e) => ModuleSummary.fromJson(e as Map<String, dynamic>)).toList()
+        ..sort((a, b) => a.sequenceNo.compareTo(b.sequenceNo));
       setState(() {
-        _modules = raw.map((e) => ModuleSummary.fromJson(e as Map<String, dynamic>)).toList()
-          ..sort((a, b) => a.sequenceNo.compareTo(b.sequenceNo));
+        _modules = modules;
         _loading = false;
+      });
+      // Fan out skill fetches in parallel and update totals once all return.
+      // Errors here are non-fatal — module list is the primary data, totals
+      // are nice-to-have stats.
+      final results = await Future.wait(
+        modules.map((m) async {
+          try {
+            return await widget.client.listModuleSkills(m.id);
+          } catch (_) {
+            return const <dynamic>[];
+          }
+        }),
+      );
+      if (!mounted) return;
+      var skills = 0;
+      var exercises = 0;
+      for (final list in results) {
+        skills += list.length;
+        for (final s in list) {
+          final m = s as Map<String, dynamic>;
+          exercises += (m['exercise_count'] as num?)?.toInt() ?? 0;
+        }
+      }
+      setState(() {
+        _totalSkills = skills;
+        _totalExercises = exercises;
       });
     } catch (err) {
       if (!mounted) return;
@@ -132,9 +164,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 children: [
                   _StatBox(value: '${_modules.length}', label: 'MÔ-ĐUN'),
                   _divider(),
-                  _StatBox(value: '${_modules.length * 4}', label: 'KỸ NĂNG'),
+                  _StatBox(value: '$_totalSkills', label: 'KỸ NĂNG'),
                   _divider(),
-                  _StatBox(value: '${_modules.length * 45}', label: 'PHÚT'),
+                  _StatBox(value: '$_totalExercises', label: 'BÀI TẬP'),
                 ],
               ),
             ),

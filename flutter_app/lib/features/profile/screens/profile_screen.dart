@@ -686,6 +686,7 @@ class _ProgressEntryTile extends StatelessWidget {
           moduleLabelFor: (id) => id,
           skillLabelFor: (kind) => skillKindLabel(l, kind),
           attemptsCountLabel: (n) => l.progressDetailAttemptsLabel(n),
+          overallLabel: l.progressOverallTitle,
           emptyTitle: l.progressEmptyTitle,
           emptyMessage: '',
           emptyCtaLabel: l.progressEmptyCta,
