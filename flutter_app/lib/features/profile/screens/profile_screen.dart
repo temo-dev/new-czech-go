@@ -15,6 +15,7 @@ import '../../../core/voice/voice_option.dart';
 import '../../../core/voice/voice_preference_service.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../progress/screens/progress_detail_screen.dart';
+import '../../progress/skill_labels.dart';
 import '../widgets/v17_account_section.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -681,9 +682,9 @@ class _ProgressEntryTile extends StatelessWidget {
         fetcher: api.fetch,
         labels: ProgressDetailLabels(
           titleAll: l.progressDetailTitle,
-          titleForSkill: (kind) => _skillLabel(l, kind),
+          titleForSkill: (kind) => skillKindLabel(l, kind),
           moduleLabelFor: (id) => id,
-          skillLabelFor: (kind) => _skillLabel(l, kind),
+          skillLabelFor: (kind) => skillKindLabel(l, kind),
           attemptsCountLabel: (n) => l.progressDetailAttemptsLabel(n),
           emptyTitle: l.progressEmptyTitle,
           emptyMessage: '',
@@ -731,13 +732,3 @@ class _ProgressEntryTile extends StatelessWidget {
   }
 }
 
-String _skillLabel(AppLocalizations l, String kind) => switch (kind) {
-      'noi' => l.progressSkillNoi,
-      'viet' => l.progressSkillViet,
-      'nghe' => l.progressSkillNghe,
-      'doc' => l.progressSkillDoc,
-      'tu_vung' => l.progressSkillTuVung,
-      'ngu_phap' => l.progressSkillNguPhap,
-      'interview' => l.progressSkillInterview,
-      _ => kind,
-    };

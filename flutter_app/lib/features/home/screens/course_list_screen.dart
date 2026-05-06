@@ -10,20 +10,9 @@ import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../../progress/screens/progress_detail_screen.dart';
+import '../../progress/skill_labels.dart';
 import '../../progress/widgets/home_progress_card.dart';
 import 'course_detail_screen.dart';
-
-// Resolves a skill_kind token to its localised display name.
-String _skillLabel(AppLocalizations l, String kind) => switch (kind) {
-      'noi' => l.progressSkillNoi,
-      'viet' => l.progressSkillViet,
-      'nghe' => l.progressSkillNghe,
-      'doc' => l.progressSkillDoc,
-      'tu_vung' => l.progressSkillTuVung,
-      'ngu_phap' => l.progressSkillNguPhap,
-      'interview' => l.progressSkillInterview,
-      _ => kind,
-    };
 
 // Card color palette — cycles through these per course index
 const _cardColors = [
@@ -72,9 +61,9 @@ class _CourseListScreenState extends State<CourseListScreen> {
         fetcher: api.fetch,
         labels: ProgressDetailLabels(
           titleAll: l.progressDetailTitle,
-          titleForSkill: (kind) => _skillLabel(l, kind),
+          titleForSkill: (kind) => skillKindLabel(l, kind),
           moduleLabelFor: (id) => id,
-          skillLabelFor: (kind) => _skillLabel(l, kind),
+          skillLabelFor: (kind) => skillKindLabel(l, kind),
           attemptsCountLabel: (n) => l.progressDetailAttemptsLabel(n),
           emptyTitle: l.progressEmptyTitle,
           emptyMessage: '',
@@ -176,7 +165,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
               errorMessage: '',
               retryLabel: l.progressErrorRetry,
               offlineLabel: l.progressOfflineChip,
-              skillLabelFor: (kind) => _skillLabel(l, kind),
+              skillLabelFor: (kind) => skillKindLabel(l, kind),
             ),
             onSkillTap: (kind) => _openProgressDetail(skillKind: kind),
           ),
