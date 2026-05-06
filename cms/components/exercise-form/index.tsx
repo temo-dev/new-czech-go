@@ -51,6 +51,110 @@ type Props = {
   onClose: () => void;
 };
 
+const EXERCISE_TYPE_TITLE_LABELS: Record<string, string> = {
+  uloha_1_topic_answers: '`Uloha 1`',
+  uloha_2_dialogue_questions: '`Uloha 2`',
+  uloha_3_story_narration: '`Uloha 3`',
+  uloha_4_choice_reasoning: '`Uloha 4`',
+  psani_1_formular: '`Psaní 1 — Formulář`',
+  psani_2_email: '`Psaní 2 — E-mail`',
+};
+
+function exerciseTypeTitleLabel(type: string): string {
+  if (EXERCISE_TYPE_TITLE_LABELS[type]) return EXERCISE_TYPE_TITLE_LABELS[type];
+  if (type.startsWith('poslech_') || type.startsWith('cteni_')) {
+    return `\`${type.replace('_', ' ').toUpperCase()}\``;
+  }
+  return '`Exercise`';
+}
+
+const WIZARD_SKILL_KINDS = ['noi', 'viet', 'nghe', 'doc', 'tu_vung', 'ngu_phap', 'interview'] as const;
+
+function WizardSkillStep({ onSelect }: { onSelect: (kind: string) => void }) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gap: 16,
+        padding: 20,
+        borderRadius: 28,
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        boxShadow: 'var(--shadow)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {[1, 2, 3].map((n) => (
+          <div
+            key={n}
+            style={{
+              width: n === 1 ? 24 : 8,
+              height: 8,
+              borderRadius: 99,
+              background: n === 1 ? 'var(--primary)' : 'var(--border)',
+              transition: 'all 0.2s',
+            }}
+          />
+        ))}
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: 0.8,
+            color: 'var(--primary)',
+            textTransform: 'uppercase',
+            marginLeft: 4,
+          }}
+        >
+          Bước 1 / 3
+        </span>
+      </div>
+      <div>
+        <h2 style={{ margin: '0 0 4px', fontSize: 22 }}>Chọn kỹ năng</h2>
+        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 14 }}>
+          Bài tập sẽ được gắn vào kỹ năng này.
+        </p>
+      </div>
+      <div style={{ display: 'grid', gap: 12 }}>
+        {WIZARD_SKILL_KINDS.map((kind) => {
+          const meta = SKILL_KIND_META[kind as keyof typeof SKILL_KIND_META];
+          if (!meta) return null;
+          return (
+            <button
+              key={kind}
+              type="button"
+              onClick={() => onSelect(kind)}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = 'var(--primary)';
+                (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--primary)';
+                (e.currentTarget as HTMLButtonElement).style.color = '#fff';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-muted)';
+                (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
+                (e.currentTarget as HTMLButtonElement).style.color = '';
+              }}
+              style={{
+                textAlign: 'left',
+                padding: '10px 14px',
+                borderRadius: 10,
+                border: '1px solid var(--border)',
+                background: 'var(--surface-muted)',
+                cursor: 'pointer',
+                transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: 13 }}>
+                {meta.icon} {meta.label}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function WizardTypeStep({
   form,
   onSelectType,
@@ -362,6 +466,31 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
     }
   }
 
+  async function handleGenerateAudio() {
+    if (!editingId) {
+      setAudioGenMsg('Lưu bài trước khi tạo audio.');
+      return;
+    }
+    setAudioGenerating(true);
+    setAudioGenMsg(null);
+    try {
+      const saveRes = await adminFetch(`${adminApi}/${editingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildUpdatePayload(form)),
+      });
+      if (!saveRes.ok) throw new Error('Lưu thất bại trước khi tạo audio.');
+      const res = await adminFetch(`${adminApi}/${editingId}/generate-audio`, { method: 'POST' });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error?.message ?? 'Failed');
+      setAudioGenMsg('Đã tạo audio.');
+    } catch (e) {
+      setAudioGenMsg(e instanceof Error ? e.message : 'Error');
+    } finally {
+      setAudioGenerating(false);
+    }
+  }
+
   const validationErrors: string[] = (() => {
     if (wizardStep !== 'content' && !editingId) return [];
     try {
@@ -520,93 +649,16 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
         <div style={{ padding: 24, display: 'grid', gap: 16, flex: 1 }}>
           {/* Wizard step 1: pick skill */}
           {!editingId && wizardStep === 'skill' && (
-            <div
-              style={{
-                display: 'grid',
-                gap: 16,
-                padding: 20,
-                borderRadius: 28,
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                boxShadow: 'var(--shadow)',
+            <WizardSkillStep
+              onSelect={(kind) => {
+                setForm((f) => ({
+                  ...f,
+                  skillKind: kind,
+                  exerciseType: SKILL_KIND_EXERCISE_TYPES[kind]?.[0] ?? f.exerciseType,
+                }));
+                setWizardStep('type');
               }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {[1, 2, 3].map((n) => (
-                  <div
-                    key={n}
-                    style={{
-                      width: n === 1 ? 24 : 8,
-                      height: 8,
-                      borderRadius: 99,
-                      background: n === 1 ? 'var(--primary)' : 'var(--border)',
-                      transition: 'all 0.2s',
-                    }}
-                  />
-                ))}
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: 0.8,
-                    color: 'var(--primary)',
-                    textTransform: 'uppercase',
-                    marginLeft: 4,
-                  }}
-                >
-                  Bước 1 / 3
-                </span>
-              </div>
-              <div>
-                <h2 style={{ margin: '0 0 4px', fontSize: 22 }}>Chọn kỹ năng</h2>
-                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 14 }}>
-                  Bài tập sẽ được gắn vào kỹ năng này.
-                </p>
-              </div>
-              <div style={{ display: 'grid', gap: 12 }}>
-                {(['noi', 'viet', 'nghe', 'doc', 'tu_vung', 'ngu_phap', 'interview'] as const).map((kind) => {
-                  const meta = SKILL_KIND_META[kind as keyof typeof SKILL_KIND_META];
-                  if (!meta) return null;
-                  return (
-                    <button
-                      key={kind}
-                      type="button"
-                      onClick={() => {
-                        setForm((f) => ({
-                          ...f,
-                          skillKind: kind,
-                          exerciseType: SKILL_KIND_EXERCISE_TYPES[kind]?.[0] ?? f.exerciseType,
-                        }));
-                        setWizardStep('type');
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.background = 'var(--primary)';
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--primary)';
-                        (e.currentTarget as HTMLButtonElement).style.color = '#fff';
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-muted)';
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
-                        (e.currentTarget as HTMLButtonElement).style.color = '';
-                      }}
-                      style={{
-                        textAlign: 'left',
-                        padding: '10px 14px',
-                        borderRadius: 10,
-                        border: '1px solid var(--border)',
-                        background: 'var(--surface-muted)',
-                        cursor: 'pointer',
-                        transition: 'background 0.15s, border-color 0.15s, color 0.15s',
-                      }}
-                    >
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>
-                        {meta.icon} {meta.label}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            />
           )}
 
           {/* Wizard step 2: pick type */}
@@ -639,23 +691,7 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                 <span style={eyebrowStyle}>{S.exercise.editorEyebrow}</span>
                 <h2 style={{ margin: 0, fontSize: 24 }}>
                   {editingId ? 'Chỉnh sửa ' : 'Tạo '}
-                  {form.exerciseType === 'uloha_1_topic_answers'
-                    ? '`Uloha 1`'
-                    : form.exerciseType === 'uloha_2_dialogue_questions'
-                      ? '`Uloha 2`'
-                      : form.exerciseType === 'uloha_3_story_narration'
-                        ? '`Uloha 3`'
-                        : form.exerciseType === 'uloha_4_choice_reasoning'
-                          ? '`Uloha 4`'
-                          : form.exerciseType === 'psani_1_formular'
-                            ? '`Psaní 1 — Formulář`'
-                            : form.exerciseType === 'psani_2_email'
-                              ? '`Psaní 2 — E-mail`'
-                              : form.exerciseType.startsWith('poslech_')
-                                ? `\`${form.exerciseType.replace('_', ' ').toUpperCase()}\``
-                                : form.exerciseType.startsWith('cteni_')
-                                  ? `\`${form.exerciseType.replace('_', ' ').toUpperCase()}\``
-                                  : '`Exercise`'}
+                  {exerciseTypeTitleLabel(form.exerciseType)}
                 </h2>
                 <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                   {S.exercise.editorHint}
@@ -731,27 +767,7 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                     editingId={editingId}
                     audioGenerating={audioGenerating}
                     audioGenMsg={audioGenMsg}
-                    onGenerateAudio={async () => {
-                      if (!editingId) { setAudioGenMsg('Lưu bài trước khi tạo audio.'); return; }
-                      setAudioGenerating(true);
-                      setAudioGenMsg(null);
-                      try {
-                        const saveRes = await adminFetch(`${adminApi}/${editingId}`, {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify(buildUpdatePayload(form)),
-                        });
-                        if (!saveRes.ok) throw new Error('Lưu thất bại trước khi tạo audio.');
-                        const res = await adminFetch(`${adminApi}/${editingId}/generate-audio`, { method: 'POST' });
-                        const j = await res.json();
-                        if (!res.ok) throw new Error(j.error?.message ?? 'Failed');
-                        setAudioGenMsg('Đã tạo audio.');
-                      } catch (e) {
-                        setAudioGenMsg(e instanceof Error ? e.message : 'Error');
-                      } finally {
-                        setAudioGenerating(false);
-                      }
-                    }}
+                    onGenerateAudio={handleGenerateAudio}
                   />
                 )}
 
@@ -763,29 +779,7 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                     editingId={editingId}
                     audioGenerating={audioGenerating}
                     audioGenMsg={audioGenMsg}
-                    onGenerateAudio={async () => {
-                      if (!editingId) { setAudioGenMsg('Lưu bài trước khi tạo audio.'); return; }
-                      setAudioGenerating(true);
-                      setAudioGenMsg(null);
-                      try {
-                        const saveRes = await adminFetch(`${adminApi}/${editingId}`, {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify(buildUpdatePayload(form)),
-                        });
-                        if (!saveRes.ok) throw new Error('Lưu thất bại trước khi tạo audio.');
-                        const res = await adminFetch(`${adminApi}/${editingId}/generate-audio`, {
-                          method: 'POST',
-                        });
-                        const j = await res.json();
-                        if (!res.ok) throw new Error(j.error?.message ?? 'Failed');
-                        setAudioGenMsg('Đã tạo audio.');
-                      } catch (e) {
-                        setAudioGenMsg(e instanceof Error ? e.message : 'Error');
-                      } finally {
-                        setAudioGenerating(false);
-                      }
-                    }}
+                    onGenerateAudio={handleGenerateAudio}
                   />
                 )}
 
