@@ -13,21 +13,17 @@ import '../../progress/screens/progress_detail_screen.dart';
 import '../../progress/widgets/home_progress_card.dart';
 import 'course_detail_screen.dart';
 
-// Resolves a skill_kind token to its VI display name. Inline pending the
-// V20 UI-6 ARB pass; the call site will switch to AppLocalizations then.
-String _skillLabel(String kind) => switch (kind) {
-      'noi' => 'Nói',
-      'viet' => 'Viết',
-      'nghe' => 'Nghe',
-      'doc' => 'Đọc',
-      'tu_vung' => 'Từ vựng',
-      'ngu_phap' => 'Ngữ pháp',
-      'interview' => 'Phỏng vấn',
+// Resolves a skill_kind token to its localised display name.
+String _skillLabel(AppLocalizations l, String kind) => switch (kind) {
+      'noi' => l.progressSkillNoi,
+      'viet' => l.progressSkillViet,
+      'nghe' => l.progressSkillNghe,
+      'doc' => l.progressSkillDoc,
+      'tu_vung' => l.progressSkillTuVung,
+      'ngu_phap' => l.progressSkillNguPhap,
+      'interview' => l.progressSkillInterview,
       _ => kind,
     };
-String _titleForSkill(String kind) => 'Tiến độ ${_skillLabel(kind)}';
-String _moduleLabel(String id) => id;
-String _attemptsLabel(int n) => '$n lượt';
 
 // Card color palette — cycles through these per course index
 const _cardColors = [
@@ -70,22 +66,23 @@ class _CourseListScreenState extends State<CourseListScreen> {
   void _openProgressDetail({String? skillKind}) {
     final api = _progressApi;
     if (api == null) return;
+    final l = AppLocalizations.of(context);
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => ProgressDetailScreen(
         fetcher: api.fetch,
-        labels: const ProgressDetailLabels(
-          titleAll: 'Tiến độ học tập',
-          titleForSkill: _titleForSkill,
-          moduleLabelFor: _moduleLabel,
-          skillLabelFor: _skillLabel,
-          attemptsCountLabel: _attemptsLabel,
-          emptyTitle: 'Chưa có tiến độ',
-          emptyMessage: 'Hoàn thành 1 bài để xem điểm mạnh/yếu của bạn.',
-          emptyCtaLabel: 'Bắt đầu học',
-          errorTitle: 'Không tải được tiến độ',
-          errorMessage: 'Kiểm tra mạng và thử lại.',
-          retryLabel: 'Thử lại',
-          offlineLabel: 'Đang offline',
+        labels: ProgressDetailLabels(
+          titleAll: l.progressDetailTitle,
+          titleForSkill: (kind) => _skillLabel(l, kind),
+          moduleLabelFor: (id) => id,
+          skillLabelFor: (kind) => _skillLabel(l, kind),
+          attemptsCountLabel: (n) => l.progressDetailAttemptsLabel(n),
+          emptyTitle: l.progressEmptyTitle,
+          emptyMessage: '',
+          emptyCtaLabel: l.progressEmptyCta,
+          errorTitle: l.progressErrorTitle,
+          errorMessage: '',
+          retryLabel: l.progressErrorRetry,
+          offlineLabel: l.progressOfflineChip,
         ),
         skillKind: skillKind,
       ),
@@ -165,21 +162,21 @@ class _CourseListScreenState extends State<CourseListScreen> {
         ),
         const SizedBox(height: AppSpacing.x4),
 
-        // ── Progress card (V20) — strings inline pending UI-6 ARB keys ──────
+        // ── Progress card (V20) ────────────────────────────────────────────
         if (_progressApi != null) ...[
           HomeProgressCard(
             fetcher: _progressApi!.fetch,
-            labels: const HomeProgressCardLabels(
-              cardTitle: 'Tiến độ học tập',
-              overallLabel: 'Tổng',
-              emptyTitle: 'Chưa có tiến độ',
-              emptyMessage: 'Hoàn thành 1 bài để xem điểm mạnh/yếu của bạn.',
-              emptyCtaLabel: 'Bắt đầu học',
-              errorTitle: 'Không tải được tiến độ',
-              errorMessage: 'Kiểm tra mạng và thử lại.',
-              retryLabel: 'Thử lại',
-              offlineLabel: 'Đang offline',
-              skillLabelFor: _skillLabel,
+            labels: HomeProgressCardLabels(
+              cardTitle: l.homeProgressCardTitle,
+              overallLabel: l.progressOverallTitle,
+              emptyTitle: l.progressEmptyTitle,
+              emptyMessage: '',
+              emptyCtaLabel: l.progressEmptyCta,
+              errorTitle: l.progressErrorTitle,
+              errorMessage: '',
+              retryLabel: l.progressErrorRetry,
+              offlineLabel: l.progressOfflineChip,
+              skillLabelFor: (kind) => _skillLabel(l, kind),
             ),
             onSkillTap: (kind) => _openProgressDetail(skillKind: kind),
           ),

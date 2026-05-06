@@ -2206,6 +2206,150 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Đang nhận diện…'**
   String get dictationOCRUploadingHint;
+
+  /// No description provided for @homeProgressCardTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tiến độ học tập'**
+  String get homeProgressCardTitle;
+
+  /// No description provided for @progressOverallTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tổng'**
+  String get progressOverallTitle;
+
+  /// No description provided for @progressOverallPercent.
+  ///
+  /// In vi, this message translates to:
+  /// **'{percent}% tổng'**
+  String progressOverallPercent(int percent);
+
+  /// No description provided for @progressSkillNoi.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nói'**
+  String get progressSkillNoi;
+
+  /// No description provided for @progressSkillViet.
+  ///
+  /// In vi, this message translates to:
+  /// **'Viết'**
+  String get progressSkillViet;
+
+  /// No description provided for @progressSkillNghe.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nghe'**
+  String get progressSkillNghe;
+
+  /// No description provided for @progressSkillDoc.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đọc'**
+  String get progressSkillDoc;
+
+  /// No description provided for @progressSkillTuVung.
+  ///
+  /// In vi, this message translates to:
+  /// **'Từ vựng'**
+  String get progressSkillTuVung;
+
+  /// No description provided for @progressSkillNguPhap.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ngữ pháp'**
+  String get progressSkillNguPhap;
+
+  /// No description provided for @progressSkillInterview.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phỏng vấn'**
+  String get progressSkillInterview;
+
+  /// No description provided for @progressBandNeedsWork.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cần luyện thêm'**
+  String get progressBandNeedsWork;
+
+  /// No description provided for @progressBandLearning.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang học'**
+  String get progressBandLearning;
+
+  /// No description provided for @progressBandSolid.
+  ///
+  /// In vi, this message translates to:
+  /// **'Vững'**
+  String get progressBandSolid;
+
+  /// No description provided for @progressBandReady.
+  ///
+  /// In vi, this message translates to:
+  /// **'Sẵn sàng'**
+  String get progressBandReady;
+
+  /// No description provided for @progressEmptyTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa có tiến độ'**
+  String get progressEmptyTitle;
+
+  /// No description provided for @progressEmptyCta.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bắt đầu học'**
+  String get progressEmptyCta;
+
+  /// No description provided for @progressErrorTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không tải được tiến độ'**
+  String get progressErrorTitle;
+
+  /// No description provided for @progressErrorRetry.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thử lại'**
+  String get progressErrorRetry;
+
+  /// No description provided for @progressOfflineChip.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang offline'**
+  String get progressOfflineChip;
+
+  /// No description provided for @progressDetailTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tiến độ học tập'**
+  String get progressDetailTitle;
+
+  /// No description provided for @progressDetailAttemptsLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'{count} lượt'**
+  String progressDetailAttemptsLabel(int count);
+
+  /// No description provided for @progressDetailLastAttemptLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lần gần nhất'**
+  String get progressDetailLastAttemptLabel;
+
+  /// No description provided for @progressLastAttemptRelativeFormat.
+  ///
+  /// In vi, this message translates to:
+  /// **'{when}'**
+  String progressLastAttemptRelativeFormat(String when);
+
+  /// No description provided for @profileProgressEntry.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tiến độ học tập'**
+  String get profileProgressEntry;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

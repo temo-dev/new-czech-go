@@ -666,35 +666,33 @@ class _AboutCard extends StatelessWidget {
 }
 
 // V20: profile entry that pushes the all-skills ProgressDetailScreen.
-// Strings remain inline VI pending UI-6 ARB pass.
 class _ProgressEntryTile extends StatelessWidget {
   const _ProgressEntryTile({required this.client});
 
   final ApiClient client;
 
-  static const _labels = ProgressDetailLabels(
-    titleAll: 'Tiến độ học tập',
-    titleForSkill: _titleForSkill,
-    moduleLabelFor: _moduleLabel,
-    skillLabelFor: _skillLabel,
-    attemptsCountLabel: _attemptsLabel,
-    emptyTitle: 'Chưa có tiến độ',
-    emptyMessage: 'Hoàn thành 1 bài để xem điểm mạnh/yếu của bạn.',
-    emptyCtaLabel: 'Bắt đầu học',
-    errorTitle: 'Không tải được tiến độ',
-    errorMessage: 'Kiểm tra mạng và thử lại.',
-    retryLabel: 'Thử lại',
-    offlineLabel: 'Đang offline',
-  );
-
   Future<void> _open(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
     if (!context.mounted) return;
+    final l = AppLocalizations.of(context);
     final api = ProgressApi(client: client, prefs: prefs);
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => ProgressDetailScreen(
         fetcher: api.fetch,
-        labels: _labels,
+        labels: ProgressDetailLabels(
+          titleAll: l.progressDetailTitle,
+          titleForSkill: (kind) => _skillLabel(l, kind),
+          moduleLabelFor: (id) => id,
+          skillLabelFor: (kind) => _skillLabel(l, kind),
+          attemptsCountLabel: (n) => l.progressDetailAttemptsLabel(n),
+          emptyTitle: l.progressEmptyTitle,
+          emptyMessage: '',
+          emptyCtaLabel: l.progressEmptyCta,
+          errorTitle: l.progressErrorTitle,
+          errorMessage: '',
+          retryLabel: l.progressErrorRetry,
+          offlineLabel: l.progressOfflineChip,
+        ),
         skillKind: null,
       ),
     ));
@@ -702,6 +700,7 @@ class _ProgressEntryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Material(
       color: AppColors.surfaceContainerLow,
       borderRadius: AppRadius.lgAll,
@@ -714,16 +713,16 @@ class _ProgressEntryTile extends StatelessWidget {
             vertical: AppSpacing.x3,
           ),
           child: Row(
-            children: const [
-              Icon(Icons.bar_chart_rounded, size: 22),
-              SizedBox(width: AppSpacing.x3),
+            children: [
+              const Icon(Icons.bar_chart_rounded, size: 22),
+              const SizedBox(width: AppSpacing.x3),
               Expanded(
                 child: Text(
-                  'Tiến độ học tập',
+                  l.profileProgressEntry,
                   style: AppTypography.titleSmall,
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, size: 22),
+              const Icon(Icons.chevron_right_rounded, size: 22),
             ],
           ),
         ),
@@ -732,16 +731,13 @@ class _ProgressEntryTile extends StatelessWidget {
   }
 }
 
-String _titleForSkill(String kind) => 'Tiến độ ${_skillLabel(kind)}';
-String _skillLabel(String kind) => switch (kind) {
-      'noi' => 'Nói',
-      'viet' => 'Viết',
-      'nghe' => 'Nghe',
-      'doc' => 'Đọc',
-      'tu_vung' => 'Từ vựng',
-      'ngu_phap' => 'Ngữ pháp',
-      'interview' => 'Phỏng vấn',
+String _skillLabel(AppLocalizations l, String kind) => switch (kind) {
+      'noi' => l.progressSkillNoi,
+      'viet' => l.progressSkillViet,
+      'nghe' => l.progressSkillNghe,
+      'doc' => l.progressSkillDoc,
+      'tu_vung' => l.progressSkillTuVung,
+      'ngu_phap' => l.progressSkillNguPhap,
+      'interview' => l.progressSkillInterview,
       _ => kind,
     };
-String _moduleLabel(String id) => id;
-String _attemptsLabel(int n) => '$n lượt';

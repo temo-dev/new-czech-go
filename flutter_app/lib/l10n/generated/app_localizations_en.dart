@@ -1155,4 +1155,82 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dictationOCRUploadingHint => 'Recognizing…';
+
+  @override
+  String get homeProgressCardTitle => 'Your progress';
+
+  @override
+  String get progressOverallTitle => 'Overall';
+
+  @override
+  String progressOverallPercent(int percent) {
+    return '$percent% overall';
+  }
+
+  @override
+  String get progressSkillNoi => 'Speaking';
+
+  @override
+  String get progressSkillViet => 'Writing';
+
+  @override
+  String get progressSkillNghe => 'Listening';
+
+  @override
+  String get progressSkillDoc => 'Reading';
+
+  @override
+  String get progressSkillTuVung => 'Vocabulary';
+
+  @override
+  String get progressSkillNguPhap => 'Grammar';
+
+  @override
+  String get progressSkillInterview => 'Interview';
+
+  @override
+  String get progressBandNeedsWork => 'Needs work';
+
+  @override
+  String get progressBandLearning => 'Learning';
+
+  @override
+  String get progressBandSolid => 'Solid';
+
+  @override
+  String get progressBandReady => 'Ready';
+
+  @override
+  String get progressEmptyTitle => 'No progress yet';
+
+  @override
+  String get progressEmptyCta => 'Start learning';
+
+  @override
+  String get progressErrorTitle => 'Could not load progress';
+
+  @override
+  String get progressErrorRetry => 'Retry';
+
+  @override
+  String get progressOfflineChip => 'Offline';
+
+  @override
+  String get progressDetailTitle => 'Your progress';
+
+  @override
+  String progressDetailAttemptsLabel(int count) {
+    return '$count attempts';
+  }
+
+  @override
+  String get progressDetailLastAttemptLabel => 'Last attempt';
+
+  @override
+  String progressLastAttemptRelativeFormat(String when) {
+    return '$when';
+  }
+
+  @override
+  String get profileProgressEntry => 'Your progress';
 }

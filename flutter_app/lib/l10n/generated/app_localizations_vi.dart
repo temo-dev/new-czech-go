@@ -1155,4 +1155,82 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get dictationOCRUploadingHint => 'Đang nhận diện…';
+
+  @override
+  String get homeProgressCardTitle => 'Tiến độ học tập';
+
+  @override
+  String get progressOverallTitle => 'Tổng';
+
+  @override
+  String progressOverallPercent(int percent) {
+    return '$percent% tổng';
+  }
+
+  @override
+  String get progressSkillNoi => 'Nói';
+
+  @override
+  String get progressSkillViet => 'Viết';
+
+  @override
+  String get progressSkillNghe => 'Nghe';
+
+  @override
+  String get progressSkillDoc => 'Đọc';
+
+  @override
+  String get progressSkillTuVung => 'Từ vựng';
+
+  @override
+  String get progressSkillNguPhap => 'Ngữ pháp';
+
+  @override
+  String get progressSkillInterview => 'Phỏng vấn';
+
+  @override
+  String get progressBandNeedsWork => 'Cần luyện thêm';
+
+  @override
+  String get progressBandLearning => 'Đang học';
+
+  @override
+  String get progressBandSolid => 'Vững';
+
+  @override
+  String get progressBandReady => 'Sẵn sàng';
+
+  @override
+  String get progressEmptyTitle => 'Chưa có tiến độ';
+
+  @override
+  String get progressEmptyCta => 'Bắt đầu học';
+
+  @override
+  String get progressErrorTitle => 'Không tải được tiến độ';
+
+  @override
+  String get progressErrorRetry => 'Thử lại';
+
+  @override
+  String get progressOfflineChip => 'Đang offline';
+
+  @override
+  String get progressDetailTitle => 'Tiến độ học tập';
+
+  @override
+  String progressDetailAttemptsLabel(int count) {
+    return '$count lượt';
+  }
+
+  @override
+  String get progressDetailLastAttemptLabel => 'Lần gần nhất';
+
+  @override
+  String progressLastAttemptRelativeFormat(String when) {
+    return '$when';
+  }
+
+  @override
+  String get profileProgressEntry => 'Tiến độ học tập';
 }

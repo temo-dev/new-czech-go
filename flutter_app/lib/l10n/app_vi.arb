@@ -517,5 +517,39 @@
     "dictationOCRConfirmBtn": "Dùng văn bản này",
     "dictationOCRRetakeBtn": "Chụp lại",
     "dictationOCRFailedBanner": "Không nhận diện được. Hãy chụp lại hoặc gõ tay",
-    "dictationOCRUploadingHint": "Đang nhận diện…"
+    "dictationOCRUploadingHint": "Đang nhận diện…",
+
+    "homeProgressCardTitle": "Tiến độ học tập",
+    "progressOverallTitle": "Tổng",
+    "progressOverallPercent": "{percent}% tổng",
+    "@progressOverallPercent": {
+        "placeholders": { "percent": { "type": "int" } }
+    },
+    "progressSkillNoi": "Nói",
+    "progressSkillViet": "Viết",
+    "progressSkillNghe": "Nghe",
+    "progressSkillDoc": "Đọc",
+    "progressSkillTuVung": "Từ vựng",
+    "progressSkillNguPhap": "Ngữ pháp",
+    "progressSkillInterview": "Phỏng vấn",
+    "progressBandNeedsWork": "Cần luyện thêm",
+    "progressBandLearning": "Đang học",
+    "progressBandSolid": "Vững",
+    "progressBandReady": "Sẵn sàng",
+    "progressEmptyTitle": "Chưa có tiến độ",
+    "progressEmptyCta": "Bắt đầu học",
+    "progressErrorTitle": "Không tải được tiến độ",
+    "progressErrorRetry": "Thử lại",
+    "progressOfflineChip": "Đang offline",
+    "progressDetailTitle": "Tiến độ học tập",
+    "progressDetailAttemptsLabel": "{count} lượt",
+    "@progressDetailAttemptsLabel": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "progressDetailLastAttemptLabel": "Lần gần nhất",
+    "progressLastAttemptRelativeFormat": "{when}",
+    "@progressLastAttemptRelativeFormat": {
+        "placeholders": { "when": { "type": "String" } }
+    },
+    "profileProgressEntry": "Tiến độ học tập"
 }

@@ -472,5 +472,39 @@
     "dictationOCRConfirmBtn": "Use this text",
     "dictationOCRRetakeBtn": "Retake",
     "dictationOCRFailedBanner": "Could not read. Retake or type instead",
-    "dictationOCRUploadingHint": "Recognizing…"
+    "dictationOCRUploadingHint": "Recognizing…",
+
+    "homeProgressCardTitle": "Your progress",
+    "progressOverallTitle": "Overall",
+    "progressOverallPercent": "{percent}% overall",
+    "@progressOverallPercent": {
+        "placeholders": { "percent": { "type": "int" } }
+    },
+    "progressSkillNoi": "Speaking",
+    "progressSkillViet": "Writing",
+    "progressSkillNghe": "Listening",
+    "progressSkillDoc": "Reading",
+    "progressSkillTuVung": "Vocabulary",
+    "progressSkillNguPhap": "Grammar",
+    "progressSkillInterview": "Interview",
+    "progressBandNeedsWork": "Needs work",
+    "progressBandLearning": "Learning",
+    "progressBandSolid": "Solid",
+    "progressBandReady": "Ready",
+    "progressEmptyTitle": "No progress yet",
+    "progressEmptyCta": "Start learning",
+    "progressErrorTitle": "Could not load progress",
+    "progressErrorRetry": "Retry",
+    "progressOfflineChip": "Offline",
+    "progressDetailTitle": "Your progress",
+    "progressDetailAttemptsLabel": "{count} attempts",
+    "@progressDetailAttemptsLabel": {
+        "placeholders": { "count": { "type": "int" } }
+    },
+    "progressDetailLastAttemptLabel": "Last attempt",
+    "progressLastAttemptRelativeFormat": "{when}",
+    "@progressLastAttemptRelativeFormat": {
+        "placeholders": { "when": { "type": "String" } }
+    },
+    "profileProgressEntry": "Your progress"
 }
