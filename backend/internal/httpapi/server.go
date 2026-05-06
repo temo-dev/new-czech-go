@@ -1807,6 +1807,85 @@ func skillKindForExerciseType(exerciseType string) string {
 	}
 }
 
+func parseDetailJSON[T any](raw json.RawMessage, missingMsg, invalidMsg string) (T, error) {
+	var zero T
+	if len(raw) == 0 || string(raw) == "null" {
+		return zero, errors.New(missingMsg)
+	}
+	var detail T
+	if err := json.Unmarshal(raw, &detail); err != nil {
+		return zero, errors.New(invalidMsg)
+	}
+	return detail, nil
+}
+
+func parseExerciseDetail(exerciseType, title string, questions []string, raw json.RawMessage) (any, error) {
+	switch exerciseType {
+	case "uloha_1_topic_answers":
+		if len(questions) == 0 {
+			return nil, errors.New("Question prompts are required for Uloha 1.")
+		}
+		return contracts.Uloha1Prompt{TopicLabel: title, QuestionPrompts: questions}, nil
+	case "uloha_2_dialogue_questions":
+		d, err := parseDetailJSON[contracts.Uloha2Detail](raw, "Scenario detail is required for Uloha 2.", "Invalid Uloha 2 detail payload.")
+		if err != nil {
+			return nil, err
+		}
+		if d.ScenarioTitle == "" || d.ScenarioPrompt == "" || len(d.RequiredInfoSlots) == 0 {
+			return nil, errors.New("Scenario title, prompt, and required info slots are required for Uloha 2.")
+		}
+		return d, nil
+	case "uloha_3_story_narration":
+		d, err := parseDetailJSON[contracts.Uloha3Detail](raw, "Story detail is required for Uloha 3.", "Invalid Uloha 3 detail payload.")
+		if err != nil {
+			return nil, err
+		}
+		if d.StoryTitle == "" || len(d.ImageAssetIDs) == 0 || len(d.NarrativeCheckpoints) == 0 {
+			return nil, errors.New("Story title, image asset ids, and narrative checkpoints are required for Uloha 3.")
+		}
+		return d, nil
+	case "uloha_4_choice_reasoning":
+		d, err := parseDetailJSON[contracts.Uloha4Detail](raw, "Choice detail is required for Uloha 4.", "Invalid Uloha 4 detail payload.")
+		if err != nil {
+			return nil, err
+		}
+		if d.ScenarioPrompt == "" || len(d.Options) == 0 {
+			return nil, errors.New("Scenario prompt and options are required for Uloha 4.")
+		}
+		return d, nil
+	case "interview_conversation":
+		d, err := parseDetailJSON[contracts.InterviewConversationDetail](raw, "Detail is required for interview_conversation.", "Invalid interview_conversation detail payload.")
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(d.SystemPrompt) == "" {
+			return nil, errors.New("system_prompt is required for interview_conversation.")
+		}
+		return d, nil
+	case "interview_choice_explain":
+		d, err := parseDetailJSON[contracts.InterviewChoiceExplainDetail](raw, "Detail is required for interview_choice_explain.", "Invalid interview_choice_explain detail payload.")
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(d.SystemPrompt) == "" {
+			return nil, errors.New("system_prompt is required for interview_choice_explain.")
+		}
+		if len(d.Options) < 1 || len(d.Options) > 4 {
+			return nil, errors.New("interview_choice_explain requires 1 to 4 options.")
+		}
+		return d, nil
+	default:
+		if len(raw) == 0 || string(raw) == "null" {
+			return nil, nil
+		}
+		var detail any
+		if err := json.Unmarshal(raw, &detail); err != nil {
+			return nil, errors.New("Invalid exercise detail payload.")
+		}
+		return detail, nil
+	}
+}
+
 func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ contracts.User) {
 	switch r.Method {
 	case http.MethodGet:
@@ -1855,104 +1934,15 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 			Status:                 status,
 			ScoringTemplatePreview: &contracts.ScoringPreview{RubricVersion: "v1", FeedbackStyle: "supportive_direct_vi"},
 		}
-		switch req.ExerciseType {
-		case "uloha_1_topic_answers":
-			if len(req.Questions) == 0 {
-				writeError(w, http.StatusBadRequest, "validation_error", "Question prompts are required for Uloha 1.", false)
-				return
-			}
-			exercise.Prompt = contracts.Uloha1Prompt{
-				TopicLabel:      req.Title,
-				QuestionPrompts: req.Questions,
-			}
-		case "uloha_2_dialogue_questions":
-			if len(req.Detail) == 0 || string(req.Detail) == "null" {
-				writeError(w, http.StatusBadRequest, "validation_error", "Scenario detail is required for Uloha 2.", false)
-				return
-			}
-			var detail contracts.Uloha2Detail
-			if err := json.Unmarshal(req.Detail, &detail); err != nil {
-				writeError(w, http.StatusBadRequest, "validation_error", "Invalid Uloha 2 detail payload.", false)
-				return
-			}
-			if detail.ScenarioTitle == "" || detail.ScenarioPrompt == "" || len(detail.RequiredInfoSlots) == 0 {
-				writeError(w, http.StatusBadRequest, "validation_error", "Scenario title, prompt, and required info slots are required for Uloha 2.", false)
-				return
-			}
+		detail, err := parseExerciseDetail(req.ExerciseType, req.Title, req.Questions, req.Detail)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "validation_error", err.Error(), false)
+			return
+		}
+		if prompt, ok := detail.(contracts.Uloha1Prompt); ok {
+			exercise.Prompt = prompt
+		} else {
 			exercise.Detail = detail
-		case "uloha_3_story_narration":
-			if len(req.Detail) == 0 || string(req.Detail) == "null" {
-				writeError(w, http.StatusBadRequest, "validation_error", "Story detail is required for Uloha 3.", false)
-				return
-			}
-			var detail contracts.Uloha3Detail
-			if err := json.Unmarshal(req.Detail, &detail); err != nil {
-				writeError(w, http.StatusBadRequest, "validation_error", "Invalid Uloha 3 detail payload.", false)
-				return
-			}
-			if detail.StoryTitle == "" || len(detail.ImageAssetIDs) == 0 || len(detail.NarrativeCheckpoints) == 0 {
-				writeError(w, http.StatusBadRequest, "validation_error", "Story title, image asset ids, and narrative checkpoints are required for Uloha 3.", false)
-				return
-			}
-			exercise.Detail = detail
-		case "uloha_4_choice_reasoning":
-			if len(req.Detail) == 0 || string(req.Detail) == "null" {
-				writeError(w, http.StatusBadRequest, "validation_error", "Choice detail is required for Uloha 4.", false)
-				return
-			}
-			var detail contracts.Uloha4Detail
-			if err := json.Unmarshal(req.Detail, &detail); err != nil {
-				writeError(w, http.StatusBadRequest, "validation_error", "Invalid Uloha 4 detail payload.", false)
-				return
-			}
-			if detail.ScenarioPrompt == "" || len(detail.Options) == 0 {
-				writeError(w, http.StatusBadRequest, "validation_error", "Scenario prompt and options are required for Uloha 4.", false)
-				return
-			}
-			exercise.Detail = detail
-		case "interview_conversation":
-			if len(req.Detail) == 0 || string(req.Detail) == "null" {
-				writeError(w, http.StatusBadRequest, "validation_error", "Detail is required for interview_conversation.", false)
-				return
-			}
-			var detail contracts.InterviewConversationDetail
-			if err := json.Unmarshal(req.Detail, &detail); err != nil {
-				writeError(w, http.StatusBadRequest, "validation_error", "Invalid interview_conversation detail payload.", false)
-				return
-			}
-			if strings.TrimSpace(detail.SystemPrompt) == "" {
-				writeError(w, http.StatusBadRequest, "validation_error", "system_prompt is required for interview_conversation.", false)
-				return
-			}
-			exercise.Detail = detail
-		case "interview_choice_explain":
-			if len(req.Detail) == 0 || string(req.Detail) == "null" {
-				writeError(w, http.StatusBadRequest, "validation_error", "Detail is required for interview_choice_explain.", false)
-				return
-			}
-			var detail contracts.InterviewChoiceExplainDetail
-			if err := json.Unmarshal(req.Detail, &detail); err != nil {
-				writeError(w, http.StatusBadRequest, "validation_error", "Invalid interview_choice_explain detail payload.", false)
-				return
-			}
-			if strings.TrimSpace(detail.SystemPrompt) == "" {
-				writeError(w, http.StatusBadRequest, "validation_error", "system_prompt is required for interview_choice_explain.", false)
-				return
-			}
-			if len(detail.Options) < 1 || len(detail.Options) > 4 {
-				writeError(w, http.StatusBadRequest, "validation_error", "interview_choice_explain requires 1 to 4 options.", false)
-				return
-			}
-			exercise.Detail = detail
-		default:
-			if len(req.Detail) > 0 && string(req.Detail) != "null" {
-				var detail any
-				if err := json.Unmarshal(req.Detail, &detail); err != nil {
-					writeError(w, http.StatusBadRequest, "validation_error", "Invalid exercise detail payload.", false)
-					return
-				}
-				exercise.Detail = detail
-			}
 		}
 		exercise.ModuleID = req.ModuleID
 		exercise.SkillKind = req.SkillKind

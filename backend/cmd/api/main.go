@@ -33,61 +33,17 @@ func main() {
 	var exerciseAudioStore store.ExerciseAudioStore
 	var exerciseSentenceAudioStore store.ExerciseSentenceAudioStore
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
-		persistentAttemptStore, err := store.NewPostgresAttemptStore(databaseURL)
-		if err != nil {
-			log.Fatalf("could not initialize postgres attempt store: %v", err)
-		}
-		persistentExerciseStore, err := store.NewPostgresExerciseStore(databaseURL)
-		if err != nil {
-			log.Fatalf("could not initialize postgres exercise store: %v", err)
-		}
-		persistentMockExamStore, err := store.NewPostgresMockExamStore(databaseURL)
-		if err != nil {
-			log.Fatalf("could not initialize postgres mock exam store: %v", err)
-		}
-		persistentMockTestStore, err := store.NewPostgresMockTestStore(databaseURL)
-		if err != nil {
-			log.Fatalf("could not initialize postgres mock test store: %v", err)
-		}
-		persistentCourseStore, err := store.NewPostgresCourseStore(databaseURL)
-		if err != nil {
-			log.Fatalf("could not initialize postgres course store: %v", err)
-		}
-		persistentModuleStore, err := store.NewPostgresModuleStore(databaseURL)
-		if err != nil {
-			log.Fatalf("could not initialize postgres module store: %v", err)
-		}
-		persistentVocabularyStore, err := store.NewPostgresVocabularyStore(databaseURL)
-		if err != nil {
-			log.Fatalf("could not initialize postgres vocabulary store: %v", err)
-		}
-		persistentGrammarStore, err := store.NewPostgresGrammarStore(databaseURL)
-		if err != nil {
-			log.Fatalf("could not initialize postgres grammar store: %v", err)
-		}
-		persistentGenerationJobStore, err := store.NewPostgresGenerationJobStore(databaseURL)
-		if err != nil {
-			log.Fatalf("could not initialize postgres generation job store: %v", err)
-		}
-		persistentExerciseAudioStore, err := store.NewPostgresExerciseAudioStore(databaseURL)
-		if err != nil {
-			log.Fatalf("could not initialize postgres exercise audio store: %v", err)
-		}
-		exerciseAudioStore = persistentExerciseAudioStore
-		persistentExerciseSentenceAudioStore, err := store.NewPostgresExerciseSentenceAudioStore(databaseURL)
-		if err != nil {
-			log.Fatalf("could not initialize postgres exercise sentence audio store: %v", err)
-		}
-		exerciseSentenceAudioStore = persistentExerciseSentenceAudioStore
-		attemptStore = persistentAttemptStore
-		exerciseStore = persistentExerciseStore
-		mockExamStore = persistentMockExamStore
-		mockTestStore = persistentMockTestStore
-		courseStore = persistentCourseStore
-		moduleStore = persistentModuleStore
-		vocabularyStore = persistentVocabularyStore
-		grammarStore = persistentGrammarStore
-		generationJobStore = persistentGenerationJobStore
+		attemptStore = mustPostgresStore("attempt", store.NewPostgresAttemptStore, databaseURL)
+		exerciseStore = mustPostgresStore("exercise", store.NewPostgresExerciseStore, databaseURL)
+		mockExamStore = mustPostgresStore("mock exam", store.NewPostgresMockExamStore, databaseURL)
+		mockTestStore = mustPostgresStore("mock test", store.NewPostgresMockTestStore, databaseURL)
+		courseStore = mustPostgresStore("course", store.NewPostgresCourseStore, databaseURL)
+		moduleStore = mustPostgresStore("module", store.NewPostgresModuleStore, databaseURL)
+		vocabularyStore = mustPostgresStore("vocabulary", store.NewPostgresVocabularyStore, databaseURL)
+		grammarStore = mustPostgresStore("grammar", store.NewPostgresGrammarStore, databaseURL)
+		generationJobStore = mustPostgresStore("generation job", store.NewPostgresGenerationJobStore, databaseURL)
+		exerciseAudioStore = mustPostgresStore("exercise audio", store.NewPostgresExerciseAudioStore, databaseURL)
+		exerciseSentenceAudioStore = mustPostgresStore("exercise sentence audio", store.NewPostgresExerciseSentenceAudioStore, databaseURL)
 		log.Printf("full Postgres persistence enabled (attempts, exercises, mock exams/tests, courses, modules, vocabulary, grammar, generation_jobs, exercise_audio, exercise_sentence_audio)")
 	}
 
@@ -252,4 +208,12 @@ func buildV17AuthDeps() (httpapi.AuthDeps, bool) {
 		BaseURL:       baseURL,
 		VerifyTTL:     24 * time.Hour,
 	}, true
+}
+
+func mustPostgresStore[T any](label string, ctor func(string) (T, error), databaseURL string) T {
+	s, err := ctor(databaseURL)
+	if err != nil {
+		log.Fatalf("could not initialize postgres %s store: %v", label, err)
+	}
+	return s
 }
