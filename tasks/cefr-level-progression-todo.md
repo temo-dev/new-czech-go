@@ -85,9 +85,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** `fetchLevelProgress` / `startPlacement(force)` / `completePlacement(sessionId)` / `createPromotionAttempt(mockTestId)`; constructor takes `baseUrl + tokenProvider` (decoupled from ApiClient internals); typed `LevelApiException(statusCode, code, message, retryAfter)` collapses both backend envelope shapes (`{error: {code,message,retry_after}}` and flat `{error: "code", message: "..."}`); typed result records (`PlacementStartResult`, `PlacementCompleteResult`, `PromotionAttemptResult`)
   - **Verify:** +6 unit tests (fetch happy, start, start with force, cooldown_active w/ retry_after parsed, flat envelope tolerated, complete happy w/ level state); `make flutter-analyze` clean; full Flutter suite 283 tests pass
   - **Size:** M
-- [ ] **V21-D3** `LevelBadge` widget
-  - **AC:** chip + 4-dot ladder; tokens only; ≥48dp; semantics; reduced-motion safe
-  - **Verify:** +3 widget tests
+- [x] **V21-D3** `LevelBadge` widget (`features/home/widgets/level_badge.dart` + test)
+  - **AC:** chip ([A1] pill via `primaryContainer`/`onPrimaryContainer`) + 4-dot ladder (current=`primary`, unlocked=`success`, locked=`surfaceContainerHighest`); "Đang học A2" caption hides at top of ladder; min 48dp tap target; `Semantics(button, label)` reads "Cấp độ X, đang học Y"; no animation (reduced-motion safe by construction)
+  - **Verify:** +4 widget tests (renders short code + studying caption, top-of-ladder hides caption, semantics label, tap callback); analyze clean; suite 287
   - **Size:** S
 - [ ] **V21-D4** `LevelProgressRing` widget
   - **AC:** 6-arc skill ring; scoreband colors; pulse on unlock respects reduced-motion
