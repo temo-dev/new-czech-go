@@ -26,6 +26,13 @@ type MasteryUpdater struct {
 	store  store.SkillMasteryStore
 	config MasteryConfig
 	now    func() time.Time
+
+	// isDemo, when set, returns true for exercises that should not feed the
+	// mastery aggregate. V21 wires this so attempts on a course's
+	// demo_exercise (taste-test for locked upper-level content) leave no
+	// trace in user_skill_mastery. nil disables the check (legacy
+	// behaviour).
+	isDemo func(exerciseID string) bool
 }
 
 // NewMasteryUpdater constructs an updater. `now` is injected so tests can
@@ -35,6 +42,15 @@ func NewMasteryUpdater(s store.SkillMasteryStore, cfg MasteryConfig, now func() 
 		now = time.Now
 	}
 	return &MasteryUpdater{store: s, config: cfg, now: now}
+}
+
+// WithDemoCheck installs a callback that decides whether an attempt's
+// exercise is a "demo" (V21). Returning true causes Update to skip the
+// aggregate write. Pass nil (or skip the call entirely) to keep every
+// attempt counting toward mastery — matches the pre-V21 default.
+func (u *MasteryUpdater) WithDemoCheck(fn func(exerciseID string) bool) *MasteryUpdater {
+	u.isDemo = fn
+	return u
 }
 
 // Update applies one attempt to the aggregate. Returns nil on no-op cases
@@ -48,6 +64,12 @@ func (u *MasteryUpdater) Update(_ context.Context, attempt contracts.Attempt, ex
 		return nil
 	}
 	if attempt.Feedback == nil || attempt.Feedback.ReadinessLevel == "" {
+		return nil
+	}
+	// V21 — demo attempts (taste-tests of locked upper-level content) must
+	// not move mastery. Skip silently so the rest of the pipeline doesn't
+	// need to know the difference.
+	if u.isDemo != nil && exercise.ID != "" && u.isDemo(exercise.ID) {
 		return nil
 	}
 

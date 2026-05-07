@@ -208,6 +208,31 @@ func TestProcessor_WithMasteryUpdater_PersistsRowOnCompletion(t *testing.T) {
 	}
 }
 
+func TestMasteryUpdater_DemoExerciseSkipsWrite(t *testing.T) {
+	updater, st := newUpdaterForTest(t)
+	updater.WithDemoCheck(func(exerciseID string) bool {
+		return exerciseID == "ex_demo"
+	})
+
+	demoEx := contracts.Exercise{ID: "ex_demo", SkillKind: "doc", ModuleID: "m1", Pool: "course"}
+	demoAttempt := attemptForUpdater("a_demo", "u_x", "ready_for_mock")
+	if err := updater.Update(context.Background(), demoAttempt, demoEx); err != nil {
+		t.Fatalf("Update demo: %v", err)
+	}
+	if rows := st.ListForUser("u_x"); len(rows) != 0 {
+		t.Errorf("demo attempt produced %d mastery rows; want 0", len(rows))
+	}
+
+	// Non-demo exercise still flows through normally — same skill/module.
+	nonDemo := contracts.Exercise{ID: "ex_real", SkillKind: "doc", ModuleID: "m1", Pool: "course"}
+	if err := updater.Update(context.Background(), attemptForUpdater("a_real", "u_x", "ready_for_mock"), nonDemo); err != nil {
+		t.Fatalf("Update non-demo: %v", err)
+	}
+	if rows := st.ListForUser("u_x"); len(rows) != 1 {
+		t.Errorf("non-demo attempt produced %d mastery rows; want 1", len(rows))
+	}
+}
+
 func TestProcessor_WithoutMasteryUpdater_StaysQuiet(t *testing.T) {
 	// Sanity check: omitting WithMasteryUpdater must not panic and must leave
 	// no per-user mastery side-effects. Locks in the contract that the hook

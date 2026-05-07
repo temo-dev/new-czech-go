@@ -51,9 +51,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** `?level=` filter on `GET /v1/courses`; per-item `level` + `unlock_state` (`unlocked`/`demo`/`locked`) + `demo_exercise_id` populated by service; `GET /v1/courses/:id` carries the same fields; `GET /v1/exercises/:id` returns `403 level_locked` when course locked unless exercise == `demo_exercise_id`; gating bypassed when level service is not wired so legacy fixture builds keep working; **`is_demo` attempt tagging deferred to V21-B8** (touches the attempt creation path which B8 owns end-to-end)
   - **Verify:** +5 integration tests (list adds level+unlock_state, level filter, course-by-id fields, locked exercise 403, demo exercise allowed)
   - **Size:** L
-- [ ] **V21-B8** Atomic promotion hook + demo-skip (`processing/level_promotion.go`, `processing/mastery_updater.go`, `store/persist_attempt_feedback.go`)
-  - **AC:** mastery-updater skips when `is_demo`; promotion hook updates attempt + sets user level on pass; idempotent on replay
-  - **Verify:** +5 unit tests (demo skip, pass, fail, replay, non-promotion untouched)
+- [x] **V21-B8** Atomic promotion hook + demo-skip (`processing/level_promotion.go` (new) + test, `processing/mastery_updater.go` `WithDemoCheck`, `httpapi/server.go` `handleMockExamComplete` wires hook, `store/promotion_attempts_store.go` `GetByFullSessionID`)
+  - **AC:** `MasteryUpdater.WithDemoCheck(fn)` callback skips Update when fn(exerciseID) returns true; `HandlePromotionOutcome(deps, session)` looks up promotion_attempts by full_session_id, computes per-skill % from sections (sum_score / sum_max × 100), `MarkResult` then on pass `SetUserLevel(targetLevel)`; both writes idempotent so replay leaves state identical; non-linked sessions return processed=false; hook wired in `handleMockExamComplete` after `CompleteMockExam`, errors logged not surfaced
+  - **Verify:** +5 unit tests (demo skip, pass promotes, fail records but no promotion, no-link returns false, replay idempotent)
   - **Size:** L
 
 **[CHECKPOINT V21-B]** `make backend-build && make backend-test` pass; +45 backend tests

@@ -24,6 +24,7 @@ import (
 type PromotionAttemptsStore interface {
 	Create(in contracts.PromotionAttempt) (contracts.PromotionAttempt, error)
 	GetLatestFailedAttempt(userID, targetLevel string) (contracts.PromotionAttempt, bool)
+	GetByFullSessionID(sessionID string) (contracts.PromotionAttempt, bool)
 	MarkResult(id string, passed bool, scorePct float64, perSkillPct map[string]float64) (contracts.PromotionAttempt, error)
 }
 
@@ -86,6 +87,20 @@ func (s *memoryPromotionAttemptsStore) GetLatestFailedAttempt(userID, targetLeve
 		return matching[i].CreatedAt.After(matching[j].CreatedAt)
 	})
 	return clonePromotionAttempt(matching[0]), true
+}
+
+func (s *memoryPromotionAttemptsStore) GetByFullSessionID(sessionID string) (contracts.PromotionAttempt, bool) {
+	if sessionID == "" {
+		return contracts.PromotionAttempt{}, false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, r := range s.rows {
+		if r.FullSessionID == sessionID {
+			return clonePromotionAttempt(r), true
+		}
+	}
+	return contracts.PromotionAttempt{}, false
 }
 
 func (s *memoryPromotionAttemptsStore) MarkResult(id string, passed bool, scorePct float64, perSkillPct map[string]float64) (contracts.PromotionAttempt, error) {
@@ -199,6 +214,27 @@ WHERE user_id = $1 AND target_level = $2 AND passed = FALSE
 ORDER BY created_at DESC
 LIMIT 1
 `, userID, targetLevel)
+	out, err := scanPromotionAttempt(row)
+	if err != nil {
+		return contracts.PromotionAttempt{}, false
+	}
+	return out, true
+}
+
+func (s *postgresPromotionAttemptsStore) GetByFullSessionID(sessionID string) (contracts.PromotionAttempt, bool) {
+	if sessionID == "" {
+		return contracts.PromotionAttempt{}, false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	row := s.db.QueryRowContext(ctx, `
+SELECT id, user_id, mock_test_id, source_level, target_level,
+       full_session_id, passed, score_pct, per_skill_pct, created_at
+FROM promotion_attempts
+WHERE full_session_id = $1
+ORDER BY created_at DESC
+LIMIT 1
+`, sessionID)
 	out, err := scanPromotionAttempt(row)
 	if err != nil {
 		return contracts.PromotionAttempt{}, false

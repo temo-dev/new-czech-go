@@ -1856,6 +1856,17 @@ func (s *Server) handleMockExamComplete(w http.ResponseWriter, r *http.Request, 
 		})
 		return
 	}
+	// V21 — fire the promotion hook. Errors are logged but never propagate;
+	// the learner still gets the session payload, and the hook is fully
+	// idempotent so a future replay (e.g. background reconciler) recovers.
+	if s.userLevelStore != nil && s.promoAttemptsStore != nil {
+		if _, err := processing.HandlePromotionOutcome(processing.PromotionHookDeps{
+			PromoAttempts: s.promoAttemptsStore,
+			UserLevels:    s.userLevelStore,
+		}, session); err != nil {
+			log.Printf("session %s promotion hook failed: %v", session.ID, err)
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})
 }
 
