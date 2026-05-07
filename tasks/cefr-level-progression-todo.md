@@ -105,9 +105,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** `WelcomeScreen` renders intro copy (≈12 phút phân loại) + dual CTAs ("Bắt đầu kiểm tra phân loại" primary, "Bỏ qua — bắt đầu từ A0" ghost) keyed for tap routing; `PlacementResultScreen` reveals the assigned level chip via `ScaleTransition + FadeTransition` (450ms easeOutBack) keyed `placement_result_reveal_animation`; reduced-motion users skip the controller entirely (key absent), level still readable; "Bắt đầu học" CTA fires `onContinue`
   - **Verify:** +4 widget tests (Welcome dual CTAs + intro copy, Welcome callbacks fire, PlacementResult headline + body + CTA, reduced motion skips reveal animation); analyze clean; suite 301
   - **Size:** L
-- [ ] **V21-D8** Promotion flow (`PreExamScreen` + `PromotionResultScreen` pass/fail)
-  - **AC:** rules + confirm + result variants; live cooldown timer; weakest-skill deep link; haptic on pass
-  - **Verify:** +5 widget tests
+- [x] **V21-D8** Promotion flow (`features/promotion/pre_exam_screen.dart` + `promotion_result_screen.dart` + test)
+  - **AC:** `PreExamScreen` shows rules (duration, pass threshold, cooldown hours) + dual CTAs ("Bắt đầu thi" primary, "Để sau" ghost); `PromotionResultScreen` branches on `passed`: PASS = success surface + spring badge (`promotion_result_badge_spring` keyed ScaleTransition, easeOutBack 450ms; reduced-motion drops the controller entirely) + dual CTAs (Khám phá / Về trang chủ); FAIL = neutral surface + diagnostic table sorted weakest-first via `LinearProgressIndicator` per skill (success vs scorePoor color by threshold) + live `Timer.periodic(1s)` cooldown countdown rendering `hh:mm:ss` (`promotion_result_cooldown_timer`) + weakest-skill deep-link CTA `onPracticeWeakSkill(skillKind)`; clock injectable for deterministic tests
+  - **Verify:** +5 widget tests (PreExam dual CTA + body fields + callback fires, pass dual CTAs, fail diagnostic table + cooldown timer, weakest deep-link skill kind, reduced-motion skips badge spring); analyze clean; suite 306
   - **Size:** L
 - [ ] **V21-D9** Home wiring + ARB strings + provider
   - **AC:** embeds badge + ring + banner; `level-progress` re-fetch on pop-back; VI = EN key count
