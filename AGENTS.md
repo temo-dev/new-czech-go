@@ -115,7 +115,15 @@ tasks/
   todo.md             active backlog index
   <slice>-plan.md     per-slice plan with phases A..E
   <slice>-todo.md     per-slice task checklist
+  *-archive-*.md      frozen mega-files preserved from earlier slices
+                      (e.g. plan-archive-v2-to-v20.md). Don't update.
 ```
+
+Archive files are allowed in any subdirectory **as long as they sit
+next to the doc they're archiving** (e.g.
+`docs/specs/SPEC-archive-v2-to-v18.md` next to slice specs,
+`tasks/plan-archive-v2-to-v20.md` next to `plan.md`). Naming pattern
+is always `<original-name>-archive-<version-range>.md`.
 
 ### Where does it go? (decision table)
 
@@ -161,7 +169,7 @@ write docs out of order:
   behaviour, the V22 spec captures the change + the relevant
   `docs/reference/` doc gets updated. The V21 slice spec stays as-is.
 - ❌ **No inlining V2..V21 spec content into `SPEC.md`.** That's
-  what `SPEC-archive-v2-to-v18.md` exists for. SPEC.md is a digest
+  what `docs/specs/SPEC-archive-v2-to-v18.md` exists for. SPEC.md is a digest
   table.
 - ❌ **No ephemeral notes (next-session.md, scratch.md, todo-temp.md).**
   Use `tasks/todo.md` for in-flight items.

@@ -6,7 +6,7 @@ for stable contracts that span multiple slices, the always-current
 doc under [`docs/reference/`](docs/reference/README.md).
 
 The full inline V2..V18.1 spec content (1860 lines) is archived at
-[SPEC-archive-v2-to-v18.md](SPEC-archive-v2-to-v18.md). Don't update
+[SPEC-archive-v2-to-v18.md](docs/specs/SPEC-archive-v2-to-v18.md). Don't update
 the archive — it is a historical record.
 
 ## Slice digest
@@ -16,18 +16,18 @@ the archive — it is a historical record.
 | V2 | 2026-04-25 | Psaní (writing) — `psani_1_formular`, `psani_2_email` | [docs/specs/v2-ui-spec.md](docs/specs/v2-ui-spec.md) |
 | V3 | 2026-04-26 | Poslech (listening) — `poslech_1..5` objective | [docs/reference/scoring-pipeline.md](docs/reference/scoring-pipeline.md) |
 | V4 | 2026-04-27 | Čtení (reading) — `cteni_1..5` objective | [docs/reference/scoring-pipeline.md](docs/reference/scoring-pipeline.md) |
-| V5 | 2026-04-27 | Full MockTest — písemná + ústní (replaced by V8 exam_mode) | [SPEC-archive-v2-to-v18.md](SPEC-archive-v2-to-v18.md) |
+| V5 | 2026-04-27 | Full MockTest — písemná + ústní (replaced by V8 exam_mode) | [SPEC-archive-v2-to-v18.md](docs/specs/SPEC-archive-v2-to-v18.md) |
 | V6 | 2026-04-28 | Vocab + Grammar LLM-assisted authoring | [docs/specs/deck-session-vocab-grammar.md](docs/specs/deck-session-vocab-grammar.md) |
 | V8 | 2026-04-30 | Voice selection (TTS routing) | [docs/reference/voice-selection-spec.md](docs/reference/voice-selection-spec.md) |
 | V8 (schema) | 2026-04-30 | Flat skills schema — `exercises.module_id + skill_kind` | [docs/specs/schema-flatten-skills.md](docs/specs/schema-flatten-skills.md) |
-| V9 | 2026-04-30 | Exam model cleanup — `ExamTemplate vs PracticeSet` | [SPEC-archive-v2-to-v18.md](SPEC-archive-v2-to-v18.md) |
+| V9 | 2026-04-30 | Exam model cleanup — `ExamTemplate vs PracticeSet` | [SPEC-archive-v2-to-v18.md](docs/specs/SPEC-archive-v2-to-v18.md) |
 | V10 | 2026-05-01 | Exam result flow redesign | [docs/specs/exam-result-flow-redesign.md](docs/specs/exam-result-flow-redesign.md) + [docs/specs/exam-result-flow-implementation.md](docs/specs/exam-result-flow-implementation.md) |
 | V11 | 2026-05-01 | Media enrichment (images on exercises + vocab) | [docs/specs/media-enrichment.md](docs/specs/media-enrichment.md) |
 | V11 (CMS) | 2026-05-01 | Exercise dashboard upgrade | [docs/specs/exercise-dashboard-upgrade.md](docs/specs/exercise-dashboard-upgrade.md) + [docs/specs/exercise-dashboard-user-flow.md](docs/specs/exercise-dashboard-user-flow.md) |
 | V12 | 2026-05-02 | Deck session mode (vocab + grammar) | [docs/specs/deck-session-vocab-grammar.md](docs/specs/deck-session-vocab-grammar.md) |
 | V13 | 2026-05-01 | Ano/Ne exercise type | [docs/specs/ano-ne-exercise-type.md](docs/specs/ano-ne-exercise-type.md) |
-| V14 | 2026-05-03 | Interview skill — ElevenLabs + Simli avatar | [SPEC-archive-v2-to-v18.md](SPEC-archive-v2-to-v18.md) (`interview-skill` ideas) |
-| V15 | 2026-05-03 | AI image generation in CMS | [SPEC-archive-v2-to-v18.md](SPEC-archive-v2-to-v18.md) (`ai-image-generation` ideas) |
+| V14 | 2026-05-03 | Interview skill — ElevenLabs + Simli avatar | [SPEC-archive-v2-to-v18.md](docs/specs/SPEC-archive-v2-to-v18.md) (`interview-skill` ideas) |
+| V15 | 2026-05-03 | AI image generation in CMS | [SPEC-archive-v2-to-v18.md](docs/specs/SPEC-archive-v2-to-v18.md) (`ai-image-generation` ideas) |
 | V16 | 2026-05-04 | Interview first-turn fix + push-to-talk | [docs/specs/interview-first-turn-fix.md](docs/specs/interview-first-turn-fix.md) |
 | V17 | 2026-05-05 | Self-serve learner — signup, email verify, IAP, quotas | [docs/specs/self-serve-learner-spec.md](docs/specs/self-serve-learner-spec.md) + [docs/reference/learner-profile-identity.md](docs/reference/learner-profile-identity.md) |
 | V17 admin | 2026-05-05 | Admin user management | [docs/specs/admin-user-management.md](docs/specs/admin-user-management.md) |
@@ -62,6 +62,6 @@ content here — that lives in `docs/specs/<slice>.md`. If the slice
 changes a stable contract, also update the relevant `docs/reference/`
 doc.
 
-The frozen archive [SPEC-archive-v2-to-v18.md](SPEC-archive-v2-to-v18.md)
+The frozen archive [SPEC-archive-v2-to-v18.md](docs/specs/SPEC-archive-v2-to-v18.md)
 is **not** updated — it preserves the original inline form for
 historical reference.
