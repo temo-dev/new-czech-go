@@ -62,9 +62,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
 
 ## Phase C — CMS authoring
 
-- [ ] **V21-C1** Course form `LevelField` + `DemoExerciseField` (+ payload + Vitest)
-  - **AC:** A0/A1/A2/B1 select default `a2`; demo dropdown nullable, hidden at lowest level
-  - **Verify:** +3 Vitest
+- [x] **V21-C1** Course form CEFR level + demo exercise (`cms/lib/level.ts` (new) + test, `cms/components/course-dashboard.tsx` extension; spec called for split `LevelField.tsx`/`DemoExerciseField.tsx` but the Course form lives inline in the dashboard, matching the existing form-fields convention — kept inline)
+  - **AC:** `<select>` over A0/A1/A2/B1 with VI labels (`Mới bắt đầu` / `Cơ bản` / `Trvalý pobyt (mặc định)` / `Občanství`), default `a2` via `DEFAULT_COURSE_LEVEL`; sanitizeLevel coerces unknown server values; demo_exercise_id text input hidden when `isLowestLevel(form.level)`; `coursePayload` carries `level` + `demo_exercise_id`
+  - **Verify:** +6 Vitest (level constants order/default, sanitize fallbacks, isCefrLevel narrowing, label fallback, isLowestLevel only flags a0); `make cms-lint` clean; `make cms-build` ok
   - **Size:** M
 - [ ] **V21-C2** MockTest form `PromotionFlagsField` (+ payload + Vitest)
   - **AC:** mutex `is_promotion`/`is_placement`; `target_level` required when promotion

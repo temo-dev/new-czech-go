@@ -1,6 +1,14 @@
 'use client';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import AiImageButton from './AiImageButton';
+import {
+  CEFR_LEVELS,
+  DEFAULT_COURSE_LEVEL,
+  LEVEL_LABELS_VI,
+  type CefrLevel,
+  sanitizeLevel,
+  isLowestLevel,
+} from '../lib/level';
 
 type Course = {
   id: string;
@@ -10,6 +18,8 @@ type Course = {
   status: string;
   sequence_no: number;
   banner_image_id?: string;
+  level?: CefrLevel;
+  demo_exercise_id?: string;
 };
 
 const API = '/api/admin/courses';
@@ -31,11 +41,20 @@ export function CourseDashboard() {
   const [saving, setSaving] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState<string | null>(null);
   const bannerInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    title: string;
+    description: string;
+    status: string;
+    sequence_no: number;
+    level: CefrLevel;
+    demo_exercise_id: string;
+  }>({
     title: '',
     description: '',
     status: 'draft',
     sequence_no: 1,
+    level: DEFAULT_COURSE_LEVEL,
+    demo_exercise_id: '',
   });
 
   useEffect(() => { load(); }, []);
@@ -72,12 +91,26 @@ export function CourseDashboard() {
 
   function openCreate() {
     setEditingId(null);
-    setForm({ title: '', description: '', status: 'draft', sequence_no: courses.length + 1 });
+    setForm({
+      title: '',
+      description: '',
+      status: 'draft',
+      sequence_no: courses.length + 1,
+      level: DEFAULT_COURSE_LEVEL,
+      demo_exercise_id: '',
+    });
     setShowForm(true);
   }
   function openEdit(c: Course) {
     setEditingId(c.id);
-    setForm({ title: c.title, description: c.description, status: c.status, sequence_no: c.sequence_no });
+    setForm({
+      title: c.title,
+      description: c.description,
+      status: c.status,
+      sequence_no: c.sequence_no,
+      level: sanitizeLevel(c.level),
+      demo_exercise_id: c.demo_exercise_id ?? '',
+    });
     setShowForm(true);
   }
   function cancel() { setShowForm(false); setEditingId(null); setError(''); }
@@ -305,6 +338,41 @@ export function CourseDashboard() {
                   <option value="published">Đã xuất bản</option>
                 </select>
               </div>
+            </div>
+            {/* V21 — CEFR level + optional demo exercise. */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                  Cấp độ CEFR
+                </label>
+                <select
+                  value={form.level}
+                  onChange={e => setForm(f => ({ ...f, level: sanitizeLevel(e.target.value) }))}
+                >
+                  {CEFR_LEVELS.map(lvl => (
+                    <option key={lvl} value={lvl}>{LEVEL_LABELS_VI[lvl]}</option>
+                  ))}
+                </select>
+                <p style={{ fontSize: 11, color: 'var(--ink-4)', margin: '4px 0 0' }}>
+                  Học viên cần unlock cấp này để truy cập đầy đủ.
+                </p>
+              </div>
+              {!isLowestLevel(form.level) && (
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                    Demo exercise ID (tuỳ chọn)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="exercise-... (để trống nếu không có demo)"
+                    value={form.demo_exercise_id}
+                    onChange={e => setForm(f => ({ ...f, demo_exercise_id: e.target.value }))}
+                  />
+                  <p style={{ fontSize: 11, color: 'var(--ink-4)', margin: '4px 0 0' }}>
+                    1 exercise mở cho học viên cấp dưới xem trước.
+                  </p>
+                </div>
+              )}
             </div>
             {/* Banner image upload — only for saved courses */}
             {editingId && (() => {
