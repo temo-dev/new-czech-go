@@ -8,6 +8,7 @@ mega-file, frozen). V19+ slices each have their own plan/todo pair.
 
 | Slice | Plan | Todo | Spec | Status |
 |---|---|---|---|---|
+| V21.3 CEFR UI Wire-up | [cefr-ui-wireup-plan.md](cefr-ui-wireup-plan.md) | [cefr-ui-wireup-todo.md](cefr-ui-wireup-todo.md) | [docs/specs/cefr-ui-wireup.md](../docs/specs/cefr-ui-wireup.md) | 📝 planned |
 | V21 CEFR Level Progression (A0→B1) | [cefr-level-progression-plan.md](cefr-level-progression-plan.md) | [cefr-level-progression-todo.md](cefr-level-progression-todo.md) | [docs/specs/cefr-level-progression.md](../docs/specs/cefr-level-progression.md) | ✅ shipped + V21.1 hotfixes |
 | V19 Skill Mastery Progress | [skill-mastery-progress-plan.md](skill-mastery-progress-plan.md) | [skill-mastery-progress-todo.md](skill-mastery-progress-todo.md) | [docs/specs/skill-mastery-progress.md](../docs/specs/skill-mastery-progress.md) | ✅ shipped |
 | V11 Exercise Dashboard upgrade | [exercise-dashboard-plan.md](exercise-dashboard-plan.md) | [exercise-dashboard-todo.md](exercise-dashboard-todo.md) | [docs/specs/exercise-dashboard-upgrade.md](../docs/specs/exercise-dashboard-upgrade.md) | ✅ shipped |
@@ -28,10 +29,10 @@ ledger.
 ### Remaining V21 backlog
 
 1. Manual TestFlight MAN-1..10 acceptance (V21-E2; deploy-time).
-2. Home `home_screen.dart` integration of `HomeLevelHeader` + onboarding
-   router gate (deploy-time wiring; widgets all shipped + tested).
-3. ARB-routed copy across V21 widgets (currently inline VI per
-   form-fields convention; queued for cleanup pass).
+2. ~~Home `home_screen.dart` integration of `HomeLevelHeader` +
+   onboarding router gate~~ → folded into **V21.3 CEFR UI Wire-up**
+   (see slice plan).
+3. ~~ARB-routed copy across V21 widgets~~ → folded into V21.3 § F1.
 
 ### Future-slice candidates
 

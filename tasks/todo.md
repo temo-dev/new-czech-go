@@ -7,6 +7,7 @@ frozen).
 For per-slice task lists with `[x]` / `[ ]` checkboxes, see the
 matching `<slice>-todo.md` file:
 
+- [cefr-ui-wireup-todo.md](cefr-ui-wireup-todo.md) — V21.3 wire-up (active)
 - [cefr-level-progression-todo.md](cefr-level-progression-todo.md) — V21 + V21.1 review hotfixes
 - [skill-mastery-progress-todo.md](skill-mastery-progress-todo.md) — V19
 - [exercise-dashboard-todo.md](exercise-dashboard-todo.md) — V11
@@ -15,10 +16,8 @@ matching `<slice>-todo.md` file:
 
 - [ ] **V21-E2** Manual TestFlight MAN-1..10 acceptance (manual,
   deploy-time, outside automated TDD)
-- [ ] **V21-Wiring** `home_screen.dart` embeds `HomeLevelHeader` +
-  onboarding router gate (composition-only, no logic)
-- [ ] **V21-i18n** Route inline VI strings in V21 widgets through
-  `AppLocalizations` (six ARB keys already added in V21-D9)
+- [→] **V21-Wiring** subsumed by V21.3 CEFR UI Wire-up
+- [→] **V21-i18n** subsumed by V21.3 § F1
 
 ## Suggestion polish (S1–S8 from V21 review)
 
