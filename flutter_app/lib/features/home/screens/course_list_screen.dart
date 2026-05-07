@@ -14,6 +14,7 @@ import '../../../models/models.dart';
 import '../../courses/widgets/locked_course_sheet.dart';
 import '../../courses/widgets/locked_course_tile.dart';
 import '../../home/widgets/home_level_header.dart';
+import '../../promotion/promotion_exam_flow.dart';
 import '../../progress/screens/progress_detail_screen.dart';
 import '../../progress/skill_labels.dart';
 import '../../progress/widgets/home_progress_card.dart';
@@ -91,6 +92,28 @@ class _CourseListScreenState extends State<CourseListScreen> {
             onTapDemo: () => _openDemoExercise(course),
             onTapContinueLowerLevel: () {},
           ),
+    );
+  }
+
+  void _openPromotionExam(LevelProgressResponse progress, String testId) {
+    final api = widget.levelApi;
+    if (api == null) return;
+    final target = progress.nextLevel;
+    if (target == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder:
+            (_) => PromotionExamFlow(
+              levelApi: api,
+              client: widget.client,
+              targetLevel: target,
+              promotionTestId: testId,
+              onFinished: () async {
+                Navigator.of(context).pop();
+                await _refreshLevelProgress();
+              },
+            ),
+      ),
     );
   }
 
@@ -191,7 +214,8 @@ class _CourseListScreenState extends State<CourseListScreen> {
               return HomeLevelHeader(
                 progress: snap.data!,
                 onTapBadge: () {},
-                onTapPromotion: (_) {},
+                onTapPromotion:
+                    (testId) => _openPromotionExam(snap.data!, testId),
               );
             },
           ),

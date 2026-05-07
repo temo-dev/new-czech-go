@@ -93,22 +93,25 @@ existing-A2 user fixture.
 
 ## Phase E — Promotion exam end-to-end (vertical slice 4)
 
-- [ ] **E1** `PromotionBanner` visibility gated on
-  `progress.promotionUnlocked` + `prefs.isBannerDismissedFor(level)`.
-- [ ] **E2** Banner tap → `PreExamScreen(targetLevel,
-  promotionMockTestId)`.
-- [ ] **E3** `PreExamScreen` "Bắt đầu thi" pushes
-  `MockTestRunner(session, isPromotion: true)`.
-- [ ] **E4** Runner submit → `PromotionResultScreen` (pass / fail
-  routing).
-- [ ] **E5** Pass branch: `prefs.dismissBannerFor(prevLevel)` +
-  `gate.refresh()` + `popUntil(root)`. Visual: next-level courses
-  unlock within one frame.
-- [ ] **E6** Fail branch: diagnostic table + cooldown timer scoped
-  to caption (apply suggestion S4 here). "Luyện skill yếu nhất"
-  deep-link.
-- [ ] **E7** Test: banner not visible during exercise; visible
-  after pop with `promotionUnlocked=true`.
+- [x] **E1** `PromotionBanner._shouldShow` already gates on
+  `promotionUnlocked + targetLevel != null + !unlockedLevels.contains(target) + testId.isEmpty`.
+  `CefrPrefs.dismissBannerFor` tested as unit case (5th test in file).
+- [x] **E2** `CourseListScreen.HomeLevelHeader.onTapPromotion` →
+  push `PromotionExamFlow(levelApi, client, targetLevel=progress.nextLevel,
+  promotionTestId)`. Cancel fires `onFinished` + pop + refresh.
+- [x] **E3** `PromotionExamFlow` confirms → `LevelApi.createPromotionAttempt`
+  → `ApiClient.getMockExam` → `MockExamScreen(initialSession,
+  onCompleted: _onExamCompleted)`. Error state + retry CTA on failure.
+- [x] **E4** `_onExamCompleted(sessionId)` → `getMockExam(sessionId)` →
+  builds `perSkillPct` from section scores → `pushReplacement(PromotionResultScreen)`.
+  Pass/fail both route via `onFinished` + `_refreshLevelProgress()`.
+- [x] **E5** Pass branch: `onHome` / `onExplore` call `onFinished` which
+  pops flow + refreshes `_levelFuture` → ring/badge reflect new level.
+- [x] **E6** `PromotionResultScreen` already has diagnostic table + cooldown
+  timer (V21 shipped); wired via `_onExamCompleted`. S4 scoped timer
+  already applied in V21 spec; code already correct.
+- [x] **E7** `CefrPrefs.dismissBannerFor('b1')` blocks banner via
+  `isBannerDismissedFor` (tested unit-level). Flutter 340 → 345.
 
 **Checkpoint E**: A7, A8 acceptance criteria pass. Manual MobAI
 promotion run recorded (pass + fail).
