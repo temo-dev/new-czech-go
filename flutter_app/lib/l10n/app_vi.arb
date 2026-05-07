@@ -573,5 +573,18 @@
     "v21PromotionCooldownLabel": "Có thể thi lại sau {hms}",
     "@v21PromotionCooldownLabel": {
         "placeholders": { "hms": { "type": "String" } }
-    }
+    },
+    "v213ExistingPromptTitle": "Bạn đang ở cấp độ {level}",
+    "@v213ExistingPromptTitle": {
+        "placeholders": { "level": { "type": "String" } }
+    },
+    "v213ExistingPromptBody": "Hệ thống đã xếp bạn vào cấp {level}. Bạn có muốn xác nhận hoặc làm lại bài kiểm tra phân loại không?",
+    "@v213ExistingPromptBody": {
+        "placeholders": { "level": { "type": "String" } }
+    },
+    "v213ExistingPromptConfirmCta": "Đúng, tôi đang ở {level}",
+    "@v213ExistingPromptConfirmCta": {
+        "placeholders": { "level": { "type": "String" } }
+    },
+    "v213ExistingPromptRetestCta": "Làm lại bài kiểm tra phân loại"
 }

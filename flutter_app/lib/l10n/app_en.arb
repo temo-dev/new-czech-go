@@ -528,5 +528,18 @@
     "v21PromotionCooldownLabel": "Retry available in {hms}",
     "@v21PromotionCooldownLabel": {
         "placeholders": { "hms": { "type": "String" } }
-    }
+    },
+    "v213ExistingPromptTitle": "You're at level {level}",
+    "@v213ExistingPromptTitle": {
+        "placeholders": { "level": { "type": "String" } }
+    },
+    "v213ExistingPromptBody": "You've been placed at {level}. Confirm or take the placement test again.",
+    "@v213ExistingPromptBody": {
+        "placeholders": { "level": { "type": "String" } }
+    },
+    "v213ExistingPromptConfirmCta": "Yes, I'm at {level}",
+    "@v213ExistingPromptConfirmCta": {
+        "placeholders": { "level": { "type": "String" } }
+    },
+    "v213ExistingPromptRetestCta": "Take placement test again"
 }

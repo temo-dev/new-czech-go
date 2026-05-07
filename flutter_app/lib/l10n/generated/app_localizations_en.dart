@@ -1264,4 +1264,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String v21PromotionCooldownLabel(String hms) {
     return 'Retry available in $hms';
   }
+
+  @override
+  String v213ExistingPromptTitle(String level) {
+    return 'You\'re at level $level';
+  }
+
+  @override
+  String v213ExistingPromptBody(String level) {
+    return 'You\'ve been placed at $level. Confirm or take the placement test again.';
+  }
+
+  @override
+  String v213ExistingPromptConfirmCta(String level) {
+    return 'Yes, I\'m at $level';
+  }
+
+  @override
+  String get v213ExistingPromptRetestCta => 'Take placement test again';
 }

@@ -2392,6 +2392,30 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Có thể thi lại sau {hms}'**
   String v21PromotionCooldownLabel(String hms);
+
+  /// No description provided for @v213ExistingPromptTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn đang ở cấp độ {level}'**
+  String v213ExistingPromptTitle(String level);
+
+  /// No description provided for @v213ExistingPromptBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hệ thống đã xếp bạn vào cấp {level}. Bạn có muốn xác nhận hoặc làm lại bài kiểm tra phân loại không?'**
+  String v213ExistingPromptBody(String level);
+
+  /// No description provided for @v213ExistingPromptConfirmCta.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đúng, tôi đang ở {level}'**
+  String v213ExistingPromptConfirmCta(String level);
+
+  /// No description provided for @v213ExistingPromptRetestCta.
+  ///
+  /// In vi, this message translates to:
+  /// **'Làm lại bài kiểm tra phân loại'**
+  String get v213ExistingPromptRetestCta;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

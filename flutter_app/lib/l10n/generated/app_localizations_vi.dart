@@ -1264,4 +1264,22 @@ class AppLocalizationsVi extends AppLocalizations {
   String v21PromotionCooldownLabel(String hms) {
     return 'Có thể thi lại sau $hms';
   }
+
+  @override
+  String v213ExistingPromptTitle(String level) {
+    return 'Bạn đang ở cấp độ $level';
+  }
+
+  @override
+  String v213ExistingPromptBody(String level) {
+    return 'Hệ thống đã xếp bạn vào cấp $level. Bạn có muốn xác nhận hoặc làm lại bài kiểm tra phân loại không?';
+  }
+
+  @override
+  String v213ExistingPromptConfirmCta(String level) {
+    return 'Đúng, tôi đang ở $level';
+  }
+
+  @override
+  String get v213ExistingPromptRetestCta => 'Làm lại bài kiểm tra phân loại';
 }

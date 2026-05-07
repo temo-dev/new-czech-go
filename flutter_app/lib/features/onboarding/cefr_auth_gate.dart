@@ -6,6 +6,7 @@ import 'package:flutter_app/core/storage/cefr_prefs.dart';
 import 'package:flutter_app/core/theme/app_colors.dart';
 import 'package:flutter_app/core/theme/app_spacing.dart';
 import 'package:flutter_app/models/models.dart';
+import 'existing_level_confirm_dialog.dart';
 
 /// V21.3 onboarding gate that sits between [AuthService.authenticated] and
 /// [LearnerShell]. Fetches [LevelProgressResponse] and routes the learner to
@@ -15,23 +16,29 @@ import 'package:flutter_app/models/models.dart';
 /// |------------------|--------------|-------------|---------|
 /// | non-null         | any          | any         | child (LearnerShell) |
 /// | null             | a0           | —           | welcomeScreen (placement intro) |
-/// | null             | non-a0       | true         | child (treat as onboarded) |
-/// | null             | non-a0       | false       | child + Phase C dialog (added in C2) |
+/// | null             | non-a0       | true        | child (treat as onboarded) |
+/// | null             | non-a0       | false       | child + existing-level dialog |
 ///
-/// [refresh] forces a re-fetch so the gate re-evaluates after the learner
-/// completes or skips placement. Call it from [PlacementResultScreen] or the
-/// skip handler.
+/// [refresh] forces a re-fetch so the gate re-evaluates after placement is
+/// completed, skipped, or the existing-level prompt is confirmed.
+///
+/// [onExistingRetest] is called when the learner chooses to retake the
+/// placement test from the existing-level dialog. Callers use this hook to
+/// push [PlacementTestScreen]. When null the gate just re-evaluates (the
+/// child shows because [CefrPrefs.isExistingPromptShown] is now true).
 class CefrAuthGate extends StatefulWidget {
   const CefrAuthGate({
     super.key,
     required this.levelApi,
     required this.child,
     required this.welcomeScreen,
+    this.onExistingRetest,
   });
 
   final LevelApi levelApi;
   final Widget child;
   final Widget welcomeScreen;
+  final VoidCallback? onExistingRetest;
 
   @override
   State<CefrAuthGate> createState() => CefrAuthGateState();
@@ -39,6 +46,7 @@ class CefrAuthGate extends StatefulWidget {
 
 class CefrAuthGateState extends State<CefrAuthGate> {
   Future<_GateDecision>? _decision;
+  bool _dialogScheduled = false;
 
   @override
   void initState() {
@@ -49,6 +57,7 @@ class CefrAuthGateState extends State<CefrAuthGate> {
   void refresh() {
     setState(() {
       _decision = _evaluate();
+      _dialogScheduled = false;
     });
   }
 
@@ -56,6 +65,62 @@ class CefrAuthGateState extends State<CefrAuthGate> {
     final prefs = await CefrPrefs.create();
     final progress = await widget.levelApi.fetchLevelProgress();
     return _GateDecision(progress: progress, prefs: prefs);
+  }
+
+  void _scheduleExistingPrompt(BuildContext ctx, _GateDecision decision) {
+    if (_dialogScheduled) return;
+    _dialogScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showExistingPrompt(ctx, decision);
+    });
+  }
+
+  Future<void> _showExistingPrompt(
+    BuildContext ctx,
+    _GateDecision decision,
+  ) async {
+    await showDialog<void>(
+      context: ctx,
+      barrierDismissible: false,
+      builder:
+          (_) => ExistingLevelConfirmDialog(
+            level: decision.progress.currentLevel,
+            onConfirm: () => _onConfirm(ctx, decision),
+            onRetest: () => _onRetest(ctx, decision),
+          ),
+    );
+  }
+
+  void _onConfirm(BuildContext ctx, _GateDecision decision) {
+    Navigator.pop(ctx);
+    _handleConfirm(decision);
+  }
+
+  Future<void> _handleConfirm(_GateDecision decision) async {
+    try {
+      await widget.levelApi.skipPlacement();
+    } catch (_) {
+      // Best-effort: 409 means placement already recorded, which is fine.
+    }
+    await decision.prefs.markExistingPromptShown();
+    if (mounted) refresh();
+  }
+
+  void _onRetest(BuildContext ctx, _GateDecision decision) {
+    Navigator.pop(ctx);
+    _handleRetest(decision);
+  }
+
+  Future<void> _handleRetest(_GateDecision decision) async {
+    await decision.prefs.markExistingPromptShown();
+    if (!mounted) return;
+    final cb = widget.onExistingRetest;
+    if (cb != null) {
+      cb();
+    } else {
+      refresh();
+    }
   }
 
   @override
@@ -102,8 +167,8 @@ class CefrAuthGateState extends State<CefrAuthGate> {
         final prefs = decision.prefs;
 
         // Already onboarded: placement taken OR prompt already recorded.
-        final alreadyOnboarded = progress.placementTakenAt != null ||
-            prefs.isExistingPromptShown;
+        final alreadyOnboarded =
+            progress.placementTakenAt != null || prefs.isExistingPromptShown;
 
         if (alreadyOnboarded) {
           return widget.child;
@@ -114,9 +179,8 @@ class CefrAuthGateState extends State<CefrAuthGate> {
           return widget.welcomeScreen;
         }
 
-        // Existing non-A0 user with placement_taken_at == null and prompt
-        // not yet shown. Phase C will overlay the dialog; for Phase B just
-        // show the child. Phase C (C2) adds the dialog overlay here.
+        // Existing non-A0 user: show child underneath + dialog on top.
+        _scheduleExistingPrompt(context, decision);
         return widget.child;
       },
     );

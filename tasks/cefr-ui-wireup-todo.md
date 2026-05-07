@@ -53,15 +53,16 @@ do not start the next phase before the checkpoint passes.
 
 ## Phase C — Existing A2 confirm dialog (vertical slice 2)
 
-- [ ] **C1** `features/onboarding/existing_level_confirm_dialog.dart`
-  (new) — `barrierDismissible: false` + `WillPopScope` absorbing
-  back. ARB keys for the two CTAs.
-- [ ] **C2** Extend `CefrAuthGate` with the existing-A2 branch (gated
-  on `prefs.isExistingPromptShown()`).
-- [ ] **C3** Wire dialog choices: "Đúng" → skip API + prefs flag;
-  "Làm lại" → push `PlacementTestScreen`.
-- [ ] **C4** Tests for one-time prompt (3 cases): not shown → appears;
-  shown → hidden; back-gesture → flag stays false.
+- [x] **C1** `features/onboarding/existing_level_confirm_dialog.dart` (new) —
+  `PopScope(canPop: false)` + AlertDialog with 2 ARB-keyed CTAs. 4 new
+  ARB keys (vi + en). Generated l10n updated.
+- [x] **C2** `CefrAuthGate` extended: `_scheduleExistingPrompt` fires via
+  `postFrameCallback` when `currentLevel != a0 && !placementTaken && !promptShown`.
+  `_dialogScheduled` flag prevents double-show in one evaluation cycle.
+- [x] **C3** Confirm: `skipPlacement()` (best-effort) + `markExistingPromptShown()`
+  + `refresh()`. Retest: `markExistingPromptShown()` + optional `onExistingRetest`
+  callback (used by `_CefrOnboarding` for PlacementTestScreen navigation).
+- [x] **C4** 8 tests covering all branches. Flutter 326 → 334.
 
 **Checkpoint C**: A4 acceptance criterion passes with SQL-seeded
 existing-A2 user fixture.
