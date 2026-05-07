@@ -97,9 +97,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** four-way visibility gate (`promotionUnlocked && targetLevel != null && !unlockedLevels.contains(target) && promotionTestId.isNotEmpty`) — any miss collapses to `SizedBox.shrink`; renders sticky home card via `successContainer` surface + Lucide-style premium icon, headline `"Sẵn sàng thi nâng cấp lên <level>"`; tap fires `onTap(mockTestId)` so caller routes to PreExamScreen (D8)
   - **Verify:** +3 widget tests (hidden when locked, hidden when target already unlocked, shows + tap fires with mock id); analyze clean; suite 294
   - **Size:** S
-- [ ] **V21-D6** `LockedCourseSheet` + `CourseListScreen` lock state
-  - **AC:** Lucide padlock SVG; mastery delta bar; ghost demo CTA; bottom sheet with primary CTA back to lower-level course
-  - **Verify:** +3 widget tests
+- [x] **V21-D6** `LockedCourseTile` + `LockedCourseSheet` (`features/courses/widgets/locked_course_tile.dart` + `locked_course_sheet.dart` + test). Course list integration scoped per spec §scope deferred to V21-D9 home wiring.
+  - **AC:** `LockedCourseTile` shows padlock + level chip + coverage delta progress bar + optional "Xem demo →" ghost CTA (hidden when `hasDemoExercise=false`); `LockedCourseSheet` shows the same delta + primary "Tiếp tục luyện" CTA + ghost demo CTA, both pop the sheet before firing callbacks; uses `surfaceContainerLow`/`outlineVariant`/`primary` tokens, `Icons.lock_outline` not emoji
+  - **Verify:** +3 widget tests (locked tile renders padlock + delta + demo CTA, demo CTA hidden when no demo, sheet dual-CTA fires correctly); analyze clean; suite 297
   - **Size:** M
 - [ ] **V21-D7** Onboarding flow (`WelcomeScreen` + `PlacementResultScreen` + router gate)
   - **AC:** first launch routes through Welcome → placement → result → home; skip = A0; reduced-motion safe reveal
