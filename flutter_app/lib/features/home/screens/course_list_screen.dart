@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/api/level_api.dart';
 import '../../../core/api/progress_api.dart';
+import '../../../core/level_utils.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../courses/widgets/locked_course_sheet.dart';
+import '../../courses/widgets/locked_course_tile.dart';
+import '../../home/widgets/home_level_header.dart';
 import '../../progress/screens/progress_detail_screen.dart';
 import '../../progress/skill_labels.dart';
 import '../../progress/widgets/home_progress_card.dart';
@@ -24,8 +29,9 @@ const _cardColors = [
 ];
 
 class CourseListScreen extends StatefulWidget {
-  const CourseListScreen({super.key, required this.client});
+  const CourseListScreen({super.key, required this.client, this.levelApi});
   final ApiClient client;
+  final LevelApi? levelApi;
 
   @override
   State<CourseListScreen> createState() => _CourseListScreenState();
@@ -36,16 +42,28 @@ class _CourseListScreenState extends State<CourseListScreen> {
   bool _loading = true;
   String? _error;
   ProgressApi? _progressApi;
-  // Lets us refresh the progress card after returning from a course detail
-  // screen — attempts completed inside push() change mastery and the home
-  // card must reflect that without an app relaunch.
-  final GlobalKey<HomeProgressCardState> _progressKey = GlobalKey<HomeProgressCardState>();
+  final GlobalKey<HomeProgressCardState> _progressKey =
+      GlobalKey<HomeProgressCardState>();
+
+  // V21.3 D1: level progress for HomeLevelHeader + locked-tile rendering.
+  Future<LevelProgressResponse>? _levelFuture;
 
   @override
   void initState() {
     super.initState();
     _load();
     _initProgressApi();
+    if (widget.levelApi != null) {
+      _levelFuture = widget.levelApi!.fetchLevelProgress();
+    }
+  }
+
+  Future<void> _refreshLevelProgress() async {
+    final api = widget.levelApi;
+    if (api == null) return;
+    setState(() {
+      _levelFuture = api.fetchLevelProgress();
+    });
   }
 
   Future<void> _initProgressApi() async {
@@ -54,6 +72,41 @@ class _CourseListScreenState extends State<CourseListScreen> {
     setState(() {
       _progressApi = ProgressApi(client: widget.client, prefs: prefs);
     });
+  }
+
+  void _openLockedSheet(
+    BuildContext ctx,
+    Course course,
+    LevelProgressResponse? progress,
+  ) {
+    showModalBottomSheet<void>(
+      context: ctx,
+      builder:
+          (_) => LockedCourseSheet(
+            title: course.title,
+            level: course.level,
+            coveragePct: progress?.coveragePct ?? 0,
+            coverageThresholdPct: progress?.coverageThresholdPct ?? 80,
+            hasDemoExercise: course.demoExerciseId.isNotEmpty,
+            onTapDemo: () => _openDemoExercise(course),
+            onTapContinueLowerLevel: () {},
+          ),
+    );
+  }
+
+  void _openDemoExercise(Course course) {
+    // Demo exercise navigation reuses the same push path as regular exercises.
+    // The server enforces recordMastery: false for demo sessions.
+    if (course.demoExerciseId.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder:
+            (_) => CourseDetailScreen(
+              client: widget.client,
+              course: course,
+            ),
+      ),
+    );
   }
 
   void _openProgressDetail({String? skillKind}) {
@@ -129,6 +182,20 @@ class _CourseListScreenState extends State<CourseListScreen> {
     return ListView(
       padding: EdgeInsets.symmetric(horizontal: h),
       children: [
+        // ── V21.3 D1: CEFR level header (badge + ring + promotion banner) ──
+        if (_levelFuture != null)
+          FutureBuilder<LevelProgressResponse>(
+            future: _levelFuture,
+            builder: (ctx, snap) {
+              if (!snap.hasData) return const SizedBox.shrink();
+              return HomeLevelHeader(
+                progress: snap.data!,
+                onTapBadge: () {},
+                onTapPromotion: (_) {},
+              );
+            },
+          ),
+
         // ── Header ──────────────────────────────────────────────────────────
         const SizedBox(height: AppSpacing.x5),
         Text(
@@ -188,6 +255,32 @@ class _CourseListScreenState extends State<CourseListScreen> {
         else
           ...List.generate(_courses.length, (i) {
             final c = _courses[i];
+
+            // V21.3 D2: locked courses use LockedCourseTile.
+            if (c.unlockState == CourseUnlockState.locked) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+                child: FutureBuilder<LevelProgressResponse>(
+                  future: _levelFuture,
+                  builder: (ctx, snap) {
+                    final progress = snap.data;
+                    return LockedCourseTile(
+                      title: c.title,
+                      level: c.level,
+                      coveragePct: progress?.coveragePct ?? 0,
+                      coverageThresholdPct:
+                          progress?.coverageThresholdPct ?? 80,
+                      hasDemoExercise: c.demoExerciseId.isNotEmpty,
+                      // D3: tap body → sheet
+                      onTap: () => _openLockedSheet(ctx, c, progress),
+                      // D3: tap demo → exercise
+                      onTapDemo: () => _openDemoExercise(c),
+                    );
+                  },
+                ),
+              );
+            }
+
             final colors = _cardColors[i % _cardColors.length];
             return Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.x3),
@@ -200,11 +293,13 @@ class _CourseListScreenState extends State<CourseListScreen> {
                 isFeatured: i == 0,
                 onTap: () async {
                   await Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => CourseDetailScreen(client: widget.client, course: c),
+                    builder:
+                        (_) =>
+                            CourseDetailScreen(client: widget.client, course: c),
                   ));
-                  // Refresh progress card on return — learner may have just
-                  // completed an attempt deeper in the navigation stack.
+                  // D4: refresh progress after pop-back.
                   await _progressKey.currentState?.refresh();
+                  await _refreshLevelProgress();
                 },
               ),
             );

@@ -357,7 +357,13 @@ class _LearnerShellState extends State<LearnerShell> {
         interviewService: _interviewService!,
       );
     } else {
-      body = CourseListScreen(client: _client);
+      body = CourseListScreen(
+        client: _client,
+        levelApi: LevelApi(
+          baseUrl: _client.baseUrl,
+          tokenProvider: () => _client.currentToken,
+        ),
+      );
     }
     return Scaffold(
       body: SafeArea(child: body),

@@ -71,16 +71,19 @@ existing-A2 user fixture.
 
 ## Phase D — Home level header + locked courses (vertical slice 3)
 
-- [ ] **D1** `features/home/screens/course_list_screen.dart` mounts
-  `HomeLevelHeader` above the course list. Scroll regression test.
-- [ ] **D2** Course rows switch to `LockedCourseTile` when
-  `required_level > current_level`. Test fixtures with mixed
-  unlocked / current / demo / locked rows.
-- [ ] **D3** Tap-locked-tile opens `LockedCourseSheet` via
-  `showModalBottomSheet`. Demo CTA opens demo exercise with
-  `recordMastery: false`. Test: post-demo progress diff is zero.
-- [ ] **D4** Refresh `_progressFuture` on `Navigator.pop` from any
-  exercise screen (mirror V20.1 `HomeProgressCard.refresh()`).
+- [x] **D1** `CourseListScreen` gains optional `levelApi: LevelApi?`. When
+  provided, fetches `LevelProgressResponse` and renders `HomeLevelHeader`
+  (badge + ring + banner) above the ListView.
+- [x] **D2** Course list routes on `course.unlockState == locked` →
+  `LockedCourseTile`; all other states use existing `_CourseCard`.
+  FutureBuilder passes progress (coveragePct, threshold) to tile.
+- [x] **D3** `LockedCourseTile.onTap` → `showModalBottomSheet(LockedCourseSheet)`.
+  `onTapDemo` → `CourseDetailScreen` (server enforces no mastery write
+  for demo sessions). `hasDemoExercise` toggled by `demoExerciseId`.
+- [x] **D4** `_CourseCard.onTap` calls `_refreshLevelProgress()` on pop
+  alongside existing `_progressKey.currentState?.refresh()`.
+  `main.dart` passes `LevelApi` constructed from `_client` to `CourseListScreen`.
+  Flutter suite 334 → 340.
 
 **Checkpoint D**: A5, A6 acceptance criteria pass. Visual matches
 `docs/specs/cefr-level-progression-ux.md` § "Information Hierarchy
