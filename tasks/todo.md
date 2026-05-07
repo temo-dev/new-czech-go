@@ -7,7 +7,7 @@ frozen).
 For per-slice task lists with `[x]` / `[ ]` checkboxes, see the
 matching `<slice>-todo.md` file:
 
-- [cefr-ui-wireup-todo.md](cefr-ui-wireup-todo.md) — V21.3 wire-up (active)
+- [cefr-ui-wireup-todo.md](cefr-ui-wireup-todo.md) — V21.3 wire-up (shipped)
 - [cefr-level-progression-todo.md](cefr-level-progression-todo.md) — V21 + V21.1 review hotfixes
 - [skill-mastery-progress-todo.md](skill-mastery-progress-todo.md) — V19
 - [exercise-dashboard-todo.md](exercise-dashboard-todo.md) — V11

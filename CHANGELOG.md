@@ -10,6 +10,108 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V21.3 — CEFR UI Wire-up — 2026-05-07
+
+All V21 CEFR backend features existed since V21..V21.2 but no widget was
+wired into the Flutter router. This slice mounts every V21 widget end-to-end
+so the learner can see their level, do placement, confirm existing level,
+use locked-course UI, and run the promotion exam.
+
+### Key changes
+
+- **Backend** — `POST /v1/users/me/placement-test/skip` added: parks a fresh
+  learner at A0 with `placement_taken_at = now` without running a 12-min
+  session. Idempotent (409 on replay). 5 handler tests.
+
+- **Flutter — fresh-signup onboarding** — `CefrAuthGate` sits between
+  `AuthState.authenticated` and `LearnerShell`. Fetches level-progress and
+  routes: loading → spinner; fresh-A0 (no placement) → `WelcomeScreen` →
+  `PlacementTestScreen`; already-onboarded → shell. `_CefrOnboarding` in
+  `main.dart` wires the gate with `LevelApi` from the auth service's client.
+  `PlacementTestScreen` calls `startPlacement` + `getMockExam`, wraps
+  `MockExamScreen(onCompleted)`, then calls `completePlacement` → pushes
+  `PlacementResultScreen`.
+
+- **Flutter — existing-A2 confirm dialog** — `ExistingLevelConfirmDialog`
+  (`PopScope(canPop: false)`, 4 ARB keys) is shown exactly once by the gate
+  when `currentLevel != a0 && placementTakenAt == null && !promptShown`.
+  Confirm: `skipPlacement()` + `markExistingPromptShown()` + refresh.
+  Retest: `markExistingPromptShown()` + push `PlacementTestScreen(force)`.
+
+- **Flutter — home level header** — `CourseListScreen` accepts optional
+  `LevelApi?`. When provided, `HomeLevelHeader` (badge + ring + banner) renders
+  above the course list. `LearnerShell` passes the api from `_client`.
+
+- **Flutter — locked courses** — `CourseListScreen` switches to
+  `LockedCourseTile` for any course with `unlockState == locked`. Tap opens
+  `LockedCourseSheet`. Demo CTA routes to `CourseDetailScreen`.
+
+- **Flutter — promotion exam** — Banner tap (`HomeLevelHeader.onTapPromotion`)
+  routes to `PromotionExamFlow`: `PreExamScreen` → `createPromotionAttempt` →
+  `MockExamScreen(onCompleted)` → `PromotionResultScreen`. `onFinished` pops
+  and refreshes the level header.
+
+- **`MockExamScreen`** — Added optional `onCompleted(sessionId)` hook. When
+  set, suppresses `_MockExamResultView` and calls the hook via
+  `postFrameCallback`; caller owns the result screen.
+
+- **`CefrPrefs`** — New `SharedPreferences` helper for two CEFR pref keys
+  (`cefr_existing_prompt_shown`, `promo_banner_dismissed_for_<level>`).
+
+### File changes
+
+```
+flutter_app/
+  lib/core/api/level_api.dart             +skipPlacement() method
+  lib/core/storage/cefr_prefs.dart        NEW — CefrPrefs helper
+  lib/features/mock_exam/screens/
+    mock_exam_screen.dart                 +onCompleted hook
+  lib/features/onboarding/
+    cefr_auth_gate.dart                   NEW — routing gate
+    placement_test_screen.dart            NEW — placement wrapper
+    existing_level_confirm_dialog.dart    NEW — one-time dialog
+    welcome_screen.dart                   (existing, now wired)
+    placement_result_screen.dart          (existing, now reachable)
+  lib/features/home/screens/
+    course_list_screen.dart               +levelApi, HomeLevelHeader, locked tiles
+  lib/features/promotion/
+    promotion_exam_flow.dart              NEW — pre-exam → exam → result
+    pre_exam_screen.dart                  (existing, now reachable)
+    promotion_result_screen.dart          (existing, now reachable)
+  lib/main.dart                           _CefrOnboarding + LevelApi wire-up
+  lib/l10n/app_vi.arb + app_en.arb        +4 keys each (v213Existing*)
+
+backend/
+  internal/httpapi/placement_handler.go  +handlePlacementTestSkip
+  internal/httpapi/placement_handler_test.go  +5 tests
+  internal/httpapi/server.go             +/placement-test/skip route
+
+test/
+  cefr_prefs_test.dart                   5 unit tests
+  level_api_test.dart                    +2 (skipPlacement)
+  screens/cefr_auth_gate_test.dart       6 widget tests
+  screens/placement_test_screen_test.dart 4 widget tests
+  screens/existing_level_prompt_test.dart 8 widget tests
+  screens/course_list_level_test.dart    6 widget tests
+  screens/promotion_exam_flow_test.dart  5 widget tests
+```
+
+### Test counts
+
+| Layer | Before | After |
+|---|---|---|
+| Flutter | 309 | 345 |
+| Backend | 654 | 659 |
+| CMS | 144 | 144 |
+
+All verified: `make flutter-analyze` + `make flutter-test` + `make backend-test`
++ `make cms-lint` + `make cms-build` green.
+
+MobAI walkthrough: pending (requires live device session — all 10 acceptance
+criteria have automated coverage).
+
+---
+
 ## V21.2 — Exam-flow runtime hotfixes (MobAI test) — 2026-05-07
 
 Driver: full mock-test flow run via MobAI on iPhone 17 Pro Max simulator
