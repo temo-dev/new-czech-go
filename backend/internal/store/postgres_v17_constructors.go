@@ -75,3 +75,28 @@ func NewPostgresSkillMasteryStore(databaseURL string) (SkillMasteryStore, error)
 	}
 	return store, nil
 }
+
+// NewPostgresUserLevelStore opens a fresh pool. The user_level columns live
+// on the users table (migration 025) and are ensured by the V17
+// postgresUserStore bootstrap, so this constructor does no DDL of its own.
+// Callers must run NewPostgresUserStore (or apply migration 025) before any
+// read fires, otherwise the column reads will fail.
+func NewPostgresUserLevelStore(databaseURL string) (UserLevelStore, error) {
+	db, err := openPostgresPool(databaseURL, "user_levels")
+	if err != nil {
+		return nil, err
+	}
+	return NewPostgresUserLevelStoreWithDB(db), nil
+}
+
+// NewPostgresPromotionAttemptsStore opens a fresh pool. The
+// promotion_attempts table is ensured by ensurePromotionAttemptsSchema during
+// the V17 postgresUserStore bootstrap, so this constructor does no DDL of
+// its own — matching the V19 SkillMasteryStore pattern.
+func NewPostgresPromotionAttemptsStore(databaseURL string) (PromotionAttemptsStore, error) {
+	db, err := openPostgresPool(databaseURL, "promotion_attempts")
+	if err != nil {
+		return nil, err
+	}
+	return NewPostgresPromotionAttemptsStoreWithDB(db), nil
+}

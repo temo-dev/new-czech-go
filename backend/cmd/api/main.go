@@ -151,10 +151,31 @@ func main() {
 		masteryStore = store.NewMemorySkillMasteryStore()
 	}
 
-	// V21: CEFR level gating. Always wired (in-memory for dev, Postgres when
-	// available). Required for placement test, promotion exam, and level UI.
-	userLevels := store.NewMemoryUserLevelStore()
-	promo := store.NewMemoryPromotionAttemptsStore()
+	// V21: CEFR level gating. Postgres-backed when V17 is wired (so the
+	// user_levels columns + promotion_attempts table are guaranteed to exist
+	// via postgresUserStore.ensureSchema); in-memory otherwise so dev
+	// fixture builds without V17 keep working. The in-memory path resets on
+	// every restart — only acceptable for legacy dev/test setups.
+	var userLevels store.UserLevelStore
+	var promo store.PromotionAttemptsStore
+	if useAuth {
+		databaseURL := os.Getenv("DATABASE_URL")
+		ul, err := store.NewPostgresUserLevelStore(databaseURL)
+		if err != nil {
+			log.Fatalf("V21 user_level store: %v", err)
+		}
+		pa, err := store.NewPostgresPromotionAttemptsStore(databaseURL)
+		if err != nil {
+			log.Fatalf("V21 promotion_attempts store: %v", err)
+		}
+		userLevels = ul
+		promo = pa
+		log.Printf("V21 CEFR level gating wired (Postgres-backed user_levels + promotion_attempts)")
+	} else {
+		userLevels = store.NewMemoryUserLevelStore()
+		promo = store.NewMemoryPromotionAttemptsStore()
+		log.Printf("V21 CEFR level gating wired (in-memory; resets on restart — V17 not enabled)")
+	}
 	levelDeps := &httpapi.LevelDeps{
 		Service: &processing.LevelService{
 			Config:        processing.LoadLevelConfig(),
@@ -166,7 +187,6 @@ func main() {
 		UserLevels:    userLevels,
 		PromoAttempts: promo,
 	}
-	log.Printf("V21 CEFR level gating wired (level-progress + placement + promotion endpoints)")
 
 	var handler http.Handler
 	switch {
