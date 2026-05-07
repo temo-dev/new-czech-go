@@ -1,123 +1,96 @@
 # Docs Index
 
-## Purpose
-This is the landing page for the project documentation of `A2 Mluveni Sprint`.
+Documentation tree for `A2 Mluvení Sprint`. The repo has shipped V2 →
+V21.1; doc surface was systematized in P1..P5 (see CHANGELOG).
 
-Use this index when you want to orient quickly in the docs tree and choose the right level of detail:
-- product direction
-- implementation plan
-- technical contracts
-- architecture shape
-- feature-level behavior
-- screen-level behavior
+For the **fastest** orientation see the root [README](../README.md) and
+[AGENTS.md](../AGENTS.md). This index is for finding the doc that fits
+the question you're holding.
 
-## Recommended Reading Order
+## How the tree is split
 
-### 1. Product Direction
-Start here if you want to understand what we are building and why.
+```
+docs/
+  reference/    Stable, always-current contracts. Update before shipping.
+  specs/        Frozen per-slice specs (V2..V21.1). Don't backfill.
+  ideas/        Pre-spec one-pagers. Per-slice.
+  plans/        Slice-level implementation plans.
+  guides/       Dev / deploy / smoke / admin handbooks.
+  architecture/ Code shape + refactor map.
+  features/     User-facing feature descriptions.
+  design/       Design system + HTML mockups (`mockups/`).
+  screens/      Per-screen behaviour notes.
+  content/      Content authoring guidance.
+```
 
-- [Idea One-Pager](/Users/daniel.dev/Desktop/czech-go-system/docs/ideas/a2-mluveni-sprint.md)
-- [Attempt Repair And Shadowing](/Users/daniel.dev/Desktop/czech-go-system/docs/ideas/attempt-repair-and-shadowing.md)
+Three sibling sources of truth at repo root:
 
-### 2. Delivery Plan
-Read this next if you want the execution order and scope breakdown.
+- [AGENTS.md](../AGENTS.md) — operational rules, scope discipline, conventions
+- [CHANGELOG.md](../CHANGELOG.md) — per-slice history with file changes + counts
+- [SPEC.md](../SPEC.md) — frozen per-slice spec summaries
 
-- [Implementation Plan](/Users/daniel.dev/Desktop/czech-go-system/docs/plans/v1-implementation-plan.md)
-- [Attempt Repair And Shadowing Plan](/Users/daniel.dev/Desktop/czech-go-system/docs/plans/attempt-repair-and-shadowing-plan.md)
+## Pick by what you need
 
-### 3. Technical Source Of Truth
-Read these when you need stable implementation contracts.
+### "How does feature X actually work right now?"
+→ [`reference/`](reference/README.md)
+8 stable contract docs (api-contracts, attempt-state-machine,
+content-and-attempt-model, scoring-pipeline, infrastructure-baseline,
+learner-profile-identity, i18n-spec, voice-selection-spec).
 
-- [Content And Attempt Model](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/content-and-attempt-model.md)
-- [API Contracts](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/api-contracts.md)
-- [Attempt State Machine](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/attempt-state-machine.md)
-- [Infrastructure Baseline](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/infrastructure-baseline.md)
-- [Scoring Pipeline](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/scoring-pipeline.md)
+### "Why was it built this way?"
+→ [`specs/`](specs/README.md)
+19 frozen slice specs. Don't update — these are historical decisions.
 
-### 3b. Build-Ready Extension Specs
-Read these when you are preparing the next major feature slice but do not want to blur today’s shipped contracts.
+### "What was the original idea?"
+→ [`ideas/`](ideas/)
+24 one-pagers, one per slice. Predate the spec; useful for context.
 
-- [Attempt Repair And Shadowing Spec](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/attempt-repair-and-shadowing.md)
+### "How do I run / deploy / smoke?"
+→ [`guides/`](guides/README.md)
+9 handbooks split across daily-dev / verifying / deploying / admin.
 
-### 4. Architecture Layer
-Read these when you want a graph-backed view of the codebase and refactor priorities.
+### "What does the codebase actually look like today?"
+→ [`architecture/current-code-shape.md`](architecture/current-code-shape.md)
+Refreshed to V21.1 — graph-backed snapshot of the 419-file repo.
 
-- [Architecture Index](/Users/daniel.dev/Desktop/czech-go-system/docs/architecture/README.md)
-- [Current Code Shape](/Users/daniel.dev/Desktop/czech-go-system/docs/architecture/current-code-shape.md)
-- [Refactor Map V1](/Users/daniel.dev/Desktop/czech-go-system/docs/architecture/refactor-map-v1.md)
+### "How does Uloha 3 work as a learner?"
+→ [`features/`](features/README.md)
+User-facing feature descriptions — Uloha 1–4, dictation, attempt
+lifecycle, CMS exercise management.
 
-### 5. Design Layer
-Read this when you want the shared visual language for Flutter and CMS.
+### "What's on screen at a given step?"
+→ [`screens/`](screens/README.md)
+Per-screen behaviour notes for Flutter + CMS surfaces.
 
-- [Design System V1](/Users/daniel.dev/Desktop/czech-go-system/docs/design/design-system-v1.md)
+### "What does the brand look like?"
+→ [`design/`](design/)
+Design system tokens + HTML mockups under `design/mockups/`.
 
-### 6. Feature Layer
-Read these when you want a feature-oriented view across backend, CMS, and Flutter.
+## When to update which doc
 
-- [Feature Docs Index](/Users/daniel.dev/Desktop/czech-go-system/docs/features/README.md)
-- [Uloha 1 Practice](/Users/daniel.dev/Desktop/czech-go-system/docs/features/uloha-1-practice.md)
-- [CMS Exercise Management](/Users/daniel.dev/Desktop/czech-go-system/docs/features/cms-exercise-management.md)
-- [Attempt Lifecycle And Feedback](/Users/daniel.dev/Desktop/czech-go-system/docs/features/attempt-lifecycle-and-feedback.md)
-
-### 7. Screen Layer
-Read these when you want UI-level behavior for Flutter and CMS.
-
-- [Screen Docs Index](/Users/daniel.dev/Desktop/czech-go-system/docs/screens/README.md)
-- [Flutter Learner Shell](/Users/daniel.dev/Desktop/czech-go-system/docs/screens/flutter-learner-shell.md)
-- [Flutter Exercise Practice](/Users/daniel.dev/Desktop/czech-go-system/docs/screens/flutter-exercise-practice.md)
-- [CMS Exercise Dashboard](/Users/daniel.dev/Desktop/czech-go-system/docs/screens/cms-exercise-dashboard.md)
-
-### 8. Dev Workflow
-Read this when you want the fastest repeatable way to run the local stack.
-
-- [Dev Workflow](/Users/daniel.dev/Desktop/czech-go-system/docs/guides/dev-workflow.md)
-- [CI And Release](/Users/daniel.dev/Desktop/czech-go-system/docs/guides/ci-release.md)
-
-## Docs Tree
-- `docs/ideas/` product direction and one-pagers
-- `docs/plans/` implementation plans and task breakdowns
-- `docs/specs/` stable technical contracts
-- `docs/architecture/` graph-backed code shape and refactor guidance
-- `docs/design/` UI foundation and shared visual rules
-- `docs/features/` feature-level behavior and status
-- `docs/screens/` concrete screen-level behavior
-- `docs/guides/` daily startup, deployment, smoke + ops handbooks
-
-## Which Doc To Update
-
-### Update `ideas`
-When product direction or scope changes materially.
-
-### Update `plans`
-When task order, delivery scope, or sequencing changes.
-
-### Update `specs`
-When contracts or technical source of truth change.
-
-### Update `architecture`
-When code shape or refactor guidance changes materially.
-
-### Update `design`
-When shared visual tokens, UI principles, or cross-surface component rules change.
-
-### Update `features`
-When a feature becomes real, changes behavior, or crosses new surfaces.
-
-### Update `screens`
-When a Flutter or CMS screen changes meaningfully in state, actions, or API usage.
-
-### Update `dev-workflow`
-When the recommended startup order, local URLs, or daily dev commands change.
+| Change | Update |
+|---|---|
+| New contract change | `reference/<doc>.md` |
+| New slice ships | `specs/<slice>.md` (frozen) + `CHANGELOG.md` + relevant `reference/` |
+| New idea proposed | `ideas/<slice>.md` |
+| New plan written | `tasks/<slice>-plan.md` + `tasks/<slice>-todo.md` |
+| Dev / deploy command changes | `guides/<topic>.md` |
+| Code shape shifts materially | `architecture/current-code-shape.md` |
+| New user-facing feature | `features/<feature>.md` |
+| Screen behaviour changes | `screens/<surface>-<screen>.md` |
+| Design tokens change | `design/system.md` (or `design-system-v1.md`) |
 
 ## Code Review Graph
-The architecture, feature, and screen docs are intended to stay informed by `code-review-graph`.
 
-The repo currently has:
+The architecture, feature, and screen docs are intended to stay
+informed by `code-review-graph` (MCP wired for this repo — see
+[CLAUDE.md](../CLAUDE.md)).
+
+Repo currently has:
+
 - git initialized
 - a local graph database at `.code-review-graph/graph.db`
+- 419 files / 4634 nodes / 37147 edges (build at commit 55c4b177ffe9)
 
-Use graph-backed review when documenting:
-- file hotspots
-- flow concentration
-- refactor pressure
-- cross-surface dependencies
+Use graph-backed review when documenting: file hotspots, flow
+concentration, refactor pressure, cross-surface dependencies.

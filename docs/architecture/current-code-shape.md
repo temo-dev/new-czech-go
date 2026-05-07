@@ -1,246 +1,222 @@
 # Current Code Shape
 
-## Purpose
-This document captures the current code shape of the repository as it exists today.
+Snapshot of how the repo is split today. Not a target architecture —
+a description of the structure that emerged after V2..V21.1 shipped.
 
-It is not a target architecture. It is a graph-backed snapshot of:
-- how the code is currently split
-- where logic is concentrated
-- which files are acting as early architectural anchors
-- where future extraction pressure is likely to appear
+Last refreshed: V21.1 (2026-05-07). Graph stats from the
+`code-review-graph` build at commit `55c4b177ffe9`:
 
-This snapshot is based on `code-review-graph` data from `2026-04-21`.
+- **419 files** parsed
+- **4634 nodes**
+- **37147 edges**
+- **10 languages**: go, typescript, javascript, swift, c, dart, bash, tsx, python, java
 
-## Graph Snapshot
-From the current graph build:
-- `19` files parsed
-- `138` total nodes
-- `616` total edges
-- `83` functions
-- `36` classes
-- `19` file nodes
+## High-level shape
 
-Languages currently present in the repo:
-- `go`
-- `javascript`
-- `typescript`
-- `tsx`
-- `dart`
-- `swift`
-- `c`
-- `objc`
-- `bash`
+Monorepo with three product surfaces and a documentation surface:
 
-Interpretation:
-- the codebase is still small
-- most architectural weight is in application files, not in a deep module tree
-- the graph is useful for structure inspection, but the repo is not yet large enough to show meaningful communities
+```
+backend/        Go API + processing pipeline + Postgres stores
+cms/            Next.js content desk
+flutter_app/    Flutter learner app (iOS-first)
+docs/           Reference contracts, slice specs, ideas, guides, design
+```
 
-## High-Level Shape
-The repository currently has three active product surfaces:
-- `backend/` for the Go API and mock orchestration
-- `cms/` for the Next.js content desk
-- `flutter_app/` for the learner experience
-
-This is a valid early monorepo shape for V1.
-
-The current architectural style is:
+Architectural style:
 - contract-first
-- vertical-slice oriented
-- intentionally monolithic inside each surface
-- mock-heavy at the infrastructure boundary
+- vertical-slice oriented (V2..V21.1)
+- monolithic inside each surface
+- mock providers behind interfaces (LLM, TTS, STT, OCR)
 
-That is the right bias for the current phase.
+## Backend layout
 
-## Surface Breakdown
+`backend/internal/` packages (not exhaustive — touched lightly):
 
-## Backend
-The backend is the current coordination center of the system.
+```
+contracts/        DTOs shared between handlers + stores. One file per domain.
+                  V21 added: level.go, user_level.go, promotion_attempt.go.
 
-Graph-backed observations:
-- [backend/internal/httpapi/server.go](/Users/daniel.dev/Desktop/czech-go-system/backend/internal/httpapi/server.go) contains `31` graph nodes
-- [backend/internal/store/memory.go](/Users/daniel.dev/Desktop/czech-go-system/backend/internal/store/memory.go) contains `22` graph nodes
-- [backend/internal/contracts/types.go](/Users/daniel.dev/Desktop/czech-go-system/backend/internal/contracts/types.go) holds shared response and payload types
+httpapi/          HTTP handlers + Server struct + route table.
+                  server.go is the edge — it composes auth, deps wiring,
+                  and route registration. Per-feature handler files
+                  (placement_handler.go, promotion_handler.go,
+                  level_handler.go, dictation_*.go, …) live alongside.
 
-What that means:
-- `server.go` currently owns a wide span of responsibilities:
-  - route registration
-  - auth handling
-  - learner endpoints
-  - admin endpoints
-  - attempt progression
-  - mock scoring orchestration
-  - response helpers
-- `memory.go` currently owns:
-  - seed data
-  - in-memory persistence
-  - exercise CRUD state
-  - attempt lifecycle mutations
+processing/       Pure logic — no HTTP, no DB writes. Each subsystem owns
+                  one file pair: <topic>.go + <topic>_test.go.
+                  Key files: processor.go (attempt funnel),
+                  mastery_updater.go (V19 hook), level_service.go (V21
+                  gating), level_promotion.go (V21 hook),
+                  *_config.go (env loaders), llm_*.go (prompts +
+                  model IDs — single source of truth per AGENTS.md).
 
-This split is understandable for the first slice, but it also means the backend currently has two gravity wells:
-- transport/orchestration in `server.go`
-- state/data logic in `memory.go`
+store/            Persistence. Each domain has interface + memory impl
+                  + postgres impl + ensureSchema runtime DDL.
+                  Pattern: <domain>_store.go (interface + memory) +
+                  postgres_<domain>.go (Postgres impl). Some domains
+                  collapse both into one file. The Postgres store
+                  ensures its schema on first construction; canonical
+                  migrations also live in backend/db/migrations/*.sql.
 
-## CMS
-The CMS is intentionally thin right now.
+contracts/, processing/, store/, httpapi/  — strict acyclic order.
+```
 
-Graph-backed observations:
-- [cms/components/exercise-dashboard.tsx](/Users/daniel.dev/Desktop/czech-go-system/cms/components/exercise-dashboard.tsx) contains `4` graph nodes
-- those nodes are:
-  - file
-  - `ExerciseDashboard`
-  - `loadExercises`
-  - `handleSubmit`
+Bootstrap path: `cmd/api/main.go` constructs each Postgres store via
+`NewPostgres<Domain>Store`, wires them into a `MemoryStore` facade
+(legacy compatibility) + a `Processor`, then assembles the HTTP server
+through `httpapi.NewServerWithAudio` / `NewServerWithMastery`.
 
-What that means:
-- the CMS is still a single-screen admin surface
-- it is not yet decomposed into smaller presentational and data modules
-- almost all meaningful behavior is still concentrated in one component
+## Backend gravity wells
 
-That is fine for V1 because the CMS is supposed to remain a thin content desk rather than become a second product.
+Files that own a wide span of responsibility — natural extraction
+candidates if pressure mounts:
 
-## Flutter Learner App
-The learner app currently concentrates most UI and flow logic in one main file plus a small API client.
+| File | Lines | Owns |
+|---|---|---|
+| `internal/httpapi/server.go` | ~2400 | route registration, auth wrappers, learner + admin handler bodies that haven't been pulled into per-feature files yet, helper functions (writeJSON, writeError) |
+| `internal/store/memory.go` | ~750 | facade for every store interface; legacy in-memory paths kept for tests |
+| `internal/contracts/types.go` | ~1000 | shared DTOs for V8+ exercise / attempt / mock tests; new V21 types live in dedicated files |
 
-Graph-backed observations:
-- [flutter_app/lib/main.dart](/Users/daniel.dev/Desktop/czech-go-system/flutter_app/lib/main.dart) contains `21` graph nodes
-- [flutter_app/lib/api_client.dart](/Users/daniel.dev/Desktop/czech-go-system/flutter_app/lib/api_client.dart) contains `12` graph nodes
+`server.go` has been growing slice-by-slice. Per-feature handler files
+(V18.1 dictation OCR, V21 placement / promotion / level) are the
+established escape valve — pulling more handler bodies out of
+`server.go` is the next natural move when it crosses ~3000 lines.
 
-Important nodes inside `main.dart`:
-- `MluveniSprintApp`
-- `LearnerShell`
-- `_LearnerShellState`
-- `_bootstrap`
-- `_ModuleCard`
-- `ExerciseScreen`
-- `_ExerciseScreenState`
-- `_startRecording`
-- `_stopRecording`
-- `_ResultCard`
+## CMS layout
 
-What that means:
-- the learner app currently combines:
-  - app shell
-  - content loading
-  - navigation
-  - attempt orchestration
-  - polling
-  - result rendering
-- this is acceptable for the first working slice
-- this file will become the main refactor candidate once real audio and more task types arrive
+`cms/` Next.js app router:
 
-## Large Function Hotspots
-`code-review-graph` flagged the following larger functions with `>= 25` lines:
+```
+app/                            Next.js routes (pages.tsx + api/admin/*)
+components/                     React components — one per dashboard surface
+  course-dashboard.tsx            includes V21 level + demo exercise fields
+  mock-test-dashboard.tsx         includes V21 promotion / placement flags
+  exercise-form/                  per-skill form fields (inline VI strings
+                                  per AGENTS.md form-field convention)
+  exercise-dashboard.tsx          (legacy, large)
+lib/
+  level.ts                        V21 CEFR level constants + sanitizers
+  mockTestFlags.ts                V21 promotion/placement mutex helpers
+  i18n.tsx                        VI/EN context — sidebar + dashboards only
+  api/                            client for backend endpoints
+__tests__/                      Vitest unit tests for the lib/ helpers
+```
 
-1. `ExerciseDashboard` in [cms/components/exercise-dashboard.tsx](/Users/daniel.dev/Desktop/czech-go-system/cms/components/exercise-dashboard.tsx) at `228` lines
-2. `NewMemoryStore` in [backend/internal/store/memory.go](/Users/daniel.dev/Desktop/czech-go-system/backend/internal/store/memory.go) at `93` lines
-3. `handleAdminExerciseByID` in [backend/internal/httpapi/server.go](/Users/daniel.dev/Desktop/czech-go-system/backend/internal/httpapi/server.go) at `55` lines
-4. `simulateScoring` in [backend/internal/httpapi/server.go](/Users/daniel.dev/Desktop/czech-go-system/backend/internal/httpapi/server.go) at `50` lines
-5. `handleAdminExercises` in [backend/internal/httpapi/server.go](/Users/daniel.dev/Desktop/czech-go-system/backend/internal/httpapi/server.go) at `48` lines
-6. `handleSubmit` in [cms/components/exercise-dashboard.tsx](/Users/daniel.dev/Desktop/czech-go-system/cms/components/exercise-dashboard.tsx) at `39` lines
-7. `UpdateExercise` in [backend/internal/store/memory.go](/Users/daniel.dev/Desktop/czech-go-system/backend/internal/store/memory.go) at `34` lines
-8. `handleAttempts` in [backend/internal/httpapi/server.go](/Users/daniel.dev/Desktop/czech-go-system/backend/internal/httpapi/server.go) at `30` lines
+Forms use **inline VI strings** per repo convention; the `lib/i18n.tsx`
+context is reserved for sidebar / dashboards / list views.
 
-Interpretation:
-- the codebase is not broadly overgrown yet
-- the current pressure points are exactly where you would expect in an early vertical slice:
-  - the main CMS screen
-  - the in-memory backend seed/store
-  - the backend HTTP adapter
+CMS is intentionally a content desk, not a second product. New form
+fields land inline in the dashboard; helper logic that needs unit
+tests (V21 mutex, level sanitization) lives under `lib/`.
 
-## What Is Structurally Good Right Now
-- the repo is split cleanly by product surface
-- docs already exist for idea, plan, specs, features, and screens
-- the backend has a clear contracts package
-- the Flutter app already separates API calls into `api_client.dart`
-- the CMS is intentionally thin rather than prematurely abstracted
-- the codebase is small enough to refactor safely before deeper dependencies harden
+## Flutter layout
 
-## What Is Structurally Fragile Right Now
-- backend HTTP and domain orchestration are still tightly mixed in `server.go`
-- backend seed data and state mutation are tightly mixed in `memory.go`
-- Flutter shell and exercise flow still live in one large UI file
-- CMS form, list, and network logic all live in one component
-- the graph shows low structural depth, which is good for speed now but means future changes can quickly overload the current files
+`flutter_app/lib/`:
 
-## Current Architectural Pattern
-The code shape today can be summarized as:
+```
+core/
+  api/api_client.dart             monolithic ApiClient (~30 KB)
+  api/level_api.dart              V21 typed client + LevelApiException
+  api/progress_api.dart           V20 cache wrapper around getProgress
+  level_utils.dart                V21 CefrLevel enum + parsers + ladder
+  skill_utils.dart                V19 skill_kind helpers
+  theme/                          AppColors, AppTypography, AppSpacing
+                                  (Babbel-inspired tokens — orange + teal)
+  auth/, streak/, voice/, …       per-feature client subsystems
 
-### Repository level
-- multi-surface monorepo
+features/
+  home/                           home screen + level header composer
+    widgets/                        level_badge, level_progress_ring,
+                                    promotion_banner, home_level_header,
+                                    streak_ring, plan_strip,
+                                    home_progress_card
+  courses/widgets/                  locked_course_tile, locked_course_sheet
+  onboarding/                       welcome_screen, placement_result_screen
+  promotion/                        pre_exam_screen, promotion_result_screen
+  progress/                         skill mastery detail
+  exercise/                         per-skill exercise screens
+  mock_exam/                        full-exam runner
+  interview/, deck_session/, …      per-feature flows
 
-### Backend level
-- monolithic service
-- transport layer with embedded orchestration
-- in-memory repository pattern
+models/models.dart                  one file holds Course / Exercise /
+                                    LevelProgressResponse / SkillMasteryInfo
+                                    / MockTest / Attempt …  (~50 KB)
 
-### CMS level
-- single-screen dashboard
-- component-local data fetching and mutation
+l10n/                               VI + EN ARB; gen-l10n produces
+                                    AppLocalizations. VI = EN key counts
+                                    are required.
 
-### Flutter level
-- single-flow shell
-- API client plus stateful screen widgets
+shared/widgets/                     cross-feature primitives (feedback_card,
+                                    primary_button, score_ring, …)
+```
 
-This is a healthy early-stage shape for contract validation and fast iteration.
+Per AGENTS.md: every learner-facing string goes through ARB →
+AppLocalizations; VI = EN key count must match. Form-internal strings
+in CMS stay inline.
 
-## Refactor Pressure To Expect Next
-If the next milestones are:
-- real audio recording
-- real upload to storage
-- real STT
-- persisted attempts and exercises
-- more oral task types
+## Test surface (post-V21.1)
 
-then the most likely extraction points are:
+| Layer | Tests | Coverage style |
+|---|---|---|
+| Backend | 647 | unit (per-package) + integration (httpapi spins NewServerForTest) + E2E smoke (`level_flow_test.go`, exam flows). Memory + Postgres stores both targeted from the same interface. |
+| CMS | 144 Vitest | pure logic helpers (`lib/*.ts`) + form payload utilities. No React-component rendering tests yet. |
+| Flutter | 309 | unit (models, utils) + widget (per-screen + per-widget) + API client integration (loopback HttpServer). |
 
-### Backend
-- split route registration from handler logic
-- move attempt orchestration into a service layer
-- replace `MemoryStore` with a persistent repository interface
-- isolate scoring orchestration from HTTP handlers
+## What is structurally good
 
-### CMS
-- split screen shell from the exercise form
-- split list rendering from mutation logic
-- introduce task-specific form components as more `Uloha` types arrive
+- Backend pkg split (contracts → store → processing → httpapi) holds
+  cleanly across 21 slices.
+- LLM / TTS / OCR config centralised — single source of truth at
+  `processing/llm_*.go` per AGENTS.md rule.
+- Per-slice idea + spec discipline produced 24 ideas + 19 frozen
+  slice specs documented under `docs/`.
+- V19 mastery hook + V21 promotion hook both wired through
+  `processor.completeAttempt` / `repo.CompleteMockExam` so a new
+  side-effect doesn't need a new fan-out point.
+- Postgres ensureSchema runs at every store boot — no manual
+  migration step required for dev / compose deploys.
 
-### Flutter
-- move learner shell and exercise practice into separate files
-- extract attempt state orchestration from widget tree code
-- separate result rendering from recording flow logic
+## What is structurally fragile
 
-## Suggested Next Structural Moves
-These are the smallest high-value structural moves that preserve the current V1 speed:
+- `httpapi/server.go` ~2400 lines — admin + learner + helper bodies
+  still mixed. New per-feature handler files are the standing escape
+  valve, but the backlog of un-extracted handlers has grown.
+- `store/memory.go` ~750 lines — facade carries every store
+  interface; tests still use it as the convenient one-stop wiring.
+- `models/models.dart` ~50 KB — Flutter parses every wire shape from
+  one file. Splitting per domain is the natural next move.
+- V19 mean vs V21 max mastery aggregation is documented but means
+  the home ring (V21) shows different per-skill numbers than the
+  progress detail (V19). Acceptable but worth flagging in onboarding
+  for new contributors.
+- ARB key count must stay matched VI=EN; `flutter gen-l10n` catches
+  drift but onboarding contributors hit this every time they add a
+  string.
 
-1. Keep contracts stable, but add a backend service layer for attempts before real storage and STT land.
-2. Extract Flutter practice flow into its own file before adding real audio recording.
-3. Split the CMS dashboard into at least:
-   - page shell
-   - exercise list
-   - create form
-4. Keep `server.go` as the HTTP edge only as soon as real integrations begin.
+## Refactor pressure to watch
 
-## Limitations Of This Snapshot
-- `code-review-graph` did not identify meaningful communities yet because the repo is still small and post-processing was minimal.
-- Hub and bridge graph tools were not usable in this run due to tool-side resolution errors, so this document leans on graph stats, file summaries, and large-function analysis instead.
-- This is a snapshot of current code shape, not a guarantee of long-term architecture quality.
+When you next touch the backend at scale (V22+), expect to land:
 
-## Bottom Line
-The current code shape is good for the phase the project is in.
+- A second wave of `httpapi/server.go` extraction. Course / exercise
+  handlers are the next obvious targets — they predate the V18+
+  per-feature file convention.
+- A `Repo` interface that supersedes the `MemoryStore` facade. The
+  legacy facade is the largest acyclic-violation risk — the test
+  wiring expects "one store to rule them all" while production
+  bootstraps each Postgres store independently.
+- Splitting `models/models.dart` once Flutter onboarding feels the
+  weight. Domain split (course/, attempt/, exam/, level/) mirrors
+  the backend `contracts/` layout.
 
-It is:
-- small
-- understandable
-- vertically sliced
-- fast to change
+## Bottom line
 
-It is also clearly approaching the point where:
-- `server.go`
-- `memory.go`
-- `main.dart`
-- `exercise-dashboard.tsx`
+V21.1 ships with a multi-slice-tested architecture. The gravity wells
+(`server.go`, `memory.go`, `models.dart`) are well-known, are flagged
+by `code-review-graph` hub analysis, and have established escape
+valves. The shape is appropriate for the current phase: it lets each
+slice land in 1–9 days without forcing a structural rewrite, and the
+tests catch regressions across all three surfaces.
 
-will become the first files worth splitting.
-
-That is not a problem yet. It is simply the next natural step once the mock boundaries turn real.
+Next structural moves should be incremental, not architectural — pull
+the next handler bundle out of `server.go`, split the next contract
+domain out of `models.dart`, etc.
