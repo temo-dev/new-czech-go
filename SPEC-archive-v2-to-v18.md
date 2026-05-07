@@ -1,0 +1,1860 @@
+# SPEC — A2 Mluvení Sprint: Skills Expansion V2→V9
+
+Source: `tasks/plan.md` (2026-04-30). Kỳ thi: Modelový test A2, NPI ČR (platný od dubna 2026).
+
+---
+
+## 1. Objective
+
+Mở rộng app luyện thi Czech A2 "trvalý pobyt" từ chỉ có **Nói** (đã xong) sang đủ 4 kỹ năng theo thứ tự:
+
+| Version | Kỹ năng | Điểm thi | Phương pháp chấm |
+|---|---|---|---|
+| V2 | Psaní — Viết | 20đ (pass ≥12) | LLM (highlight lỗi + corrected text + criteria) |
+| V3 | Poslech — Nghe | 25đ | Objective (đúng/sai, sync) |
+| V4 | Čtení — Đọc | 25đ | Objective (đúng/sai, sync) |
+| V5 | Full MockTest | 110đ tổng | 2 session: písemná (V2+V3+V4) + ústní (V1) |
+
+**Target users:** Người Việt đang chuẩn bị thi A2 Czech để xin trạy pobyt.
+
+**Non-goals:**
+- Free-form AI tutoring
+- Live teacher marketplace
+- Pronunciation-first positioning
+- Advanced analytics platform
+
+---
+
+## 2. Exercise Types (nguồn chuẩn: PDF Modelový test 2)
+
+### V1 — Mluvení / Nói ✅ ĐÃ XONG
+| exercise_type | Mô tả | Điểm |
+|---|---|---|
+| `uloha_1_topic_answers` | 8 câu / 2 chủ đề | 8 |
+| `uloha_2_dialogue_questions` | 2 hội thoại, hỏi 4 thông tin | 12 |
+| `uloha_3_story_narration` | Kể chuyện 4 tranh | 10 |
+| `uloha_4_choice_reasoning` | Chọn 1/3 phương án + lý do | 7 |
+| _(bonus)_ | Phát âm | 3 |
+
+### V2 — Psaní / Viết
+| exercise_type | Mô tả | Điểm |
+|---|---|---|
+| `psani_1_formular` | 3 câu hỏi form, mỗi câu ≥10 từ | 8 |
+| `psani_2_email` | Email theo 5 ảnh, ≥35 từ | 12 |
+
+### V3 — Poslech / Nghe
+| exercise_type | Mô tả | Điểm |
+|---|---|---|
+| `poslech_1` | 5 đoạn ngắn → chọn A-D | 5 |
+| `poslech_2` | 5 đoạn ngắn → chọn A-D | 5 |
+| `poslech_3` | 5 đoạn → match A-G (2 dư) | 5 |
+| `poslech_4` | 5 dialog → chọn ảnh A-F (1 dư) | 5 |
+| `poslech_5` | Nghe voicemail → điền thông tin (5 ô) | 5 |
+
+### V4 — Čtení / Đọc
+| exercise_type | Mô tả | Điểm |
+|---|---|---|
+| `cteni_1` | Match 5 ảnh/tin nhắn → A-H (3 dư) | 5 |
+| `cteni_2` | Đọc text → chọn A-D (5 câu) | 5 |
+| `cteni_3` | Match 4 text → nhân vật A-E (1 dư) | 4 |
+| `cteni_4` | Chọn A-D (6 câu) | 6 |
+| `cteni_5` | Đọc text → điền thông tin (5 ô) | 5 |
+
+---
+
+## 3. Kiến trúc quyết định (frozen)
+
+### Pool separation
+```
+pool=course  → Course → Module → Skill → Exercise  (luyện tập)
+pool=exam    → MockTest → MockTestSection → Exercise (thi thử)
+```
+Cùng exercise_type nhưng **2 records riêng**. Admin tạo khóa học riêng + bài exam riêng.
+
+### Attempt flows theo skill
+
+**Speaking (V1 — đã có):**
+```
+POST /v1/attempts → POST /:id/upload-url → upload audio → POST /:id/upload-complete
+→ async: Transcribe → LLM feedback → review artifact
+→ GET /:id (poll until completed)
+```
+
+**Writing (V2):**
+```
+POST /v1/attempts → POST /:id/submit-text  {answers:[...] | text:"..."}
+→ async: LLM writing feedback → review artifact (no Polly TTS)
+→ GET /:id (poll until completed)
+```
+
+**Listening/Reading (V3/V4):**
+```
+POST /v1/attempts → POST /:id/submit-answers  {answers:{"1":"B",...}}
+→ sync: objective scorer → completed immediately
+→ GET /:id (returns completed, no polling needed)
+```
+
+### Writing review artifact
+Reuse `AttemptReviewArtifact`. Mapping:
+- `source_transcript_text` ← learner written text
+- `corrected_transcript_text` ← LLM-corrected
+- `model_answer_text` ← example answer
+- `speaking_focus_items` ← writing error highlights
+- `diff_chunks` ← text diff
+- `tts_audio` ← **nil** (không dùng Polly cho writing)
+
+### Listening audio source (V3)
+Admin chọn 1 trong 2:
+- Upload MP3/WAV trực tiếp
+- Nhập Czech text → backend gọi Polly → 1 voice (Tomáš Czech neural) → 1 audio file
+
+`poslech_4` dialog: segments `[{speaker:"A", text:...}, {speaker:"B", text:...}]` ghép tuần tự, 1 voice. Upgrade 2 voices là backlog.
+
+### Objective scoring (V3/V4)
+```go
+// Shared cho cả listening và reading
+AnswerSubmission { Answers map[int]string }
+ObjectiveResult  { Score, MaxScore, Breakdown []QuestionResult }
+QuestionResult   { QuestionNo, LearnerAnswer, CorrectAnswer, IsCorrect }
+```
+- Multiple choice: exact match (case-insensitive key "A"/"B"/...)
+- Fill-in (`cteni_5`, `poslech_5`): **1đ/câu**, substring match (case-insensitive, trim). Partial credit — không all-or-nothing.
+
+### Full exam V5 (superseded by V9)
+```
+písemná (V4+V2+V3): max 70đ, pass ≥42 (60%)
+ústní   (V1):       max 40đ, pass ≥24 (60%)
+overall_passed = pisemna_passed AND ustni_passed
+```
+~~DB: `full_exam_sessions` bảng mới + `session_type` trên `mock_tests`.~~
+→ **V9:** `FullExamSession` bị xóa. `session_type` → `exam_mode`. Xem section V9 bên dưới.
+
+### Exam model V9 — ExamTemplate vs PracticeSet
+
+Idea doc: `docs/ideas/exam-template-vs-practice-set.md`
+
+```
+exam_mode: "real" | "practice"   (thay session_type trên mock_tests)
+
+"real"     → ExamTemplate: admin chọn exercise per section, scoring 60% cố định
+"practice" → PracticeSet:  admin chọn sections tự do, pass_threshold_percent tùy chỉnh
+```
+
+**Xóa hoàn toàn:**
+- `FullExamSession`, `FullExamCreateRequest`, `FullExamCompleteRequest` khỏi contracts
+- `FullExamStore` interface + memory + postgres implementations
+- `FullExamScorer`, `FindOpenFullExamForAutoLink` khỏi processing
+- Routes `/v1/full-exams`, `/v1/full-exams/:id/complete`
+- Auto-link mechanism trong `handleMockExamComplete`
+- DB table `full_exam_sessions` (DROP TABLE IF EXISTS trong main.go cleanup)
+
+**Thay đổi:**
+- `mock_tests.session_type` → `mock_tests.exam_mode VARCHAR(20) DEFAULT ''`
+- `MockTest.SessionType` → `MockTest.ExamMode` trong Go contracts
+- Scoring: `exam_mode = "real"` → threshold 60% (≥24/40 ustni, ≥42/70 pisemna); `"practice"` → `pass_threshold_percent`
+
+---
+
+## 4. API Contracts (mới — V2/V3/V4)
+
+### POST /v1/attempts/:id/submit-text
+```json
+Request: {
+  "answers": ["câu trả lời 1", "câu trả lời 2", "câu trả lời 3"],
+  "text": "full email text"
+}
+```
+- `answers` dùng cho `psani_1_formular` (3 items)
+- `text` dùng cho `psani_2_email`
+- Server validate word count, trả 400 nếu thiếu
+- Attempt chuyển → `scoring` → async LLM → `completed`
+
+### POST /v1/attempts/:id/submit-answers
+```json
+Request: { "answers": {"1": "B", "2": "A", "3": "D"} }
+Response: attempt object (status=completed, objective_result populated)
+```
+- Sync scoring, không cần poll
+- Keys = question_no (string), values = answer string
+
+### GET /v1/exercises/:id/audio
+- Returns signed URL hoặc stream (same pattern as attempt audio)
+- Serves pre-generated Polly audio hoặc uploaded file
+
+### POST /v1/admin/exercises/:id/generate-audio
+- Gọi Polly với text từ exercise detail
+- Lưu audio → `exercise_audio` table
+- Returns `{storage_key, mime_type, duration_sec}`
+
+### ~~POST /v1/full-exams (V5)~~ — **XÓA trong V9**
+Route này bị xóa. `FullExamSession` không còn tồn tại.
+
+---
+
+## 5. Data Model mới
+
+### DB schema (inline trong Go ensureSchema — không có migration files riêng)
+| Table | Trạng thái |
+|---|---|
+| `exercise_audio` | ✅ tồn tại (V3) |
+| `full_exam_sessions` | ~~V5~~ **XÓA trong V9** — `DROP TABLE IF EXISTS` trong main.go |
+| `mock_tests.session_type` | ~~V5~~ **XÓA trong V9** — thay bằng `exam_mode` |
+| `mock_tests.exam_mode` | **THÊM trong V9** — `VARCHAR(20) NOT NULL DEFAULT ''` |
+
+### New Go structs (contracts/types.go)
+- `Psani1Detail`, `Psani2Detail`, `WritingSubmission`
+- `Poslech1Detail`, `Poslech2Detail`, `Poslech3Detail`, `Poslech4Detail`, `Poslech5Detail`
+- `Cteni1Detail`, `Cteni2Detail`, `Cteni3Detail`, `Cteni4Detail`, `Cteni5Detail`
+- `AnswerSubmission`, `ObjectiveResult`, `QuestionResult`
+- `ListeningAudioSource`, `AudioSegment`, `MultipleChoiceOption`, `FillQuestion`
+- ~~`FullExamSession` (V5)~~ **XÓA trong V9**
+
+### AttemptFeedback extension
+Thêm field: `objective_result *ObjectiveResult` (nil cho speaking/writing).
+
+---
+
+## 6. Project Structure
+
+```
+backend/
+  internal/
+    contracts/types.go          -- tất cả types mới ở đây
+    processing/
+      writing_scorer.go         -- NEW V2
+      exercise_audio.go         -- NEW V3 (Polly for exercises)
+      objective_scorer.go       -- NEW V3/V4 (shared)
+      ~~full_exam_scorer.go~~    -- XÓA trong V9
+    httpapi/server.go           -- thêm routes mới; xóa /v1/full-exams* trong V9
+    store/
+      postgres_mock_tests.go    -- exam_mode column thay session_type (V9)
+      ~~full_exam_store.go~~    -- XÓA trong V9
+      ~~postgres_full_exam_store.go~~ -- XÓA trong V9
+
+cms/app/exercises/              -- extend exercise forms per type
+flutter_app/lib/
+  features/exercise/
+    screens/
+      writing_exercise_screen.dart   -- NEW V2
+      listening_exercise_screen.dart -- NEW V3
+      reading_exercise_screen.dart   -- NEW V4
+    widgets/
+      multiple_choice_widget.dart    -- NEW V3 (reused V4)
+      match_widget.dart              -- NEW V3 (reused V4)
+      fill_in_widget.dart            -- NEW V3 (reused V4)
+      audio_player_widget.dart       -- NEW V3
+      image_match_widget.dart        -- NEW V4
+      match_text_widget.dart         -- NEW V4
+      objective_result_card.dart     -- NEW V3 (reused V4)
+      writing_result_card.dart       -- NEW V2
+  features/mock_exam/
+    screens/
+      ~~full_exam_intro_screen.dart~~  -- XÓA trong V9
+      ~~full_exam_result_screen.dart~~ -- XÓA trong V9
+  models/models.dart             -- extend với tất cả types mới
+  core/api/api_client.dart       -- add submitText(), submitAnswers(), getExerciseAudio()
+```
+
+---
+
+## 7. Code Style
+
+### Backend (Go)
+- Monolithic trong V1-V5. Không tách service.
+- Prefer standard library. Không thêm dependency mới trừ khi cần thiết.
+- Mỗi skill có file scorer riêng (`writing_scorer.go`, `objective_scorer.go`) — không nhét vào `processor.go`.
+- Provider pattern: `WritingFeedbackProvider` interface, default impl gọi LLM, fallback rule-based.
+- Tất cả new exercise detail types serialize/deserialize qua `json.RawMessage` detail column (existing pattern).
+- Error responses: `{"error": {"code": "...", "message": "..."}}`.
+- Objective scoring: **không** gọi LLM, không gọi Polly. Pure Go computation.
+
+### CMS (Next.js)
+- Thin content desk. Không thêm workflow automation.
+- Explicit form per exercise type (không generic schema builder).
+- Audio preview trong CMS sau khi generate: `<audio>` element với URL từ backend.
+- i18n: mọi string qua `cms/lib/i18n.tsx`.
+
+### Flutter (Dart)
+- `skillKind` quyết định routing tới screen nào (không hardcode exercise_type).
+- Word count validation hoàn toàn client-side trước khi gọi API.
+- `ObjectiveResultCard` reuse cho cả Listening lẫn Reading.
+- Không dùng `setState` trong màn hình phức tạp — dùng provider/bloc đang có.
+- ARB keys mới: prefix `writing_`, `listening_`, `reading_` cho i18n strings.
+
+---
+
+## 8. Testing Strategy
+
+### Backend
+- Unit test `objective_scorer.go`: mỗi exercise type có ít nhất 1 happy path + 1 wrong answer test.
+- Unit test fill-in matching: "Bramborový salát" matches "salát", "SALÁT", " salát ".
+- Integration test cho mỗi new endpoint (mock Polly, mock LLM).
+- `make backend-test` phải pass trước mỗi CHECKPOINT.
+
+### CMS
+- `make cms-lint && make cms-build` tại mỗi CHECKPOINT.
+- Manual smoke: tạo exercise mỗi loại → save → reload → data intact.
+
+### Flutter
+- `make flutter-analyze` phải pass (0 warnings).
+- `make flutter-test` cho widget tests của answer widgets.
+- Manual end-to-end trên simulator cho mỗi skill mới trước CHECKPOINT.
+
+---
+
+## 9. Boundaries
+
+### ALWAYS DO
+- Chạy `make backend-build` sau mỗi thay đổi Go.
+- Validate word count client-side (Flutter) TRƯỚC KHI gọi API.
+- Objective scoring là sync — không gọi goroutine không cần thiết.
+- Mỗi new route trong `server.go` phải có `withAuth` hoặc `withRole("admin")`.
+- Fill-in answers dùng substring match (case-insensitive, trim) — không exact string match. 1đ/câu, partial credit.
+- `psani_1_formular`: LLM gọi 3 lần (1 per question), điểm = sum. Không gộp 3 câu vào 1 prompt.
+- Thêm `skill_kind → exercise_type` mapping vào validation khi thêm exercise type mới.
+
+### ASK FIRST
+- Thay đổi `AttemptReviewArtifact` struct fields tên/type (Flutter đang dùng).
+- Thêm Polly voice thứ 2 cho dialog (backlog, không làm trong V3).
+- Bất kỳ thay đổi nào vào `mock_exam_sessions` table schema (đang được MockTest dùng).
+- Thêm LLM call vào objective scoring flow.
+
+### NEVER DO
+- Không dùng LLM để chấm objective exercises (listening/reading).
+- Không dùng Polly đọc `model_answer` cho Writing exercises (quyết định V2).
+- Không merge exercises giữa pool=course và pool=exam.
+- Không làm V5 trước khi V4 CHECKPOINT green.
+- Không thêm SQS, EventBridge, microservices (infrastructure baseline).
+- Không đưa `psani_2_email` images vào base64 trong JSON — dùng S3/asset URLs.
+
+---
+
+## 10. Verification per Version
+
+| Version | Lệnh | Manual check |
+|---|---|---|
+| W (Writing) | `make backend-build && make backend-test && make cms-build && make flutter-analyze` | psani_1 → nhập 3 câu ≥10 từ → submit → ResultCard có highlight lỗi |
+| L (Listening) | same | poslech_5 → nghe voicemail 2 lần → điền thông tin → điểm hiển thị ngay |
+| R (Reading) | same | cteni_5 → điền fill-in → fuzzy match hoạt động |
+| M (Full exam) | `make verify` | Full exam → písemná (cteni+psani+poslech) → ústní → overall PASS/FAIL |
+
+---
+
+## 11. Scoring Decisions (đã chốt 2026-04-27)
+
+### psani_1_formular — LLM chấm riêng từng câu
+LLM nhận 3 câu hỏi + 3 câu trả lời → trả về 3 `readiness_level` riêng biệt.
+Điểm tổng = sum(điểm từng câu). Lý do: dễ debug, feedback chi tiết, tránh mơ hồ khi 1 câu tốt / 1 câu kém.
+
+```
+psani_1 total_score = score_q1 + score_q2 + score_q3
+max = 8đ → mỗi câu max ~2.67đ → dùng readiness map:
+  weak   = 0đ
+  ok     = 1đ
+  strong = 2đ
+  (câu thứ 3 bonus nếu cả 3 strong: +2 → tổng 8)
+```
+
+Hoặc đơn giản hơn: normalize về [0,1] rồi × max_points:
+```
+readiness_fraction: weak=0.0, ok=0.5, strong=1.0
+score_qi = round(readiness_fraction_i × (max_points / 3))
+```
+
+### readiness_level → điểm (universal mapping)
+```
+weak   = 0     (fraction = 0.0)
+ok     = 1     (fraction = 0.5)
+strong = 2     (fraction = 1.0)
+```
+Normalize khi cần thang [0,1]: `fraction = {weak:0, ok:0.5, strong:1.0}[level]`.
+Áp dụng cho cả Speaking (existing) lẫn Writing (V2).
+
+### cteni_5 / poslech_5 — fill-in: 1đ/câu đúng
+Partial credit. 5 ô → tối đa 5đ. Matching: substring, case-insensitive, trim.
+Lý do: công bằng hơn, phản ánh năng lực từng item, dễ thống kê lỗi phổ biến.
+
+```go
+func matchFillIn(learner, correct string) bool {
+    l := strings.ToLower(strings.TrimSpace(learner))
+    c := strings.ToLower(strings.TrimSpace(correct))
+    return strings.Contains(l, c) || strings.Contains(c, l)
+}
+```
+
+### V5 písemná section order: cteni → poslech → psani
+Lý do: nhận diện input trước (đọc/nghe), production sau (viết). Hợp flow đánh giá năng lực ngôn ngữ.
+
+```
+Section 1: cteni_1 … cteni_5   (40 phút)
+Section 2: poslech_1 … poslech_5 (~40 phút)
+Section 3: psani_1 + psani_2   (25 phút)
+```
+
+---
+
+## V6 — LLM-Assisted Vocab & Grammar (2026-04-28)
+
+Full plan: `tasks/plan-vocab-grammar.md`. Key decisions frozen below.
+
+### Objective
+
+Thêm 2 skill kinds mới (`tu_vung`, `ngu_phap`) với 4 exercise types
+(`quizcard_basic`, `matching`, `fill_blank`, `choice_word`) vào course flow.
+Admin authoring được hỗ trợ bởi LLM — không phải manual, không phải auto-publish.
+
+Target users: Admin nhập content Czech A2 tiếng Việt. Learner luyện từ vựng/ngữ pháp.
+
+### LLM Usage Boundary (frozen — do not cross)
+
+**ALLOWED (content authoring, admin-only):**
+- Vocabulary draft generation (flashcards, matching pairs, example sentences)
+- Grammar draft generation (fill_blank, choice_word, explanations, distractors)
+- Explanation generation for any exercise type
+
+**NOT ALLOWED:**
+- Objective exercise scoring at runtime (remains pure Go, deterministic)
+- Learner answer evaluation for fill_blank / choice_word / matching
+- Any LLM call in the attempt → submit-answers → result flow
+
+> LLM trong V6 = content authoring assistant. Scoring = Go `ScoreObjectiveAnswers`. Published content must pass admin review before learner sees it.
+
+### New Exercise Types
+
+| Type | Skills | Scoring |
+|------|--------|---------|
+| `quizcard_basic` | tu_vung only | Self-assessed: always 1/1. known/review stored in transcript_json. |
+| `matching` | tu_vung, ngu_phap | Objective: correct pairs / total. Uses `ScoreObjectiveAnswers`. |
+| `fill_blank` | tu_vung, ngu_phap | Objective: substring match. Same as cteni_5 pattern. |
+| `choice_word` | tu_vung, ngu_phap | Objective: exact option match. Same as poslech pattern. |
+
+Pool = course only. pool=exam rejected at creation.
+
+### Generation Flow (frozen)
+
+```
+POST /v1/admin/content-generation-jobs  →  202 { job_id }  (async, goroutine)
+GET  /v1/admin/content-generation-jobs/:id  →  poll every 2s
+status: pending → running → generated | failed → rejected | published
+```
+
+Rate limit: 1 active job per admin. 409 if another running.  
+Claude `tool_use` enforces JSON schema — no free text output.
+
+### Skill Auto-Creation (frozen)
+
+When admin creates VocabularySet or GrammarRule, backend calls `ensureSkill(moduleID, skillKind)`.
+If no tu_vung/ngu_phap skill exists for that module → auto-create with status=published.
+Admin never needs to visit /skills to create vocabulary/grammar skills.
+
+### Publish Behavior (frozen)
+
+`POST /admin/content-generation-jobs/:id/publish`:
+1. Validate ALL exercises in edited_payload_json (choice_word: 4 options, correct∈options; fill_blank: `___` in prompt; etc.)
+2. If any fail → 400 + `validation_errors[]`. Nothing published.
+3. If all pass → create exercises rows (source_type, source_id, generation_job_id set on each). Atomic.
+
+### Draft Editing UI (frozen)
+
+`GeneratedExerciseReviewTable` dispatches per exercise type:
+- `QuizcardDraftEditor` — front/back/explanation
+- `ChoiceWordDraftEditor` — prompt/4 options/correct selector/explanation
+- `FillBlankDraftEditor` — sentence(must have ___)/answer/explanation
+- `MatchingDraftEditor` — pair rows (term|definition), add/remove
+
+No per-exercise regenerate. Per-job only: reject + create new job.
+
+### New DB Migrations
+
+- 013: `vocabulary_sets`, `vocabulary_items`
+- 014: `grammar_rules`
+- 015: `content_generation_jobs` (with provider/model/tokens/cost/duration fields)
+- 016: `exercises` ADD `source_type TEXT`, `source_id TEXT`, `generation_job_id TEXT` (nullable)
+
+### New API Endpoints
+
+```
+POST/GET/PATCH/DELETE /v1/admin/vocabulary-sets
+POST/GET/PATCH/DELETE /v1/admin/vocabulary-sets/:id/items
+POST/GET/PATCH/DELETE /v1/admin/grammar-rules
+POST   /v1/admin/content-generation-jobs       (async, 409 guard)
+GET    /v1/admin/content-generation-jobs/:id   (poll)
+PATCH  /v1/admin/content-generation-jobs/:id/draft
+POST   /v1/admin/content-generation-jobs/:id/publish
+POST   /v1/admin/content-generation-jobs/:id/reject
+```
+
+### New CMS Pages
+
+- `/vocabulary` — VocabularySet CRUD + LLM generation + per-type review + publish
+- `/grammar` — GrammarRule CRUD (conjugation table) + LLM generation + review + publish
+
+### New Flutter
+
+- `VocabGrammarExerciseScreen` — routes by exerciseType
+- `QuizcardWidget` — flip card 200ms, Đã biết/Ôn lại, no ObjectiveResultCard
+- `MatchingWidget` — tap-to-pair, color-coded connections, submit when all paired
+- Reuse `FillInWidget` + `MultipleChoiceWidget` from V3
+
+### Matching Exercise Contract (frozen)
+
+```json
+// Stored in exercises.detail
+{
+  "pairs": [
+    { "left_id": "1", "left": "chodím", "right_id": "A", "right": "đi bộ" },
+    { "left_id": "2", "left": "běžím",  "right_id": "B", "right": "chạy"  }
+  ],
+  "correct_answers": { "1": "A", "2": "B" }
+}
+
+// Learner submits (Flutter shuffles right-side display, left stays fixed)
+{ "answers": { "1": "C", "2": "A" } }
+
+// Scoring: exact match on right_id key (single char → exact in ScoreObjectiveAnswers)
+```
+
+Flutter shuffles `right_id`/`right` display order. `left_id` order is fixed. Server stores deterministic pairs.
+
+### Store Architecture (V6, frozen)
+
+Three new interfaces following existing `SkillStore` pattern:
+- `VocabularyStore` — CRUD for vocabulary_sets + vocabulary_items
+- `GrammarStore` — CRUD for grammar_rules
+- `GenerationJobStore` — job lifecycle + `MarkAllRunningFailed(msg)` called on server start
+
+`ContentGenerator` interface with `ClaudeContentGenerator` (prod) + `MockContentGenerator` (tests).
+
+Shared `ValidateExercisePayload()` + `BuildExerciseFromDraft()` used by both HTTP handler and publish endpoint.
+
+### Rate Limit Scope (frozen)
+
+Per admin per module: `WHERE requested_by='admin' AND module_id=$1 AND status IN ('pending','running')`.
+Admin can generate for different modules simultaneously.
+
+### V6 Boundaries
+
+NEVER in V6:
+- LLM in scoring/grading flow
+- Auto-publish without admin review
+- Per-exercise regenerate (per-job only)
+- Quizcard mastery dashboard (backlog)
+- pool=exam for any new exercise type
+- Partial publish (all-or-nothing)
+- Full-text matching answers (use option key A/B/C)
+- Goroutine left stuck on server restart (must recover on boot)
+
+---
+
+## V9 — Exam Model Cleanup (2026-04-30)
+
+Idea doc: `docs/ideas/exam-template-vs-practice-set.md`
+Full plan + task breakdown: `tasks/plan.md` (section V9), `tasks/todo.md` (EX-1 → EX-4).
+
+### Objective
+
+Untangle exam session model. Hai loại rõ ràng thay vì 1 entity với 4-value `session_type` flag:
+
+| Mode | Tên gọi | Scoring | Admin config |
+|------|---------|---------|--------------|
+| `"real"` | ExamTemplate | 60% cố định (≥24/40 ustni, ≥42/70 pisemna) | Chọn exercise per section |
+| `"practice"` | PracticeSet | `pass_threshold_percent` tùy chỉnh | Chọn sections tự do |
+
+`MockTest` entity và `MockExamSession` **giữ nguyên**. Chỉ đổi field + xóa `FullExamSession` layer.
+
+### Kiến trúc quyết định (frozen)
+
+| Quyết định | Lý do |
+|---|---|
+| Giữ tên DB table `mock_tests` | Không đáng rủi ro rename migration |
+| Giữ `MockExamSession` cho cả 2 modes | 1 table đủ, không over-engineer |
+| Xóa toàn bộ `FullExamSession` stack | Dead code — không có Flutter UI nào trigger sau V7 |
+| `exam_mode = "real"` scoring = 60% flat | Theo spec NPI ČR (≥24/40, ≥42/70) |
+| DROP TABLE inline trong main.go | Không có migration files riêng trong codebase — schema quản lý qua ensureSchema() |
+| `exam_mode = ""` (empty string) = "practice" | Backward compat — existing records không bị break |
+
+### Deleted (V9)
+
+**Backend files xóa:**
+- `backend/internal/processing/full_exam_scorer.go`
+- `backend/internal/processing/full_exam_scorer_test.go`
+- `backend/internal/processing/full_exam_auto_link_test.go`
+- `backend/internal/store/full_exam_store.go`
+- `backend/internal/store/full_exam_store_test.go`
+- `backend/internal/store/postgres_full_exam_store.go`
+
+**Backend types xóa** (từ `contracts/types.go`):
+- `FullExamSession`
+- `FullExamCreateRequest`
+- `FullExamCompleteRequest`
+
+**Backend routes xóa** (từ `server.go`):
+- `POST /v1/full-exams`
+- `GET /v1/full-exams`
+- `GET /v1/full-exams/:id`
+- `POST /v1/full-exams/:id/complete`
+
+**Flutter files xóa:**
+- `flutter_app/lib/features/mock_exam/screens/full_exam_intro_screen.dart`
+- `flutter_app/lib/features/mock_exam/screens/full_exam_result_screen.dart`
+
+### Changed (V9)
+
+- `mock_tests` DB: ADD `exam_mode VARCHAR(20) NOT NULL DEFAULT ''`, DROP `session_type`
+- `contracts.MockTest`: `SessionType string` → `ExamMode string`
+- `postgres_mock_tests.go` ensureSchema: migrate column
+- `server.go` handleAdminMockTests: đọc/ghi `exam_mode`
+- CMS MockTest form: bỏ `session_type` dropdown, thêm `exam_mode` radio (`real` | `practice`)
+- Flutter `MockTest` model: `sessionType` → `examMode`
+- Flutter `api_client.dart`: xóa FullExam API calls
+
+### V9 Boundaries
+
+NEVER:
+- Rebuild `FullExamSession` hay equivalent 2-part exam tracking — thay vào đó dùng 2 `MockExamSession` riêng biệt nếu cần
+- Thêm `session_type` lại dưới bất kỳ tên gọi nào — `exam_mode: "real" | "practice"` là source of truth
+- Enforce 4-section structure cho `exam_mode = "real"` tại validation layer — convention, không phải constraint
+
+ASK FIRST:
+- Bất kỳ thay đổi nào vào `computeScoring()` logic — ảnh hưởng cả real và practice mode
+- Thêm `exam_mode` value mới ngoài `"real"` và `"practice"`
+
+### V9 Verification
+
+| Step | Lệnh | Manual check |
+|------|------|--------------|
+| EX-1 | `make backend-build && make backend-test` | `GET /v1/full-exams` → 404 |
+| EX-2 | `make backend-build && make backend-test` | `GET /v1/mock-tests` → trả `exam_mode`, không có `session_type` |
+| EX-3 | `make cms-lint && make cms-build` | Tạo MockTest → chọn real/practice → reload → đúng |
+| EX-4 | `make flutter-analyze && make flutter-test` | 0 errors, 0 FullExam references |
+
+---
+
+## V13 — Ano/Ne Exercise Type (2026-05-01)
+
+Thêm `cteni_6` (Đọc) và `poslech_6` (Nghe) — dạng bài True/False theo format Modelový test A2 NPI.
+
+### Objective
+
+Learner đọc/nghe một văn bản thực tế (lịch giờ, thông báo, biển hiệu) rồi xác nhận từng câu phát biểu là đúng (ANO) hay sai (NE).
+
+Thiết kế: `docs/designs/ano-ne-exercise-type.html`
+Idea doc: `docs/ideas/ano-ne-exercise-type.md`
+
+### Exercise Types mới
+
+| exercise_type | skill_kind | Mô tả | Điểm |
+|---|---|---|---|
+| `cteni_6` | `doc` | Đọc văn bản + 1–5 câu ANO/NE | admin nhập |
+| `poslech_6` | `nghe` | Nghe audio (Polly TTS passage) + 1–5 câu ANO/NE | admin nhập |
+
+### Detail Payload (frozen)
+
+```json
+{
+  "passage": "Vlašim\nMěstský úřad – úřední hodiny\n...",
+  "statements": [
+    { "question_no": 1, "statement": "Na úřadu města je zavřeno ve středu." },
+    { "question_no": 2, "statement": "Ve čtvrtek je polední přestávka do jedné hodiny." },
+    { "question_no": 3, "statement": "V úterý úřední hodiny končí ve dvě hodiny odpoledne." }
+  ],
+  "correct_answers": { "1": "ANO", "2": "NE", "3": "ANO" }
+}
+```
+
+Ghi chú:
+- `correct_answers` dùng uppercase `"ANO"`/`"NE"` — `matchObjectiveAnswer` case-insensitive nên match được
+- `poslech_6`: `passage` là prose script để Polly đọc; không cần bảng cột
+- Không có `options` — `extractOptionTexts` trả về rỗng → `LearnerAnswerText`/`CorrectAnswerText` = `""` → `_AnswerDisplay` hiển thị raw `"ANO"`/`"NE"` từ `LearnerAnswer`/`CorrectAnswer` (behaviour đúng)
+- statement count: 1–5, validate tại CMS
+
+### Kiến trúc quyết định (frozen)
+
+**Scoring:** Reuse `objective_scorer.go` — không thay đổi. `extractCorrectAnswers` đọc `correct_answers` map, `matchObjectiveAnswer` xử lý "ANO"/"NE" qua substring match (không bị nhầm vì "ano" ∩ "ne" = ∅).
+
+**Question text extraction:** Thêm nhánh trong `extractQuestionTexts` để đọc `statements[].statement` → `texts[question_no]`.
+
+**Audio (poslech_6):** Thêm `case "poslech_6"` trong `exercise_audio.go` trả về `detail.passage` làm TTS text.
+
+**Submit endpoint:** Reuse `POST /v1/attempts/:id/submit-answers` — không thay đổi.
+
+**Flutter routing:** `exerciseType.startsWith('poslech_')` và `startsWith('cteni_')` đã route đúng screen — chỉ thêm layout builders.
+
+**Result display:** `ObjectiveResultCard` đã hoạt động — không thay đổi. Hiển thị `ANO`/`NE` uppercase từ `LearnerAnswer`/`CorrectAnswer`.
+
+**DB:** Không cần migration. Exercises dùng `detail jsonb` column hiện tại.
+
+### API Changes (không có endpoint mới)
+
+Chỉ cần cập nhật validation trong `handleCreateExercise`/`handleUpdateExercise`:
+- Accept `cteni_6` và `poslech_6` như valid exercise types
+- Validate `statements` length 1–5
+- `correct_answers` keys phải map 1:1 với `statements[].question_no`
+
+### Data Model mới
+
+**Go structs (contracts/types.go):**
+
+```go
+// Dùng chung cho cteni_6 và poslech_6
+type AnoNeDetail struct {
+    Passage        string           `json:"passage"`
+    Statements     []AnoNeStatement `json:"statements"`
+    CorrectAnswers map[string]string `json:"correct_answers"` // "1"→"ANO", "2"→"NE"
+    MaxPoints      int              `json:"max_points,omitempty"`
+}
+
+type AnoNeStatement struct {
+    QuestionNo int    `json:"question_no"`
+    Statement  string `json:"statement"`
+}
+```
+
+**content-and-attempt-model.md:** Thêm `cteni_6` và `poslech_6` vào `ExerciseType` enum.
+
+### Changes per Layer
+
+**Backend (Go):**
+- `contracts/types.go`: thêm `AnoNeDetail`, `AnoNeStatement`
+- `processing/objective_scorer.go`: thêm nhánh trong `extractQuestionTexts` cho `statements[].statement`
+- `processing/exercise_audio.go`: thêm `case "poslech_6": return detail.passage`
+- `server.go` (hoặc `exercise_handler.go`): accept `cteni_6`/`poslech_6` trong valid type list
+
+**CMS (Next.js):**
+- `exercise-utils.ts`: thêm `"cteni_6"` và `"poslech_6"` vào type list; thêm `buildAnoNePayload()` và `formStateFromAnoNe()`
+- `components/exercise-form/AnoNeFields.tsx`: passage textarea + statement repeater (max 5) với ANO/NE toggle per row + max_points field
+- `components/exercise-form/index.tsx`: wire `cteni_6`/`poslech_6` → `AnoNeFields`
+
+**Flutter (Dart):**
+- `lib/features/exercise/widgets/ano_ne_widget.dart`: `AnoNeWidget` — list of `_AnoNeRow` (statement text + ANO/NE buttons, 44pt tap target)
+- `lib/features/exercise/screens/reading_exercise_screen.dart`: thêm `_buildCteni6Layout()` — PassageCard + `AnoNeWidget`
+- `lib/features/exercise/screens/listening_exercise_screen.dart`: thêm `_buildPoslech6Layout()` — `AudioPlayerWidget` + `AnoNeWidget`
+- `lib/l10n/`: thêm 4 keys: `anoNeInstruction`, `anoButton`, `neButton`, `anoNeCorrectHint`, `anoNeWrongHint`
+- `lib/l10n/intl_vi.arb` + `intl_en.arb`: điền giá trị
+
+**Docs:**
+- `docs/reference/content-and-attempt-model.md`: cập nhật `ExerciseType` enum
+- `docs/reference/api-contracts.md`: ghi chú `cteni_6`/`poslech_6` hợp lệ với `submit-answers`
+
+### Testing Strategy
+
+**Backend:**
+```go
+// objective_scorer_test.go — thêm:
+TestScoreObjectiveAnswers_AnoNe_AllCorrect
+TestScoreObjectiveAnswers_AnoNe_SomeWrong
+TestScoreObjectiveAnswers_AnoNe_CaseInsensitive  // "ano" vs "ANO"
+TestExtractQuestionTexts_Statements              // statements[].statement → texts map
+TestBuildExerciseAudioText_Poslech6              // returns passage string
+```
+
+**CMS (Vitest):**
+```ts
+// exercise-utils.test.ts — thêm:
+buildAnoNePayload — valid 3-statement payload
+buildAnoNePayload — rejects >5 statements
+formStateFromAnoNe — roundtrip
+```
+
+**Flutter:**
+```dart
+// ano_ne_widget_test.dart (mới):
+renders all statements
+ANO button selects → NE deselects
+NE button selects → ANO deselects
+submit disabled until all answered
+post-submit: disabled, correct row green, wrong row red
+```
+
+### V13 Boundaries
+
+ALWAYS:
+- `correct_answers` keys = stringified `question_no` ("1", "2"...) — nhất quán với mọi objective type khác
+- Uppercase "ANO"/"NE" trong payload — display-ready, case-insensitive matching vẫn đúng
+- Validate `statements.length >= 1 && <= 5` trong CMS trước khi gọi API
+- `passage` cho poslech_6 phải là prose (không có bảng cột) — Polly TTS đọc tự nhiên hơn
+- Submit button chỉ kích hoạt khi tất cả statements đã được chọn
+
+NEVER:
+- Thêm LLM scoring cho ano/ne — pure objective, không cần LLM
+- Thêm database migration mới — `detail jsonb` đã đủ
+- Thêm endpoint mới — `submit-answers` đã cover
+- Thêm `statements` parsing vào exercise types khác ngoài cteni_6/poslech_6
+
+ASK FIRST:
+- Thêm "passage reveal" toggle trong result card (hiện tại không có, nhưng có thể cần)
+- Thay đổi statement limit (hiện tại 1–5)
+- Thêm per-statement feedback text
+
+### V13 Verification
+
+| Step | Lệnh | Manual check |
+|------|------|--------------|
+| AN-1 | `make backend-build && make backend-test` | `TestScoreObjectiveAnswers_AnoNe_*` pass |
+| AN-2 | `make backend-build` | POST `submit-answers` với `{"1":"ANO","2":"NE"}` → `completed`, score đúng |
+| AN-3 | `make cms-lint && make cms-build && cd cms && npm test` | AnoNeFields render, statement repeater + ANO/NE toggle |
+| AN-4 | `make flutter-analyze && make flutter-test` | `AnoNeWidget` tests pass, 0 analyze errors |
+| AN-5 | Manual (iOS sim) | cteni_6: đọc passage → chọn ANO/NE → submit → ObjectiveResultCard hiển thị đúng |
+| AN-6 | Manual (iOS sim) | poslech_6: audio play → chọn ANO/NE → submit → score hiển thị |
+| AN-7 | Manual (CMS) | Tạo cteni_6 → 3 statements → ANO/NE toggle → publish → hiện trong app |
+| CHECKPOINT | `make verify` | Full pass |
+
+---
+
+## V15 — AI Image Generation in CMS (2026-05-03)
+
+Idea doc: `docs/ideas/ai-image-generation.md`
+Design: `docs/designs/ai-image-generation.html`
+
+### Objective
+
+Thêm nút **"✨ Tạo bằng AI"** ngay cạnh nút upload ảnh ở mọi nơi CMS dùng ảnh. Admin nhập prompt tiếng Anh → backend gọi Flux.1-schnell (Replicate) → preview thumbnail → xác nhận → ảnh tự động upload vào asset store và gắn vào exercise/course/mock-test.
+
+**Target users:** CMS admin tạo nội dung — giảm thời gian tìm/chụp/upload ảnh thủ công.
+
+**Non-goals (V15):**
+- Auto-generate prompt từ nội dung bài
+- Batch generate nhiều ảnh cùng lúc
+- Generation history / gallery
+- Style preset picker
+- Provider nào khác ngoài Replicate Flux
+
+---
+
+### V15 Scope
+
+#### Backend changes
+
+**Env var mới:**
+```
+REPLICATE_API_KEY=r8_...   # Replicate account API key
+```
+
+**Endpoint mới:** `POST /api/admin/ai/generate-image`
+- Auth: cookie `admin_token` (same middleware)
+- Request: `{ "prompt": string }` — max 500 chars, min 3 chars
+- Flow nội bộ:
+  1. Validate prompt
+  2. Rate-limit check: max 5 req/phút per admin (in-memory, reset hàng phút)
+  3. POST Replicate `https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions`
+  4. Poll `GET /v1/predictions/{id}` mỗi 1s cho đến `status == "succeeded"` hoặc timeout 30s
+  5. Download image bytes từ `output[0]` URL
+  6. Lưu vào asset store (LocalFile hoặc S3 tùy `STORAGE_PROVIDER`) — `asset_kind = "ai_generated"`
+  7. Trả `{ "data": { "asset_id": string, "preview_url": string } }`
+- Error responses:
+  - `400` — prompt quá ngắn/dài
+  - `429` — rate limit exceeded (`{ "error": { "message": "Rate limit: 5 req/min" } }`)
+  - `503` — Replicate API unavailable hoặc `REPLICATE_API_KEY` chưa set
+  - `504` — Timeout sau 30s
+- Image format: JPEG 512×512 (Flux schnell default output)
+
+**File mới:** `backend/handler_ai_image.go`
+```go
+// handleGenerateImage: POST /api/admin/ai/generate-image
+// replicateClient: interface{} wrapper cho Replicate REST calls + polling
+// aiImageRateLimiter: map[adminEmail]rateWindow (in-memory)
+```
+
+**Graceful degradation:** Nếu `REPLICATE_API_KEY` không set → endpoint trả `503` với message rõ ràng. Backend khởi động bình thường — không fatal.
+
+#### CMS changes
+
+**Component mới:** `cms/components/AiImageButton.tsx`
+
+Props:
+```ts
+interface AiImageButtonProps {
+  onAssetCreated: (assetId: string) => void
+  disabled?: boolean         // true khi exercise chưa save (editingId = null)
+  existingAssetId?: string   // đổi label thành "✨ Tạo lại bằng AI"
+  initialPrompt?: string     // optional pre-fill
+}
+```
+
+State machine (internal):
+```
+idle → open → generating → preview → uploading → idle (success)
+                          ↘ error → open (retry, prompt preserved)
+          ↑
+          close (Hủy từ open)
+```
+
+UI behavior:
+- Nút `✨ Tạo bằng AI` kế `📁 Tải ảnh lên` trong cùng một `btn-row`
+- Click → `slideDown` panel 180ms `ease-out`; click lại → đóng về `idle`
+- `disabled=true` → `opacity:0.5`, `cursor:not-allowed`, `title="Lưu bài tập trước"`
+- Generating: cả hai nút upload + AI đều bị dim; progress bar indeterminate
+- Preview: thumbnail 120×80px + "✓ Dùng ảnh này" / "🔄 Thử lại" / "✕ Hủy"
+- Sau confirm: gọi `onAssetCreated(assetId)`, đóng panel về `idle`
+- Sau confirm: hiện pill `✨ AI generated` dưới ảnh (purely informational)
+- Textarea không submit khi nhấn Enter (xuống dòng bình thường)
+- Placeholder: `"e.g. A cozy Czech café with a couple having coffee, warm lighting"`
+- Hint: `"💡 Mô tả bằng tiếng Anh cho kết quả tốt hơn. Flux Schnell ~3–5s/ảnh."`
+- Rate limit error: `"Đã tạo 5 ảnh trong phút này. Thử lại sau."`
+- Respect `prefers-reduced-motion` — nếu bật, bỏ slideDown animation
+
+**Tích hợp 5 vị trí:**
+
+| Vị trí | File | Cách tích hợp |
+|--------|------|---------------|
+| Exercise context_image | `cms/components/exercise-form/index.tsx` ~L1020 | Thêm `<AiImageButton>` kế `<label>` upload hiện tại |
+| Vocab/Grammar option image | `cms/components/exercise-form/OptionRow.tsx` | Thêm `<AiImageButton>` kế input file |
+| Čtení 1 per-item image | `cms/components/exercise-form/CteniFields.tsx` | Thêm `<AiImageButton>` kế upload toggle |
+| Course banner | `cms/app/courses/page.tsx` | Thêm `<AiImageButton>` kế banner upload |
+| MockTest banner | `cms/app/mock-tests/page.tsx` | Thêm `<AiImageButton>` kế banner upload |
+
+**API route mới:** `cms/app/api/admin/ai/generate-image/route.ts`
+- Proxy đến backend `POST /api/admin/ai/generate-image` (cùng pattern các admin routes hiện có)
+- Thread cookie `admin_token` qua `getAdminToken(request)`
+
+#### Flutter changes
+
+**Không có.** Feature này hoàn toàn CMS-only — chỉ thay đổi cách admin tạo ảnh, không ảnh hưởng gì đến Flutter learner app.
+
+---
+
+### V15 Acceptance Criteria
+
+```
+AC-1: Admin nhấn "✨ Tạo bằng AI" → prompt panel xuất hiện (slideDown) trong ≤16ms
+AC-2: Submit prompt tiếng Anh → Flux trả ảnh trong ≤30s → thumbnail hiển thị
+AC-3: "Dùng ảnh này" → asset lưu vào store → preview xuất hiện trong form như upload thủ công
+AC-4: "Thử lại" → panel mở lại với prompt cũ còn nguyên
+AC-5: "Hủy" → panel đóng, không có asset nào được tạo
+AC-6: 6 lần generate/phút → lần 6 nhận error 429 với message rõ ràng
+AC-7: Nút bị dim + disabled khi exercise chưa có ID
+AC-8: REPLICATE_API_KEY không set → backend khởi động bình thường; endpoint trả 503
+AC-9: Timeout sau 30s → error panel + prompt cũ còn để retry
+AC-10: Component hoạt động đúng ở cả 5 placement
+AC-11: prefers-reduced-motion → không có slideDown animation
+```
+
+---
+
+### V15 Testing
+
+**Backend (`backend/handler_ai_image_test.go`):**
+```go
+TestHandleGenerateImage_MissingKey          // 503 khi REPLICATE_API_KEY empty
+TestHandleGenerateImage_PromptTooShort      // 400 khi prompt < 3 chars
+TestHandleGenerateImage_PromptTooLong       // 400 khi prompt > 500 chars
+TestHandleGenerateImage_RateLimit           // 429 sau 5 req trong cùng phút
+TestHandleGenerateImage_ReplicateTimeout    // 504 khi mock Replicate không respond trong 30s
+TestHandleGenerateImage_Success             // 200 + asset_id + preview_url với mock Replicate
+TestHandleGenerateImage_ReplicateFailed     // 503 khi Replicate trả status=failed
+TestAiImageRateLimiter_ResetsAfterMinute    // counter reset sau 60s
+```
+
+**CMS (Vitest — `cms/__tests__/AiImageButton.test.tsx`):**
+```ts
+renders AI button next to upload button
+disabled when no exerciseId — button has opacity style, cursor not-allowed
+clicking button opens prompt panel with slideDown
+clicking again closes panel (idle)
+generate button disabled when prompt empty
+onAssetCreated called with assetId after confirm
+retry preserves prompt text
+cancel from preview — no onAssetCreated called
+rate limit error message rendered
+```
+
+**Commands:** `make backend-build && make backend-test && make cms-lint && make cms-build && cd cms && npm test`
+
+---
+
+### V15 Boundaries
+
+**ALWAYS:**
+- `REPLICATE_API_KEY` chỉ ở backend env — không bao giờ expose ra CMS hay Flutter
+- Rate limit check trước khi gọi Replicate — không để admin accidentally spam
+- `asset_kind = "ai_generated"` để phân biệt với `"image"` và `"context_image"` upload thủ công
+- Validate prompt length trên cả CMS (disable button nếu rỗng) và backend (400 response)
+- Backend khởi động bình thường khi thiếu `REPLICATE_API_KEY` (không fatal exit)
+- Prompt textarea không submit khi Enter — chỉ "▶ Tạo" button là trigger
+
+**ASK FIRST:**
+- Thêm Flux.1-dev option (chất lượng cao hơn, chậm hơn, đắt hơn)
+- Lưu generation history vào DB
+- Auto-generate prompt từ exercise content (cần thêm LLM call)
+- Ảnh lớn hơn 512px
+- Thêm style preset (realistic / cartoon / illustration)
+- Bật AI image generation trong production (cần confirm `REPLICATE_API_KEY` + budget)
+
+**NEVER:**
+- Gọi Replicate trực tiếp từ CMS frontend (browser) — API key phải server-side
+- Dùng `asset_kind = "image"` hay `"context_image"` cho AI-generated assets — gây confusion với upload flow
+- Auto-upload mà không có bước confirm của admin
+- Thêm queue/worker cho generation — synchronous endpoint đủ với 30s timeout
+- Gọi Replicate endpoint khác ngoài `flux-schnell` trong V15
+
+### V15 Verification
+
+| Step | Lệnh | Manual check |
+|------|------|--------------|
+| AI-0 | `REPLICATE_API_KEY=test make backend-build` | Build pass |
+| AI-1 | `make backend-test` | `TestHandleGenerateImage_*` + `TestAiImageRateLimiter_*` pass |
+| AI-2 | `make cms-lint && make cms-build && cd cms && npm test` | AiImageButton tests pass |
+| AI-3 | Manual — không có key | Backend start bình thường; nhấn "✨ Tạo" → error "Chức năng chưa được cấu hình" |
+| AI-4 | Manual — có key | Nhập prompt → ~5s → thumbnail hiển thị → confirm → ảnh xuất hiện trong form |
+| AI-5 | Manual — 5 lần liên tiếp | Lần thứ 6 → rate limit error rõ ràng |
+| AI-6 | Manual — 5 placements | Nút AI hoạt động đúng ở exercise form, OptionRow, CteniFields, Course, MockTest |
+| CHECKPOINT | `make verify` | Full pass |
+
+---
+
+## V14 — Interview Skill: ElevenLabs Conversational AI + Simli Avatar (2026-05-02)
+
+Idea doc: `docs/ideas/interview-skill.md`
+Design: `docs/designs/interview-skill.html`
+
+### Objective
+
+Thêm `skill_kind = "interview"` — learner luyện nói tiếng Czech theo hội thoại real-time với avatar Czech examiner AI, thay vì luồng record → async transcribe → feedback hiện tại.
+
+Hai exercise types mới:
+
+| exercise_type | Mô tả | Scoring |
+|---|---|---|
+| `interview_conversation` | Hội thoại theo chủ đề, agent hỏi 5–8 câu | LLM post-session |
+| `interview_choice_explain` | Chọn 1 trong 1–4 phương án → giải thích lý do | LLM post-session |
+
+Platform: Flutter iOS only. Entry point: `ModuleDetail` (cùng hàng với Nói/Nghe/Viết/Đọc).
+
+**Non-goals (V14):**
+- Multiple avatar faces / voice selection
+- Real-time scoring trong lúc hội thoại
+- MockTest integration (pool=exam) — deferred
+- Pronunciation breakdown per word
+
+### Kiến trúc quyết định (frozen)
+
+#### Ephemeral token flow (security)
+
+ElevenLabs API key **không bao giờ** nằm trong Flutter app. Pattern:
+
+```
+Flutter → POST /v1/interview-sessions/token
+            { exercise_id, attempt_id, selected_option? }
+                    ↓ learner auth check
+          Go → ElevenLabs REST API
+            POST /v1/convai/conversation/get_signed_url
+            với system_prompt đã inject {selected_option}
+                    ↓
+          Response: { signed_url, expires_in: 30s }
+                    ↓
+          Flutter → WebSocket thẳng tới ElevenLabs (signed_url)
+```
+
+Lý do: API key an toàn ở server, không có proxy latency (mỗi audio chunk không đi qua Go).
+
+#### ElevenLabs Conversational AI WebSocket (Dart)
+
+Không dùng `elevenlabs_flutter` package (chỉ là TTS wrapper). Viết custom Dart WebSocket client:
+
+```
+Dart WebSocket → wss://api.elevenlabs.io/v1/convai/conversation?signed_url=...
+  send: { type: "audio", audio: <base64 PCM16 chunk> }  (mic input)
+  recv: { type: "audio", audio: <base64 PCM16 chunk> }  (agent speech)
+  recv: { type: "transcript", message: { role, message } }  (accumulate)
+  recv: { type: "interruption" }  (agent bị ngắt)
+  recv: { type: "conversation_initiation_metadata" }  (ready signal)
+```
+
+Transcript tự accumulate từ `transcript` events — **không** lấy từ một endpoint cuối session.
+
+#### Simli avatar (Flutter)
+
+```dart
+// pubspec.yaml
+simli_client: ^1.0.1
+flutter_webrtc: ^0.9.x  // required by simli_client
+
+// Session screen
+SimliClient simliClient = SimliClient(
+  clientConfig: SimliClientConfig(
+    apiKey: '<SIMLI_API_KEY>',      // từ Flutter config / env
+    faceId: kSimliDefaultFaceId,   // hằng số, 1 face duy nhất
+    syncAudio: true,
+    handleSilence: true,
+    maxSessionLength: 900,          // 15 phút max
+  ),
+  log: Logger(),
+);
+
+// Pipe ElevenLabs PCM16 → Simli
+elevenLabsWsClient.onAudioChunk = (Uint8List pcm16) {
+  simliClient.sendAudioData(pcm16);
+};
+
+// Render
+RTCVideoView(simliClient.videoRenderer!, mirror: false)
+```
+
+**Sprint 0 blocker:** Verify `simli_client` v1.0.1 vẫn tương thích với Simli API hiện tại trước khi Sprint 1.
+
+#### Attempt flow (mới)
+
+```
+POST /v1/attempts  { exercise_id, skill_kind="interview" }
+→ POST /v1/interview-sessions/token  { exercise_id, attempt_id, selected_option? }
+   → Flutter WS → ElevenLabs (real-time conversation)
+→ Learner bấm "Kết thúc" hoặc max_turns đạt
+→ POST /v1/attempts/:id/submit-interview
+   { transcript: [{speaker, text, at_sec}], duration_sec }
+   → attempt status → scoring
+   → async: interview_scorer.go → LLM (Claude) → completed
+→ GET /:id poll → completed → ResultScreen
+```
+
+#### system_prompt template
+
+Admin nhập plain text. Biến duy nhất: `{selected_option}` (chỉ dùng trong `interview_choice_explain`).
+Backend inject server-side trước khi gọi ElevenLabs API để tạo signed URL.
+
+```go
+// Ví dụ injection:
+prompt := strings.ReplaceAll(exercise.SystemPrompt, "{selected_option}", req.SelectedOption)
+```
+
+### Detail Payloads (frozen)
+
+```json
+// interview_conversation — exercises.detail
+{
+  "topic": "Gia đình và bạn bè",
+  "tips": ["Trả lời câu hoàn chỉnh", "Dùng từ nối: protože, ale, a také"],
+  "system_prompt": "You are Jana Nováková, a Czech A2 examiner. Conduct a friendly interview about family and friends. Ask 5-8 natural questions at A2 level. Start with 'Dobrý den!' ...",
+  "max_turns": 8,
+  "show_transcript": true
+}
+
+// interview_choice_explain — exercises.detail
+{
+  "question": "Bạn muốn đi du lịch ở đâu?",
+  "options": [
+    { "id": "1", "label": "Praha", "image_asset_id": "...", "tips": ["památky", "doprava"] },
+    { "id": "2", "label": "Krkonoše", "image_asset_id": "", "tips": ["počasí", "sport"] },
+    { "id": "3", "label": "Brno", "image_asset_id": "" },
+    { "id": "4", "label": "Český Krumlov", "image_asset_id": "" }
+  ],
+  "system_prompt": "You are Jana Nováková. The learner chose {selected_option}. Ask 4-6 follow-up questions about why they chose it and what they would do there.",
+  "max_turns": 6,
+  "show_transcript": false
+}
+```
+
+Ghi chú:
+- `tips` optional (chỉ hiển thị trong IntroScreen, không gửi tới ElevenLabs)
+- `interview_choice_explain.options[].tips` optional, tối đa 5 gợi ý cho từng phương án; Flutter hiển thị sau khi learner chọn option và dùng lại trong prompt card của session. Nếu option không có tips thì fallback về `detail.tips` nếu có.
+- `image_asset_id` optional — dùng `image_asset_id = ""` nếu không có ảnh (choice hiển thị text only)
+- `show_transcript`: nếu `true`, overlay phụ đề dưới avatar trong session; nếu `false`, không hiển thị
+
+### New Go Types (contracts/types.go)
+
+```go
+type InterviewConversationDetail struct {
+    Topic          string   `json:"topic"`
+    Tips           []string `json:"tips,omitempty"`
+    SystemPrompt   string   `json:"system_prompt"`
+    MaxTurns       int      `json:"max_turns"`
+    ShowTranscript bool     `json:"show_transcript"`
+}
+
+type InterviewChoiceExplainDetail struct {
+    Question       string            `json:"question"`
+    Options        []InterviewOption `json:"options"`
+    SystemPrompt   string            `json:"system_prompt"`
+    MaxTurns       int               `json:"max_turns"`
+    ShowTranscript bool              `json:"show_transcript"`
+}
+
+type InterviewOption struct {
+    ID           string `json:"id"`
+    Label        string `json:"label"`
+    ImageAssetID string `json:"image_asset_id,omitempty"`
+    Tips         []string `json:"tips,omitempty"`
+}
+
+type InterviewTokenRequest struct {
+    ExerciseID     string `json:"exercise_id"`
+    AttemptID      string `json:"attempt_id"`
+    SelectedOption string `json:"selected_option,omitempty"`
+}
+
+type InterviewTokenResponse struct {
+    SignedURL  string `json:"signed_url"`
+    ExpiresIn int    `json:"expires_in"`
+}
+
+type InterviewTranscriptTurn struct {
+    Speaker string `json:"speaker"` // "examiner" | "learner"
+    Text    string `json:"text"`
+    AtSec   int    `json:"at_sec"` // seconds from session start
+}
+
+type InterviewSubmitRequest struct {
+    Transcript  []InterviewTranscriptTurn `json:"transcript"`
+    DurationSec int                       `json:"duration_sec"`
+}
+```
+
+### New API Endpoints
+
+```
+POST /v1/interview-sessions/token          (withAuth — learner)
+  Request:  InterviewTokenRequest
+  Response: InterviewTokenResponse
+  Logic:
+    1. Load exercise by exercise_id
+    2. Check attempt exists + belongs to learner
+    3. Inject selected_option vào system_prompt nếu interview_choice_explain
+    4. Call ElevenLabs POST /v1/convai/conversation/get_signed_url
+    5. Return signed_url (expires ~30s — Flutter phải connect ngay)
+
+POST /v1/attempts/:id/submit-interview     (withAuth — learner)
+  Request:  InterviewSubmitRequest
+  Response: attempt object (status=scoring)
+  Logic:
+    1. Save transcript turns vào attempt.transcript_json
+    2. Save duration_sec vào attempt metadata
+    3. Launch goroutine: interview_scorer.go → LLM → mark completed
+```
+
+### Environment Variables mới
+
+| Var | Mô tả | Required |
+|---|---|---|
+| `ELEVENLABS_API_KEY` | ElevenLabs API key để tạo signed URL | Yes (nếu dùng interview) |
+| `SIMLI_API_KEY` | Simli API key — lưu ở Flutter config / build-time constant | Yes (nếu dùng avatar) |
+| `SIMLI_FACE_ID` | Face ID cố định (1 face duy nhất trong V14) | Yes (nếu dùng avatar) |
+
+**Lưu ý:** `SIMLI_API_KEY` và `SIMLI_FACE_ID` nằm trong Flutter app (không phải secret backend). Chấp nhận được vì Simli session cost per-minute, không phải per-call secret.
+
+### Project Structure mới
+
+```
+backend/
+  internal/
+    contracts/types.go                 -- thêm Interview* types
+    processing/
+      interview_scorer.go              -- NEW: LLM scoring post-session
+    httpapi/server.go                  -- thêm 2 routes interview
+
+cms/app/exercises/
+  exercise-utils.ts                    -- thêm interview_conversation, interview_choice_explain
+  components/exercise-form/
+    InterviewConversationFields.tsx    -- NEW
+    InterviewChoiceExplainFields.tsx   -- NEW
+    index.tsx                          -- wire 2 types mới
+
+flutter_app/
+  pubspec.yaml                         -- thêm simli_client, flutter_webrtc
+  lib/features/interview/
+    screens/
+      interview_list_screen.dart       -- NEW
+      interview_intro_screen.dart      -- NEW (shared Luồng A + B)
+      interview_session_screen.dart    -- NEW (core experience)
+      interview_result_screen.dart     -- NEW (reuse ResultCard pattern)
+    services/
+      elevenlabs_ws_client.dart        -- NEW: custom Dart WS client
+      simli_session_manager.dart       -- NEW: wraps simli_client lifecycle
+    widgets/
+      choice_option_grid.dart          -- NEW: 2×2 grid cho choice type
+      session_status_pill.dart         -- NEW: connecting/listening/speaking
+      mic_waveform_widget.dart         -- NEW: animated bars
+      avatar_video_container.dart      -- NEW: RTCVideoView wrapper
+  lib/features/home/screens/
+    module_detail_screen.dart          -- MODIFY: thêm interview skill card
+  lib/core/api/api_client.dart         -- thêm getInterviewToken(), submitInterview()
+  lib/models/models.dart               -- thêm InterviewOption, InterviewTranscriptTurn, etc.
+  lib/l10n/intl_vi.arb + intl_en.arb  -- thêm interview_* i18n keys
+```
+
+### interview_scorer.go — Scoring Logic
+
+Reuse `LLMFeedbackProvider` pattern. Claude nhận full transcript + exercise context:
+
+```
+Prompt inputs:
+  - exercise type + topic/question
+  - selected_option (nếu choice_explain)
+  - full transcript (speaker-labeled turns)
+  - duration_sec
+
+Claude output (via tool_use schema):
+  - overall readiness_level (weak/ok/strong)
+  - feedback_items (max 4 items với criterion + comment)
+  - vocabulary_score (0–10)
+  - grammar_score (0–10)
+  - fluency_score (0–10)
+  - model_answer_sample (optional: example of a good response)
+```
+
+Map `readiness_level` → `total_score` dùng `DEFAULT_MAX_POINTS` của exercise (hoặc 10 nếu không set).
+
+### CMS Changes
+
+**InterviewConversationFields.tsx fields:**
+- Tiêu đề `*`
+- Topic (hiển thị trong IntroScreen cho learner) `*`
+- Tips (repeater, optional, max 5)
+- System Prompt (textarea, `*`) + hint: "Agent dùng prompt này để dẫn dắt hội thoại Czech A2"
+- Max turns (number input, default 8, range 2–12)
+- Show transcript toggle (default on)
+
+**InterviewChoiceExplainFields.tsx fields:**
+- Tiêu đề `*`
+- Câu hỏi chính (hiển thị cho learner) `*`
+- Options repeater (1–4 items, mỗi item: label `*` + image upload optional + learner tips optional tối đa 5)
+- System Prompt `*` + hint: "`{selected_option}` sẽ bị thay bằng lựa chọn thực tế của learner"
+- Max turns (number, default 6)
+- Show transcript toggle (default off)
+
+Validate:
+- Options: 1–4 items bắt buộc
+- System prompt phải không rỗng
+- `interview_choice_explain`: system_prompt nên chứa `{selected_option}` — warning (không block)
+
+### Flutter i18n Keys mới (prefix `interview_`)
+
+```
+interviewSkillLabel       = "Phỏng vấn AI"
+interviewSkillDesc        = "Hội thoại thực tế với examiner"
+interviewNewBadge         = "MỚI"
+interviewTopicLabel       = "Chủ đề hội thoại"
+interviewChoiceLabel      = "Chọn phương án"
+interviewChoiceInstruction = "Chọn 1 và giải thích lý do"
+interviewTipsTitle        = "Examiner sẽ hỏi về"
+interviewTipsHint         = "Mẹo luyện tập"
+interviewStartBtn         = "Bắt đầu phỏng vấn"
+interviewStartWithChoice  = "Bắt đầu với lựa chọn này"
+interviewSelectedLabel    = "Đã chọn:"
+interviewStatusConnecting = "Đang kết nối với examiner..."
+interviewStatusReady      = "Sẵn sàng"
+interviewStatusSpeaking   = "Examiner đang nói"
+interviewStatusListening  = "Đang lắng nghe bạn..."
+interviewEndBtn           = "Kết thúc"
+interviewEndConfirm       = "Bạn có muốn kết thúc phỏng vấn không?"
+interviewAnalyzing        = "Đang chấm điểm..."
+interviewResultTitle      = "Kết quả phỏng vấn"
+interviewTabFeedback      = "Nhận xét"
+interviewTabTranscript    = "Hội thoại"
+interviewExaminer         = "Examiner"
+interviewYou              = "Bạn"
+interviewConnectError     = "Không kết nối được, thử lại"
+interviewMicDenied        = "Cần quyền microphone"
+```
+
+### Testing Strategy
+
+**Sprint 0 (spike — không commit vào main):**
+```
+[ ] Test ElevenLabs ConvAI + Czech system prompt qua ElevenLabs dashboard web
+    → Verify agent nghe được, trả lời Czech đúng A2 level
+[ ] Build standalone Flutter app với simli_client
+    → Feed fake PCM16 silence → verify RTCVideoView renders on iPhone
+    → Feed real PCM16 audio → verify lip-sync visible
+[ ] Verify PCM16 16kHz mono = format ElevenLabs output và Simli input
+```
+
+Sprint 0 phải pass trước khi bắt đầu bất kỳ code production nào.
+
+**Backend:**
+```go
+// interview_scorer_test.go
+TestScoreInterviewSession_Conversation_Strong   // full transcript, fluent answers
+TestScoreInterviewSession_Conversation_Weak     // monosyllabic answers
+TestScoreInterviewSession_ChoiceExplain_Strong  // good explanation
+TestInjectSelectedOption_ReplacesPlaceholder    // "{selected_option}" injection
+TestInjectSelectedOption_NoPlaceholderOk        // no {selected_option} in prompt = ok
+```
+
+**CMS (Vitest):**
+```ts
+buildInterviewConversationPayload — valid payload
+buildInterviewConversationPayload — rejects 0 tips (ok, optional)
+buildInterviewChoiceExplainPayload — rejects <3 options
+buildInterviewChoiceExplainPayload — rejects >4 options
+formStateFromInterviewConversation — roundtrip
+formStateFromInterviewChoiceExplain — roundtrip
+```
+
+**Flutter:**
+```dart
+// interview tests
+interview_list_screen_test.dart — renders 2 exercise type groups
+interview_intro_conv_test.dart  — shows topic, tips, start button enabled
+interview_intro_choice_test.dart — start disabled until option selected; enables after tap
+interview_session_status_test.dart — StatusPill renders 4 states
+choice_option_grid_test.dart — tap selects, second tap on different = deselects first
+```
+
+**Commands:** `make backend-build && make backend-test && make cms-lint && make cms-build && make flutter-analyze && make flutter-test`
+
+### V14 Boundaries
+
+**ALWAYS:**
+- Sprint 0 spike phải pass TRƯỚC khi commit bất kỳ production code
+- ElevenLabs API key chỉ ở backend, không bao giờ trong Flutter app
+- Inject `{selected_option}` server-side trong `handleInterviewToken`, không ở CMS
+- `show_transcript` flag quyết định overlay display — không hardcode trong Flutter
+- Transcript accumulate client-side từ WebSocket `transcript` events — không gọi endpoint nào của ElevenLabs để lấy transcript sau session
+- `max_turns` là soft limit: Flutter end session khi đủ lượt, không cần ElevenLabs force-close
+- `interview_choice_explain` phải có 1–4 options, validate tại CMS trước submit
+- Mỗi route mới (`/v1/interview-sessions/token`, `/v1/attempts/:id/submit-interview`) phải có `withAuth`
+
+**ASK FIRST:**
+- Thêm multiple Simli face IDs trong CMS (avatar selection)
+- Thêm pronunciation scoring hoặc per-word feedback
+- MockTest integration — bài interview vào pool=exam
+- Thay đổi ElevenLabs ConvAI WebSocket message format (nếu API update)
+- Thêm mid-session coaching ("Bạn cần dùng thêm từ nối")
+- Real-time transcript streaming vào ResultScreen
+
+**NEVER:**
+- Gọi ElevenLabs Conversational AI trực tiếp từ Flutter với raw API key
+- Dùng `elevenlabs_flutter` package — nó là TTS wrapper, không phải ConvAI
+- Scoring trong real-time (mid-session) — complexity không tương xứng với giá trị V14
+- Store ElevenLabs conversation_id hay session metadata lâu dài trong DB — chỉ transcript quan trọng
+- Thêm SQS/queue cho interview scoring — goroutine pattern đủ cho V14
+- pool=exam cho interview exercises trong V14
+
+### V14 Verification
+
+| Step | Lệnh | Manual check |
+|---|---|---|
+| IV-0 | Spike (standalone app, không commit) | Simli avatar render trên iPhone; ElevenLabs Czech agent hoạt động |
+| IV-1 | `make backend-build && make backend-test` | `TestInjectSelectedOption_*` pass; `TestScoreInterviewSession_*` pass |
+| IV-2 | `make backend-build` | `POST /v1/interview-sessions/token` trả `signed_url`; `POST /v1/attempts/:id/submit-interview` → status=scoring |
+| IV-3 | `make cms-lint && make cms-build && cd cms && npm test` | Tạo interview_conversation và interview_choice_explain trong CMS → save → reload intact |
+| IV-4 | `make flutter-analyze && make flutter-test` | 0 warnings; choice grid + status pill tests pass |
+| IV-5 | Manual (iPhone) — Luồng A | ModuleDetail → Phỏng vấn → chọn hội thoại → Intro → Bắt đầu → session → Kết thúc → score |
+| IV-6 | Manual (iPhone) — Luồng B | Chọn phương án → chọn option → session (chip hiển thị) → Kết thúc → score |
+| IV-7 | Manual (iPhone) — Avatar | Simli RTCVideoView visible; lip-sync khi examiner nói; mic waveform khi learner nói |
+| CHECKPOINT | `make verify` | Full pass |
+
+
+---
+
+## V16 — Interview First-Turn Fix + Push-to-Talk + UX Polish (2026-05-04)
+
+Sửa bug examiner mất audio đầu phiên Simli + nâng UX hội thoại + chuyển sang push-to-talk. Post-smoke update: Simli trở thành opt-in trong Profile; mặc định dùng sound wave local audio vì log thực tế cho thấy ElevenLabs trả audio nhanh nhưng Simli `SPEAK` có thể trễ 11–15s.
+
+### Scope
+
+| Slice | Mô tả |
+|---|---|
+| Audio gate fix | Buffer agent chunks tới khi Simli `onVideoReady` (first-frame) thay `isConnected` (WS START); fallback timer flush local PCM khi quá `audio_buffer_timeout_ms` |
+| Simli opt-in | `InterviewPreferenceService.avatarEnabled` default `false`; learner bật avatar trong Profile khi muốn luyện với mặt người; sound wave là path mặc định để giảm latency |
+| Local audio gain | Profile slider `Âm lượng giám khảo` 100–180%, default 135%; `PcmAudioPlayer` apply PCM16 gain có clipping |
+| Display prompt | Backend derive `display_prompt` từ `system_prompt` (strip "You are…", extract ÚKOL/TASK block); admin nhập timeout trong CMS; preview real-time |
+| Prompt card UI | Card đáy + auto-collapse 8s + pulse animation khi `agent_response_complete`; choice variant hiện option đã chọn |
+| Preparing overlay | 4-step checklist (init → avatar → examiner → ready) thay cho black screen |
+| Audio session | Simli duplex dùng `playAndRecord + videoChat`; sound-wave PTT mic dùng `playAndRecord + measurement` và giữ `record` không tự đổi lại iOS audio session; sound-wave examiner playback chuyển sang `playback/spokenAudio` trước mỗi lượt để tránh iOS ducking làm turn sau nhỏ tiếng dần |
+| Push-to-talk | Mic button toggle (idle gray / orange enabled / red pulse recording / send icon); state authoritative từ Simli SPEAK/SILENT WS messages; 12s agent-wait timeout sau user turn; 550ms preroll buffer + 1600 byte minimum trước khi flush |
+| Outbound mic gain | Sound-wave mode boost PCM16 gửi lên ElevenLabs `2.4x` có clipping an toàn; log `rawPeak`/`sentPeak` + ElevenLabs `vad_score` max để debug VAD |
+| Local playback gate | Sound-wave mode chờ local playback phát xong mới enable mic; chunk flush không tự mở mic, chỉ `agent_response_complete` hoặc silence timeout mới complete turn; flush defer khi mic active/transition để tránh iOS `!pri`; `PcmAudioPlayer` serialize drain để không bỏ chunk khi silence timer và `agent_response_complete` cùng fire |
+| Responsive session UI | Bottom panel tách scroll lane (transcript + prompt) và fixed controls lane (timer + mic + end); compact screen có prompt max-height, compact mic/sound-wave/status pill |
+| Result CTA | Sticky "Hoàn thành" / "Finish" button → `Navigator.popUntil(home)` |
+
+### Decisions (frozen)
+
+1. `display_prompt` = derived from `system_prompt`, không thêm DB column
+2. Prompt card position bottom (gần controls bar), expanded 8s mặc định
+3. Choice variant chỉ hiện option đã chọn (id + label), không list 3 options
+4. `audio_buffer_timeout_ms` config qua CMS — range [500, 5000], default 1500
+5. Mic = push-to-talk, không server VAD always-on
+6. Simli SPEAK/SILENT là authoritative signal cho `_state`; EL `agent_response_complete` chỉ dùng cho local-only path
+7. Filter empty learner turns (Unicode `\p{L}|\p{N}` regex) — drop "..."/whitespace
+8. Simli avatar không auto-enable theo API key; learner phải opt-in trong Profile
+9. Sound-wave examiner playback phải giữ mic locked tới khi audio phát xong
+10. Profile local audio volume chỉ áp dụng examiner playback; sound-wave mic send gain là fixed internal boost cho ElevenLabs VAD, không expose trong Profile
+11. Local chunk flush không được đổi state `ready`; chỉ agent complete/silence timeout mới mở lại mic
+
+### Touched files
+
+- Backend: `processing/interview_prompt.go` (new), `contracts/types.go`, `httpapi/server.go`, `httpapi/interview_preview.go` (new), `httpapi/v16_interview*_test.go` (new)
+- Flutter: `models/models.dart`, `core/interview/interview_preference_service.dart`, `features/profile/screens/profile_screen.dart`, `features/interview/screens/interview_session_screen.dart`, `features/interview/services/{simli_session_manager,pcm_audio_player,elevenlabs_ws_client}.dart`, `features/interview/widgets/{prompt_card,session_status_pill,avatar_video_container}.dart`, `lib/l10n/app_{vi,en}.arb`, tests
+- CMS: `components/exercise-form/InterviewConversationFields.tsx`, `InterviewChoiceExplainFields.tsx`, `components/PromptPreview.tsx` (new), `components/exercise-utils.ts`, `app/api/admin/interview/preview-prompt/route.ts` (new), `__tests__/interview-fields-v16.test.ts` (new)
+- Docs: `docs/ideas/interview-first-turn-fix.md`, `docs/specs/interview-first-turn-fix.md`, `docs/plans/interview-first-turn-fix-plan.md`, `docs/designs/interview-first-turn-fix.html`
+
+### V16 New i18n keys
+
+| Key | VI | EN |
+|---|---|---|
+| `interviewPromptLabel` | Đề bài | Task |
+| `interviewTapToView` | Tap để xem đề bài | Tap to view task |
+| `interviewVocabHints` | Gợi ý từ | Vocab hints |
+| `interviewPttIdleHint` | Tap để bắt đầu nói | Tap to start speaking |
+| `interviewPttSendHint` | Đang ghi · Tap để gửi | Recording · Tap to send |
+| `interviewFinishBtn` | Hoàn thành | Finish |
+| `profileInterviewSection` | Phỏng vấn | Interview |
+| `profileInterviewAvatarTitle` | Dùng avatar Simli | Use Simli avatar |
+| `profileInterviewAvatarDescription` | Tắt để phản hồi nhanh bằng sound wave. Bật khi muốn luyện với avatar. | Turn this off for faster sound wave replies. Turn it on when you want avatar practice. |
+| `profileInterviewVolumeTitle` | Âm lượng giám khảo | Examiner volume |
+| `profileInterviewVolumeDescription` | Chỉ áp dụng khi dùng sound wave. | Only applies when sound wave mode is used. |
+| `profileInterviewVolumeValue` | `{percent}%` | `{percent}%` |
+
+### Required ElevenLabs agent settings
+
+Agent dashboard → Security:
+- ✅ Allow client override system_prompt
+- ✅ Allow client override first_message
+- ✅ Allow client override TTS voice
+
+Nếu không bật `first_message` override → agent không nói câu chào → 3s metadata-fallback enable mic để learner nói trước.
+
+### Avoid in V16
+
+- ❌ Mute mic global (regression interruption capability — handled by PTT)
+- ❌ Auto-enable Simli chỉ vì `SIMLI_API_KEY` tồn tại; avatar phải là learner opt-in
+- ❌ Server-side `display_prompt` storage (luôn derive)
+- ❌ Hardcode `audio_buffer_timeout_ms` (admin config)
+- ❌ Bypass admin auth cho preview endpoint
+- ❌ Drop EL `agent_response_complete` event handler (vẫn cần cho local-only path)
+
+### V16 Verification
+
+| Step | Lệnh | Manual check |
+|---|---|---|
+| BE-1 | `make backend-test` | 297 tests pass — `TestDerivePromptForLearner_*`, `TestExerciseGet_*`, `TestInterviewPreviewPrompt_*` |
+| FE-1 | `make flutter-analyze && make flutter-test` | 159 tests pass — `interview_prompt_derive_test`, `prompt_card_test`, `interview_session_widgets_test`, `interview_intro_screen_test`, `profile_screen_test`, `interview_preference_service_test` |
+| CMS-1 | `make cms-lint && cd cms && npm test && make cms-build` | 95 Vitest pass — `interview-fields-v16` clamp + payload + option tips parser + min 1 option |
+| MAN-1 | iPhone Simli ON + ElevenLabs first_message enabled | 5 sessions liên tiếp · 0 lần miss audio đầu · examiner phát đầy đủ câu chào |
+| MAN-2 | iPhone với `SIMLI_API_KEY` empty | Regression: audio đầy đủ qua local PcmAudioPlayer |
+| MAN-3 | Network Link Conditioner "3G slow" | Fallback timer fire (`debugPrint`); audio vẫn nghe được |
+| MAN-4 | Tap mic khi examiner nói | Mic disabled (gray) — không tap được |
+| MAN-5 | Tap mic khi examiner xong (Simli SILENT) | Mic enable orange → tap → red pulse → speak → tap send |
+| MAN-6 | Result screen | Nút "Hoàn thành" cam ở bottom; tap → quay home |
+| MAN-7 | Echo test | Speakerphone iPhone — không có turn rỗng "..." trong transcript |
+| MAN-8 | Profile Simli OFF (default) | Session dùng sound wave; first audio nhanh; log `Simli disabled by learner preference` |
+| MAN-9 | Profile volume 180% | Log `Interview local audio gain=1.80`; examiner volume ổn định qua nhiều turn |
+| MAN-10 | iPhone compact / Facebook in-app browser | Prompt card scroll được, mic + end button không bị che/chồng; no overflow |
+| MAN-11 | Sound-wave PTT giọng nhỏ | Log `sentPeak` cao hơn `rawPeak` khoảng 2.4x; `vadMax` không còn `none`/rất thấp; learner transcript không rỗng |
+| CHECKPOINT | `make verify` | Full pass |
+
+---
+
+## V18 — Dictation Exercise (`psani_3_dictation`)
+
+> Status: spec frozen, implementation pending
+> Spec: `docs/specs/dictation-exercise.md`
+> Idea: `docs/ideas/dictation-exercise.md`
+> Design: `docs/designs/dictation-exercise.html`
+
+### Tóm tắt
+
+Thêm exercise type mới `psani_3_dictation` vào skill `viet`. Admin author 3–8 câu Czech + ảnh ngữ cảnh tùy chọn → Polly sinh MP3 từng câu → learner nghe (auto-play lần đầu, repeat tối đa N) → gõ lại → backend chấm bằng weighted Levenshtein (diacritic substitution weight 0.5) + LLM annotate diff/error_tags. Pool=`course` only. Không vào MockTest exam pool.
+
+### Mục tiêu
+
+- Luyện chính tả (pravopisné cvičení) cho A2 learner: dấu phụ, viết hoa, ranh giới từ.
+- Reuse hạ tầng V1 (Polly, Claude, image_asset_id, submit-text endpoint) — không thêm SDK mới.
+- Score deterministic + LLM annotation song song (LLM fail không block result).
+
+### Decisions locked (xem spec § 0)
+
+| # | Decision | Value |
+|---|---|---|
+| D1 | Voice picker | Admin per-exercise (`voice_id` field). |
+| D2 | Pass threshold default | 60%, admin override per-exercise. |
+| D3 | Replay-count storage | `attempts.details_json.replay_counts: [int]`. |
+| D4 | Sentence count | Min 3, Max 8 hard. |
+| D5 | OCR | Out of V18, planned V18.1 sau pilot. |
+| D6 | Audio | N MP3s per exercise, `exercise_audios.sentence_idx` nullable column. |
+| D7 | Submit endpoint | `POST /v1/attempts/:id/submit-text` extended với `sentences[]` shape. |
+| D8 | LLM annotation | Async/parallel, fail-soft. |
+| D9 | Replay cap | Client-only enforcement. |
+| D10 | Pool | `course` only. |
+
+### Acceptance Criteria (xem spec § 2.2)
+
+10 AC measurable: từ "publish exercise dưới 2 phút" → "diacritic-only mistake ≥ 50% accuracy" → "≥ 25 new tests across 3 layers".
+
+### File changes
+
+- Backend: `processing/dictation_scorer.go` (new), `processing/dictation_llm.go` (new), `processing/dictation_scorer_test.go` (new), `processing/exercise_audio.go` (edit — add `GenerateSentenceAudio`), `processing/llm_config.go` (edit), `processing/llm_prompts.go` (edit — `DictationSystemPrompt`), `processing/llm_user_prompts.go` (edit — `buildDictationUserPrompt`), `processing/llm_fallbacks.go` (edit), `contracts/types.go` (edit — `DictationDetail`/`DictationSubmission`/`DictationFeedback`/`DictationSentenceScore`), `httpapi/server.go` (edit), `httpapi/admin_dictation_audio.go` (new), `httpapi/attempts.go` (edit — branch on exercise_type), `httpapi/dictation_test.go` (new), `store/postgres_exercise_audio.go` (edit — `addColumnIfMissing` cho `sentence_idx`)
+- CMS: `components/exercise-form/DictationFields.tsx` (new), `components/exercise-form/exercise-utils.ts` (edit — types + helpers), `components/exercise-form/index.tsx` (edit — branch), `lib/i18n.tsx` (edit), `app/api/admin/exercises/[exerciseId]/dictation/sentences/[idx]/audio/route.ts` (new), `components/__tests__/dictation-fields.test.ts` (new)
+- Flutter: `features/exercise/screens/dictation_exercise_screen.dart` (new), `features/exercise/widgets/dictation_audio_card.dart` (new), `features/exercise/widgets/czech_keyboard_chips.dart` (new), `features/exercise/widgets/dictation_result_card.dart` (new), `models/models.dart` (edit), `core/api/api_client.dart` (edit — `submitDictation`), `l10n/app_{vi,en}.arb` (edit), `test/dictation_exercise_screen_test.dart` (new), `test/dictation_models_test.dart` (new)
+- DB: inline `ALTER TABLE exercise_audios ADD COLUMN IF NOT EXISTS sentence_idx INT NULL` + composite index. Không có goose migration file.
+- Docs: `docs/ideas/dictation-exercise.md`, `docs/specs/dictation-exercise.md`, `docs/designs/dictation-exercise.html` (đã có)
+
+### V18 New i18n keys
+
+| Key | VI | EN |
+|---|---|---|
+| `dictationListenInstruction` | Nghe và viết lại câu | Listen and write the sentence |
+| `dictationSentenceLabel` | Câu {idx} / {total} | Sentence {idx} / {total} |
+| `dictationRepeatRemaining` | Còn {n} lượt nghe lại | {n} replay(s) left |
+| `dictationRepeatExhausted` | Hết lượt nghe lại | No replays left |
+| `dictationKeyboardHint` | Bàn phím Czech | Czech keyboard |
+| `dictationNextBtn` | Tiếp → | Next → |
+| `dictationSubmitBtn` | Nộp bài | Submit |
+| `dictationPrevBtn` | ← Trước | ← Prev |
+| `dictationResultPerSentence` | Độ chính xác từng câu | Per-sentence accuracy |
+| `dictationLLMUnavailable` | Phản hồi chi tiết tạm không khả dụng | Detailed feedback temporarily unavailable |
+
+### Avoid in V18
+
+- ❌ OCR submission (defer V18.1)
+- ❌ Single-MP3 + SSML break + timestamp-seek (per-sentence MP3 chosen)
+- ❌ LLM as scorer (deterministic Levenshtein is the score)
+- ❌ Server-side replay-cap enforcement
+- ❌ Auto-advance on Enter key
+- ❌ Live char-by-char scoring under TextField
+- ❌ Penalty for paste / Czech chip
+- ❌ Block submit on missing sentence audio at runtime (admin prevents at publish)
+- ❌ Include dictation in MockTest exam pool
+
+### V18 Verification
+
+| Step | Lệnh | Manual check |
+|---|---|---|
+| BE-1 | `make backend-test` | +10 tests min — `TestDictationDistance_*`, `TestSentenceAccuracy_*`, `TestSubmitDictation_*` |
+| FE-1 | `make flutter-analyze && make flutter-test` | +10 tests min — `dictation_exercise_screen_test`, `dictation_models_test`, `dictation_result_card_test` |
+| CMS-1 | `make cms-lint && cd cms && npm test && make cms-build` | +5 Vitest min — `dictation-fields` split + validate + payload |
+| MAN-1 | Admin author 6-câu, Polly từng row, publish | Exercise xuất hiện ở learner Module Viết |
+| MAN-2 | Learner gõ exact ref text | 10/10, PASS |
+| MAN-3 | Learner gõ ref minus all diacritics | 50–70%, biên giới PASS/FAIL |
+| MAN-4 | Repeat 3× câu 2 | Nút disable ở 3/3, tooltip "Hết lượt" |
+| MAN-5 | Submit fail (mạng off) | Banner Retry, text không mất |
+| MAN-6 | Background app giữa attempt | TextField + replay counter preserved |
+| MAN-7 | Tab Sửa bài | Diff highlight green/red |
+| MAN-8 | LLM mock fail | Result vẫn render với deterministic-only diff |
+| CHECKPOINT | `make verify` | Full pass |
+
+---
+
+## V18.1 — Dictation OCR Submission
+
+> Status: spec frozen, implementation pending
+> Spec: `docs/specs/dictation-ocr.md`
+> Idea: `docs/ideas/dictation-ocr.md`
+> Parent: V18 (`psani_3_dictation`)
+
+### Tóm tắt
+
+Mở rộng `psani_3_dictation` với handwriting submission qua **Claude Vision OCR** (existing `ANTHROPIC_API_KEY`, không vendor mới). Field mới `DictationDetail.submission_mode: "type" | "ocr" | "both"` (default `"type"` — backward-compat V18). Learner chụp ảnh từng câu → preview OCR text trong editable TextField → confirm → submit. OCR text feed vào `dictation_processor` cũ — same Levenshtein scorer, same `DictationFeedback` shape.
+
+### Decisions locked (xem spec § 0)
+
+| # | Decision | Value |
+|---|---|---|
+| O1 | Provider | Claude Vision (zero new SDK/secret) |
+| O2 | Model | `LLM_OCR_MODEL` env (default `claude-opus-4-7`) |
+| O3 | Mode toggle | `submission_mode` field, default `"type"` |
+| O4 | Granularity | 1 photo per sentence |
+| O5 | Preview-confirm | OCR returns to editable TextField; learner edits + confirms |
+| O6 | Score path | Reuse V18 `dictation_processor` Levenshtein |
+| O7 | Endpoints | `POST /v1/attempts/:id/dictation-ocr-preview` + `submit-dictation-ocr` |
+| O8 | Storage | `media_assets.attempt_id` column (new), `dictation-ocr/` prefix |
+| O9 | Image cap | 8 max, 5MB each, JPEG/PNG/HEIC |
+| O10 | Pilot threshold | CER ≤10% trên 20×6 photo gold set trước khi promote default |
+
+### Acceptance Criteria
+
+12 AC (xem spec § 2.2): từ "admin toggle submission_mode" → "score parity type vs OCR" → "fail-soft empty text on OCR error" → "≥ 18 new tests".
+
+### File changes
+
+Backend new: `processing/dictation_ocr.go` + test, `httpapi/attempt_dictation_ocr.go` + test
+Backend edits: `contracts/types.go` (SubmissionMode field), `processing/llm_config.go` (LLM_OCR_MODEL), `processing/llm_prompts.go` (DictationOCRSystemPrompt), `processing/llm_user_prompts.go` (buildDictationOCRUserPrompt), `processing/dictation_processor.go` (path branch), `store/postgres_media_assets.go` (attempt_id column), `httpapi/server.go` (route reg)
+CMS edits: `DictationFields.tsx` (mode dropdown), `exercise-utils.ts` (validation), `lib/i18n.tsx` (3 admin keys), `__tests__/dictation-fields.test.ts`
+Flutter new: `widgets/dictation_ocr_preview_card.dart` + test
+Flutter edits: `screens/dictation_exercise_screen.dart` (branch), `models/models.dart` (parser), `core/api/api_client.dart` (2 methods), `l10n/app_{vi,en}.arb` (8 keys), tests
+DB: inline `addColumnIfMissing("media_assets", "attempt_id", "UUID NULL")`
+
+### V18.1 New i18n keys
+
+| Key | VI | EN |
+|---|---|---|
+| `dictationModeTypeLabel` | Gõ | Type |
+| `dictationModeOCRLabel` | 📷 Chụp ảnh | 📷 Take photo |
+| `dictationOCRPreviewTitle` | Kiểm tra văn bản đã đọc | Review recognized text |
+| `dictationOCRPreviewHint` | Sửa lại nếu cần, rồi xác nhận | Edit if needed, then confirm |
+| `dictationOCRConfirmBtn` | Dùng văn bản này | Use this text |
+| `dictationOCRRetakeBtn` | Chụp lại | Retake |
+| `dictationOCRFailedBanner` | Không nhận diện được. Hãy chụp lại hoặc gõ tay | Could not read. Retake or type instead |
+| `dictationOCRUploadingHint` | Đang nhận diện… | Recognizing… |
+
+### Avoid in V18.1
+
+- ❌ New OCR vendor (Google Vision, Azure, Tesseract) — Claude Vision đủ
+- ❌ On-device OCR (Vision Framework iOS, ML Kit Android) — defer V18.2+
+- ❌ Auto-submit OCR text (preview-confirm là safety net)
+- ❌ 500 on OCR fail (must fail-soft empty text)
+- ❌ Score penalty for OCR misread
+- ❌ Multi-sentence single photo (1 photo per sentence)
+- ❌ Image post-processing (deskew, rotate, contrast)
+- ❌ OCR cho exercise type khác psani_3_dictation
+- ❌ OCR vào MockTest exam pool
+
+### V18.1 Verification
+
+| Step | Lệnh | Manual check |
+|---|---|---|
+| BE-1 | `make backend-test` | +8 tests min — `TestClaudeVisionOCR_*`, `TestSubmitDictationOCR_*`, `TestDictationOCRPreview_*` |
+| FE-1 | `make flutter-analyze && make flutter-test` | +6 widget tests min |
+| CMS-1 | `make cms-lint && cd cms && npm test && make cms-build` | +4 Vitest min |
+| MAN-1 | Admin toggle `submission_mode="ocr"`, publish | Learner thấy chỉ camera button |
+| MAN-2 | Learner photo perfect handwriting | OCR đúng, score 10/10 |
+| MAN-3 | Photo illegible | Empty text + banner Retry, image không mất |
+| MAN-4 | Photo có č/š/ž/ě/ř | OCR ≥90% chars; learner edit 10% còn lại; PASS |
+| MAN-5 | Network off mid-OCR | Banner Retry, image preserved |
+| MAN-6 | Mixed mode `"both"` | Per-sentence toggle works |
+| MAN-7 | Old V18 exercise (no submission_mode) | Behaves identically |
+| MAN-8 | Pilot gold set (20×6 photos, 5 learners) | CER ≤10% averaged |
+| CHECKPOINT | `make verify` | Full pass |
+
+---
+
+## V21 — CEFR Level Progression (A0 → B1)
+
+> Detail: `docs/specs/cefr-level-progression.md` + UX:
+> `docs/specs/cefr-level-progression-ux.md` + idea:
+> `docs/ideas/cefr-level-progression.md`. Decided 2026-05-06.
+
+### V21 Scope
+
+Pivot from "A2-only sprint" to a **level-gated CEFR ladder** (A0 / A1 /
+A2 / B1). Each learner has `users.current_level`. Content above level
+is locked behind a **2-gate promotion**: skill mastery threshold
+unlocks a **promotion exam** (a `MockTest` flagged `is_promotion=true`,
+`target_level=<lvl>`); passing promotes the learner.
+
+MVP ships **A2 + B1** only. Schema accommodates A0/A1 without
+re-architecture. Existing users backfilled to `current_level='a2'`,
+`unlocked_levels={a0,a1,a2}`.
+
+### V21 Schema
+
+| Table | Change |
+|---|---|
+| `courses` | `+level enum(a0,a1,a2,b1) NOT NULL DEFAULT 'a2'`, index on level |
+| `users` | `+current_level enum DEFAULT 'a0'`, `+unlocked_levels TEXT[] DEFAULT {a0}`, `+placement_taken_at TIMESTAMPTZ NULL` |
+| `mock_tests` | `+is_promotion BOOL`, `+is_placement BOOL`, `+target_level enum NULL`, CHECK promotion → target required |
+| `promotion_attempts` | NEW: id, user_id, mock_test_id, source_level, target_level, full_session_id, passed, score_pct, per_skill_pct JSONB, created_at |
+
+All migrations via `addColumnIfMissing()` per backend convention.
+
+### V21 Configuration
+
+| Env | Default | Use |
+|---|---|---|
+| `LEVEL_MASTERY_THRESHOLD_PCT` | 70.0 | Per-skill mastery to unlock |
+| `LEVEL_COVERAGE_THRESHOLD_PCT` | 80.0 | Module coverage to unlock |
+| `LEVEL_PROMOTION_PASS_PCT` | 60.0 | Pass score per section |
+| `LEVEL_PROMOTION_COOLDOWN_HOURS` | 24 | Cooldown between failed attempts |
+| `LEVEL_DEMO_EXERCISE_PER_LEVEL` | 1 | Demo exercises shown per locked upper level |
+
+Loader: `backend/internal/processing/level_config.go` (sibling to V19
+`processing_config.go` — kept in `processing/` per repo convention,
+not the `internal/config/` package the original plan named since no
+such package exists).
+
+### V21 Endpoints
+
+| Route | Purpose |
+|---|---|
+| `GET /v1/users/me/level-progress` | Per-skill mastery vs threshold + unlock state |
+| `POST /v1/users/me/placement-test/start` | Returns placement MockTest + session |
+| `POST /v1/users/me/placement-test/complete` | Maps score → assigned level, writes user |
+| `POST /v1/promotion-attempts` | Create promotion attempt; rejects if locked or in cooldown |
+| `GET /v1/courses` (modify) | Adds `?level=` filter + per-item `unlock_state` |
+| `GET /v1/courses/:id` (modify) | Adds `unlock_state`, `demo_exercise_id`, `level` |
+
+Existing `GET /v1/users/me/progress` (V19) **payload unchanged**.
+
+### V21 Backend Layout
+
+Reconciled at slice end — code lands across the existing package
+split rather than a new `internal/level/` package, matching the V19
+mastery layout.
+
+| File | Owns |
+|---|---|
+| `backend/internal/processing/level_service.go` | Gating math, `ComputeLevelProgress`, `MapPlacementScoreToLevel`, `ResolveCourseUnlock`. Pure orchestration. |
+| `backend/internal/processing/level_promotion.go` | `HandlePromotionOutcome` post-scoring hook (V21-B8); marks ledger + atomically promotes user. |
+| `backend/internal/processing/level_config.go` | Env loader (`LEVEL_*` vars). Sibling to `processing_config.go` (V19) and `llm_config.go`. |
+| `backend/internal/processing/mastery_updater.go` | Extended with `WithDemoCheck` so demo attempts skip mastery aggregate. |
+| `backend/internal/store/user_level_store.go` | `UserLevelStore` interface + memory + Postgres impls (level columns on `users`). |
+| `backend/internal/store/promotion_attempts_store.go` | `PromotionAttemptsStore` interface + memory + Postgres impls + `ensurePromotionAttemptsSchema`. |
+| `backend/internal/contracts/level.go` | `LevelProgressResponse` + `SkillMasteryInfo` DTOs. |
+| `backend/internal/contracts/user_level.go` | `UserLevel` struct. |
+| `backend/internal/contracts/promotion_attempt.go` | `PromotionAttempt` ledger row. |
+| `backend/internal/httpapi/level_handler.go` | `GET /v1/users/me/level-progress` + `LevelDeps` + `SetLevelDeps`. |
+| `backend/internal/httpapi/placement_handler.go` | `POST /v1/users/me/placement-test/start` + `/complete`. |
+| `backend/internal/httpapi/promotion_handler.go` | `POST /v1/promotion-attempts` (5-step error precedence). |
+| `backend/internal/httpapi/level_flow_test.go` | E2E smoke (V21-E1). |
+
+`LevelService` consumes V19's `SkillMasteryStore` via the read-only
+`LevelMasteryReader` interface — **no duplicate aggregation logic.**
+
+### V21 CMS
+
+| File | Change |
+|---|---|
+| `cms/components/course-form/*` | `Level` select + `DemoExerciseField` |
+| `cms/components/mock-test-form/*` | `is_promotion`, `is_placement`, `target_level` (mutex on placement+promotion) |
+
+CMS keeps inline VI strings (per AGENTS.md).
+
+### V21 Flutter
+
+| Path | Change |
+|---|---|
+| `flutter_app/lib/core/api/level_api.dart` | NEW client |
+| `flutter_app/lib/features/onboarding/welcome_screen.dart` | NEW |
+| `flutter_app/lib/features/onboarding/placement_result_screen.dart` | NEW |
+| `flutter_app/lib/features/home/widgets/level_badge.dart` | NEW |
+| `flutter_app/lib/features/home/widgets/level_progress_ring.dart` | NEW |
+| `flutter_app/lib/features/home/widgets/promotion_banner.dart` | NEW |
+| `flutter_app/lib/features/courses/widgets/locked_course_sheet.dart` | NEW |
+| `flutter_app/lib/features/promotion/pre_exam_screen.dart` | NEW |
+| `flutter_app/lib/features/promotion/promotion_result_screen.dart` | NEW (pass + fail variants) |
+| `flutter_app/lib/features/home/home_screen.dart` | MODIFY — embed badge + ring + banner |
+| `flutter_app/lib/features/courses/course_list_screen.dart` | MODIFY — lock + demo states |
+| `flutter_app/lib/l10n/app_vi.arb` + `app_en.arb` | NEW keys (count must match) |
+
+**Reuse `AppColors` / `AppSpacing` / `AppTypography`. NO new style
+system.** Icons via Lucide vector pack.
+
+### V21 Behavior Rules
+
+- Onboarding routes every new user through placement (skippable; skip
+  → `a0`).
+- Existing users: backfilled to `a2`, all lower levels unlocked,
+  `placement_taken_at NULL`. Settings exposes opt-in re-test.
+- Locked exercise reads return `403 level_locked` except the demo
+  exercise per upper-level course (`Course.demo_exercise_id`).
+- Demo attempts **do not** write mastery aggregates.
+- Server is sole authority for `unlock_state`. Client never decides.
+- Promotion fail does **not** decrement mastery — only writes a
+  `promotion_attempts` row + 24h cooldown.
+- Promotion pass is atomic: scoring write + level promotion in one
+  transaction. Idempotent.
+
+### Avoid in V21
+
+- ❌ Skill-wise CEFR per learner (defer to future slice)
+- ❌ Adaptive promotion exam generation
+- ❌ A0 / A1 content authoring inside this slice
+- ❌ Auto-demotion / level expiry
+- ❌ Certificate / badge sharing
+- ❌ Per-screen ad-hoc colors (must use `AppColors`)
+- ❌ Emoji icons (Lucide SVG only)
+- ❌ Client-side gate computation
+- ❌ Inlining LLM prompt/model strings (per AGENTS.md)
+- ❌ Decrementing mastery on promotion fail
+- ❌ A new `PromotionTest` entity (use `MockTest` flags)
+
+### V21 Verification
+
+| Layer | Lệnh | Pass |
+|---|---|---|
+| BE-unit | `make backend-test` | +20 tests min — gating, cooldown, placement bands, atomic promotion, V19 mastery still passing |
+| BE-int | `tests/level_flow_test.go` (new) | Signup → skip placement → A0 → seed mastery → attempt → fail → cooldown → retry → pass → B1 unlocked |
+| CMS | `make cms-lint && make cms-build && cd cms && npm test` | +6 Vitest min |
+| Flutter | `make flutter-analyze && make flutter-test` | +12 widget tests min (`LevelBadge`, `LevelProgressRing`, `LockedCourseSheet`, `PromotionResultScreen` pass + fail) |
+| Smoke | `make smoke-promotion-flow` (new) | E2E: placement → mastery seed → promotion pass |
+| CHECKPOINT | `make verify` | Full pass |
