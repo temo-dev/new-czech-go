@@ -28,11 +28,11 @@ Read this next if you want the execution order and scope breakdown.
 ### 3. Technical Source Of Truth
 Read these when you need stable implementation contracts.
 
-- [Content And Attempt Model](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/content-and-attempt-model.md)
-- [API Contracts](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/api-contracts.md)
-- [Attempt State Machine](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/attempt-state-machine.md)
-- [Infrastructure Baseline](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/infrastructure-baseline.md)
-- [Scoring Pipeline](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/scoring-pipeline.md)
+- [Content And Attempt Model](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/content-and-attempt-model.md)
+- [API Contracts](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/api-contracts.md)
+- [Attempt State Machine](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/attempt-state-machine.md)
+- [Infrastructure Baseline](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/infrastructure-baseline.md)
+- [Scoring Pipeline](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/scoring-pipeline.md)
 
 ### 3b. Build-Ready Extension Specs
 Read these when you are preparing the next major feature slice but do not want to blur today’s shipped contracts.
@@ -70,8 +70,8 @@ Read these when you want UI-level behavior for Flutter and CMS.
 ### 8. Dev Workflow
 Read this when you want the fastest repeatable way to run the local stack.
 
-- [Dev Workflow](/Users/daniel.dev/Desktop/czech-go-system/docs/dev-workflow.md)
-- [CI And Release](/Users/daniel.dev/Desktop/czech-go-system/docs/ci-release.md)
+- [Dev Workflow](/Users/daniel.dev/Desktop/czech-go-system/docs/guides/dev-workflow.md)
+- [CI And Release](/Users/daniel.dev/Desktop/czech-go-system/docs/guides/ci-release.md)
 
 ## Docs Tree
 - `docs/ideas/` product direction and one-pagers
@@ -81,7 +81,7 @@ Read this when you want the fastest repeatable way to run the local stack.
 - `docs/design/` UI foundation and shared visual rules
 - `docs/features/` feature-level behavior and status
 - `docs/screens/` concrete screen-level behavior
-- `docs/dev-workflow.md` daily startup and verification flow
+- `docs/guides/` daily startup, deployment, smoke + ops handbooks
 
 ## Which Doc To Update
 

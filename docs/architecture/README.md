@@ -32,11 +32,11 @@ Read this when you want to know:
 - [Implementation Plan](/Users/daniel.dev/Desktop/czech-go-system/docs/plans/v1-implementation-plan.md)
 
 ### Technical Source Of Truth
-- [Content And Attempt Model](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/content-and-attempt-model.md)
-- [API Contracts](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/api-contracts.md)
-- [Attempt State Machine](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/attempt-state-machine.md)
-- [Infrastructure Baseline](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/infrastructure-baseline.md)
-- [Scoring Pipeline](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/scoring-pipeline.md)
+- [Content And Attempt Model](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/content-and-attempt-model.md)
+- [API Contracts](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/api-contracts.md)
+- [Attempt State Machine](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/attempt-state-machine.md)
+- [Infrastructure Baseline](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/infrastructure-baseline.md)
+- [Scoring Pipeline](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/scoring-pipeline.md)
 
 ### Feature And UI Layers
 - [Feature Docs](/Users/daniel.dev/Desktop/czech-go-system/docs/features/README.md)

@@ -113,7 +113,7 @@ Place loaders in `backend/internal/config/level.go` (new file). Do
 ## API Contracts
 
 All routes versioned under `/v1`. Align with
-`docs/specs/api-contracts.md`.
+`docs/reference/api-contracts.md`.
 
 ### `GET /v1/users/me/level-progress`
 

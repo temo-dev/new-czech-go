@@ -7,7 +7,7 @@
 ## Goal
 Ship multi-language support (`vi`, `en`) end-to-end: learner-picked interface language drives both UI copy and LLM-generated feedback.
 
-See [i18n-multi-language-support.md](/Users/daniel.dev/Desktop/czech-go-system/docs/ideas/i18n-multi-language-support.md) for motivation and [i18n-spec.md](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/i18n-spec.md) for the contract.
+See [i18n-multi-language-support.md](/Users/daniel.dev/Desktop/czech-go-system/docs/ideas/i18n-multi-language-support.md) for motivation and [i18n-spec.md](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/i18n-spec.md) for the contract.
 
 ## Strategy
 Two vertical slices. Keep the app shippable after each slice.

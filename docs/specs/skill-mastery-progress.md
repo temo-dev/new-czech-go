@@ -244,7 +244,7 @@ Response shape:
 - Empty user: `overall_progress = 0`, `overall_band = needs_work`,
   `skills = []`. Flutter renders empty state from this.
 
-Add to `docs/specs/api-contracts.md` after V19 ships.
+Add to `docs/reference/api-contracts.md` after V19 ships.
 
 ## Backend File Layout
 

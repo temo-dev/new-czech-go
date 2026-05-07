@@ -733,8 +733,8 @@ type AnoNeStatement struct {
 - `lib/l10n/intl_vi.arb` + `intl_en.arb`: điền giá trị
 
 **Docs:**
-- `docs/specs/content-and-attempt-model.md`: cập nhật `ExerciseType` enum
-- `docs/specs/api-contracts.md`: ghi chú `cteni_6`/`poslech_6` hợp lệ với `submit-answers`
+- `docs/reference/content-and-attempt-model.md`: cập nhật `ExerciseType` enum
+- `docs/reference/api-contracts.md`: ghi chú `cteni_6`/`poslech_6` hợp lệ với `submit-answers`
 
 ### Testing Strategy
 

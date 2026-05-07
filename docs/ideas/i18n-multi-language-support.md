@@ -49,7 +49,7 @@ Feedback is the primary value of the app. A learner who picks English UI but get
 | Feedback asks Claude to cite Czech phrases in EN prose | Low | Prompt already instructs Claude to quote exact Czech phrases. Czech citation format is locale-agnostic. |
 
 ## Related Docs
-- `docs/specs/i18n-spec.md` — technical contract for locale plumbing
+- `docs/reference/i18n-spec.md` — technical contract for locale plumbing
 - `docs/plans/i18n-implementation-plan.md` — phased build plan
-- `docs/specs/scoring-pipeline.md` — how LLM feedback integrates today
-- `docs/specs/api-contracts.md` — where the `locale` field lands on attempt create
+- `docs/reference/scoring-pipeline.md` — how LLM feedback integrates today
+- `docs/reference/api-contracts.md` — where the `locale` field lands on attempt create

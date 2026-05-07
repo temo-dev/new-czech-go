@@ -57,8 +57,8 @@ real transcript path
 
 **Files likely touched:**
 - `docs/specs/attempt-repair-and-shadowing.md`
-- `docs/specs/api-contracts.md`
-- `docs/specs/content-and-attempt-model.md`
+- `docs/reference/api-contracts.md`
+- `docs/reference/content-and-attempt-model.md`
 
 ## Task 2: Add backend persistence for review artifacts
 
@@ -162,7 +162,7 @@ real transcript path
 **Files likely touched:**
 - `backend/internal/httpapi/server.go`
 - `backend/internal/httpapi/server_test.go`
-- `docs/specs/api-contracts.md`
+- `docs/reference/api-contracts.md`
 - `flutter_app/lib/api_client.dart`
 
 **Status note:**

@@ -296,7 +296,7 @@ Unchanged. `DictationFeedback` shape is identical.
 ## 10. Open items (resolve in plan phase)
 
 - `media_assets.attempt_id` FK vs new `dictation_attempt_images` table — **Recommend `media_assets.attempt_id` column**: smaller diff, reuses `image_asset_id` plumbing; FK can be nullable/non-strict.
-- 30-day image eviction — defer to V18.3 ops slice; document in `docs/specs/infrastructure-baseline.md` as TODO.
+- 30-day image eviction — defer to V18.3 ops slice; document in `docs/reference/infrastructure-baseline.md` as TODO.
 - Anthropic preview cost monitoring — add per-day counter in admin dashboard (V18.2).
 - Dropping preview endpoint and OCR-on-Submit only (saves an endpoint) — **Reject**: preview UX is the core safety net for AC9; cost is already paid once per image.
 

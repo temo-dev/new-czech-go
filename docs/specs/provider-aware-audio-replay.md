@@ -5,8 +5,8 @@ This spec defines how the Flutter learner app streams stored audio (attempt reco
 
 Related:
 - [idea](/Users/daniel.dev/Desktop/czech-go-system/docs/ideas/provider-aware-audio-replay.md)
-- [api-contracts.md](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/api-contracts.md)
-- [infrastructure-baseline.md](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/infrastructure-baseline.md)
+- [api-contracts.md](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/api-contracts.md)
+- [infrastructure-baseline.md](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/infrastructure-baseline.md)
 
 ## Goals
 - Learner hears audio as soon as `just_audio` buffers enough bytes.

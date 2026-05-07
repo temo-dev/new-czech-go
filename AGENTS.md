@@ -57,17 +57,21 @@ Read before any structural change:
 
 | File | Owns |
 |------|------|
-| `SPEC.md` | Per-slice spec summaries (V2..V20) — all decisions frozen |
+| `SPEC.md` | Per-slice spec summaries (V2..V21.1) — all decisions frozen |
 | `tasks/plan.md` | Per-slice implementation plans with design decisions |
 | `tasks/todo.md` | Task checklist with tick state |
 | `CHANGELOG.md` | Per-slice history with file changes + final test counts |
-| `docs/specs/content-and-attempt-model.md` | Exercise type catalog |
-| `docs/specs/api-contracts.md` | Wire shapes |
-| `docs/specs/attempt-state-machine.md` | Attempt lifecycle |
-| `docs/specs/infrastructure-baseline.md` | V1 baseline + LLM env table |
-| `docs/specs/scoring-pipeline.md` | Scoring contract |
+| `docs/reference/content-and-attempt-model.md` | Exercise type catalog |
+| `docs/reference/api-contracts.md` | Wire shapes |
+| `docs/reference/attempt-state-machine.md` | Attempt lifecycle |
+| `docs/reference/infrastructure-baseline.md` | V1 baseline + LLM env table |
+| `docs/reference/scoring-pipeline.md` | Scoring contract |
+| `docs/reference/learner-profile-identity.md` | V17 user account model |
+| `docs/reference/i18n-spec.md` | Localization conventions |
+| `docs/reference/voice-selection-spec.md` | TTS voice routing |
 
-Slice-specific specs live under `docs/specs/<slice>.md` plus a paired
+`docs/reference/` holds **stable, always-current** contracts. Slice-specific
+specs (frozen after ship) live under `docs/specs/<slice>.md` plus a paired
 `docs/ideas/<slice>.md` (idea note) and optional `docs/plans/<slice>-plan.md`.
 
 `code-review-graph` MCP is wired for this repo — use it for impact
@@ -109,8 +113,8 @@ Use the root `Makefile`:
 | Smoke tests | `make smoke-attempt-flow` / `make smoke-course-flow` / `make smoke-exam-flow` / `make smoke-all` |
 | Full verify | `make verify` |
 
-For daily local startup: [docs/dev-workflow.md](docs/dev-workflow.md).
-For smoke usage and API notes: [docs/smoke-test-guide.md](docs/smoke-test-guide.md).
+For daily local startup: [docs/guides/dev-workflow.md](docs/guides/dev-workflow.md).
+For smoke usage and API notes: [docs/guides/smoke-test-guide.md](docs/guides/smoke-test-guide.md).
 
 Per `RTK.md`, prefix shell commands with `rtk` (Makefile already does).
 
@@ -118,9 +122,9 @@ Per `RTK.md`, prefix shell commands with `rtk` (Makefile already does).
 
 - Monolithic in V1.
 - Prefer standard library before adding deps.
-- Align request/response payloads with `docs/specs/api-contracts.md`.
+- Align request/response payloads with `docs/reference/api-contracts.md`.
 - Align learner-facing feedback with
-  `docs/specs/content-and-attempt-model.md`.
+  `docs/reference/content-and-attempt-model.md`.
 
 ### LLM prompts and model IDs — single source of truth
 
@@ -153,7 +157,7 @@ Reject in code review:
 - `os.Getenv("LLM_*" / "ELEVENLABS_*" / "REPLICATE_*")` outside
   `llm_config.go`.
 
-See `docs/specs/infrastructure-baseline.md` § "LLM configuration is
+See `docs/reference/infrastructure-baseline.md` § "LLM configuration is
 centralized" for the full env-var table.
 
 ### Storage
@@ -194,7 +198,7 @@ centralized" for the full env-var table.
 ## Infrastructure Conventions
 
 - Stay within the V1 baseline in
-  `docs/specs/infrastructure-baseline.md`.
+  `docs/reference/infrastructure-baseline.md`.
 - Do not introduce SQS, EventBridge, microservices, or Kubernetes
   unless the human explicitly changes scope.
 - Prefer a long-running Go service over serverless complexity.

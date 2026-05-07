@@ -1812,8 +1812,8 @@ TestBuildExerciseAudioText_Poslech6               // exercise.Detail = AnoNeDeta
 ### Slice AN-3 — Docs update
 
 **Files:**
-- `docs/specs/content-and-attempt-model.md` — thêm `cteni_6` và `poslech_6` vào `ExerciseType` enum
-- `docs/specs/api-contracts.md` — ghi chú `cteni_6`/`poslech_6` hợp lệ với `submit-answers`
+- `docs/reference/content-and-attempt-model.md` — thêm `cteni_6` và `poslech_6` vào `ExerciseType` enum
+- `docs/reference/api-contracts.md` — ghi chú `cteni_6`/`poslech_6` hợp lệ với `submit-answers`
 
 **AC:** Docs updated, không cần build check.
 

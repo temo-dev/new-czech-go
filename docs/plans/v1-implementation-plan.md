@@ -47,7 +47,7 @@ Content model + attempt model
 
 **Files likely touched:**
 - `docs/plans/v1-implementation-plan.md`
-- `docs/specs/content-and-attempt-model.md`
+- `docs/reference/content-and-attempt-model.md`
 
 **Estimated scope:** Small: 1-2 files
 
@@ -68,7 +68,7 @@ Content model + attempt model
 
 **Files likely touched:**
 - `docs/plans/v1-implementation-plan.md`
-- `docs/specs/infrastructure-baseline.md`
+- `docs/reference/infrastructure-baseline.md`
 
 **Estimated scope:** Small: 1-2 files
 
@@ -88,8 +88,8 @@ Content model + attempt model
 **Dependencies:** Tasks 1-2
 
 **Files likely touched:**
-- `docs/specs/api-contracts.md`
-- `docs/specs/attempt-state-machine.md`
+- `docs/reference/api-contracts.md`
+- `docs/reference/attempt-state-machine.md`
 
 **Estimated scope:** Medium: 3-5 files
 

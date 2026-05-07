@@ -601,7 +601,7 @@ Out of scope (open):
   was already added in V14).
 - Initials fallback derived from `display_name` (first 2 chars) or
   email local-part when avatar is absent.
-- Specs: `docs/specs/learner-profile-identity.md` · idea:
+- Specs: `docs/reference/learner-profile-identity.md` · idea:
   `docs/ideas/learner-profile-identity.md`.
 - Tests: 452 backend (+5), 201 Flutter, 95 CMS Vitest.
 
@@ -744,7 +744,7 @@ Out of scope (open):
   `conversation_config_override.tts.voice_id`. **Requires** "Allow
   client to override TTS voice" in ElevenLabs agent Security settings —
   WS reject otherwise.
-- Specs: `docs/ideas/interview-skill.md` · `docs/designs/interview-skill.html`.
+- Specs: `docs/ideas/interview-skill.md` · `docs/design/mockups/interview-skill.html`.
 - Tests: 263 backend, 61 CMS Vitest, 102 Flutter.
 
 ---
@@ -956,7 +956,7 @@ Out of scope (open):
   redesigns).
 - `criteria_results` parsed in Flutter `AttemptFeedbackView` as
   `CriterionCheckView`.
-- Admin content guide: `docs/admin-guide.md`.
+- Admin content guide: `docs/guides/admin-guide.md`.
 
 ---
 

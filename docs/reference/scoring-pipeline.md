@@ -74,7 +74,7 @@ The scoring pipeline must produce a valid `AttemptFeedback` object with:
 - `retry_advice`
 - optional sample answer data
 
-This shape must match [content-and-attempt-model.md](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/content-and-attempt-model.md).
+This shape must match [content-and-attempt-model.md](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/content-and-attempt-model.md).
 
 ## Pipeline Stages
 
@@ -487,7 +487,7 @@ Current implementation note:
 - The repo now has an `LLMFeedbackProvider` layer backed by Claude. Rule-based logic is always the fallback.
 - `Uloha 1` summaries mention the active topic label; `Uloha 2` summaries mention the scenario title. Both are included in the LLM prompt context.
 - `Uloha 3` and `Uloha 4` LLM prompts include the narrative/choice detail but task-completion rules for those types are still less refined than `Uloha 1` and `Uloha 2`.
-- **All prompts, model IDs, and fallback feedback are centralized** in `backend/internal/processing/llm_{config,prompts,user_prompts,fallbacks}.go`. Never inline prompt strings or model literals in scorer/handler files. See `docs/specs/infrastructure-baseline.md` for the file-ownership table and edit guide, and `AGENTS.md` § "LLM prompts and model IDs — single source of truth" for the convention rule.
+- **All prompts, model IDs, and fallback feedback are centralized** in `backend/internal/processing/llm_{config,prompts,user_prompts,fallbacks}.go`. Never inline prompt strings or model literals in scorer/handler files. See `docs/reference/infrastructure-baseline.md` for the file-ownership table and edit guide, and `AGENTS.md` § "LLM prompts and model IDs — single source of truth" for the convention rule.
 
 Fallback should still aim to produce:
 - `overall_summary`

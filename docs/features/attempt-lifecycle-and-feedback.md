@@ -26,8 +26,8 @@ This feature coordinates the backend attempt lifecycle from creation through lea
 - [backend/internal/store/attempt_store.go](/Users/daniel.dev/Desktop/czech-go-system/backend/internal/store/attempt_store.go)
 - [backend/internal/contracts/types.go](/Users/daniel.dev/Desktop/czech-go-system/backend/internal/contracts/types.go)
 - [flutter_app/lib/api_client.dart](/Users/daniel.dev/Desktop/czech-go-system/flutter_app/lib/api_client.dart)
-- [docs/specs/attempt-state-machine.md](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/attempt-state-machine.md)
-- [docs/specs/scoring-pipeline.md](/Users/daniel.dev/Desktop/czech-go-system/docs/specs/scoring-pipeline.md)
+- [docs/reference/attempt-state-machine.md](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/attempt-state-machine.md)
+- [docs/reference/scoring-pipeline.md](/Users/daniel.dev/Desktop/czech-go-system/docs/reference/scoring-pipeline.md)
 
 ## Graph Notes
 Graph inspection shows this feature is structurally backend-heavy today:
