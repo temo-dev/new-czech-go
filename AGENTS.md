@@ -227,21 +227,23 @@ silently expanding scope.
 
 ## Current Status
 
-All planned slices V2 → V20 shipped. See [CHANGELOG.md](CHANGELOG.md)
+All planned slices V2 → V21 shipped. See [CHANGELOG.md](CHANGELOG.md)
 for per-slice file changes, decisions, and final test counts.
 `tasks/todo.md` tracks active backlog.
 
-**Latest** (2026-05-06): V20.1 hotfixes from end-to-end MobAI learner
-simulation — `cteni_4` per-question options + `question_no` answer
-keys (B5+B6, P0); api_client tolerates flat `{"error":"<code>"}`
-envelopes (cast crash); `HomeProgressCard.refresh()` on pop-back to
-home (B7); flashcard "Đã biết" / "Ôn lại" fires background attempt so
-`tu_vung` mastery accrues (B8); course-detail stats use real
-skill/exercise totals instead of `modules.length * 4` (B4); reading
-+ listening result screens chain "Bài tiếp theo →" CTA when invoked
-from "Bắt đầu tất cả" (B3); `exerciseListSubtitle` ARB rewritten to a
-skill-neutral copy (B1). Backend 570 tests (unchanged — no contract
-changes), Flutter 266, CMS 121.
+**Latest** (2026-05-07): V21 CEFR Level Progression (A0 → B1) — pivot
+from "A2-only sprint" to a level-gated CEFR ladder with a 2-gate
+promotion (mastery threshold unlocks a promotion exam, passing the
+exam promotes the learner). MVP ships A2 + B1; A0/A1 schema-ready,
+content deferred. Server is sole authority for `unlock_state` and
+`promotion_unlocked` (client never recomputes gates). Existing users
+backfill to A2 via migration 026 (idempotent — guarded by
+`current_level='a0' AND placement_taken_at IS NULL`). Adds
+`promotion_attempts` ledger, `LevelService` gating math + atomic
+promotion hook (`HandlePromotionOutcome`, idempotent on replay),
+demo-aware `WithDemoCheck` so taste-test runs skip mastery aggregate.
+Backend 636 tests (570 + 66), Flutter 309 (266 + 43), CMS 144 (~123 +
+21). `make verify` + `make smoke-promotion-flow` both green.
 
 V19 skill mastery aggregate + `GET /v1/users/me/progress` and V20
 Flutter UI ship as in CHANGELOG.

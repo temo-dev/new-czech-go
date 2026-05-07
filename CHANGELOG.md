@@ -10,6 +10,155 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V21 — CEFR Level Progression (A0 → B1) — 2026-05-07
+
+Pivot from "A2-only sprint" to a level-gated CEFR ladder. Each
+learner has a `users.current_level`; content above their level is
+locked behind a 2-gate promotion (mastery threshold unlocks a
+promotion exam, passing the exam promotes the learner). MVP ships
+A2 + B1 only — A0/A1 schema-ready, content deferred. Existing users
+backfill to A2 with `{a0,a1,a2}` unlocked.
+
+Per-slice docs: idea `docs/ideas/cefr-level-progression.md`,
+spec `docs/specs/cefr-level-progression.md`, UX
+`docs/specs/cefr-level-progression-ux.md`, plan
+`tasks/cefr-level-progression-plan.md`.
+
+### V21 schema (migrations 025 + 026)
+
+- `courses` `+level enum(a0,a1,a2,b1) DEFAULT 'a2'`,
+  `+demo_exercise_id`, `courses_level_idx`. Existing courses backfill
+  to `a2`.
+- `users` `+current_level`, `+unlocked_levels TEXT[] DEFAULT {a0}`,
+  `+placement_taken_at`. Migration 026 backfills pre-V21 users to
+  `current_level='a2'` + `{a0,a1,a2}` (idempotent — guarded by
+  `current_level='a0' AND placement_taken_at IS NULL` so re-runs and
+  greenfield deploys are no-ops).
+- `mock_tests` `+is_promotion`, `+is_placement`, `+target_level` with
+  three CHECK constraints (target enum, promotion-target-required,
+  promotion/placement mutex).
+- `promotion_attempts` (new): per-attempt ledger with FKs to
+  `users(id)` + `mock_tests(id)`, descending composite index
+  `(user_id, target_level, created_at DESC)`.
+
+### V21 endpoints
+
+- `GET /v1/users/me/level-progress` — server-authoritative gating
+  state for the home screen. Returns per-skill mastery vs threshold,
+  coverage pct, `promotion_unlocked` flag, optional cooldown
+  timestamp. `Cache-Control: no-store`.
+- `POST /v1/users/me/placement-test/start` — picks the latest
+  `is_placement=true` MockTest, creates a session, returns
+  `{mock_test_id, full_session_id}`. `409 placement_already_taken`
+  unless `?force=true`.
+- `POST /v1/users/me/placement-test/complete` — reads session
+  `OverallScore`, maps via `LevelService.MapPlacementScoreToLevel`,
+  persists `current_level + placement_taken_at`. `404` hides
+  wrong-owner / missing-session identically.
+- `POST /v1/promotion-attempts` — error precedence: `404
+  mock_test_not_found` → `400 mock_test_not_promotion` → `409
+  level_already_unlocked` → `400 promotion_locked` → `400
+  cooldown_active` (with `retry_after`). On pass creates
+  `mock_exam_session` + `promotion_attempts` row.
+- `GET /v1/courses(/:id)` — adds `?level=` filter, per-item
+  `level / unlock_state / demo_exercise_id`. `unlock_state` ∈
+  `{unlocked, demo, locked}` — server is sole authority.
+- `GET /v1/exercises/:id` — `403 level_locked` unless caller's level
+  unlocks the parent course OR exercise == course's `demo_exercise_id`.
+
+### V21 backend layout
+
+Code lands across the existing package split (no new
+`internal/level/` package — matches V19 mastery layout):
+
+- `processing/level_service.go` — gating math (`ComputeLevelProgress`,
+  `ResolveCourseUnlock`).
+- `processing/level_promotion.go` — `HandlePromotionOutcome` post-
+  scoring hook; idempotent on replay.
+- `processing/level_config.go` — env loader (sole owner of `LEVEL_*`
+  reads).
+- `processing/mastery_updater.go` — extended with `WithDemoCheck` so
+  demo attempts skip mastery aggregate writes.
+- `store/user_level_store.go` — interface + memory + Postgres impls.
+- `store/promotion_attempts_store.go` — interface + memory + Postgres
+  impls + schema helper.
+- `contracts/level.go`, `contracts/user_level.go`,
+  `contracts/promotion_attempt.go` — DTOs.
+- `httpapi/level_handler.go`, `placement_handler.go`,
+  `promotion_handler.go` — wire the four endpoints + `LevelDeps`.
+- `httpapi/level_flow_test.go` — E2E smoke (V21-E1).
+- Hook fired from `httpapi/server.go.handleMockExamComplete` after
+  `repo.CompleteMockExam` returns the finalised session.
+
+### V21 CMS
+
+- Course form: `<select>` over CEFR levels (`cms/lib/level.ts` shared
+  helpers) + optional `demo_exercise_id` text input (hidden at
+  lowest level). `coursePayload` carries both fields.
+- MockTest form: mutex `is_promotion`/`is_placement` checkboxes via
+  `cms/lib/mockTestFlags.ts` helpers (`togglePromotion`,
+  `togglePlacement`, `setTargetLevel`, `validateMockTestFlags`,
+  `mockTestFlagsPayload`); target_level select reveals only when
+  promotion is on; `validateMockTestFlags` blocks submit when
+  promotion lacks target.
+
+### V21 Flutter
+
+- `core/level_utils.dart` — `CefrLevel` enum + parsers + ladder
+  helpers + `CourseUnlockState`.
+- `core/api/level_api.dart` — typed client; `LevelApiException`
+  collapses both backend envelope shapes (`{error: {code, ...}}` and
+  flat `{error: "code"}`).
+- `models/models.dart` extended — `LevelProgressResponse`,
+  `SkillMasteryInfo`, `Course.level/unlockState/demoExerciseId`.
+- `features/home/widgets/level_badge.dart`,
+  `level_progress_ring.dart`, `promotion_banner.dart`,
+  `home_level_header.dart` — home composer.
+- `features/courses/widgets/locked_course_tile.dart`,
+  `locked_course_sheet.dart` — locked-state UI.
+- `features/onboarding/welcome_screen.dart`,
+  `placement_result_screen.dart` — first-launch flow.
+- `features/promotion/pre_exam_screen.dart`,
+  `promotion_result_screen.dart` — pre-exam confirm + pass/fail
+  result with diagnostic table + live cooldown timer.
+- ARB additions (matched VI = EN counts): six `v21*` keys for badge
+  / banner / locked / promotion copy.
+
+### V21 boundaries
+
+- Server is sole authority for `unlock_state` and `promotion_unlocked`.
+  Client never recomputes gates.
+- Promotion fail does **not** decrement mastery — only writes the
+  ledger row + 24h cooldown.
+- Demo attempts (`exercise == course.demo_exercise_id`) skip mastery
+  aggregate via `WithDemoCheck` callback so taste-test runs leave no
+  trace.
+- Reuse `MockTest` via flags. No new `PromotionTest` entity.
+
+### V21 deferred (per scope discipline)
+
+- A0 / A1 module + exercise authoring (content question, not
+  engineering).
+- `home_screen.dart` integration of `HomeLevelHeader`.
+- Onboarding router gate (first-launch routing through Welcome →
+  placement → result → home).
+- Per-screen ARB-routed copy across the V21 widgets (queued for
+  deploy-time wiring pass).
+
+### V21 final test counts
+
+- Backend: **636** (baseline 570, +66 net — A1+A2: +7, B1: +6, B2:
+  +4, B3: +10, B4: +4, B5: +7, B6: +7, B7: +5, B8: +5, E1: +2 —
+  exceeds plan budget +45).
+- CMS Vitest: **144** (baseline ~123, +21 — C1: +6, C2: +15;
+  exceeds plan budget +6).
+- Flutter: **309** (baseline 266, +43 — D1: +11, D2: +6, D3: +4,
+  D4: +4, D5: +3, D6: +3, D7: +4, D8: +5, D9: +3; exceeds plan
+  budget +32).
+- `make verify` exits 0; `make smoke-promotion-flow` exits 0.
+
+---
+
 ## V20.1 — Hotfixes from learner-flow simulation — 2026-05-06
 
 End-to-end MobAI simulation through the demo course surfaced 7 bugs in

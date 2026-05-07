@@ -1747,7 +1747,10 @@ All migrations via `addColumnIfMissing()` per backend convention.
 | `LEVEL_PROMOTION_COOLDOWN_HOURS` | 24 | Cooldown between failed attempts |
 | `LEVEL_DEMO_EXERCISE_PER_LEVEL` | 1 | Demo exercises shown per locked upper level |
 
-Loader: `backend/internal/config/level.go`.
+Loader: `backend/internal/processing/level_config.go` (sibling to V19
+`processing_config.go` — kept in `processing/` per repo convention,
+not the `internal/config/` package the original plan named since no
+such package exists).
 
 ### V21 Endpoints
 
@@ -1764,16 +1767,28 @@ Existing `GET /v1/users/me/progress` (V19) **payload unchanged**.
 
 ### V21 Backend Layout
 
+Reconciled at slice end — code lands across the existing package
+split rather than a new `internal/level/` package, matching the V19
+mastery layout.
+
 | File | Owns |
 |---|---|
-| `backend/internal/level/service.go` | Gating math, threshold logic |
-| `backend/internal/level/repository.go` | DB reads/writes for users + promotion_attempts |
-| `backend/internal/level/handlers.go` | HTTP wiring |
-| `backend/internal/level/deps.go` | `LevelDeps` struct (mirrors V19 `MasteryDeps`) |
-| `backend/internal/config/level.go` | Env loader |
+| `backend/internal/processing/level_service.go` | Gating math, `ComputeLevelProgress`, `MapPlacementScoreToLevel`, `ResolveCourseUnlock`. Pure orchestration. |
+| `backend/internal/processing/level_promotion.go` | `HandlePromotionOutcome` post-scoring hook (V21-B8); marks ledger + atomically promotes user. |
+| `backend/internal/processing/level_config.go` | Env loader (`LEVEL_*` vars). Sibling to `processing_config.go` (V19) and `llm_config.go`. |
+| `backend/internal/processing/mastery_updater.go` | Extended with `WithDemoCheck` so demo attempts skip mastery aggregate. |
+| `backend/internal/store/user_level_store.go` | `UserLevelStore` interface + memory + Postgres impls (level columns on `users`). |
+| `backend/internal/store/promotion_attempts_store.go` | `PromotionAttemptsStore` interface + memory + Postgres impls + `ensurePromotionAttemptsSchema`. |
+| `backend/internal/contracts/level.go` | `LevelProgressResponse` + `SkillMasteryInfo` DTOs. |
+| `backend/internal/contracts/user_level.go` | `UserLevel` struct. |
+| `backend/internal/contracts/promotion_attempt.go` | `PromotionAttempt` ledger row. |
+| `backend/internal/httpapi/level_handler.go` | `GET /v1/users/me/level-progress` + `LevelDeps` + `SetLevelDeps`. |
+| `backend/internal/httpapi/placement_handler.go` | `POST /v1/users/me/placement-test/start` + `/complete`. |
+| `backend/internal/httpapi/promotion_handler.go` | `POST /v1/promotion-attempts` (5-step error precedence). |
+| `backend/internal/httpapi/level_flow_test.go` | E2E smoke (V21-E1). |
 
-`LevelService` consumes `MasteryDeps` (V19) — **no duplicate
-aggregation logic.**
+`LevelService` consumes V19's `SkillMasteryStore` via the read-only
+`LevelMasteryReader` interface — **no duplicate aggregation logic.**
 
 ### V21 CMS
 

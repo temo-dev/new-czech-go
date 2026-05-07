@@ -124,10 +124,12 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** in-process Go integration test (preferred for stability over Python script + running server) drives the full flow: skip placement → seed passing mastery → fetch level-progress (asserts `promotion_unlocked=true`) → POST /v1/promotion-attempts (asserts 201 + payload) → simulate session completion + invoke `HandlePromotionOutcome` → assert `current_level=b1` + ledger row passed=true; also covers fail path: failed scoring leaves user level untouched + retry within window returns `400 cooldown_active` with `retry_after`
   - **Verify:** `make smoke-promotion-flow` exits 0 (2 tests pass); full backend suite stays green
   - **Size:** L
-- [ ] **V21-E2** Manual MAN-1..MAN-10 on TestFlight
+- [ ] **V21-E2** Manual MAN-1..MAN-10 on TestFlight (deferred — manual deploy-time pass; outside automated TDD scope)
   - Per plan E2 — onboarding, placement bands, locked card, demo no-write, banner, pass celebration, fail diagnostic, existing-user backfill, reduced-motion, VoiceOver
-- [ ] **V21-E3** `make verify` final
-  - **AC:** Backend +45, Flutter +32, CMS +6; full verify green; no V19/V20 regression
+- [x] **V21-E3** `make verify` final + reconciliation
+  - **AC:** `make verify` exits 0 (backend-build, cms-lint clean, cms-build compiled, flutter-analyze clean, flutter-test 309 passing); SPEC.md V21 backend layout reconciled to actual paths (no `internal/level/` package — code spread across `processing/` / `store/` / `httpapi/` / `contracts/` per V19 convention); CHANGELOG V21 entry written with full schema/endpoints/layout/CMS/Flutter/boundaries/deferred + final counts; AGENTS.md "Current Status" updated to V21
+  - **Verify:** Backend 636 (+66 — exceeds plan +45), Flutter 309 (+43 — exceeds +32), CMS 144 (+21 — exceeds +6); `make verify` exit 0; `make smoke-promotion-flow` exit 0
+  - **Size:** S
 
 **[CHECKPOINT V21-FINAL]**
 - [ ] Backend test target ≥ 615
