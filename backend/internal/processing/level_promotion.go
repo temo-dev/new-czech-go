@@ -52,7 +52,7 @@ func HandlePromotionOutcome(deps PromotionHookDeps, session contracts.MockExamSe
 		return false, nil
 	}
 
-	scorePct := float64(session.OverallScore)
+	scorePct := OverallScorePctFromSession(session)
 	perSkill := perSkillPctFromSections(session.Sections)
 
 	if _, err := deps.PromoAttempts.MarkResult(pa.ID, session.Passed, scorePct, perSkill); err != nil {
@@ -64,6 +64,25 @@ func HandlePromotionOutcome(deps PromotionHookDeps, session contracts.MockExamSe
 		}
 	}
 	return true, nil
+}
+
+// OverallScorePctFromSession converts a MockExamSession's raw OverallScore
+// (sum of section_score + optional pronunciation bonus) into a 0–100
+// percentage by dividing by the sum of section MaxPoints. Returns 0 when
+// the section breakdown carries no max — keeps misconfigured mocks from
+// crashing the gating pipeline. Public so the placement handler can
+// reuse the same conversion (V21 spec § score scale).
+func OverallScorePctFromSession(session contracts.MockExamSession) float64 {
+	totalMax := 0
+	for _, sec := range session.Sections {
+		if sec.MaxPoints > 0 {
+			totalMax += sec.MaxPoints
+		}
+	}
+	if totalMax <= 0 {
+		return 0
+	}
+	return float64(session.OverallScore) / float64(totalMax) * 100
 }
 
 // perSkillPctFromSections aggregates section-level scores into per-skill

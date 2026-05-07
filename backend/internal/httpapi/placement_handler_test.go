@@ -34,7 +34,11 @@ func newPlacementTestServer(t *testing.T, now time.Time, skipSeed bool) (*httpte
 			IsPlacement:              true,
 			EstimatedDurationMinutes: 12,
 			Sections: []contracts.MockTestSection{
-				{SequenceNo: 1, SkillKind: "doc", ExerciseID: "ex_doc_1", ExerciseType: "cteni_1"},
+				// MaxPoints explicit so OverallScorePctFromSession has a
+				// real denominator (V21 review C2). Set to 100 so
+				// SetMockExamOverallScoreForTesting(score) directly
+				// expresses score_pct in the placement happy-path test.
+				{SequenceNo: 1, SkillKind: "doc", ExerciseID: "ex_doc_1", ExerciseType: "cteni_1", MaxPoints: 100},
 			},
 		})
 		if err != nil {
@@ -113,6 +117,32 @@ func TestPlacementHandler_Start_FreshUserCreatesSession(t *testing.T) {
 	}
 	if data["full_session_id"].(string) == "" {
 		t.Error("full_session_id missing")
+	}
+}
+
+// V21 review I3: a draft placement mock must not be served to learners.
+func TestPlacementHandler_Start_DraftPlacementMockNotPicked_404(t *testing.T) {
+	srv, repo, _, _ := newPlacementTestServer(t, time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC), true)
+	defer srv.Close()
+
+	if _, err := repo.CreateMockTest(contracts.MockTest{
+		Title: "Draft placement", Status: "draft",
+		IsPlacement: true,
+		Sections: []contracts.MockTestSection{
+			{SequenceNo: 1, SkillKind: "doc", ExerciseID: "ex_doc_1", ExerciseType: "cteni_1", MaxPoints: 100},
+		},
+	}); err != nil {
+		t.Fatalf("seed draft placement: %v", err)
+	}
+
+	status, body := placementPost(t, srv, "/v1/users/me/placement-test/start",
+		"dev-learner-token", nil)
+	if status != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404 (draft must not be served); body=%v",
+			status, body)
+	}
+	if code := errCode(body); code != "placement_not_configured" {
+		t.Errorf("error.code = %q, want placement_not_configured", code)
 	}
 }
 
@@ -211,6 +241,36 @@ func TestPlacementHandler_Complete_WrongOwner_404(t *testing.T) {
 		map[string]string{"full_session_id": other.ID})
 	if status != http.StatusNotFound {
 		t.Errorf("status = %d, want 404", status)
+	}
+}
+
+// V21 review C1: a session for a non-placement MockTest must NOT be
+// accepted by /placement-test/complete. Without this guard a learner
+// could submit any of their regular mock_exam_session ids and bypass
+// the placement test entirely.
+func TestPlacementHandler_Complete_RejectsNonPlacementSession_404(t *testing.T) {
+	srv, repo, _, _ := newPlacementTestServer(t, time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC), false)
+	defer srv.Close()
+
+	plain, err := repo.CreateMockTest(contracts.MockTest{
+		Title: "Practice Mock", Status: "published",
+		Sections: []contracts.MockTestSection{
+			{SequenceNo: 1, SkillKind: "doc", ExerciseID: "ex_doc_1", ExerciseType: "cteni_1", MaxPoints: 100},
+		},
+	})
+	if err != nil {
+		t.Fatalf("seed plain mock: %v", err)
+	}
+	session, err := repo.CreateMockExam("user-learner-1", plain.ID)
+	if err != nil {
+		t.Fatalf("seed practice session: %v", err)
+	}
+	repo.SetMockExamOverallScoreForTesting(session.ID, 80)
+
+	status, _ := placementPost(t, srv, "/v1/users/me/placement-test/complete",
+		"dev-learner-token", map[string]string{"full_session_id": session.ID})
+	if status != http.StatusNotFound {
+		t.Errorf("status = %d, want 404 (non-placement session must not assign level)", status)
 	}
 }
 

@@ -1233,4 +1233,30 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get profileProgressEntry => 'Tiến độ học tập';
+
+  @override
+  String v21LevelBadgeStudying(String level) {
+    return 'Đang học $level';
+  }
+
+  @override
+  String v21PromotionBannerHeadline(String level) {
+    return 'Sẵn sàng thi nâng cấp lên $level';
+  }
+
+  @override
+  String get v21LockedCourseRequirement => 'Hoàn thành mastery để mở khoá';
+
+  @override
+  String v21PromotionPassHeadline(String level) {
+    return 'Bạn đã lên $level!';
+  }
+
+  @override
+  String get v21PromotionFailHeadline => 'Chưa đạt — luyện thêm nhé';
+
+  @override
+  String v21PromotionCooldownLabel(String hms) {
+    return 'Có thể thi lại sau $hms';
+  }
 }

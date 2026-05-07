@@ -85,12 +85,28 @@ func (s *LevelService) MapPlacementScoreToLevel(score float64) string {
 // An empty courseLevel is treated as a fully-unlocked legacy course so the
 // pre-V21 backfill path keeps working until every course gets a level
 // assignment.
+//
+// Reads the user level fresh on every call. Listing endpoints that
+// resolve unlock for many courses in a row should prefer
+// [ResolveCourseUnlockWith] so the user level read stays O(1) per
+// request — see V21 review I1.
 func (s *LevelService) ResolveCourseUnlock(userID, courseLevel, demoExerciseID string) string {
 	if courseLevel == "" {
 		return "unlocked"
 	}
 	level, _ := s.UserLevels.GetUserLevel(userID)
-	for _, lvl := range level.UnlockedLevels {
+	return ResolveCourseUnlockWith(level.UnlockedLevels, courseLevel, demoExerciseID)
+}
+
+// ResolveCourseUnlockWith is the pure variant: it computes the unlock
+// state from a pre-fetched UnlockedLevels slice. Use this from list
+// handlers (e.g. GET /v1/courses) so a single level read powers every
+// course tile, instead of N+1 store hits.
+func ResolveCourseUnlockWith(unlockedLevels []string, courseLevel, demoExerciseID string) string {
+	if courseLevel == "" {
+		return "unlocked"
+	}
+	for _, lvl := range unlockedLevels {
 		if lvl == courseLevel {
 			return "unlocked"
 		}

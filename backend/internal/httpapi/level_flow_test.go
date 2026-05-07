@@ -66,7 +66,9 @@ func TestV21LevelFlow_E2E_PromotionPassUnlocksTargetLevel(t *testing.T) {
 	//    in handleMockExamComplete then fires HandlePromotionOutcome.
 	//    For the smoke we drive both directly so the test stays sealed
 	//    against the per-attempt scoring pipeline.
-	if !repo.SetMockExamOverallScoreForTesting(sessionID, 78) {
+	// OverallScore is raw points; pct = score / sum(MaxPoints) × 100.
+	// 17 / 20 → 85% — well above the 60% pass threshold.
+	if !repo.SetMockExamOverallScoreForTesting(sessionID, 17) {
 		t.Fatalf("seed session overall score: session not found")
 	}
 	session, _ := repo.MockExamByID(sessionID)
@@ -115,8 +117,8 @@ func TestV21LevelFlow_E2E_PromotionPassUnlocksTargetLevel(t *testing.T) {
 	if pa.ID != promoAttemptID {
 		t.Errorf("ledger id mismatch: got %s want %s", pa.ID, promoAttemptID)
 	}
-	if !pa.Passed || pa.ScorePct != 78 {
-		t.Errorf("ledger row not marked pass: %+v", pa)
+	if !pa.Passed || pa.ScorePct != 85 {
+		t.Errorf("ledger row not marked pass: %+v (want passed=true, score_pct=85)", pa)
 	}
 }
 

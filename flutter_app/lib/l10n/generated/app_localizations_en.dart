@@ -1233,4 +1233,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileProgressEntry => 'Your progress';
+
+  @override
+  String v21LevelBadgeStudying(String level) {
+    return 'Studying $level';
+  }
+
+  @override
+  String v21PromotionBannerHeadline(String level) {
+    return 'Ready to test up to $level';
+  }
+
+  @override
+  String get v21LockedCourseRequirement => 'Reach mastery threshold to unlock';
+
+  @override
+  String v21PromotionPassHeadline(String level) {
+    return 'You\'re now at $level!';
+  }
+
+  @override
+  String get v21PromotionFailHeadline => 'Not yet — keep practicing';
+
+  @override
+  String v21PromotionCooldownLabel(String hms) {
+    return 'Retry available in $hms';
+  }
 }

@@ -237,16 +237,17 @@ func (s *memoryMockTestStore) SetMockTestBannerImage(id, storageKey string) bool
 	return true
 }
 
-// LatestPlacementMockTest returns the placement-flagged mock test most
-// recently added to the store. The memory backend has no created_at, so
-// "most recently added" maps to the highest-sorted ID — IDs are
-// monotonically increasing in the memory CreateMockTest path.
+// LatestPlacementMockTest returns the placement-flagged published mock
+// test most recently added to the store. Drafts never leak to learners
+// (V21 review I3). The memory backend has no created_at, so "most
+// recently added" maps to the highest-sorted ID — IDs are monotonically
+// increasing in the memory CreateMockTest path.
 func (s *memoryMockTestStore) LatestPlacementMockTest() (contracts.MockTest, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	var best *contracts.MockTest
 	for _, t := range s.tests {
-		if !t.IsPlacement {
+		if !t.IsPlacement || t.Status != "published" {
 			continue
 		}
 		if best == nil || t.ID > best.ID {

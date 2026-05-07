@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
+	"github.com/danieldev/czech-go-system/backend/internal/processing"
 )
 
 func (s *Server) handlePlacementTestStart(w http.ResponseWriter, r *http.Request, user contracts.User) {
@@ -100,8 +101,21 @@ func (s *Server) handlePlacementTestComplete(w http.ResponseWriter, r *http.Requ
 		writeNotFound(w)
 		return
 	}
+	// V21 review C1: validate the session belongs to a placement-flagged
+	// MockTest. Without this check a learner could submit any of their
+	// regular mock_exam_session ids and have its score map to a level —
+	// silently skipping the placement test.
+	if session.MockTestID == "" {
+		writeNotFound(w)
+		return
+	}
+	mock, mockOK := s.repo.MockTestByID(session.MockTestID)
+	if !mockOK || !mock.IsPlacement {
+		writeNotFound(w)
+		return
+	}
 
-	scorePct := float64(session.OverallScore)
+	scorePct := processing.OverallScorePctFromSession(session)
 	assignedLevel := s.levelService.MapPlacementScoreToLevel(scorePct)
 	updated, err := s.userLevelStore.MarkPlacementTaken(user.ID, assignedLevel, time.Now().UTC())
 	if err != nil {

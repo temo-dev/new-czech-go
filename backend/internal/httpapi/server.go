@@ -2666,12 +2666,21 @@ func (s *Server) handleCourses(w http.ResponseWriter, r *http.Request, user cont
 	}
 	courses := s.repo.ListCourses("published")
 	levelFilter := r.URL.Query().Get("level")
+	// V21 review I1: read the user level once per request so N courses
+	// don't generate N store reads.
+	var unlockedLevels []string
+	if s.levelService != nil && s.userLevelStore != nil {
+		ul, _ := s.userLevelStore.GetUserLevel(user.ID)
+		unlockedLevels = ul.UnlockedLevels
+	}
 	out := make([]contracts.Course, 0, len(courses))
 	for _, c := range courses {
 		if levelFilter != "" && c.Level != levelFilter {
 			continue
 		}
-		c.UnlockState = s.resolveCourseUnlockState(user.ID, c)
+		if s.levelService != nil {
+			c.UnlockState = processing.ResolveCourseUnlockWith(unlockedLevels, c.Level, c.DemoExerciseID)
+		}
 		out = append(out, c)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": out, "meta": map[string]any{}})

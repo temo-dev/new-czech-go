@@ -2350,6 +2350,42 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Tiến độ học tập'**
   String get profileProgressEntry;
+
+  /// No description provided for @v21LevelBadgeStudying.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang học {level}'**
+  String v21LevelBadgeStudying(String level);
+
+  /// No description provided for @v21PromotionBannerHeadline.
+  ///
+  /// In vi, this message translates to:
+  /// **'Sẵn sàng thi nâng cấp lên {level}'**
+  String v21PromotionBannerHeadline(String level);
+
+  /// No description provided for @v21LockedCourseRequirement.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hoàn thành mastery để mở khoá'**
+  String get v21LockedCourseRequirement;
+
+  /// No description provided for @v21PromotionPassHeadline.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn đã lên {level}!'**
+  String v21PromotionPassHeadline(String level);
+
+  /// No description provided for @v21PromotionFailHeadline.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa đạt — luyện thêm nhé'**
+  String get v21PromotionFailHeadline;
+
+  /// No description provided for @v21PromotionCooldownLabel.
+  ///
+  /// In vi, this message translates to:
+  /// **'Có thể thi lại sau {hms}'**
+  String v21PromotionCooldownLabel(String hms);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -350,7 +350,7 @@ func (s *postgresMockTestStore) LatestPlacementMockTest() (contracts.MockTest, b
 SELECT id, title, description, estimated_duration_minutes, status, pass_threshold_percent, exam_mode, banner_image_id,
        is_promotion, is_placement, target_level
 FROM mock_tests
-WHERE is_placement = TRUE
+WHERE is_placement = TRUE AND status = 'published'
 ORDER BY created_at DESC
 LIMIT 1
 `).Scan(&t.ID, &t.Title, &t.Description, &t.EstimatedDurationMinutes, &t.Status, &t.PassThresholdPercent, &t.ExamMode, &t.BannerImageID,
