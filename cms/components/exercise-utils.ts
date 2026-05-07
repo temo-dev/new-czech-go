@@ -35,6 +35,15 @@ export type Exercise = {
     question_prompts?: string[];
   };
   detail?: Record<string, unknown>;
+  // V23 — admin-list-only quality projection. Backend computes per
+  // row in GET /v1/admin/exercises; absent on every other endpoint.
+  validation_flags?: {
+    missing_audio: boolean;
+    missing_sentence_audio: boolean;
+    orphan: boolean;
+    missing_sample: boolean;
+    unpublished: boolean;
+  };
 };
 
 export type ExerciseType =
@@ -1226,4 +1235,33 @@ export function validateDictation(form: DictationFormState, opts?: { requireAudi
   }
 
   return { ok: errors.length === 0, errors };
+}
+
+// V23 Phase B1 — quick-clone payload transform.
+// Strips id (backend assigns) and forces status to draft. Preserves
+// module, skill, type, prompt, assets, sample answer, and duration
+// fields so the new draft starts fully wired except for audio (which
+// regenerates separately via /v1/admin/exercises/:id/generate-audio).
+// The returned shape is compatible with POST /v1/admin/exercises.
+export type CloneExercisePayload = Omit<Exercise, 'id'> & { status: string };
+
+export function cloneExercisePayload(src: Exercise): CloneExercisePayload {
+  return {
+    title: `Copy of ${src.title}`,
+    status: 'draft',
+    module_id: src.module_id,
+    skill_kind: src.skill_kind,
+    pool: src.pool,
+    exercise_type: src.exercise_type,
+    short_instruction: src.short_instruction,
+    learner_instruction: src.learner_instruction,
+    estimated_duration_sec: src.estimated_duration_sec,
+    prep_time_sec: src.prep_time_sec,
+    recording_time_limit_sec: src.recording_time_limit_sec,
+    sample_answer_enabled: src.sample_answer_enabled,
+    sample_answer_text: src.sample_answer_text,
+    prompt: src.prompt,
+    assets: src.assets,
+    detail: src.detail,
+  };
 }

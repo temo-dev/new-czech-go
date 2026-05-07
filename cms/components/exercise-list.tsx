@@ -1,7 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useS } from '../lib/i18n';
+import { hasAnyIssue } from './validation-badges';
+import { ValidationBadgeCluster } from './validation-badge-cluster';
 import {
   CmsCourse,
   CmsModule,
@@ -30,6 +32,8 @@ type Props = {
   onFilterChange: (patch: Partial<ExerciseListFilters>) => void;
   onEdit: (item: Exercise) => void;
   onDelete: (id: string) => void;
+  onClone?: (item: Exercise) => void | Promise<void>;
+  onRowClick?: (item: Exercise) => void;
   onReload: () => void;
   onOpenCreate: () => void;
 };
@@ -45,6 +49,8 @@ export function ExerciseList({
   onFilterChange,
   onEdit,
   onDelete,
+  onClone,
+  onRowClick,
   onReload,
   onOpenCreate,
 }: Props) {
@@ -70,6 +76,8 @@ export function ExerciseList({
     [items],
   );
 
+  const [problemOnly, setProblemOnly] = useState(false);
+
   const filteredItems = useMemo(() => items.filter((item) => {
     if (skillKind && item.skill_kind !== skillKind) return false;
     if (moduleId && item.module_id !== moduleId) return false;
@@ -83,8 +91,9 @@ export function ExerciseList({
       !item.title.toLowerCase().includes(text.toLowerCase()) &&
       !item.exercise_type.toLowerCase().includes(text.toLowerCase())
     ) return false;
+    if (problemOnly && !hasAnyIssue(item.validation_flags)) return false;
     return true;
-  }), [items, skillKind, moduleId, courseId, moduleMap, mtExerciseIds, text]);
+  }), [items, skillKind, moduleId, courseId, moduleMap, mtExerciseIds, text, problemOnly]);
 
   function clearFilters() {
     onFilterChange({ courseId: '', moduleId: '', skillKind: '', mockTestId: '', text: '' });
@@ -271,9 +280,26 @@ export function ExerciseList({
             ✕ Xoá
           </button>
         )}
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 12,
+            color: 'var(--ink-2)',
+            cursor: 'pointer',
+            marginLeft: 'auto',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={problemOnly}
+            onChange={(e) => setProblemOnly(e.target.checked)}
+          />
+          Chỉ hiện vấn đề
+        </label>
         <span
           style={{
-            marginLeft: 'auto',
             fontSize: 12,
             color: 'var(--ink-3)',
             fontVariantNumeric: 'tabular-nums',
@@ -288,7 +314,7 @@ export function ExerciseList({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '2fr 1fr 100px 96px',
+          gridTemplateColumns: '2fr 1fr 200px 240px',
           gap: 0,
           padding: '8px 24px',
           background: 'var(--surface-alt)',
@@ -345,15 +371,17 @@ export function ExerciseList({
               key={item.id}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '2fr 1fr 100px 96px',
+                gridTemplateColumns: '2fr 1fr 200px 240px',
                 gap: 0,
                 padding: '14px 24px',
                 borderBottom: idx < filteredItems.length - 1 ? '1px solid var(--border)' : 'none',
                 alignItems: 'center',
                 transition: 'background 120ms',
+                cursor: onRowClick ? 'pointer' : 'default',
               }}
               onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-alt)')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              onClick={() => onRowClick?.(item)}
             >
               {/* Title + type */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
@@ -434,7 +462,13 @@ export function ExerciseList({
                 )}
               </div>
 
-              {/* Status badge */}
+              {/* Status badge + V23 validation badges */}
+              <div style={{
+                display: 'flex', flexDirection: 'column', gap: 4,
+                alignItems: 'flex-start',
+                minWidth: 0,
+                overflow: 'hidden',
+              }}>
               <span
                 style={{
                   display: 'inline-flex',
@@ -461,9 +495,11 @@ export function ExerciseList({
               >
                 {S.status[item.status as keyof typeof S.status] ?? item.status}
               </span>
+              <ValidationBadgeCluster flags={item.validation_flags} variant="row" />
+              </div>
 
               {/* Actions */}
-              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   onClick={() => onEdit(item)}
@@ -480,6 +516,25 @@ export function ExerciseList({
                 >
                   {S.action.edit}
                 </button>
+                {onClone && (
+                  <button
+                    type="button"
+                    onClick={() => void onClone(item)}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: 8,
+                      border: '1px solid var(--border)',
+                      background: 'var(--brand-soft)',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: 'var(--brand-deep)',
+                    }}
+                    title="Sao chép thành bài tập mới (status=draft, không clone audio)"
+                  >
+                    Sao chép
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => onDelete(item.id)}

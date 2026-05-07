@@ -5,7 +5,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 // ── Messages ───────────────────────────────────────────────────────────────────
 
 export interface Messages {
-  nav: { exercises: string; courses: string; mockTests: string; learners: string; users: string; modules: string; skills: string; vocabulary: string; grammar: string; guide: string };
+  nav: { exercises: string; courses: string; mockTests: string; learners: string; users: string; modules: string; skills: string; vocabulary: string; grammar: string; guide: string; contentHealth: string };
   action: { create: string; edit: string; save: string; saveChanges: string; saving: string; delete: string; cancel: string; update: string };
   status: { draft: string; published: string; archived: string };
   pick: { module: string; skill: string; course: string; exercise: string; moduleForSkills: string; allCourses: string };
@@ -22,6 +22,7 @@ const VI: Messages = {
     exercises: 'Bài tập', courses: 'Khóa học', mockTests: 'Mock Test',
     learners: 'Học viên', users: 'Tài khoản', modules: 'Module', skills: 'Kỹ năng',
     vocabulary: 'Từ vựng', grammar: 'Ngữ pháp', guide: 'Hướng dẫn',
+    contentHealth: 'Sức khỏe nội dung',
   },
   action: {
     create: 'Tạo', edit: 'Chỉnh sửa', save: 'Lưu', saveChanges: 'Lưu thay đổi',
@@ -106,6 +107,7 @@ const EN: Messages = {
     exercises: 'Exercises', courses: 'Courses', mockTests: 'Mock Tests',
     learners: 'Learners', users: 'Accounts', modules: 'Modules', skills: 'Skills',
     vocabulary: 'Vocabulary', grammar: 'Grammar', guide: 'Guide',
+    contentHealth: 'Content Health',
   },
   action: {
     create: 'Create', edit: 'Edit', save: 'Save', saveChanges: 'Save changes',

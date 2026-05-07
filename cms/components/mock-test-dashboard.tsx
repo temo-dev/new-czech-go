@@ -14,6 +14,12 @@ import {
   CefrLevelOptions,
   type MockTestFlagsState,
 } from '../lib/mockTestFlags';
+import {
+  findPromotionConflict,
+  gatingBadge,
+  matchesKindFilter,
+  type MockTestKind,
+} from './mock-test-dashboard-utils';
 
 type Exercise = {
   id: string;
@@ -121,7 +127,23 @@ export function MockTestDashboard() {
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState<string | null>(null);
+  const [kindFilter, setKindFilter] = useState<MockTestKind>('all');
   const bannerInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const visibleTests = tests.filter(t => matchesKindFilter(t, kindFilter));
+
+  // Promotion uniqueness pre-check. Recomputes on every render against
+  // the in-memory `tests` array; cheap (linear scan over ≤200 rows) and
+  // avoids a fetch round-trip. Backend remains the gate of last resort.
+  const promotionConflict = findPromotionConflict(
+    tests,
+    {
+      is_promotion: form.flags.is_promotion,
+      status: form.status,
+      target_level: form.flags.target_level || '',
+    },
+    editingId ?? '',
+  );
 
   useEffect(() => {
     Promise.all([fetchTests(), fetchExercises()]);
@@ -233,7 +255,16 @@ export function MockTestDashboard() {
       });
       if (!res.ok) {
         const json = await res.json();
-        throw new Error(json.error?.message ?? 'Save failed');
+        const errBlock = json.error ?? {};
+        if (res.status === 409 && errBlock.code === 'promotion_exam_already_published') {
+          const lvl = String(errBlock.level ?? '').toUpperCase();
+          const title = errBlock.existing_title ?? errBlock.existing_id ?? '?';
+          const hint = errBlock.hint ?? '';
+          throw new Error(
+            `Đã có promotion exam published cho ${lvl}: "${title}". ${hint}`,
+          );
+        }
+        throw new Error(errBlock.message ?? 'Save failed');
       }
       await fetchTests();
       cancelForm();
@@ -321,15 +352,36 @@ export function MockTestDashboard() {
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px', fontFamily: 'sans-serif' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Mock Tests</h1>
-        <button onClick={openCreate} style={btnStyle('primary')}>{S.mockTest.newCta}</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280' }}>
+            Loại:
+            <select
+              value={kindFilter}
+              onChange={e => setKindFilter(e.target.value as MockTestKind)}
+              style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13 }}
+            >
+              <option value="all">Tất cả</option>
+              <option value="normal">Thường</option>
+              <option value="promotion">Promotion</option>
+              <option value="placement">Placement</option>
+            </select>
+          </label>
+          <button onClick={openCreate} style={btnStyle('primary')}>{S.mockTest.newCta}</button>
+        </div>
       </div>
 
       {error && <p style={{ color: 'red', marginBottom: 16 }}>{error}</p>}
 
       {!showForm && (
         <>
-          {tests.length === 0 && <p style={{ color: '#6b7280' }}>No mock tests yet.</p>}
-          {tests.map(t => (
+          {visibleTests.length === 0 && (
+            <p style={{ color: '#6b7280' }}>
+              {tests.length === 0
+                ? 'No mock tests yet.'
+                : `Không có mock test loại "${kindFilter}".`}
+            </p>
+          )}
+          {visibleTests.map(t => (
             <div key={t.id} style={cardStyle}>
               {/* Banner image strip */}
               {t.banner_image_id && (
@@ -345,6 +397,12 @@ export function MockTestDashboard() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     {statusBadge(t.status)}
                     {examModeBadge(t.exam_mode)}
+                    {(() => {
+                      const gb = gatingBadge(t);
+                      return gb ? (
+                        <span className={`badge ${gb.cls}`}>{gb.label}</span>
+                      ) : null;
+                    })()}
                     <strong>{t.title}</strong>
                   </div>
                   <p style={{ margin: '4px 0', color: '#6b7280', fontSize: 14 }}>{t.description}</p>
@@ -520,6 +578,22 @@ export function MockTestDashboard() {
             <p style={{ fontSize: 11, color: 'var(--ink-4)', margin: '6px 0 0' }}>
               Mỗi mock chỉ chọn 1 trong 2 cờ. Promotion bắt buộc có target level.
             </p>
+            {promotionConflict && (
+              <div style={{
+                marginTop: 10,
+                padding: '10px 12px',
+                background: '#fff8d6',
+                borderLeft: '4px solid #facc15',
+                color: '#7c4a03',
+                fontSize: 12.5,
+                borderRadius: 4,
+              }}>
+                <strong>Cảnh báo:</strong> đã có promotion exam published cho{' '}
+                <strong>{(form.flags.target_level || '').toUpperCase()}</strong>:{' '}
+                &quot;{promotionConflict.title ?? promotionConflict.id}&quot; (id <code>{promotionConflict.id}</code>).
+                Hủy Published ở đề đó trước khi đổi sang đề này.
+              </div>
+            )}
           </div>
 
           <div style={{ marginTop: 20 }}>

@@ -1,10 +1,51 @@
 # Current Code Shape
 
 Snapshot of how the repo is split today. Not a target architecture —
-a description of the structure that emerged after V2..V21.3 shipped.
+a description of the structure that emerged after V2..V22 shipped.
 
-Last refreshed: V21.3 (2026-05-07). Graph stats from session-start
-(built at commit `8b5c05e44ec6` before V21.3):
+Last refreshed: V23 (2026-05-08). V23 additions on top of V22:
+
+- Backend: extends `GET /v1/admin/exercises` to wrap each row with
+  `validation_flags` computed by the new
+  `computeValidationFlags(repo, ex)` helper. Same helper backs the
+  V22 aggregate Content Health page — 5 rule definitions live in
+  one place.
+- CMS: introduces the `components/exercise-preview/` directory
+  pattern — preview pane + per-type renderer files + small hooks
+  (`useDebouncedForm`, `useMediaQuery`) — alongside the
+  `*-utils.ts` companion convention from V22. Quick-fix modal +
+  validation badges follow the same pattern. The preview layout
+  ships standalone for V23; wiring into the existing slide-over
+  form is the V24 slice's job (boundary preserved: V23 does not
+  refactor the 1361 LOC form monolith).
+- Conventions reinforced: Strict modal scope (publish + audio
+  regen only), per-row validation_flags inline (not separate
+  query param), clone-shares-asset / skip-audio (admin regenerates
+  via existing endpoint).
+
+V22 additions on top of V21.3 baseline:
+
+- Backend: 2 new admin handlers (`admin_user_state.go`,
+  `admin_content_health.go`) + 3 new list/find methods on existing
+  store interfaces (`PromotionAttempts.ListForUser`,
+  `Attempt.ListAttemptsForUser`, `MockTest.FindPublishedPromotionByLevel`).
+  No new store package. Promotion uniqueness guard lives in
+  `server.go` as `checkPromotionUniqueness` rather than a separate
+  validator layer.
+- CMS: 2 new components (`learner-xray.tsx`, `content-health.tsx`)
+  with paired `*-utils.ts` helper files for unit-testability, plus 1
+  new helper file (`mock-test-dashboard-utils.ts`) extracted from the
+  existing dashboard. 2 new page routes (`/users/[userId]`,
+  `/content-health`) + 2 new proxy routes. Sidebar gained one entry.
+  No new abstraction layer — components fetch directly through the
+  existing `/api/admin/*` proxy pattern.
+- The pattern of "component + `*-utils.ts` companion file" is now
+  the V22+ convention for any non-trivial CMS surface, since CMS
+  test infra remains pure-vitest (no `@testing-library/react`) and
+  component render is delegated to manual smoke.
+
+Graph stats from session-start (built at commit `8b5c05e44ec6` before
+V21.3 — V22 not yet re-indexed):
 
 - **467 files** parsed (post-V21.3 ~478 with new Flutter + backend files)
 - **5038 nodes**

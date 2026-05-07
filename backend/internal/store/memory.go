@@ -323,6 +323,10 @@ func (s *MemoryStore) ListAttempts() []contracts.Attempt {
 	return s.attempts.ListAttempts()
 }
 
+func (s *MemoryStore) ListAttemptsForUser(userID string, limit int) []contracts.Attempt {
+	return s.attempts.ListAttemptsForUser(userID, limit)
+}
+
 func (s *MemoryStore) SetCourseStore(cs CourseStore) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -477,6 +481,9 @@ func (s *MemoryStore) LatestPlacementMockTest() (contracts.MockTest, bool) {
 }
 func (s *MemoryStore) LatestPromotionMockTest(targetLevel string) (contracts.MockTest, bool) {
 	return s.mockTests.LatestPromotionMockTest(targetLevel)
+}
+func (s *MemoryStore) FindPublishedPromotionByLevel(targetLevel, excludeID string) (contracts.MockTest, bool) {
+	return s.mockTests.FindPublishedPromotionByLevel(targetLevel, excludeID)
 }
 
 func (s *MemoryStore) MockExamByID(id string) (contracts.MockExamSession, bool) {

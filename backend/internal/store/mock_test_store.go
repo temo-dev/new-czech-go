@@ -26,6 +26,12 @@ type MockTestStore interface {
 	// this to surface the promotion test id on level-progress responses
 	// (V21 review I5) so the client can deep-link straight to PreExam.
 	LatestPromotionMockTest(targetLevel string) (contracts.MockTest, bool)
+	// FindPublishedPromotionByLevel returns the first published promotion
+	// MockTest for the given target_level, optionally excluding excludeID
+	// to support self-exclusion in PATCH flows. Powers the V22 app-layer
+	// "1 published promotion exam per target_level" guard. Empty
+	// targetLevel always misses.
+	FindPublishedPromotionByLevel(targetLevel, excludeID string) (contracts.MockTest, bool)
 }
 
 // defaultMaxPoints maps exercise_type → max speaking score per real A2 exam rubric.
@@ -284,4 +290,22 @@ func (s *memoryMockTestStore) LatestPromotionMockTest(targetLevel string) (contr
 		return contracts.MockTest{}, false
 	}
 	return *best, true
+}
+
+func (s *memoryMockTestStore) FindPublishedPromotionByLevel(targetLevel, excludeID string) (contracts.MockTest, bool) {
+	if targetLevel == "" {
+		return contracts.MockTest{}, false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, t := range s.tests {
+		if !t.IsPromotion || t.Status != "published" || t.TargetLevel != targetLevel {
+			continue
+		}
+		if t.ID == excludeID {
+			continue
+		}
+		return *t, true
+	}
+	return contracts.MockTest{}, false
 }

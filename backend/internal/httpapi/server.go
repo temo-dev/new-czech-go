@@ -266,6 +266,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/admin/exercises/", s.withRole("admin", s.handleAdminExerciseByID))
 	s.mux.HandleFunc("/v1/admin/mock-tests", s.withRole("admin", s.handleAdminMockTests))
 	s.mux.HandleFunc("/v1/admin/mock-tests/", s.withRole("admin", s.handleAdminMockTestByID))
+	s.mux.HandleFunc("/v1/admin/content-health", s.withRole("admin", s.handleAdminContentHealth))
 	s.mux.HandleFunc("/v1/admin/courses", s.withRole("admin", s.handleAdminCourses))
 	s.mux.HandleFunc("/v1/admin/courses/", s.withRole("admin", s.handleAdminCourseByID))
 	s.mux.HandleFunc("/v1/admin/modules", s.withRole("admin", s.handleAdminModules))
@@ -1714,6 +1715,14 @@ func (s *Server) handleAdminMockTests(w http.ResponseWriter, r *http.Request, _ 
 			})
 			return
 		}
+		if errBody, ok := validateMockTestPromotion(t); ok {
+			writeJSON(w, http.StatusBadRequest, errBody)
+			return
+		}
+		if conflict, ok := s.checkPromotionUniqueness(t, ""); ok {
+			writeJSON(w, http.StatusConflict, conflict)
+			return
+		}
 		created, err := s.repo.CreateMockTest(t)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{
@@ -1725,6 +1734,61 @@ func (s *Server) handleAdminMockTests(w http.ResponseWriter, r *http.Request, _ 
 	default:
 		writeMethodNotAllowed(w)
 	}
+}
+
+// validCefrLevels enumerates the V21 CEFR codes accepted on the wire.
+// Mock tests with is_promotion=true must carry one of these in
+// target_level; the form selector ships the same enum on the CMS side
+// (lib/level.ts). Any other value is rejected with 400 so a stray curl
+// or future API integration cannot persist garbage that breaks the V21
+// gating math.
+var validCefrLevels = map[string]struct{}{
+	"a0": {}, "a1": {}, "a2": {}, "b1": {},
+}
+
+// validateMockTestPromotion checks promotion-related invariants on a
+// mock-test payload. Returns (errorBody, true) when the request must
+// be rejected with 400; otherwise (nil, false). Currently enforces:
+// promotion mocks must carry a valid CEFR target_level.
+func validateMockTestPromotion(t contracts.MockTest) (map[string]any, bool) {
+	if !t.IsPromotion {
+		return nil, false
+	}
+	if _, ok := validCefrLevels[t.TargetLevel]; ok {
+		return nil, false
+	}
+	return map[string]any{
+		"error": map[string]any{
+			"code":    "invalid_target_level",
+			"message": "Promotion mock test phải có target_level thuộc {a0, a1, a2, b1}.",
+			"got":     t.TargetLevel,
+			"valid":   []string{"a0", "a1", "a2", "b1"},
+		},
+	}, true
+}
+
+// checkPromotionUniqueness enforces the V22 "1 published promotion exam
+// per target_level" guard. Returns (conflictBody, true) when the input
+// would clash with an existing published promotion mock at the same
+// level (excluding excludeID); returns (nil, false) otherwise.
+func (s *Server) checkPromotionUniqueness(t contracts.MockTest, excludeID string) (map[string]any, bool) {
+	if !t.IsPromotion || t.Status != "published" || t.TargetLevel == "" {
+		return nil, false
+	}
+	existing, ok := s.repo.FindPublishedPromotionByLevel(t.TargetLevel, excludeID)
+	if !ok {
+		return nil, false
+	}
+	return map[string]any{
+		"error": map[string]any{
+			"code":    "promotion_exam_already_published",
+			"message": "Đã có promotion exam published cho level này.",
+			"level":   t.TargetLevel,
+			"existing_id":    existing.ID,
+			"existing_title": existing.Title,
+			"hint":           "Hủy Published ở đề đang published trước khi đổi đề khác.",
+		},
+	}, true
 }
 
 func (s *Server) handleAdminMockTestByID(w http.ResponseWriter, r *http.Request, u contracts.User) {
@@ -1752,6 +1816,14 @@ func (s *Server) handleAdminMockTestByID(w http.ResponseWriter, r *http.Request,
 			writeJSON(w, http.StatusBadRequest, map[string]any{
 				"error": map[string]any{"code": "invalid_body", "message": err.Error()},
 			})
+			return
+		}
+		if errBody, ok := validateMockTestPromotion(update); ok {
+			writeJSON(w, http.StatusBadRequest, errBody)
+			return
+		}
+		if conflict, ok := s.checkPromotionUniqueness(update, id); ok {
+			writeJSON(w, http.StatusConflict, conflict)
 			return
 		}
 		updated, ok := s.repo.UpdateMockTest(id, update)
@@ -1979,7 +2051,15 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 	switch r.Method {
 	case http.MethodGet:
 		pool := r.URL.Query().Get("pool")
-		writeJSON(w, http.StatusOK, map[string]any{"data": s.repo.ListExercises(pool), "meta": map[string]any{}})
+		items := s.repo.ListExercises(pool)
+		out := make([]exerciseWithFlags, len(items))
+		for i, ex := range items {
+			out[i] = exerciseWithFlags{
+				Exercise:        ex,
+				ValidationFlags: computeValidationFlags(s.repo, ex),
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": out, "meta": map[string]any{}})
 	case http.MethodPost:
 		var req struct {
 			ExerciseType          string          `json:"exercise_type"`

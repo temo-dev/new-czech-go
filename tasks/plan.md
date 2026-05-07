@@ -8,6 +8,8 @@ mega-file, frozen). V19+ slices each have their own plan/todo pair.
 
 | Slice | Plan | Todo | Spec | Status |
 |---|---|---|---|---|
+| V23 Exercise Authoring Polish | [v23-exercise-authoring-polish-plan.md](v23-exercise-authoring-polish-plan.md) | [v23-exercise-authoring-polish-todo.md](v23-exercise-authoring-polish-todo.md) | [docs/specs/v23-exercise-authoring-polish.md](../docs/specs/v23-exercise-authoring-polish.md) | ✅ implemented (C8 deferred V24; awaiting commit + manual smoke) |
+| V22 CMS Catch-Up | [v22-cms-catch-up-plan.md](v22-cms-catch-up-plan.md) | [v22-cms-catch-up-todo.md](v22-cms-catch-up-todo.md) | [docs/specs/v22-cms-catch-up.md](../docs/specs/v22-cms-catch-up.md) | ✅ implemented (awaiting commit + manual smoke) |
 | V21.3 CEFR UI Wire-up | [cefr-ui-wireup-plan.md](cefr-ui-wireup-plan.md) | [cefr-ui-wireup-todo.md](cefr-ui-wireup-todo.md) | [docs/specs/cefr-ui-wireup.md](../docs/specs/cefr-ui-wireup.md) | ✅ shipped |
 | V21 CEFR Level Progression (A0→B1) | [cefr-level-progression-plan.md](cefr-level-progression-plan.md) | [cefr-level-progression-todo.md](cefr-level-progression-todo.md) | [docs/specs/cefr-level-progression.md](../docs/specs/cefr-level-progression.md) | ✅ shipped + V21.1 hotfixes |
 | V19 Skill Mastery Progress | [skill-mastery-progress-plan.md](skill-mastery-progress-plan.md) | [skill-mastery-progress-todo.md](skill-mastery-progress-todo.md) | [docs/specs/skill-mastery-progress.md](../docs/specs/skill-mastery-progress.md) | ✅ shipped |

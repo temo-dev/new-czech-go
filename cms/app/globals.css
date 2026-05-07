@@ -207,12 +207,14 @@ textarea {
   letter-spacing: 0.4px;
 }
 
-.badge-brand   { background: var(--brand-soft);   color: var(--brand-ink); }
-.badge-ready   { background: var(--ready-bg);     color: var(--ready); }
-.badge-almost  { background: var(--almost-bg);    color: var(--almost); }
-.badge-needs   { background: var(--needs-bg);     color: var(--needs); }
-.badge-error   { background: var(--not-ready-bg); color: var(--not-ready); }
-.badge-neutral { background: var(--border);       color: var(--ink-2); }
+.badge-brand     { background: var(--brand-soft);   color: var(--brand-ink); }
+.badge-ready     { background: var(--ready-bg);     color: var(--ready); }
+.badge-almost    { background: var(--almost-bg);    color: var(--almost); }
+.badge-needs     { background: var(--needs-bg);     color: var(--needs); }
+.badge-error     { background: var(--not-ready-bg); color: var(--not-ready); }
+.badge-neutral   { background: var(--border);       color: var(--ink-2); }
+.badge-promotion { background: var(--brand-soft);   color: var(--brand-deep); }
+.badge-placement { background: var(--accent-soft);  color: var(--accent); }
 
 /* ── Section headings ────────────────────────────────────────────────────── */
 .eyebrow {

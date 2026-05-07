@@ -119,7 +119,7 @@ func (s *Server) handleAdminUserByID(w http.ResponseWriter, r *http.Request, cal
 		writeError(w, http.StatusBadRequest, "missing_id", "user id required", false)
 		return
 	}
-	// Sub-resource routing: /v1/admin/users/:id/{reset-password,usage/reset}
+	// Sub-resource routing: /v1/admin/users/:id/{reset-password,usage/reset,state}
 	if idx := strings.Index(rest, "/"); idx >= 0 {
 		id := rest[:idx]
 		sub := rest[idx+1:]
@@ -128,6 +128,8 @@ func (s *Server) handleAdminUserByID(w http.ResponseWriter, r *http.Request, cal
 			s.handleAdminResetUserPassword(w, r, caller, id)
 		case "usage/reset":
 			s.handleAdminResetUserUsage(w, r, id)
+		case "state":
+			s.handleAdminUserState(w, r, caller, id)
 		default:
 			writeNotFound(w)
 		}

@@ -498,6 +498,34 @@ func (s *postgresAttemptStore) ListAttempts() []contracts.Attempt {
 	return items
 }
 
+func (s *postgresAttemptStore) ListAttemptsForUser(userID string, limit int) []contracts.Attempt {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	q := attemptSelectQuery + ` WHERE a.user_id = $1 ORDER BY a.started_at DESC`
+	args := []any{userID}
+	if limit > 0 {
+		q += ` LIMIT $2`
+		args = append(args, limit)
+	}
+
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	items := make([]contracts.Attempt, 0)
+	for rows.Next() {
+		attempt, err := scanAttemptRow(rows.Scan)
+		if err != nil {
+			continue
+		}
+		items = append(items, *attempt)
+	}
+	return items
+}
+
 const attemptSelectQuery = `
 SELECT
 	a.id,

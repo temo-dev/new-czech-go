@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 type AdminUser = {
@@ -191,7 +192,15 @@ export function UsersDashboard() {
               <tbody>
                 {users.map((u, i) => (
                   <tr key={u.id} style={{ borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
-                    <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: 12 }}>{u.email}</td>
+                    <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: 12 }}>
+                      <Link
+                        href={`/users/${u.id}`}
+                        style={{ color: 'var(--ink)', textDecoration: 'none' }}
+                        title="Xem chi tiết X-Ray"
+                      >
+                        {u.email}
+                      </Link>
+                    </td>
                     <td style={{ padding: '10px 14px' }}>{u.display_name || '—'}</td>
                     <td style={{ padding: '10px 14px' }}>
                       <span className={`badge ${u.role === 'admin' ? 'badge-error' : 'badge-neutral'}`}>{u.role}</span>

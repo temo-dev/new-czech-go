@@ -8,6 +8,73 @@ import (
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
 
+// V22 CMS Catch-Up — Phase D1.
+// FindPublishedPromotionByLevel powers the app-layer "1 published
+// promotion exam per target_level" guard. Differs from
+// LatestPromotionMockTest by accepting an excludeID for self-exclusion
+// during PATCH flows.
+
+func TestMemoryMockTestStore_FindPublishedPromotionByLevel_HitWhenOnePublished(t *testing.T) {
+	store := newMemoryMockTestStore()
+	winner, err := store.CreateMockTest(contracts.MockTest{
+		Title: "A2 Promote", Status: "published",
+		IsPromotion: true, TargetLevel: "a2",
+	})
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	got, ok := store.FindPublishedPromotionByLevel("a2", "")
+	if !ok {
+		t.Fatal("expected hit, got miss")
+	}
+	if got.ID != winner.ID {
+		t.Errorf("got %q, want %q", got.ID, winner.ID)
+	}
+}
+
+func TestMemoryMockTestStore_FindPublishedPromotionByLevel_MissWhenEmpty(t *testing.T) {
+	store := newMemoryMockTestStore()
+	if _, ok := store.FindPublishedPromotionByLevel("a2", ""); ok {
+		t.Error("expected miss on empty store")
+	}
+	if _, ok := store.FindPublishedPromotionByLevel("", ""); ok {
+		t.Error("empty target_level must always miss")
+	}
+}
+
+func TestMemoryMockTestStore_FindPublishedPromotionByLevel_ExcludesSelf(t *testing.T) {
+	store := newMemoryMockTestStore()
+	only, err := store.CreateMockTest(contracts.MockTest{
+		Title: "A2 Promote", Status: "published",
+		IsPromotion: true, TargetLevel: "a2",
+	})
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if _, ok := store.FindPublishedPromotionByLevel("a2", only.ID); ok {
+		t.Error("expected miss when only candidate is excluded by self ID")
+	}
+}
+
+func TestMemoryMockTestStore_FindPublishedPromotionByLevel_IgnoresDraftsAndWrongLevel(t *testing.T) {
+	store := newMemoryMockTestStore()
+	if _, err := store.CreateMockTest(contracts.MockTest{
+		Title: "Draft A2 Promote", Status: "draft",
+		IsPromotion: true, TargetLevel: "a2",
+	}); err != nil {
+		t.Fatalf("seed draft: %v", err)
+	}
+	if _, err := store.CreateMockTest(contracts.MockTest{
+		Title: "Published B1 Promote", Status: "published",
+		IsPromotion: true, TargetLevel: "b1",
+	}); err != nil {
+		t.Fatalf("seed b1: %v", err)
+	}
+	if _, ok := store.FindPublishedPromotionByLevel("a2", ""); ok {
+		t.Error("expected miss — only candidates are draft or different level")
+	}
+}
+
 func TestMemoryMockTestStore_LatestPromotionMockTest_FiltersByLevelAndStatus(t *testing.T) {
 	store := newMemoryMockTestStore()
 
@@ -178,5 +245,80 @@ func TestMemoryPromotionAttemptsStore_MarkResult_UpdatesAndIsIdempotent(t *testi
 	// MarkResult on unknown ID is a not-found error.
 	if _, err := s.MarkResult("does-not-exist", true, 1.0, nil); err == nil {
 		t.Error("MarkResult on unknown ID expected error, got nil")
+	}
+}
+
+// V22 CMS Catch-Up — Phase B1.
+// ListForUser is the per-user descending-by-created_at list used by the
+// X-Ray screen. The 21-row sentinel limit is the caller's responsibility;
+// the store accepts any positive limit and clamps the slice. limit=0
+// means unlimited.
+
+func TestMemoryPromotionAttemptsStore_ListForUser_EmptyForNoData(t *testing.T) {
+	s := newMemoryPromotionAttemptsStore()
+	out := s.ListForUser("user-anyone", 10)
+	if len(out) != 0 {
+		t.Fatalf("expected empty slice, got %d rows", len(out))
+	}
+}
+
+func TestMemoryPromotionAttemptsStore_ListForUser_FiltersByUser_OrderedDesc(t *testing.T) {
+	s := newMemoryPromotionAttemptsStore()
+	now := time.Now().UTC()
+	mustCreate := func(userID string, ago time.Duration) contracts.PromotionAttempt {
+		got, err := s.Create(contracts.PromotionAttempt{
+			UserID:      userID,
+			TargetLevel: "b1",
+			MockTestID:  "mt-1",
+			CreatedAt:   now.Add(-ago),
+		})
+		if err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+		return got
+	}
+	mustCreate("user-A", 30*time.Minute) // older
+	mid := mustCreate("user-A", 20*time.Minute)
+	newest := mustCreate("user-A", 10*time.Minute)
+	mustCreate("user-B", 5*time.Minute) // wrong user — must be excluded
+
+	out := s.ListForUser("user-A", 10)
+	if len(out) != 3 {
+		t.Fatalf("expected 3 rows for user-A, got %d", len(out))
+	}
+	if out[0].ID != newest.ID {
+		t.Errorf("expected newest first; got ID %s", out[0].ID)
+	}
+	if out[1].ID != mid.ID {
+		t.Errorf("expected mid second; got ID %s", out[1].ID)
+	}
+	for _, r := range out {
+		if r.UserID != "user-A" {
+			t.Errorf("found row leaked from another user: %s", r.UserID)
+		}
+	}
+}
+
+func TestMemoryPromotionAttemptsStore_ListForUser_LimitClamps(t *testing.T) {
+	s := newMemoryPromotionAttemptsStore()
+	now := time.Now().UTC()
+	for i := 0; i < 5; i++ {
+		if _, err := s.Create(contracts.PromotionAttempt{
+			UserID:      "user-A",
+			TargetLevel: "b1",
+			MockTestID:  "mt-1",
+			CreatedAt:   now.Add(-time.Duration(i) * time.Minute),
+		}); err != nil {
+			t.Fatalf("Create %d: %v", i, err)
+		}
+	}
+	out := s.ListForUser("user-A", 3)
+	if len(out) != 3 {
+		t.Fatalf("expected limit clamp to 3, got %d", len(out))
+	}
+	// Limit=0 means caller does not constrain — return all.
+	all := s.ListForUser("user-A", 0)
+	if len(all) != 5 {
+		t.Fatalf("expected unlimited (limit=0) → 5, got %d", len(all))
 	}
 }

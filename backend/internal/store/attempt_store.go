@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -20,6 +21,10 @@ type AttemptStore interface {
 	FailAttempt(id, failureCode string)
 	Attempt(id string) (*contracts.Attempt, bool)
 	ListAttempts() []contracts.Attempt
+	// ListAttemptsForUser returns the user's attempts ordered by started_at
+	// DESC. limit=0 means unlimited; positive limit clamps the slice. Powers
+	// the V22 admin X-Ray "Recent attempts" section.
+	ListAttemptsForUser(userID string, limit int) []contracts.Attempt
 }
 
 type memoryAttemptStore struct {
@@ -189,6 +194,26 @@ func (s *memoryAttemptStore) ListAttempts() []contracts.Attempt {
 		items = append(items, *cloneAttempt(attempt))
 	}
 	return items
+}
+
+func (s *memoryAttemptStore) ListAttemptsForUser(userID string, limit int) []contracts.Attempt {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := make([]contracts.Attempt, 0)
+	for _, attempt := range s.attempts {
+		if attempt.UserID == userID {
+			out = append(out, *cloneAttempt(attempt))
+		}
+	}
+	// StartedAt is RFC3339 — lexicographic descending order matches chronological.
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].StartedAt > out[j].StartedAt
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out
 }
 
 func attemptCounterKey(userID, exerciseID string) string {

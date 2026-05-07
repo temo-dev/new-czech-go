@@ -5,12 +5,14 @@ import { useS } from '../lib/i18n';
 import { adminFetch } from '../lib/api';
 import { ExerciseList, ExerciseListFilters } from './exercise-list';
 import { ExerciseSlideOver } from './exercise-form';
+import { ExerciseQuickFixModal } from './exercise-quick-fix-modal';
 import { ExerciseMatrix, ExamPoolMatrix, MatrixSkillKind } from './exercise-matrix';
 import {
   CmsCourse,
   CmsModule,
   CmsMockTest,
   Exercise,
+  cloneExercisePayload,
   eyebrowStyle,
   metricCardStyle,
   metricHintStyle,
@@ -79,6 +81,7 @@ export function ExerciseDashboard() {
   // ── UI state ─────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<'course' | 'exam'>('course');
   const [showForm, setShowForm] = useState(false);
+  const [quickFixId, setQuickFixId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formPrefill, setFormPrefill] = useState<FormPrefill>(null);
   const [activeCell, setActiveCell] = useState<ActiveCell>(null);
@@ -192,6 +195,45 @@ export function ExerciseDashboard() {
       await loadExercises();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
+    }
+  }
+
+  // V23 Phase B — quick clone. Fetches the source detail, transforms
+  // via cloneExercisePayload, POSTs as a new draft, then drops the
+  // admin into edit mode on the new row. exercise_audio is skipped on
+  // the backend side (clone payload omits the audio link); admin runs
+  // /generate-audio after editing as needed.
+  async function handleClone(source: Exercise) {
+    setError(null);
+    try {
+      const detailRes = await adminFetch(`/api/admin/exercises/${source.id}`);
+      if (!detailRes.ok) {
+        const p = await detailRes.json().catch(() => ({}));
+        throw new Error(p.error?.message ?? 'Không tải được bài tập gốc.');
+      }
+      const detailJson = await detailRes.json();
+      const fresh = (detailJson.data ?? detailJson) as Exercise;
+
+      const payload = cloneExercisePayload(fresh);
+      const createRes = await adminFetch('/api/admin/exercises', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!createRes.ok) {
+        const p = await createRes.json().catch(() => ({}));
+        throw new Error(p.error?.message ?? 'Tạo bản sao thất bại.');
+      }
+      const createdJson = await createRes.json();
+      const created = (createdJson.data ?? createdJson) as Exercise;
+
+      await loadExercises();
+      // Open the new draft directly so the admin can edit and republish.
+      setFormPrefill(null);
+      setEditingId(created.id);
+      setShowForm(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lỗi không xác định');
     }
   }
 
@@ -339,6 +381,8 @@ export function ExerciseDashboard() {
               }}
               onEdit={startEditing}
               onDelete={handleDelete}
+              onClone={handleClone}
+              onRowClick={(item) => setQuickFixId(item.id)}
               onReload={loadExercises}
               onOpenCreate={() =>
                 openCreate(
@@ -376,6 +420,34 @@ export function ExerciseDashboard() {
           />
         </div>
       )}
+
+      <QuickFixSlot
+        quickFixId={quickFixId}
+        items={items}
+        onClose={() => setQuickFixId(null)}
+        onApplied={loadExercises}
+      />
     </main>
+  );
+}
+
+function QuickFixSlot({
+  quickFixId, items, onClose, onApplied,
+}: {
+  quickFixId: string | null;
+  items: Exercise[];
+  onClose: () => void;
+  onApplied: () => void;
+}) {
+  if (!quickFixId) return null;
+  const target = items.find((i) => i.id === quickFixId);
+  if (!target) return null;
+  return (
+    <ExerciseQuickFixModal
+      exercise={target}
+      flags={target.validation_flags}
+      onClose={onClose}
+      onApplied={onApplied}
+    />
   );
 }

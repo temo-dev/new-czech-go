@@ -26,6 +26,10 @@ type PromotionAttemptsStore interface {
 	GetLatestFailedAttempt(userID, targetLevel string) (contracts.PromotionAttempt, bool)
 	GetByFullSessionID(sessionID string) (contracts.PromotionAttempt, bool)
 	MarkResult(id string, passed bool, scorePct float64, perSkillPct map[string]float64) (contracts.PromotionAttempt, error)
+	// ListForUser returns the user's attempts ordered by created_at DESC.
+	// limit=0 means unlimited; positive limit clamps the slice. Powers the
+	// V22 admin X-Ray screen.
+	ListForUser(userID string, limit int) []contracts.PromotionAttempt
 }
 
 // ── Memory implementation ──────────────────────────────────────────────────
@@ -101,6 +105,24 @@ func (s *memoryPromotionAttemptsStore) GetByFullSessionID(sessionID string) (con
 		}
 	}
 	return contracts.PromotionAttempt{}, false
+}
+
+func (s *memoryPromotionAttemptsStore) ListForUser(userID string, limit int) []contracts.PromotionAttempt {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]contracts.PromotionAttempt, 0)
+	for _, r := range s.rows {
+		if r.UserID == userID {
+			out = append(out, clonePromotionAttempt(r))
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].CreatedAt.After(out[j].CreatedAt)
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out
 }
 
 func (s *memoryPromotionAttemptsStore) MarkResult(id string, passed bool, scorePct float64, perSkillPct map[string]float64) (contracts.PromotionAttempt, error) {
@@ -240,6 +262,38 @@ LIMIT 1
 		return contracts.PromotionAttempt{}, false
 	}
 	return out, true
+}
+
+func (s *postgresPromotionAttemptsStore) ListForUser(userID string, limit int) []contracts.PromotionAttempt {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	q := `
+SELECT id, user_id, mock_test_id, source_level, target_level,
+       full_session_id, passed, score_pct, per_skill_pct, created_at
+FROM promotion_attempts
+WHERE user_id = $1
+ORDER BY created_at DESC`
+	args := []any{userID}
+	if limit > 0 {
+		q += ` LIMIT $2`
+		args = append(args, limit)
+	}
+
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	out := make([]contracts.PromotionAttempt, 0)
+	for rows.Next() {
+		r, err := scanPromotionAttempt(rows)
+		if err != nil {
+			return nil
+		}
+		out = append(out, r)
+	}
+	return out
 }
 
 func (s *postgresPromotionAttemptsStore) MarkResult(id string, passed bool, scorePct float64, perSkillPct map[string]float64) (contracts.PromotionAttempt, error) {

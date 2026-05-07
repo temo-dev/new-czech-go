@@ -41,6 +41,8 @@ the archive — it is a historical record.
 | V21.1 | 2026-05-07 | V21 review hotfixes (C1+C2 + I1+I3 + I4+I5+I2/I8 + I6 doc) | (CHANGELOG entry) |
 | V21.2 | 2026-05-07 | Exam-flow runtime hotfixes (MobAI test) — gate counter pin + Flutter UX + admin usage/reset | (CHANGELOG entry) |
 | V21.3 | 2026-05-07 | CEFR UI wire-up — auth gate, placement test, existing-A2 dialog, HomeLevelHeader, locked courses, promotion exam end-to-end | [docs/specs/cefr-ui-wireup.md](docs/specs/cefr-ui-wireup.md) |
+| V22 | 2026-05-07 | CMS catch-up — Learner X-Ray (admin debug screen), promotion / placement badge + filter + uniqueness guard, on-demand Content Health Report (6 rules) | [docs/specs/v22-cms-catch-up.md](docs/specs/v22-cms-catch-up.md) |
+| V23 | 2026-05-08 | Exercise authoring polish — quick-clone row action, validation_flags inline badges + quick-fix modal, inline preview pane MVP (top 5 type) | [docs/specs/v23-exercise-authoring-polish.md](docs/specs/v23-exercise-authoring-polish.md) |
 
 ## Stable contracts
 

@@ -441,3 +441,42 @@ func TestRollupReadiness(t *testing.T) {
 		})
 	}
 }
+
+// V22 CMS Catch-Up — Phase B1.
+// ListAttemptsForUser is the per-user descending-by-started_at list used by
+// the X-Ray screen "Recent attempts" section. Limit clamps the slice;
+// limit=0 means unlimited.
+func TestMemoryAttemptStore_ListAttemptsForUser_FiltersAndLimits(t *testing.T) {
+	s := newMemoryAttemptStore()
+
+	// Seed 2 attempts for user-A and 1 for user-B.
+	if _, err := s.CreateAttempt("user-A", "ex-1", "uloha_1", "ios", "0.1", "vi"); err != nil {
+		t.Fatalf("seed user-A #1: %v", err)
+	}
+	if _, err := s.CreateAttempt("user-A", "ex-2", "uloha_1", "ios", "0.1", "vi"); err != nil {
+		t.Fatalf("seed user-A #2: %v", err)
+	}
+	if _, err := s.CreateAttempt("user-B", "ex-3", "uloha_1", "ios", "0.1", "vi"); err != nil {
+		t.Fatalf("seed user-B: %v", err)
+	}
+
+	out := s.ListAttemptsForUser("user-A", 10)
+	if len(out) != 2 {
+		t.Fatalf("expected 2 attempts for user-A, got %d", len(out))
+	}
+	for _, a := range out {
+		if a.UserID != "user-A" {
+			t.Errorf("found attempt leaked from another user: %s", a.UserID)
+		}
+	}
+
+	// Limit clamps result length.
+	if got := s.ListAttemptsForUser("user-A", 1); len(got) != 1 {
+		t.Errorf("limit=1 expected 1 row, got %d", len(got))
+	}
+
+	// Unknown user → empty slice.
+	if got := s.ListAttemptsForUser("user-Z", 10); len(got) != 0 {
+		t.Errorf("expected empty slice for unknown user, got %d", len(got))
+	}
+}

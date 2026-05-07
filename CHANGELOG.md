@@ -10,6 +10,334 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V23 — Exercise Authoring Polish — 2026-05-08
+
+V22 closed the admin debug + content-health gap, but exercise
+authoring stayed slow: a 1361 LOC form, audio gen one button at a
+time, and zero learner-side preview meant every new bài tập went
+through publish → test on Flutter → fix loops. V23 ships three
+verticals to compress that loop while volume is still <50 (so the
+tools land before scale pain hits).
+
+Spec: `docs/specs/v23-exercise-authoring-polish.md`. Plan + todo:
+`tasks/v23-exercise-authoring-polish-{plan,todo}.md`.
+
+### Key changes
+
+- **B Quick-Clone** (row action on `/`): admin clicks "Sao chép" on
+  any exercise list row → backend GET source detail → CMS transforms
+  via `cloneExercisePayload` (preserve module/skill/type/prompt/
+  assets/sample, strip id, force status=draft, **skip exercise_audio
+  link** so each clone regenerates audio against its own edited
+  prompt) → POST as new draft → admin lands directly in the edit
+  form on the new row. 5× faster seeding for similar bài tập (4
+  Úloha 1 chủ đề khác, 5 cteni đoạn văn) without any "audio mismatch
+  with prompt" risk.
+
+- **H Validation Inline Badges** (list view): `GET /v1/admin/exercises`
+  responses now carry `validation_flags` per row — five rules
+  computed server-side using the same logic V22 powered the aggregate
+  Content Health page with: `missing_audio` (skill=nghe with no
+  exercise_audio), `missing_sentence_audio` (psani_3_dictation with
+  no per-sentence audio), `orphan` (pool=course with empty
+  module_id), `missing_sample` (noi/viet with sample_enabled but
+  empty text), `unpublished` (draft). Admin sees ❌/⚠/📝/✓ badges
+  inline next to status, plus a "Chỉ hiện vấn đề" filter checkbox to
+  scope the list to rows with quality issues (drafts that are
+  otherwise clean stay hidden so the admin can focus on rot, not
+  workflow). Click any row → quick-fix modal: publish/unpublish radio
+  + a "Tạo lại audio" button (enabled only for nghe / dictation),
+  routing anything else through the full edit form. Strict V23
+  scope — no module reassign, no inline sample edit.
+
+- **C Inline Preview MVP**: split-pane layout component
+  (`ExerciseEditLayout`) + preview pane with always-visible
+  disclaimer band ("🔍 Preview low-fidelity. Hãy test trên Flutter
+  trước khi ship."), driven by a `selectPreviewRenderer(type)`
+  router. Top 5 V23 types render dedicated low-fidelity mock cards:
+  uloha_1/2/3/4 (Speaking) via `UlohaPreview` (4 variants in one
+  component) and `psani_2_email` (Writing) via `PsaniEmailPreview`.
+  The other 11 types fall through to a placeholder explaining the
+  V23 boundary. State debounced via `useDebouncedForm(form, 200)`
+  hook to keep typing responsive; layout swaps to a slide-in drawer
+  via `useMediaQuery('(min-width: 1280px)')` below 1280 px.
+
+### Decisions worth remembering
+
+- **No DB migration.** Validation flags compute on-the-fly from
+  joins of existing tables; no schema change V23.
+- **DRY via per-row helper.** V22's `admin_content_health.go`
+  shipped six aggregate checks; V23 extracts a per-Exercise
+  `computeValidationFlags(repo, ex) ValidationFlags` helper there,
+  reused by both the V22 dashboard counters and the V23 list-row
+  badges. Single source of truth for rule definitions.
+- **Clone audio policy: skip.** Cloned exercises do not copy the
+  source `exercise_audio` row. Admin runs the existing
+  `POST /v1/admin/exercises/:id/generate-audio` endpoint after
+  editing. Avoids prompt/audio mismatch when admin tweaks the
+  source's question list in the new draft.
+- **Strict quick-fix scope.** Modal only does publish/unpublish +
+  audio regen. Module reassignment, sample text edits, and other
+  field changes route through the full slide-over form. Keeps the
+  modal predictable; no scope creep.
+- **`unpublished` flag does not count as an "issue".** Draft is a
+  workflow state, not content rot. The "Chỉ hiện vấn đề" filter
+  hides clean drafts so the admin can triage real problems.
+- **Preview is `aria-hidden`.** Preview is a visual aid; the form
+  is the source of truth for screen readers. Avoids double-reading.
+- **C8 live-wire deferred.** The preview pane + layout component
+  + 3 renderers + helpers all ship and are unit-tested, but wiring
+  them inside the existing 1361 LOC `ExerciseSlideOver` would
+  require restructuring that conflicts with the V23 boundary "no
+  form monolith refactor". The integration adapter ships in the
+  V24 form-refactor slice. Result: V23 lands the building blocks;
+  V24 plugs them in without further design work.
+
+### File changes
+
+**Backend (3 files)**:
+- `internal/httpapi/admin_content_health.go` — `+ValidationFlags`
+  type, `+computeValidationFlags(repo, ex)` helper,
+  `+exerciseWithFlags` wire shape; `+strings`, `+store` imports.
+- `internal/httpapi/server.go` — `handleAdminExercises` GET case
+  now wraps each row with its computed flags before writeJSON.
+- `internal/httpapi/admin_exercises_test.go` (new) — 3 list-shape
+  tests (response includes flags / forbidden non-admin / pool
+  filter still works).
+- `internal/httpapi/admin_content_health_test.go` — +10
+  per-rule tests on `computeValidationFlags`.
+
+**CMS (10 files modified / created)**:
+- `components/exercise-utils.ts` — `+cloneExercisePayload` helper +
+  `Exercise.validation_flags?` field.
+- `components/exercise-list.tsx` — `+onClone` + `+onRowClick`
+  props, "Sao chép" row button, "Chỉ hiện vấn đề" filter
+  checkbox, badge cluster column inline next to status pill,
+  row-click → modal handler, button stop-propagation.
+- `components/exercise-dashboard.tsx` — `+handleClone` (fetch +
+  POST), `+quickFixId` state, mounted `<ExerciseQuickFixModal>`,
+  threaded new props.
+- `components/validation-badges.ts` (new) — `flagsToBadges` +
+  `hasAnyIssue` pure helpers.
+- `components/exercise-quick-fix-modal.tsx` (new) — modal +
+  `audioRegenSupported` exported helper.
+- `components/exercise-edit-layout.tsx` (new) — split-pane layout
+  + drawer for narrow widths.
+- `components/exercise-preview/router.ts` (new) —
+  `selectPreviewRenderer`.
+- `components/exercise-preview/index.tsx` (new) — `<PreviewPane>` +
+  `<DisclaimerBand>`.
+- `components/exercise-preview/use-debounced-form.ts` (new).
+- `components/exercise-preview/use-media-query.ts` (new).
+- `components/exercise-preview/uloha-preview.tsx` (new) — 4-variant
+  Speaking renderer.
+- `components/exercise-preview/psani-email-preview.tsx` (new).
+- `components/exercise-preview/placeholder.tsx` (new).
+- `__tests__/exercise-clone.test.ts` (new) — 6 cases.
+- `__tests__/validation-badges.test.ts` (new) — 11 cases.
+- `__tests__/exercise-quick-fix.test.ts` (new) — 4 cases on
+  `audioRegenSupported`.
+- `__tests__/preview-routing.test.ts` (new) — 6 cases.
+
+### Post-review fixes
+
+- **C-1 row layout overflow** (`exercise-list.tsx`): grid columns
+  widened from `2fr 1fr 100px 96px` to `2fr 1fr 200px 240px` so the
+  new validation badges (e.g. "❌ Thiếu sentence audio") fit in the
+  status column and the third actions button ("Sao chép") fits
+  alongside [Sửa] and [Xóa] without overflowing into the next
+  column. Status cell wrapper gets `min-width: 0` + `overflow:
+  hidden` and the badge cluster gets `flex-wrap: wrap` so a long
+  label wraps within its column instead of pushing the layout.
+- **I-1 IIFE refactor** (`exercise-list.tsx`,
+  `exercise-dashboard.tsx`, `exercise-quick-fix-modal.tsx`): the
+  inline-IIFE pattern (same anti-pattern V22 already fixed) is now
+  replaced by a shared `<ValidationBadgeCluster flags variant>`
+  component (`row` vs `modal` variants) and a `<QuickFixSlot>`
+  wrapper for the modal mount. New `badgeStyle(variant)` helper
+  centralises the variant → CSS variable lookup.
+
+### Final test counts
+
+- Backend: **696** tests (was 683 at V22 ship → +13: 10
+  per-rule + 3 list-shape).
+- CMS: **217** tests in **14 files** (was 190 in 10 → +27: 6
+  clone + 11 badges + 4 quick-fix + 6 preview-routing).
+- Flutter: **345** tests (no change — V23 does not touch Flutter).
+- `make verify` (backend-build + cms-lint + cms-build +
+  flutter-analyze + flutter-test): green.
+- `make smoke-attempt-flow` + `make smoke-course-flow`: pass.
+  `smoke-exam-flow` 401 flake remains pre-V22 baseline; not a
+  V23 regression.
+
+---
+
+## V22 — CMS Catch-Up — 2026-05-07
+
+CMS desk had drifted 2-3 slices behind learner-facing app: V19 mastery
+aggregate, V20 Flutter UI, V21 CEFR + promotion + placement, V21.2 admin
+escape hatch all shipped without a CMS counterpart for debug or content
+authoring of the new constructs. V22 closes that gap with three vertical
+features under a strict read-only V22 boundary.
+
+Spec: `docs/specs/v22-cms-catch-up.md`. Plan + todo:
+`tasks/v22-cms-catch-up-{plan,todo}.md`.
+
+### Key changes
+
+- **B Learner X-Ray** (`/users/[userId]`): admin clicks a row in the
+  Users list to land on a 5-section debug screen — Profile, CEFR state
+  (`current_level` / `unlocked_levels` / `placement_taken_at`),
+  Mastery (per-skill × module × score × attempts × updated_at), the
+  Promotion attempts ledger (capped at 20 newest with `has_more` hint),
+  and Recent attempts (last 20). Backed by a new
+  `GET /v1/admin/users/:id/state` aggregator that pulls from the V17
+  user store, V21 user_levels, V19 user_skill_mastery, V21
+  promotion_attempts, V21.2 daily_usage, and the attempts ledger.
+  Read-only V22 footer offers Reset usage hôm nay (reuses V21.2
+  endpoint) and a back link to the bulk Users dashboard for password
+  reset / delete.
+
+- **C Mock test list polish** (`/mock-tests`): the V21 form already had
+  `is_promotion` / `is_placement` / `target_level` fields wired, but
+  the list view did not surface them. Added `🎯 → A2` orange pill +
+  `📍 Placement` teal pill alongside status / exam_mode badges, plus a
+  "Loại" filter dropdown (Tất cả / Thường / Promotion / Placement)
+  that scopes client-side. Added an app-layer "1 published promotion
+  exam per `target_level`" guard: `POST` and `PATCH /v1/admin/mock-tests`
+  return `409 promotion_exam_already_published` with `{level,
+  existing_id, existing_title, hint}`. CMS form runs the same check
+  client-side (against the in-memory `tests` array) so a yellow inline
+  warning appears before submit; the backend remains the gate of last
+  resort.
+
+- **F Content Health Report** (`/content-health`): on-demand 6-rule
+  scanner that surfaces content rot before it leaks to learners.
+  Rules: orphan exercises (`pool=course && module_id=''`), nghe
+  exercises missing `exercise_audio`, modules with zero exercises,
+  mock_tests with zero sections, courses with zero modules, dictation
+  exercises (`psani_3_dictation`) missing `exercise_sentence_audio`.
+  Each rule caps at 50 items with a `truncated` flag. Backed by
+  `GET /v1/admin/content-health` — handler-level aggregator over the
+  existing `MemoryStore` facade (no new store file). UI is a 6-card
+  grid with click-to-expand item tables that link to the offending
+  entity. New sidebar entry "Sức khỏe nội dung".
+
+### Decisions worth remembering
+
+- **No DB migration.** V22-CMS reads the V21 schema as-is; the
+  promotion uniqueness guard is app-layer (DB constraint enforces
+  target_level required + placement-promotion mutex but not
+  uniqueness, since draft + multiple target_level need to coexist).
+- **`module_empty` rule, not `untested_skill_in_module`.** Spec
+  originally proposed a per-skill check on each module; V22 simplifies
+  to "module has zero exercises" until the per-skill rubric is needed.
+- **CMS test layer = pure helpers.** CMS infra is plain Vitest with
+  no `@testing-library/react` or `jsdom`. Component render coverage
+  is delegated to manual smoke; instead, every non-trivial UI helper
+  (formatters, badge spec builders, conflict detector, state machine
+  predicates) is extracted to a `*-utils.ts` companion file and unit
+  tested. 44 new helper tests across 3 files.
+- **B11 Action footer = Reset usage only.** Spec said reuse the
+  existing `ConfirmResetUsage` + `ResetPassword` modals from
+  `users-dashboard.tsx`. Those are not exported and pulling them out
+  was scope creep; instead the footer uses `window.confirm()` for
+  Reset usage and links back to `/users` for password reset / delete
+  (where the existing modals already live).
+- **F is on-demand only.** Backend has no general scheduler; cron
+  defers to whenever content authoring scales beyond the solo admin.
+- **D0 microtask dropped.** Spec hinted at adding query-string
+  filtering to `GET /v1/admin/mock-tests`. The CMS already has the
+  full `tests` array in memory; D3's pre-submit warning reads that
+  state directly.
+
+### File changes
+
+**Backend (8 files modified / created)**:
+- `internal/contracts/learner_state.go` (new) — `LearnerStateResponse`
+  + 5 sub-types
+- `internal/store/promotion_attempts_store.go` — `ListForUser` on
+  interface + memory + postgres
+- `internal/store/attempt_store.go` — `ListAttemptsForUser` on
+  interface + memory; `+sort` import
+- `internal/store/postgres_attempts.go` — postgres
+  `ListAttemptsForUser` reusing `attemptSelectQuery`
+- `internal/store/mock_test_store.go` — `FindPublishedPromotionByLevel`
+  on interface + memory
+- `internal/store/postgres_mock_tests.go` — postgres
+  `FindPublishedPromotionByLevel`
+- `internal/store/memory.go` — `ListAttemptsForUser` +
+  `FindPublishedPromotionByLevel` facade forwarders
+- `internal/httpapi/admin_user_state.go` (new) — handler
+  `GET /v1/admin/users/:id/state`
+- `internal/httpapi/admin_content_health.go` (new) — handler
+  `GET /v1/admin/content-health` + 6 check functions
+- `internal/httpapi/admin_users.go` — sub-resource case `state`
+- `internal/httpapi/server.go` — `checkPromotionUniqueness` helper +
+  wired into POST / PATCH handlers; new
+  `/v1/admin/content-health` route
+
+**CMS (12 files modified / created)**:
+- `app/api/admin/users/[userId]/state/route.ts` (new) — proxy
+- `app/api/admin/content-health/route.ts` (new) — proxy
+- `app/users/[userId]/page.tsx` (new) — page route
+- `app/content-health/page.tsx` (new) — page route
+- `components/learner-xray.tsx` (new, ~360 LOC) — X-Ray component
+- `components/learner-xray-utils.ts` (new) — formatter helpers
+- `components/content-health.tsx` (new, ~250 LOC) — health report
+- `components/content-health-utils.ts` (new) — entityLink + state
+  helpers
+- `components/mock-test-dashboard-utils.ts` (new) — gatingBadge /
+  kindFilter / findPromotionConflict
+- `components/mock-test-dashboard.tsx` — wired badge + filter +
+  inline conflict warning + 409 toast
+- `components/users-dashboard.tsx` — wrap email cell in `<Link>` to
+  X-Ray
+- `components/cms-sidebar.tsx` — new "Sức khỏe nội dung" entry
+- `app/globals.css` — `.badge-promotion` / `.badge-placement`
+- `lib/i18n.tsx` — `nav.contentHealth` (VI + EN)
+
+**Tests**:
+- Backend: 21 new tests across 5 files
+  (`promotion_attempts_store_test.go` +3 list-for-user, +4
+  find-published-promotion; `memory_test.go` +1 list-attempts-for-user;
+  `admin_user_state_test.go` 5 X-Ray cases; `admin_mock_tests_test.go`
+  4 promotion conflict cases; `admin_content_health_test.go` 4
+  content-health cases).
+- CMS: 44 new helper tests across 3 files
+  (`learner-xray-helpers.test.ts` 17, `mock-test-dashboard-conflict.test.ts`
+  19, `content-health-helpers.test.ts` 10).
+
+### Post-review fixes
+
+- **I-1 backend enum validation** (`server.go:validateMockTestPromotion`):
+  promotion mocks must carry `target_level` ∈ {a0, a1, a2, b1}. Stray
+  values (incl. empty) → `400 invalid_target_level`. Wired into POST +
+  PATCH paths. 3 new tests.
+- **S-3 module label N+1** (`admin_user_state.go`): pre-fetch the full
+  module list once into a `map[id]title`, replace per-row
+  `ModuleByID` lookups. Single facade call vs 30 — material on
+  postgres.
+- **S-6 IIFE refactor** (`mock-test-dashboard.tsx`): lift the
+  `findPromotionConflict` call out of the inline IIFE inside JSX into
+  a `promotionConflict` const at the top of the component; render the
+  warning via standard `{conflict && <div>}`.
+
+### Final test counts
+
+- Backend: **683** tests (was 659 at V21.3 ship → +24, including I-1
+  validation fix).
+- CMS: **190** tests in **10 files** (was 144 in 7 → +46).
+- Flutter: **345** tests (no change — V22-CMS does not touch Flutter).
+- `make verify` (backend-build + cms-lint + cms-build + flutter-analyze
+  + flutter-test): green.
+- `make smoke-attempt-flow` + `make smoke-course-flow`: pass.
+  `make smoke-exam-flow` fails 401 on `/v1/attempts/:id/audio` —
+  reproduced on `main` before this slice; pre-existing flake unrelated
+  to V22-CMS.
+
+---
+
 ## V21.3 — CEFR UI Wire-up — 2026-05-07
 
 All V21 CEFR backend features existed since V21..V21.2 but no widget was

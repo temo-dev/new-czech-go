@@ -372,6 +372,42 @@ LIMIT 1
 	return t, true
 }
 
+// FindPublishedPromotionByLevel returns the first published promotion
+// MockTest for the given target_level, optionally excluding excludeID.
+// Powers the V22 app-layer "1 published promotion exam per level"
+// guard. Empty targetLevel always misses.
+func (s *postgresMockTestStore) FindPublishedPromotionByLevel(targetLevel, excludeID string) (contracts.MockTest, bool) {
+	if targetLevel == "" {
+		return contracts.MockTest{}, false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var (
+		t        contracts.MockTest
+		levelOut sql.NullString
+	)
+	err := s.db.QueryRowContext(ctx, `
+SELECT id, title, description, estimated_duration_minutes, status, pass_threshold_percent, exam_mode, banner_image_id,
+       is_promotion, is_placement, target_level
+FROM mock_tests
+WHERE is_promotion = TRUE AND status = 'published' AND target_level = $1 AND id <> $2
+ORDER BY created_at DESC
+LIMIT 1
+`, targetLevel, excludeID).Scan(&t.ID, &t.Title, &t.Description, &t.EstimatedDurationMinutes, &t.Status, &t.PassThresholdPercent, &t.ExamMode, &t.BannerImageID,
+		&t.IsPromotion, &t.IsPlacement, &levelOut)
+	if err == sql.ErrNoRows {
+		return contracts.MockTest{}, false
+	}
+	if err != nil {
+		return contracts.MockTest{}, false
+	}
+	if levelOut.Valid {
+		t.TargetLevel = levelOut.String
+	}
+	return t, true
+}
+
 // LatestPlacementMockTest returns the placement-flagged MockTest with the
 // most recent created_at. Drives the V21 placement-test/start endpoint.
 func (s *postgresMockTestStore) LatestPlacementMockTest() (contracts.MockTest, bool) {
