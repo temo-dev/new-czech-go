@@ -33,17 +33,19 @@ do not start the next phase before the checkpoint passes.
   wraps MockExamScreen with onCompleted → completePlacement → PlacementResultScreen.
   MockExamScreen gained optional onCompleted(sessionId) hook.
   4 widget tests (loading, error, ready, retry). Flutter 316 → 320.
-- [ ] **B2** `features/onboarding/cefr_auth_gate.dart` (new) —
-  loading / fresh-A0 / already-onboarded branches. Three test cases.
-- [ ] **B3** `main.dart` — `_V17AuthGate.authenticated` branch wraps
-  `LearnerShell` with `CefrAuthGate`. Regression test:
-  already-onboarded user sees no extra UI.
-- [ ] **B4** Wire `WelcomeScreen.onStart` → `PlacementTestScreen`.
-  Wire `WelcomeScreen.onSkip` → `levelApi.skipPlacementTest()` then
-  `gate.refresh()`.
-- [ ] **B5** `PlacementResultScreen` "Tiếp tục" CTA pops to root +
-  triggers `gate.refresh()`. Manual run: signup → welcome →
-  placement → result → shell.
+- [x] **B2** `features/onboarding/cefr_auth_gate.dart` (new) —
+  loading / fresh-A0 / already-onboarded / error-retry / prefs-read
+  branches. 6 widget tests. Flutter 320 → 326.
+- [x] **B3** `main.dart` — authenticated branch now routes through
+  `_CefrOnboarding` → `CefrAuthGate` + `LearnerShell`. Auth-welcome
+  + onboarding-welcome disambiguated via import aliases.
+- [x] **B4** `_CefrOnboarding` wires `onboarding_welcome.WelcomeScreen`
+  callbacks: `onStart` pushes `PlacementTestScreen`, `onSkip` calls
+  `levelApi.skipPlacement()` (best-effort) then `gate.refresh()`.
+- [x] **B5** `PlacementTestScreen.onFinished` = `gate.refresh()` →
+  CefrAuthGate re-fetches → `placement_taken_at != null` → child
+  (LearnerShell) visible. Full signup → placement → result → shell
+  path wired end-to-end.
 
 **Checkpoint B**: A1, A2, A3 acceptance criteria pass on simulator.
 

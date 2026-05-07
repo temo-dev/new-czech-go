@@ -13,9 +13,13 @@ import 'core/locale/locale_scope.dart';
 import 'core/voice/voice_preference_service.dart';
 import 'core/theme/app_theme.dart';
 import 'l10n/generated/app_localizations.dart';
+import 'core/api/level_api.dart';
 import 'features/auth/screens/signup_screen.dart' show AuthServiceProvider;
-import 'features/auth/screens/welcome_screen.dart';
+import 'features/auth/screens/welcome_screen.dart' as auth_welcome show WelcomeScreen;
 import 'features/exercise/screens/exercise_screen.dart' as exercise_feature;
+import 'features/onboarding/cefr_auth_gate.dart';
+import 'features/onboarding/placement_test_screen.dart';
+import 'features/onboarding/welcome_screen.dart' as onboarding_welcome show WelcomeScreen;
 import 'features/exercise/screens/listening_exercise_screen.dart';
 import 'features/exercise/screens/reading_exercise_screen.dart';
 import 'features/exercise/screens/vocab_grammar_exercise_screen.dart';
@@ -107,12 +111,74 @@ class _V17AuthGate extends StatelessWidget {
               body: Center(child: CircularProgressIndicator()),
             );
           case AuthState.unauthenticated:
-            return const WelcomeScreen();
+            return const auth_welcome.WelcomeScreen();
           case AuthState.needsVerify:
           case AuthState.authenticated:
-            return const LearnerShell();
+            return _CefrOnboarding(service: service);
         }
       },
+    );
+  }
+}
+
+/// V21.3 onboarding wrapper. Sits between authentication and LearnerShell so
+/// that fresh-signup users land on the placement test before the course list.
+class _CefrOnboarding extends StatefulWidget {
+  const _CefrOnboarding({required this.service});
+
+  final AuthService service;
+
+  @override
+  State<_CefrOnboarding> createState() => _CefrOnboardingState();
+}
+
+class _CefrOnboardingState extends State<_CefrOnboarding> {
+  late final GlobalKey<CefrAuthGateState> _gateKey;
+  late final LevelApi _levelApi;
+  late final ApiClient _client;
+
+  @override
+  void initState() {
+    super.initState();
+    _gateKey = GlobalKey<CefrAuthGateState>();
+    _client = widget.service.apiClientForScreens;
+    _levelApi = LevelApi(
+      baseUrl: _client.baseUrl,
+      tokenProvider: () => _client.currentToken,
+    );
+  }
+
+  void _refreshGate() => _gateKey.currentState?.refresh();
+
+  Future<void> _handleSkip() async {
+    try {
+      await _levelApi.skipPlacement();
+    } catch (_) {
+      // Best-effort: if skip fails (e.g. already taken), refresh anyway so
+      // the gate re-evaluates.
+    }
+    _refreshGate();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CefrAuthGate(
+      key: _gateKey,
+      levelApi: _levelApi,
+      child: const LearnerShell(),
+      welcomeScreen: onboarding_welcome.WelcomeScreen(
+        onStart: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder:
+                (_) => PlacementTestScreen(
+                  levelApi: _levelApi,
+                  client: _client,
+                  onFinished: _refreshGate,
+                ),
+          ),
+        ),
+        onSkip: _handleSkip,
+      ),
     );
   }
 }

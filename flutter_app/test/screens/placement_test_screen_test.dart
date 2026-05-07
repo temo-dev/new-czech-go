@@ -6,10 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter_app/core/api/api_client.dart';
 import 'package:flutter_app/core/api/level_api.dart';
-import 'package:flutter_app/core/level_utils.dart';
 import 'package:flutter_app/features/onboarding/placement_test_screen.dart';
 import 'package:flutter_app/l10n/generated/app_localizations.dart';
-import 'package:flutter_app/models/models.dart';
 
 // ─── fakes ────────────────────────────────────────────────────────────────────
 
@@ -66,13 +64,6 @@ PlacementStartResult _startResult() => const PlacementStartResult(
   fullSessionId: _kSessionId,
 );
 
-PlacementCompleteResult _completeResult() => PlacementCompleteResult(
-  assignedLevel: CefrLevel.a2,
-  scorePct: 60.0,
-  currentLevel: CefrLevel.a2,
-  unlockedLevels: const {CefrLevel.a0, CefrLevel.a1, CefrLevel.a2},
-  placementTakenAt: DateTime(2026, 5, 7, 12),
-);
 
 Map<String, dynamic> _sessionJson({bool completed = false}) => {
   'id': _kSessionId,
