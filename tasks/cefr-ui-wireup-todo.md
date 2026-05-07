@@ -16,10 +16,11 @@ do not start the next phase before the checkpoint passes.
   (`cefr_existing_prompt_shown`, `promo_banner_dismissed_for_<level>`).
   Unit tests under `test/cefr_prefs_test.dart` (5 cases). Flutter
   suite 309 → 314.
-- [ ] **A2** Audit `flutter_app/lib/core/api/level_api.dart` — confirm
-  `startPlacementTest`, `skipPlacementTest`,
-  `startPromotionExam(targetLevel)` exist with typed return shapes.
-  Add unit tests for any new model class.
+- [x] **A2** Audit `flutter_app/lib/core/api/level_api.dart` — confirmed
+  existing: `startPlacement`, `completePlacement`, `createPromotionAttempt`.
+  Added: `skipPlacement()` + backend `POST /v1/users/me/placement-test/skip`
+  (handler + 5 tests). Flutter 314 → 316. Backend 654 → 659.
+  Spec patched for endpoint name discrepancies.
 
 **Checkpoint A**: `make flutter-analyze` + `make flutter-test` green.
 

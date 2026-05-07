@@ -44,16 +44,19 @@ No CEFR algorithmic changes.
 
 ```
 SignupScreen → AuthService.authenticated
-  → AuthGate fetches GET /v1/users/me/progress
+  → AuthGate fetches GET /v1/users/me/level-progress
   → progress.placementTakenAt == null && currentLevel == 'a0'
   → onboarding/WelcomeScreen
        ├─ "Bắt đầu kiểm tra phân loại" → PlacementTestScreen
-       │     → MockTestRunner(is_placement=true, mockTestId from
-       │                      GET /v1/placement-test/start)
-       │     → submit → PlacementResultScreen(level)
+       │     → POST /v1/users/me/placement-test/start (returns
+       │       mock_test_id + full_session_id)
+       │     → MockTestRunner(is_placement=true, sessionId)
+       │     → POST /v1/users/me/placement-test/complete
+       │     → PlacementResultScreen(level)
        │     → "Tiếp tục" → LearnerShell(Home)
        └─ "Bỏ qua — bắt đầu từ A0"
-             → POST /v1/placement-test/skip (sets placement_taken_at)
+             → POST /v1/users/me/placement-test/skip
+                 (sets current_level='a0' + placement_taken_at=now)
              → LearnerShell(Home)
 ```
 
@@ -61,16 +64,19 @@ SignupScreen → AuthService.authenticated
 
 ```
 LoginScreen → AuthService.authenticated
-  → AuthGate fetches progress
+  → AuthGate fetches level-progress
   → currentLevel == 'a2' && placementTakenAt == null
        && SharedPreferences['cefr_existing_prompt_shown'] != true
   → ExistingLevelConfirmDialog (modal over LearnerShell)
        ├─ "Đúng — tôi đang ở A2"
-       │     → POST /v1/placement-test/skip
+       │     → POST /v1/users/me/placement-test/skip
+       │       (idempotent — 409 placement_already_taken on replay)
        │     → SharedPreferences set true
        │     → dismiss → Home
        └─ "Làm test phân loại lại"
-             → PlacementTestScreen flow (same as 3.1)
+             → PlacementTestScreen flow (same as 3.1) but the
+               LevelApi.startPlacement call uses ?force=true so the
+               existing placement_taken_at does not 409
              → on result, set SharedPreferences true
 ```
 
@@ -83,14 +89,18 @@ without an explicit choice).
 
 ```
 ExerciseScreen finish → pop back to LearnerShell(Home)
-  → HomeLevelHeader._refresh() re-fetches progress
+  → HomeLevelHeader._refresh() re-fetches level-progress
   → progress.promotionUnlocked == true
-       && SharedPreferences['promo_banner_dismissed_for_<level>']
+       && progress.nextLevel != null
+       && SharedPreferences['promo_banner_dismissed_for_<nextLevel>']
           != true
   → PromotionBanner becomes visible (sticky under ring)
-  → tap → PreExamScreen(targetLevel, promotionMockTestId)
-       → "Bắt đầu thi" → MockTestRunner(is_promotion=true)
-       → submit → PromotionResultScreen(outcome)
+  → tap → PreExamScreen(progress.nextLevel, progress.promotionTestID)
+       → "Bắt đầu thi"
+       → POST /v1/promotion-attempts (returns full_session_id)
+       → MockTestRunner(is_promotion=true, sessionId)
+       → POST /v1/mock-exam-sessions/:id/submit (existing pipeline)
+       → PromotionResultScreen(outcome)
             ├─ pass → celebration + auto pop to Home
             │         → next-level courses unlock
             └─ fail → diagnostic table + 24h cooldown timer
@@ -121,21 +131,43 @@ Banner is **not** shown mid-session. End-of-session = the
 | `flutter_app/lib/features/courses/widgets/locked_course_sheet.dart` | reuse | Triggered when learner taps a locked tile. |
 | `flutter_app/lib/core/storage/cefr_prefs.dart` | **new** | Thin `SharedPreferences` wrapper for the two keys (`cefr_existing_prompt_shown`, `promo_banner_dismissed_for_<level>`). |
 
-## 5. Backend contract (no changes)
+## 5. Backend contract
 
-This slice consumes existing endpoints only:
+V21 + V21.2 already shipped 4 of the 5 endpoints this slice needs.
+**V21.3 A2 added the 5th** (`/placement-test/skip`) because there was
+no atomic way to record a skipped onboarding without burning a
+session.
 
-| Endpoint | Used by |
-|---|---|
-| `GET /v1/users/me/progress` | `CefrAuthGate`, `HomeLevelHeader._refresh`, post-attempt refresh |
-| `GET /v1/placement-test/start` | `PlacementTestScreen` |
-| `POST /v1/placement-test/skip` | `WelcomeScreen.onSkip`, existing-A2 dialog confirm |
-| `GET /v1/promotion-exam/start` | `PreExamScreen` |
-| `POST /v1/mock-exam-sessions/:id/submit` | `MockTestRunner` (existing) |
+| Endpoint | Method | Used by | Status |
+|---|---|---|---|
+| `/v1/users/me/level-progress` | GET | `CefrAuthGate`, `HomeLevelHeader._refresh`, post-attempt refresh | shipped V21 |
+| `/v1/users/me/placement-test/start` | POST | `PlacementTestScreen` (with optional `?force=true` for re-test) | shipped V21 |
+| `/v1/users/me/placement-test/complete` | POST | `MockTestRunner` post-submit when `is_placement=true` | shipped V21 |
+| `/v1/users/me/placement-test/skip` | POST | `WelcomeScreen.onSkip`, existing-A2 dialog confirm | **added V21.3 A2** |
+| `/v1/promotion-attempts` | POST | `PreExamScreen` "Bắt đầu thi" CTA | shipped V21 |
+| `/v1/mock-exam-sessions/:id/submit` | POST | `MockTestRunner` (existing for both placement + promotion) | shipped pre-V21 |
 
-If any field needed by the wire-up is missing from
-`/v1/users/me/progress` (e.g. `promotionMockTestId`), file an issue
-and block this slice rather than adding it ad-hoc.
+The Flutter typed wrappers live in `lib/core/api/level_api.dart`:
+
+| Wrapper | Endpoint | Returns |
+|---|---|---|
+| `LevelApi.fetchLevelProgress()` | GET level-progress | `LevelProgressResponse` |
+| `LevelApi.startPlacement({force})` | POST start | `PlacementStartResult` |
+| `LevelApi.completePlacement(fullSessionId)` | POST complete | `PlacementCompleteResult` |
+| `LevelApi.skipPlacement()` | POST skip | `PlacementCompleteResult` (scorePct=0) |
+| `LevelApi.createPromotionAttempt(mockTestId)` | POST promotion-attempts | `PromotionAttemptResult` |
+
+The promotion banner reads `progress.nextLevel` for the target
+display and `progress.promotionTestID` for the mock-test id passed
+into `createPromotionAttempt`. There is no separate `targetLevel`
+field on the progress payload.
+
+Errors surface as `LevelApiException` (typed, exposes `statusCode`,
+`code`, `message`, `retryAfter`). It is **not** the same class as
+the V21.2 `ApiException` used by attempts; widget code that wants
+to render `recordErrorRateLimit{resetTime}` for level-flow rate
+limits must switch on `LevelApiException.statusCode == 429`
+explicitly.
 
 ## 6. Acceptance criteria
 

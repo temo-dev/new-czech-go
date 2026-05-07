@@ -309,3 +309,107 @@ func TestPlacementHandler_Complete_MissingBody_400(t *testing.T) {
 		t.Errorf("status = %d, want 400; body=%v", status, body)
 	}
 }
+
+// V21.3 A2 — POST /v1/users/me/placement-test/skip lets the onboarding flow
+// record an explicit "skip" without burning a 12-min placement session. The
+// learner is parked at A0 with placement_taken_at = now so the auth gate
+// transitions to LearnerShell and the onboarding screens never re-show.
+
+func TestPlacementHandler_Skip_RequiresAuth(t *testing.T) {
+	srv, _, _, _ := newPlacementTestServer(t, time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC), false)
+	defer srv.Close()
+	status, _ := placementPost(t, srv, "/v1/users/me/placement-test/skip", "", nil)
+	if status != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", status)
+	}
+}
+
+func TestPlacementHandler_Skip_RejectsGet_405(t *testing.T) {
+	srv, _, _, _ := newPlacementTestServer(t, time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC), false)
+	defer srv.Close()
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/v1/users/me/placement-test/skip", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer dev-learner-token")
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatalf("do: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("status = %d, want 405", resp.StatusCode)
+	}
+}
+
+func TestPlacementHandler_Skip_FreshUserParksAtA0(t *testing.T) {
+	now := time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC)
+	srv, _, userLevels, _ := newPlacementTestServer(t, now, false)
+	defer srv.Close()
+
+	status, body := placementPost(t, srv, "/v1/users/me/placement-test/skip", "dev-learner-token", nil)
+	if status != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%v", status, body)
+	}
+	data := body["data"].(map[string]any)
+	if data["assigned_level"].(string) != "a0" {
+		t.Errorf("assigned_level = %v, want a0", data["assigned_level"])
+	}
+	if data["current_level"].(string) != "a0" {
+		t.Errorf("current_level = %v, want a0", data["current_level"])
+	}
+	unlocked, _ := data["unlocked_levels"].([]any)
+	if len(unlocked) != 1 || unlocked[0].(string) != "a0" {
+		t.Errorf("unlocked_levels = %v, want [a0]", data["unlocked_levels"])
+	}
+	if data["placement_taken_at"] == nil {
+		t.Error("placement_taken_at = nil after skip")
+	}
+
+	got, ok := userLevels.GetUserLevel("user-learner-1")
+	if !ok {
+		t.Fatal("user level row missing after skip")
+	}
+	if got.CurrentLevel != "a0" {
+		t.Errorf("store CurrentLevel = %q, want a0", got.CurrentLevel)
+	}
+	if got.PlacementTakenAt == nil {
+		t.Error("store PlacementTakenAt = nil after skip")
+	}
+}
+
+// Skip is one-shot. After a learner has placed (or skipped) once, a second
+// /skip must 409 — same shape as /start so the client can collapse both
+// branches onto a single "already onboarded" handler.
+func TestPlacementHandler_Skip_AlreadyTaken_409(t *testing.T) {
+	now := time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC)
+	srv, _, userLevels, _ := newPlacementTestServer(t, now, false)
+	defer srv.Close()
+
+	if _, err := userLevels.MarkPlacementTaken("user-learner-1", "a1",
+		time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC)); err != nil {
+		t.Fatalf("seed placement_taken_at: %v", err)
+	}
+
+	status, body := placementPost(t, srv, "/v1/users/me/placement-test/skip", "dev-learner-token", nil)
+	if status != http.StatusConflict {
+		t.Fatalf("status = %d, want 409; body=%v", status, body)
+	}
+	if code := errCode(body); code != "placement_already_taken" {
+		t.Errorf("error.code = %q, want placement_already_taken", code)
+	}
+}
+
+func TestPlacementHandler_Skip_FeatureDisabled_404(t *testing.T) {
+	repo := store.NewMemoryStore()
+	srv := httptest.NewServer(NewServerForTest(repo, nil).Handler())
+	defer srv.Close()
+
+	status, body := placementPost(t, srv, "/v1/users/me/placement-test/skip", "dev-learner-token", nil)
+	if status != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404; body=%v", status, body)
+	}
+	if code := errCode(body); code != "feature_disabled" {
+		t.Errorf("error.code = %q, want feature_disabled", code)
+	}
+}

@@ -67,6 +67,28 @@ class LevelApi {
     );
   }
 
+  /// POST /v1/users/me/placement-test/skip
+  /// Parks the learner at A0 + sets placement_taken_at without running the
+  /// 12-min placement session. Idempotent: a second call returns
+  /// 409 placement_already_taken (surfaced as [LevelApiException] so the
+  /// auth gate can collapse "already onboarded" branches).
+  Future<PlacementCompleteResult> skipPlacement() async {
+    final raw = await _request('POST', '/v1/users/me/placement-test/skip');
+    final data = (raw['data'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final unlocked = ((data['unlocked_levels'] as List?) ?? const [])
+        .whereType<String>()
+        .map(parseLevel)
+        .toSet();
+    return PlacementCompleteResult(
+      assignedLevel: parseLevel(data['assigned_level'] as String?),
+      scorePct: 0.0,
+      currentLevel: parseLevel(data['current_level'] as String?),
+      unlockedLevels: unlocked,
+      placementTakenAt:
+          DateTime.tryParse(data['placement_taken_at'] as String? ?? ''),
+    );
+  }
+
   /// POST /v1/promotion-attempts
   /// Creates a session + ledger row when all gates pass.
   Future<PromotionAttemptResult> createPromotionAttempt(String mockTestId) async {

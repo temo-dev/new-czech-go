@@ -166,6 +166,65 @@ void main() {
     }
   });
 
+  test('skipPlacement parks learner at A0 + sets placement_taken_at', () async {
+    final server = await _bindServer((request) async {
+      expect(request.method, 'POST');
+      expect(request.uri.path, '/v1/users/me/placement-test/skip');
+      expect(request.headers.value('authorization'), 'Bearer test-token');
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode({
+          'data': {
+            'assigned_level': 'a0',
+            'current_level': 'a0',
+            'unlocked_levels': ['a0'],
+            'placement_taken_at': '2026-05-07T12:00:00Z',
+          },
+          'meta': {},
+        }));
+      await request.response.close();
+    });
+
+    final api = _client(server);
+    try {
+      final result = await api.skipPlacement();
+      expect(result.assignedLevel, CefrLevel.a0);
+      expect(result.currentLevel, CefrLevel.a0);
+      expect(result.unlockedLevels, {CefrLevel.a0});
+      expect(result.placementTakenAt, isNotNull);
+      expect(result.placementTakenAt!.toUtc().year, 2026);
+    } finally {
+      await server.close(force: true);
+    }
+  });
+
+  test('skipPlacement surfaces 409 placement_already_taken as exception', () async {
+    final server = await _bindServer((request) async {
+      request.response
+        ..statusCode = HttpStatus.conflict
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode({
+          'error': {
+            'code': 'placement_already_taken',
+            'message': 'You have already taken or skipped the placement test.',
+          },
+        }));
+      await request.response.close();
+    });
+
+    final api = _client(server);
+    try {
+      await api.skipPlacement();
+      fail('expected LevelApiException for placement_already_taken');
+    } on LevelApiException catch (e) {
+      expect(e.statusCode, 409);
+      expect(e.code, 'placement_already_taken');
+    } finally {
+      await server.close(force: true);
+    }
+  });
+
   test('completePlacement returns assigned level + level state', () async {
     final server = await _bindServer((request) async {
       expect(request.method, 'POST');

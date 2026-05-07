@@ -12,6 +12,14 @@ package httpapi
 //   submit a level directly), maps it via LevelService.MapPlacementScoreToLevel,
 //   and persists current_level + placement_taken_at via UserLevelStore.
 //   404 when the session is missing or owned by someone else.
+//
+// POST /v1/users/me/placement-test/skip                                 (V21.3)
+//   Records an explicit "skip" without burning a 12-min placement session:
+//   the learner is parked at A0 with placement_taken_at = now so the auth
+//   gate transitions to LearnerShell on next progress fetch. Idempotent —
+//   second call returns 409 placement_already_taken (matching /start so the
+//   client collapses both branches onto a single "already onboarded"
+//   handler).
 
 import (
 	"encoding/json"
@@ -172,6 +180,45 @@ func (s *Server) handlePlacementTestComplete(w http.ResponseWriter, r *http.Requ
 		"data": map[string]any{
 			"assigned_level":     assignedLevel,
 			"score_pct":          scorePct,
+			"current_level":      updated.CurrentLevel,
+			"unlocked_levels":    updated.UnlockedLevels,
+			"placement_taken_at": updated.PlacementTakenAt,
+		},
+		"meta": map[string]any{},
+	})
+}
+
+// handlePlacementTestSkip parks a fresh learner at A0 without running the
+// placement session. The auth gate uses placement_taken_at to decide whether
+// to show onboarding, so writing it explicitly is what releases the gate.
+func (s *Server) handlePlacementTestSkip(w http.ResponseWriter, r *http.Request, user contracts.User) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	if s.levelService == nil || s.userLevelStore == nil {
+		writeError(w, http.StatusNotFound, "feature_disabled",
+			"Level progression is not enabled on this server.", false)
+		return
+	}
+	if existing, ok := s.userLevelStore.GetUserLevel(user.ID); ok && existing.PlacementTakenAt != nil {
+		writeError(w, http.StatusConflict, "placement_already_taken",
+			"You have already taken or skipped the placement test.", false)
+		return
+	}
+
+	const skippedLevel = "a0"
+	updated, err := s.userLevelStore.MarkPlacementTaken(user.ID, skippedLevel, time.Now().UTC())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"error": map[string]any{"code": "placement_skip_failed", "message": err.Error()},
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"assigned_level":     skippedLevel,
 			"current_level":      updated.CurrentLevel,
 			"unlocked_levels":    updated.UnlockedLevels,
 			"placement_taken_at": updated.PlacementTakenAt,
