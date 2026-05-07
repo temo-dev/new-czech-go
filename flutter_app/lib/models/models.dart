@@ -1,3 +1,5 @@
+import 'package:flutter_app/core/level_utils.dart';
+
 class Course {
   const Course({
     required this.id,
@@ -7,6 +9,9 @@ class Course {
     required this.status,
     required this.sequenceNo,
     this.bannerImageId = '',
+    this.level = CefrLevel.a2,
+    this.unlockState = CourseUnlockState.unknown,
+    this.demoExerciseId = '',
   });
 
   final String id;
@@ -16,6 +21,9 @@ class Course {
   final String status;
   final int sequenceNo;
   final String bannerImageId;
+  final CefrLevel level;
+  final CourseUnlockState unlockState;
+  final String demoExerciseId;
 
   factory Course.fromJson(Map<String, dynamic> json) {
     return Course(
@@ -26,8 +34,114 @@ class Course {
       status: json['status'] as String? ?? 'published',
       sequenceNo: (json['sequence_no'] as num?)?.toInt() ?? 0,
       bannerImageId: json['banner_image_id'] as String? ?? '',
+      // Course fallback differs from generic parseLevel: when the server
+      // omits the field (legacy fixture or pre-V21 row), default to a2 so
+      // the existing A2 product keeps rendering — matches the backend
+      // migration 025 column default.
+      level: _parseCourseLevel(json['level']),
+      unlockState: parseCourseUnlockState(json['unlock_state'] as String?),
+      demoExerciseId: json['demo_exercise_id'] as String? ?? '',
     );
   }
+}
+
+CefrLevel _parseCourseLevel(Object? raw) {
+  if (raw is String && raw.isNotEmpty) return parseLevel(raw);
+  return CefrLevel.a2;
+}
+
+// V21 CEFR level progression — wire shape for GET /v1/users/me/level-progress.
+
+class SkillMasteryInfo {
+  const SkillMasteryInfo({
+    required this.pct,
+    required this.thresholdPct,
+    required this.passes,
+  });
+
+  final double pct;
+  final double thresholdPct;
+  final bool passes;
+
+  factory SkillMasteryInfo.fromJson(Map<String, dynamic> json) {
+    return SkillMasteryInfo(
+      pct: (json['pct'] as num?)?.toDouble() ?? 0.0,
+      thresholdPct: (json['threshold_pct'] as num?)?.toDouble() ?? 0.0,
+      passes: json['passes'] as bool? ?? false,
+    );
+  }
+}
+
+class LevelProgressResponse {
+  const LevelProgressResponse({
+    required this.userID,
+    required this.currentLevel,
+    required this.unlockedLevels,
+    required this.nextLevel,
+    this.placementTakenAt,
+    required this.skillMastery,
+    required this.coveragePct,
+    required this.coverageThresholdPct,
+    required this.allSkillsPass,
+    required this.promotionUnlocked,
+    this.promotionTestID = '',
+    this.promotionCooldownUntil,
+  });
+
+  final String userID;
+  final CefrLevel currentLevel;
+  final Set<CefrLevel> unlockedLevels;
+  final CefrLevel? nextLevel;
+  final DateTime? placementTakenAt;
+  final Map<String, SkillMasteryInfo> skillMastery;
+  final double coveragePct;
+  final double coverageThresholdPct;
+  final bool allSkillsPass;
+  final bool promotionUnlocked;
+  final String promotionTestID;
+  final DateTime? promotionCooldownUntil;
+
+  factory LevelProgressResponse.fromJson(Map<String, dynamic> json) {
+    final unlockedRaw = (json['unlocked_levels'] as List?) ?? const [];
+    final unlocked = unlockedRaw
+        .whereType<String>()
+        .map(parseLevel)
+        .toSet();
+    final masteryRaw =
+        (json['skill_mastery'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final mastery = masteryRaw.map<String, SkillMasteryInfo>(
+      (k, v) => MapEntry(k, SkillMasteryInfo.fromJson(
+        (v as Map).cast<String, dynamic>(),
+      )),
+    );
+    final currentLevel = parseLevel(json['current_level'] as String?);
+    // next_level may be null at the top of the ladder; fall back to the
+    // computed ladder so the client always has something to render.
+    final nextRaw = json['next_level'] as String?;
+    final next = (nextRaw == null || nextRaw.isEmpty)
+        ? nextCefrLevel(currentLevel)
+        : parseLevel(nextRaw);
+    return LevelProgressResponse(
+      userID: json['user_id'] as String? ?? '',
+      currentLevel: currentLevel,
+      unlockedLevels: unlocked,
+      nextLevel: next,
+      placementTakenAt: _parseTime(json['placement_taken_at']),
+      skillMastery: mastery,
+      coveragePct: (json['coverage_pct'] as num?)?.toDouble() ?? 0.0,
+      coverageThresholdPct:
+          (json['coverage_threshold_pct'] as num?)?.toDouble() ?? 0.0,
+      allSkillsPass: json['all_skills_pass'] as bool? ?? false,
+      promotionUnlocked: json['promotion_unlocked'] as bool? ?? false,
+      promotionTestID: json['promotion_test_id'] as String? ?? '',
+      promotionCooldownUntil: _parseTime(json['promotion_cooldown_until']),
+    );
+  }
+}
+
+DateTime? _parseTime(Object? raw) {
+  if (raw is! String || raw.isEmpty) return null;
+  return DateTime.tryParse(raw);
 }
 
 // SkillSummary is computed from exercises grouped by skill_kind within a module.

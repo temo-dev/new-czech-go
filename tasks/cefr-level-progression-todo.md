@@ -77,9 +77,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
 
 ## Phase D — Flutter
 
-- [ ] **V21-D1** Models + level utils (`models/level.dart`, `shared/util/level.dart`, `models/course.dart`)
-  - **AC:** `Level` enum + helpers; `LevelProgressResponse` parses; `Course` parses new fields
-  - **Verify:** +4 unit tests
+- [x] **V21-D1** Level models + utils (`flutter_app/lib/core/level_utils.dart` (new), `flutter_app/lib/models/models.dart` (extend `Course` + add `LevelProgressResponse` + `SkillMasteryInfo`), `flutter_app/test/level_model_test.dart` (new); spec called for `models/level.dart` + `shared/util/level.dart` but the repo uses single `models/models.dart` + `core/skill_utils.dart` pattern — kept those conventions)
+  - **AC:** `CefrLevel` enum (a0–b1); `parseLevel`/`cefrLevelCode`/`nextCefrLevel`/`cefrLevelOrder`/`cefrLevelLabel`/`cefrLevelChipColor` helpers; `CourseUnlockState` enum (`unknown`/`unlocked`/`demo`/`locked`) + parser; `Course.fromJson` parses `level`/`unlock_state`/`demo_exercise_id` (legacy fallback default = `a2` to match backend migration 025); `LevelProgressResponse.fromJson` parses full payload incl. nested `skill_mastery` map, `unlocked_levels` set, optional timestamps; missing optional fields default safely
+  - **Verify:** +11 unit tests (4 ladder, 2 LevelProgress, 4 Course states, 1 round-trip); `make flutter-analyze` clean; full Flutter suite 277 tests pass
   - **Size:** M
 - [ ] **V21-D2** `LevelApi` client (`core/api/level_api.dart`)
   - **AC:** 4 methods; tolerates flat `{"error":"<code>"}` envelopes
