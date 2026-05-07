@@ -93,9 +93,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** 6-arc CustomPainter ring (one arc per skill — `noi`/`viet`/`nghe`/`doc`/`tu_vung`/`ngu_phap`), arc fill % from `SkillMasteryInfo.pct`, color via existing `AppColors.scoreExcellent`/`Good`/`Fair`/`Poor` thresholds (≥85/≥70/≥50); center label `<current> → <next>` + `<readiness>% sẵn sàng` (avg of skill pcts); top-of-ladder `nextLevel == null` hides arrow + next-level label; pulse via `ScaleTransition` (1.0↔1.04, 800ms reverse-repeat) keyed `level_progress_ring_pulse` when `promotionUnlocked && !disableAnimations`; reduced-motion shows static `Sẵn sàng` pill keyed `level_progress_ring_ready_pill` instead
   - **Verify:** +4 widget tests (renders ladder + pct, top-of-ladder hides arrow, pulse keyed when unlocked + motion enabled, reduced motion shows static pill); analyze clean; suite 291
   - **Size:** L
-- [ ] **V21-D5** `PromotionBanner` widget
-  - **AC:** visible only when unlocked + target not yet in `unlocked_levels`; CTA navigates to `PreExamScreen`
-  - **Verify:** +2 widget tests
+- [x] **V21-D5** `PromotionBanner` widget (`features/home/widgets/promotion_banner.dart` + test)
+  - **AC:** four-way visibility gate (`promotionUnlocked && targetLevel != null && !unlockedLevels.contains(target) && promotionTestId.isNotEmpty`) — any miss collapses to `SizedBox.shrink`; renders sticky home card via `successContainer` surface + Lucide-style premium icon, headline `"Sẵn sàng thi nâng cấp lên <level>"`; tap fires `onTap(mockTestId)` so caller routes to PreExamScreen (D8)
+  - **Verify:** +3 widget tests (hidden when locked, hidden when target already unlocked, shows + tap fires with mock id); analyze clean; suite 294
   - **Size:** S
 - [ ] **V21-D6** `LockedCourseSheet` + `CourseListScreen` lock state
   - **AC:** Lucide padlock SVG; mastery delta bar; ghost demo CTA; bottom sheet with primary CTA back to lower-level course
