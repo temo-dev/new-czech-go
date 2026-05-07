@@ -81,9 +81,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** `CefrLevel` enum (a0–b1); `parseLevel`/`cefrLevelCode`/`nextCefrLevel`/`cefrLevelOrder`/`cefrLevelLabel`/`cefrLevelChipColor` helpers; `CourseUnlockState` enum (`unknown`/`unlocked`/`demo`/`locked`) + parser; `Course.fromJson` parses `level`/`unlock_state`/`demo_exercise_id` (legacy fallback default = `a2` to match backend migration 025); `LevelProgressResponse.fromJson` parses full payload incl. nested `skill_mastery` map, `unlocked_levels` set, optional timestamps; missing optional fields default safely
   - **Verify:** +11 unit tests (4 ladder, 2 LevelProgress, 4 Course states, 1 round-trip); `make flutter-analyze` clean; full Flutter suite 277 tests pass
   - **Size:** M
-- [ ] **V21-D2** `LevelApi` client (`core/api/level_api.dart`)
-  - **AC:** 4 methods; tolerates flat `{"error":"<code>"}` envelopes
-  - **Verify:** +4 unit tests
+- [x] **V21-D2** `LevelApi` typed client (`core/api/level_api.dart` (new) + test)
+  - **AC:** `fetchLevelProgress` / `startPlacement(force)` / `completePlacement(sessionId)` / `createPromotionAttempt(mockTestId)`; constructor takes `baseUrl + tokenProvider` (decoupled from ApiClient internals); typed `LevelApiException(statusCode, code, message, retryAfter)` collapses both backend envelope shapes (`{error: {code,message,retry_after}}` and flat `{error: "code", message: "..."}`); typed result records (`PlacementStartResult`, `PlacementCompleteResult`, `PromotionAttemptResult`)
+  - **Verify:** +6 unit tests (fetch happy, start, start with force, cooldown_active w/ retry_after parsed, flat envelope tolerated, complete happy w/ level state); `make flutter-analyze` clean; full Flutter suite 283 tests pass
   - **Size:** M
 - [ ] **V21-D3** `LevelBadge` widget
   - **AC:** chip + 4-dot ladder; tokens only; ≥48dp; semantics; reduced-motion safe
