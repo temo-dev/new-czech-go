@@ -43,9 +43,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** start picks latest `is_placement=true` MockTest, creates `mock_exam_session`, returns `{mock_test_id, full_session_id}`; 409 `placement_already_taken` w/o `?force=true`; 404 `placement_not_configured` when no placement mock seeded; complete trusts session `OverallScore`, maps via `LevelService.MapPlacementScoreToLevel`, writes `current_level + placement_taken_at`; 404 hides wrong-owner and missing-session identically; 400 `missing_full_session_id`
   - **Verify:** +7 integration tests (auth required, fresh start, no config 404, already-taken 409 + force ok, complete happy, complete wrong-owner 404, complete missing body 400)
   - **Size:** L
-- [ ] **V21-B6** `POST /v1/promotion-attempts` (`httpapi/promotion_handler.go`)
-  - **AC:** error precedence per spec (404 → 400 not_promotion → 409 already_unlocked → 400 promotion_locked → 400 cooldown_active); creates session + attempt
-  - **Verify:** +6 integration tests (happy + each error)
+- [x] **V21-B6** `POST /v1/promotion-attempts` (`httpapi/promotion_handler.go` + test, `LevelDeps.PromoAttempts`, route)
+  - **AC:** error precedence enforced (404 mock_test_not_found → 400 mock_test_not_promotion → 409 level_already_unlocked → 400 promotion_locked → 400 cooldown_active w/ retry_after); promotion_locked also fires when target ≠ NextLevel(current); on success creates `mock_exam_session` + `promotion_attempts` row, returns 201 `{promotion_attempt_id, full_session_id, target_level}`
+  - **Verify:** +7 integration tests (auth, not-found, not-promotion, already-unlocked, locked, cooldown, happy)
   - **Size:** L
 - [ ] **V21-B7** Course handler modifications (`httpapi/courses_handler.go`)
   - **AC:** `?level=` filter; `unlock_state` + `level` + `demo_exercise_id` per item; `403 level_locked` on exercise reads except demo; demo attempts tagged `is_demo=true`

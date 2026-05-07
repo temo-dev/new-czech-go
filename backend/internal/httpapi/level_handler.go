@@ -20,10 +20,11 @@ import (
 // handlers from either the V17 auth bootstrap path or the legacy
 // dev-fixture path (mirrors MasteryDeps for V19). Only Service is required
 // for the read-only level-progress endpoint; mutation handlers (placement,
-// promotion) additionally require UserLevels.
+// promotion) additionally require UserLevels and/or PromoAttempts.
 type LevelDeps struct {
-	Service    *processing.LevelService
-	UserLevels store.UserLevelStore
+	Service       *processing.LevelService
+	UserLevels    store.UserLevelStore
+	PromoAttempts store.PromotionAttemptsStore
 }
 
 // SetLevelDeps wires the V21 level gating service + stores. Endpoints that
@@ -31,6 +32,7 @@ type LevelDeps struct {
 func (s *Server) SetLevelDeps(d LevelDeps) {
 	s.levelService = d.Service
 	s.userLevelStore = d.UserLevels
+	s.promoAttemptsStore = d.PromoAttempts
 }
 
 func (s *Server) handleUserLevelProgress(w http.ResponseWriter, r *http.Request, user contracts.User) {
