@@ -101,9 +101,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** `LockedCourseTile` shows padlock + level chip + coverage delta progress bar + optional "Xem demo →" ghost CTA (hidden when `hasDemoExercise=false`); `LockedCourseSheet` shows the same delta + primary "Tiếp tục luyện" CTA + ghost demo CTA, both pop the sheet before firing callbacks; uses `surfaceContainerLow`/`outlineVariant`/`primary` tokens, `Icons.lock_outline` not emoji
   - **Verify:** +3 widget tests (locked tile renders padlock + delta + demo CTA, demo CTA hidden when no demo, sheet dual-CTA fires correctly); analyze clean; suite 297
   - **Size:** M
-- [ ] **V21-D7** Onboarding flow (`WelcomeScreen` + `PlacementResultScreen` + router gate)
-  - **AC:** first launch routes through Welcome → placement → result → home; skip = A0; reduced-motion safe reveal
-  - **Verify:** +4 widget tests
+- [x] **V21-D7** Onboarding screens (`features/onboarding/welcome_screen.dart` + `placement_result_screen.dart` + test). Router gate (first-launch routing through Welcome → placement → result → home) deferred to V21-D9 home wiring per scope discipline.
+  - **AC:** `WelcomeScreen` renders intro copy (≈12 phút phân loại) + dual CTAs ("Bắt đầu kiểm tra phân loại" primary, "Bỏ qua — bắt đầu từ A0" ghost) keyed for tap routing; `PlacementResultScreen` reveals the assigned level chip via `ScaleTransition + FadeTransition` (450ms easeOutBack) keyed `placement_result_reveal_animation`; reduced-motion users skip the controller entirely (key absent), level still readable; "Bắt đầu học" CTA fires `onContinue`
+  - **Verify:** +4 widget tests (Welcome dual CTAs + intro copy, Welcome callbacks fire, PlacementResult headline + body + CTA, reduced motion skips reveal animation); analyze clean; suite 301
   - **Size:** L
 - [ ] **V21-D8** Promotion flow (`PreExamScreen` + `PromotionResultScreen` pass/fail)
   - **AC:** rules + confirm + result variants; live cooldown timer; weakest-skill deep link; haptic on pass
