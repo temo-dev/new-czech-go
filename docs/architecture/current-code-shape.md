@@ -1,14 +1,14 @@
 # Current Code Shape
 
 Snapshot of how the repo is split today. Not a target architecture —
-a description of the structure that emerged after V2..V21.1 shipped.
+a description of the structure that emerged after V2..V21.3 shipped.
 
-Last refreshed: V21.1 (2026-05-07). Graph stats from the
-`code-review-graph` build at commit `55c4b177ffe9`:
+Last refreshed: V21.3 (2026-05-07). Graph stats from session-start
+(built at commit `8b5c05e44ec6` before V21.3):
 
-- **419 files** parsed
-- **4634 nodes**
-- **37147 edges**
+- **467 files** parsed (post-V21.3 ~478 with new Flutter + backend files)
+- **5038 nodes**
+- **40981 edges**
 - **10 languages**: go, typescript, javascript, swift, c, dart, bash, tsx, python, java
 
 ## High-level shape
@@ -64,7 +64,11 @@ contracts/, processing/, store/, httpapi/  — strict acyclic order.
 Bootstrap path: `cmd/api/main.go` constructs each Postgres store via
 `NewPostgres<Domain>Store`, wires them into a `MemoryStore` facade
 (legacy compatibility) + a `Processor`, then assembles the HTTP server
-through `httpapi.NewServerWithAudio` / `NewServerWithMastery`.
+through `httpapi.NewServerWithAuth` / `NewServerWithMastery` /
+`NewServerWithAudio`. V21.3 added mandatory in-memory `LevelDeps`
+(UserLevelStore + PromotionAttemptsStore + LevelService) wired via
+`assembleServer`'s variadic `*LevelDeps` parameter — all three
+constructors now accept it.
 
 ## Backend gravity wells
 
@@ -117,26 +121,38 @@ tests (V21 mutex, level sanitization) lives under `lib/`.
 core/
   api/api_client.dart             monolithic ApiClient (~30 KB)
   api/level_api.dart              V21 typed client + LevelApiException
+                                  (V21.3 added skipPlacement())
   api/progress_api.dart           V20 cache wrapper around getProgress
   level_utils.dart                V21 CefrLevel enum + parsers + ladder
   skill_utils.dart                V19 skill_kind helpers
+  storage/cefr_prefs.dart         V21.3 SharedPreferences helper for
+                                  two CEFR keys (prompt_shown, banner_dismissed)
   theme/                          AppColors, AppTypography, AppSpacing
                                   (Babbel-inspired tokens — orange + teal)
   auth/, streak/, voice/, …       per-feature client subsystems
 
 features/
-  home/                           home screen + level header composer
-    widgets/                        level_badge, level_progress_ring,
-                                    promotion_banner, home_level_header,
-                                    streak_ring, plan_strip,
-                                    home_progress_card
-  courses/widgets/                  locked_course_tile, locked_course_sheet
-  onboarding/                       welcome_screen, placement_result_screen
-  promotion/                        pre_exam_screen, promotion_result_screen
-  progress/                         skill mastery detail
-  exercise/                         per-skill exercise screens
-  mock_exam/                        full-exam runner
-  interview/, deck_session/, …      per-feature flows
+  home/
+    screens/course_list_screen.dart  V21.3: accepts LevelApi?;
+                                     mounts HomeLevelHeader + LockedCourseTile +
+                                     PromotionExamFlow routing
+    widgets/                         level_badge, level_progress_ring,
+                                     promotion_banner, home_level_header,
+                                     streak_ring, plan_strip, home_progress_card
+  courses/widgets/                   locked_course_tile, locked_course_sheet
+  onboarding/                        V21.3 full CEFR onboarding:
+                                     cefr_auth_gate.dart (routing gate)
+                                     placement_test_screen.dart (exam wrapper)
+                                     existing_level_confirm_dialog.dart (one-time)
+                                     welcome_screen.dart (placement intro)
+                                     placement_result_screen.dart (level reveal)
+  promotion/                         pre_exam_screen, promotion_result_screen
+                                     promotion_exam_flow.dart (V21.3 orchestrator:
+                                     PreExam → MockExam → PromotionResult)
+  progress/                          skill mastery detail
+  exercise/                          per-skill exercise screens
+  mock_exam/                         full-exam runner (V21.3: onCompleted hook)
+  interview/, deck_session/, …       per-feature flows
 
 models/models.dart                  one file holds Course / Exercise /
                                     LevelProgressResponse / SkillMasteryInfo
@@ -154,13 +170,13 @@ Per AGENTS.md: every learner-facing string goes through ARB →
 AppLocalizations; VI = EN key count must match. Form-internal strings
 in CMS stay inline.
 
-## Test surface (post-V21.1)
+## Test surface (post-V21.3)
 
 | Layer | Tests | Coverage style |
 |---|---|---|
-| Backend | 647 | unit (per-package) + integration (httpapi spins NewServerForTest) + E2E smoke (`level_flow_test.go`, exam flows). Memory + Postgres stores both targeted from the same interface. |
+| Backend | 659 | unit (per-package) + integration (httpapi spins NewServerForTest) + E2E smoke (`level_flow_test.go`, exam flows). Memory + Postgres stores both targeted from the same interface. V21.3 +5 (placement/skip handler). |
 | CMS | 144 Vitest | pure logic helpers (`lib/*.ts`) + form payload utilities. No React-component rendering tests yet. |
-| Flutter | 309 | unit (models, utils) + widget (per-screen + per-widget) + API client integration (loopback HttpServer). |
+| Flutter | 345 | unit (models, utils, CefrPrefs) + widget (per-screen + per-widget, _FakeLevelApi pattern for API-dependent screens) + API client integration (loopback HttpServer). V21.3 +36 across 7 new test files. |
 
 ## What is structurally good
 
