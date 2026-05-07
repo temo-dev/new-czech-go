@@ -512,7 +512,7 @@ func (s *Server) handleModuleExercises(w http.ResponseWriter, r *http.Request, _
 	writeNotFound(w)
 }
 
-func (s *Server) handleExercise(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+func (s *Server) handleExercise(w http.ResponseWriter, r *http.Request, user contracts.User) {
 	path := strings.TrimPrefix(r.URL.Path, "/v1/exercises/")
 	if strings.Contains(path, "/assets/") && strings.HasSuffix(path, "/file") {
 		exerciseID, assetID, ok := splitExerciseAssetPath(path, "file")
@@ -537,6 +537,13 @@ func (s *Server) handleExercise(w http.ResponseWriter, r *http.Request, _ contra
 		writeNotFound(w)
 		return
 	}
+	// V21 level gate. Only enforced when the level service is wired so
+	// pre-V21 dev fixture builds keep their existing exercise reads.
+	if !s.exerciseAccessibleForUser(user.ID, exercise) {
+		writeError(w, http.StatusForbidden, "level_locked",
+			"This exercise is part of a course you have not unlocked yet.", false)
+		return
+	}
 	if exercise.SkillKind == "interview" {
 		exercise.Detail = processing.EnrichInterviewDetail(exercise.Detail)
 	}
@@ -545,6 +552,35 @@ func (s *Server) handleExercise(w http.ResponseWriter, r *http.Request, _ contra
 		exercise.Detail = processing.EnrichDictationDetail(exercise.Detail, audios)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": exercise, "meta": map[string]any{}})
+}
+
+// exerciseAccessibleForUser checks the V21 course-level gate. Returns
+// true when:
+//   - the level service is not wired (gating disabled)
+//   - the exercise has no module/course (e.g. exam-pool standalone reads)
+//   - the parent course's level is in the user's unlocked_levels
+//   - the exercise is the parent course's designated demo exercise
+// Returns false otherwise — caller renders 403 level_locked.
+func (s *Server) exerciseAccessibleForUser(userID string, ex contracts.Exercise) bool {
+	if s.levelService == nil {
+		return true
+	}
+	if ex.ModuleID == "" {
+		return true
+	}
+	mod, ok := s.repo.ModuleByID(ex.ModuleID)
+	if !ok || mod.CourseID == "" {
+		return true
+	}
+	course, ok := s.repo.CourseByID(mod.CourseID)
+	if !ok || course.Level == "" {
+		return true
+	}
+	state := s.levelService.ResolveCourseUnlock(userID, course.Level, course.DemoExerciseID)
+	if state == "unlocked" {
+		return true
+	}
+	return state == "demo" && course.DemoExerciseID == ex.ID
 }
 
 func (s *Server) handleAttempts(w http.ResponseWriter, r *http.Request, user contracts.User) {
@@ -2612,16 +2648,25 @@ func attemptSequenceOrZero(attemptID string) int {
 
 // ── Learner: Courses + Skills ────────────────────────────────────────────────
 
-func (s *Server) handleCourses(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+func (s *Server) handleCourses(w http.ResponseWriter, r *http.Request, user contracts.User) {
 	if r.Method != http.MethodGet {
 		writeMethodNotAllowed(w)
 		return
 	}
 	courses := s.repo.ListCourses("published")
-	writeJSON(w, http.StatusOK, map[string]any{"data": courses, "meta": map[string]any{}})
+	levelFilter := r.URL.Query().Get("level")
+	out := make([]contracts.Course, 0, len(courses))
+	for _, c := range courses {
+		if levelFilter != "" && c.Level != levelFilter {
+			continue
+		}
+		c.UnlockState = s.resolveCourseUnlockState(user.ID, c)
+		out = append(out, c)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": out, "meta": map[string]any{}})
 }
 
-func (s *Server) handleCourseByID(w http.ResponseWriter, r *http.Request, _ contracts.User) {
+func (s *Server) handleCourseByID(w http.ResponseWriter, r *http.Request, user contracts.User) {
 	path := strings.TrimPrefix(r.URL.Path, "/v1/courses/")
 	if strings.HasSuffix(path, "/modules") {
 		id := strings.TrimSuffix(path, "/modules")
@@ -2644,7 +2689,18 @@ func (s *Server) handleCourseByID(w http.ResponseWriter, r *http.Request, _ cont
 		writeNotFound(w)
 		return
 	}
+	c.UnlockState = s.resolveCourseUnlockState(user.ID, c)
 	writeJSON(w, http.StatusOK, map[string]any{"data": c, "meta": map[string]any{}})
+}
+
+// resolveCourseUnlockState computes the per-learner unlock state for a
+// course. When the V21 level service is not wired (e.g. legacy dev fixture
+// builds), returns "unlocked" so existing clients keep working.
+func (s *Server) resolveCourseUnlockState(userID string, c contracts.Course) string {
+	if s.levelService == nil {
+		return ""
+	}
+	return s.levelService.ResolveCourseUnlock(userID, c.Level, c.DemoExerciseID)
 }
 
 // ── Admin: Courses ────────────────────────────────────────────────────────────

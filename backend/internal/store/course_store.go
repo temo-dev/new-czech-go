@@ -88,6 +88,12 @@ func (s *memoryCourseStore) UpdateCourse(id string, update contracts.Course) (co
 	if update.SequenceNo != 0 {
 		existing.SequenceNo = update.SequenceNo
 	}
+	if update.Level != "" {
+		existing.Level = update.Level
+	}
+	// DemoExerciseID can be updated to "" (clearing the demo) so we always
+	// honour the incoming value rather than gating on non-empty.
+	existing.DemoExerciseID = update.DemoExerciseID
 	return *existing, true
 }
 

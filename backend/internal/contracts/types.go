@@ -16,6 +16,12 @@ type Course struct {
 	Status        string `json:"status,omitempty"` // draft, published
 	SequenceNo    int    `json:"sequence_no,omitempty"`
 	BannerImageID string `json:"banner_image_id,omitempty"` // storage key for course banner
+	// V21 CEFR level + demo exercise (one demo per locked upper-level course).
+	Level          string `json:"level,omitempty"`            // a0|a1|a2|b1
+	DemoExerciseID string `json:"demo_exercise_id,omitempty"` // exercise visible from a locked course
+	// V21 transient gating field — populated only on learner-facing
+	// responses (`GET /v1/courses(/:id)`); never persisted by the store.
+	UnlockState string `json:"unlock_state,omitempty"` // unlocked|demo|locked
 }
 
 // SkillSummary is a computed aggregate of exercises grouped by skill_kind within a module.

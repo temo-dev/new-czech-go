@@ -47,9 +47,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** error precedence enforced (404 mock_test_not_found → 400 mock_test_not_promotion → 409 level_already_unlocked → 400 promotion_locked → 400 cooldown_active w/ retry_after); promotion_locked also fires when target ≠ NextLevel(current); on success creates `mock_exam_session` + `promotion_attempts` row, returns 201 `{promotion_attempt_id, full_session_id, target_level}`
   - **Verify:** +7 integration tests (auth, not-found, not-promotion, already-unlocked, locked, cooldown, happy)
   - **Size:** L
-- [ ] **V21-B7** Course handler modifications (`httpapi/courses_handler.go`)
-  - **AC:** `?level=` filter; `unlock_state` + `level` + `demo_exercise_id` per item; `403 level_locked` on exercise reads except demo; demo attempts tagged `is_demo=true`
-  - **Verify:** +5 integration tests
+- [x] **V21-B7** Course handler modifications (`httpapi/server.go` `handleCourses`/`handleCourseByID`/`handleExercise`, `contracts.Course` `Level`/`DemoExerciseID`/`UnlockState`, memory + Postgres course store SELECT/INSERT/UPDATE, `LevelService.ResolveCourseUnlock`)
+  - **AC:** `?level=` filter on `GET /v1/courses`; per-item `level` + `unlock_state` (`unlocked`/`demo`/`locked`) + `demo_exercise_id` populated by service; `GET /v1/courses/:id` carries the same fields; `GET /v1/exercises/:id` returns `403 level_locked` when course locked unless exercise == `demo_exercise_id`; gating bypassed when level service is not wired so legacy fixture builds keep working; **`is_demo` attempt tagging deferred to V21-B8** (touches the attempt creation path which B8 owns end-to-end)
+  - **Verify:** +5 integration tests (list adds level+unlock_state, level filter, course-by-id fields, locked exercise 403, demo exercise allowed)
   - **Size:** L
 - [ ] **V21-B8** Atomic promotion hook + demo-skip (`processing/level_promotion.go`, `processing/mastery_updater.go`, `store/persist_attempt_feedback.go`)
   - **AC:** mastery-updater skips when `is_demo`; promotion hook updates attempt + sets user level on pass; idempotent on replay

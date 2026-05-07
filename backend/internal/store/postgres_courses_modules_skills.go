@@ -59,7 +59,7 @@ CREATE INDEX IF NOT EXISTS courses_level_idx ON courses (level);
 func (s *postgresCourseStore) ListCourses(status string) []contracts.Course {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	q := `SELECT id, slug, title, description, status, sequence_no, banner_image_id FROM courses`
+	q := `SELECT id, slug, title, description, status, sequence_no, banner_image_id, level, demo_exercise_id FROM courses`
 	args := []any{}
 	if status != "" {
 		q += ` WHERE status = $1`
@@ -74,7 +74,7 @@ func (s *postgresCourseStore) ListCourses(status string) []contracts.Course {
 	var out []contracts.Course
 	for rows.Next() {
 		var c contracts.Course
-		if err := rows.Scan(&c.ID, &c.Slug, &c.Title, &c.Description, &c.Status, &c.SequenceNo, &c.BannerImageID); err == nil {
+		if err := rows.Scan(&c.ID, &c.Slug, &c.Title, &c.Description, &c.Status, &c.SequenceNo, &c.BannerImageID, &c.Level, &c.DemoExerciseID); err == nil {
 			out = append(out, c)
 		}
 	}
@@ -90,8 +90,8 @@ func (s *postgresCourseStore) CourseByID(id string) (contracts.Course, bool) {
 	defer cancel()
 	var c contracts.Course
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, slug, title, description, status, sequence_no, banner_image_id FROM courses WHERE id = $1`, id,
-	).Scan(&c.ID, &c.Slug, &c.Title, &c.Description, &c.Status, &c.SequenceNo, &c.BannerImageID)
+		`SELECT id, slug, title, description, status, sequence_no, banner_image_id, level, demo_exercise_id FROM courses WHERE id = $1`, id,
+	).Scan(&c.ID, &c.Slug, &c.Title, &c.Description, &c.Status, &c.SequenceNo, &c.BannerImageID, &c.Level, &c.DemoExerciseID)
 	if err != nil {
 		return contracts.Course{}, false
 	}
@@ -105,13 +105,16 @@ func (s *postgresCourseStore) CreateCourse(c contracts.Course) (contracts.Course
 	if c.Status == "" {
 		c.Status = "draft"
 	}
+	if c.Level == "" {
+		c.Level = "a2"
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO courses (id, slug, title, description, status, sequence_no)
-		 VALUES ($1,$2,$3,$4,$5,$6)
+		`INSERT INTO courses (id, slug, title, description, status, sequence_no, level, demo_exercise_id)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 		 ON CONFLICT (id) DO NOTHING`,
-		c.ID, c.Slug, c.Title, c.Description, c.Status, c.SequenceNo,
+		c.ID, c.Slug, c.Title, c.Description, c.Status, c.SequenceNo, c.Level, c.DemoExerciseID,
 	)
 	if err != nil {
 		return contracts.Course{}, err
@@ -128,14 +131,16 @@ func (s *postgresCourseStore) UpdateCourse(id string, update contracts.Course) (
 	defer cancel()
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE courses SET
-			slug        = CASE WHEN $2 <> '' THEN $2 ELSE slug END,
-			title       = CASE WHEN $3 <> '' THEN $3 ELSE title END,
-			description = CASE WHEN $4 <> '' THEN $4 ELSE description END,
-			status      = CASE WHEN $5 <> '' THEN $5 ELSE status END,
-			sequence_no = CASE WHEN $6 <> 0  THEN $6 ELSE sequence_no END,
-			updated_at  = now()
+			slug             = CASE WHEN $2 <> '' THEN $2 ELSE slug END,
+			title            = CASE WHEN $3 <> '' THEN $3 ELSE title END,
+			description      = CASE WHEN $4 <> '' THEN $4 ELSE description END,
+			status           = CASE WHEN $5 <> '' THEN $5 ELSE status END,
+			sequence_no      = CASE WHEN $6 <> 0  THEN $6 ELSE sequence_no END,
+			level            = CASE WHEN $7 <> '' THEN $7 ELSE level END,
+			demo_exercise_id = $8,
+			updated_at       = now()
 		 WHERE id = $1`,
-		id, update.Slug, update.Title, update.Description, update.Status, update.SequenceNo,
+		id, update.Slug, update.Title, update.Description, update.Status, update.SequenceNo, update.Level, update.DemoExerciseID,
 	)
 	if err != nil {
 		return contracts.Course{}, false

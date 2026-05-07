@@ -76,6 +76,31 @@ func (s *LevelService) MapPlacementScoreToLevel(score float64) string {
 	return s.Config.LevelFromPlacementScore(score)
 }
 
+// ResolveCourseUnlock returns the per-user unlock state for a course:
+//   - "unlocked" — courseLevel is among the user's UnlockedLevels.
+//   - "demo"     — the course is otherwise locked but exposes a single
+//                  demo exercise so the learner can taste-test the level.
+//   - "locked"   — fully blocked.
+//
+// An empty courseLevel is treated as a fully-unlocked legacy course so the
+// pre-V21 backfill path keeps working until every course gets a level
+// assignment.
+func (s *LevelService) ResolveCourseUnlock(userID, courseLevel, demoExerciseID string) string {
+	if courseLevel == "" {
+		return "unlocked"
+	}
+	level, _ := s.UserLevels.GetUserLevel(userID)
+	for _, lvl := range level.UnlockedLevels {
+		if lvl == courseLevel {
+			return "unlocked"
+		}
+	}
+	if demoExerciseID != "" {
+		return "demo"
+	}
+	return "locked"
+}
+
 // ComputeLevelProgress builds the `LevelProgressResponse` payload for the
 // given user. The response is fully populated end-to-end including the
 // derived `PromotionUnlocked` flag — clients render it as-is.
