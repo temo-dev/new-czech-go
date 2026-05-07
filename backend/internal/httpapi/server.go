@@ -85,23 +85,24 @@ func NewServer(repo *store.MemoryStore, processor *processing.Processor, uploadP
 // NewServerWithAuth (in auth_handlers.go) which wires the same setup plus
 // the UserStore/AuthTokenStore/EmailSender dependency bundle. Callers that
 // want V19 mastery without V17 auth use NewServerWithMastery.
-func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider, audioURLProvider AudioURLProvider, audioSignSecret []byte) http.Handler {
-	return assembleServer(repo, processor, uploadProvider, audioURLProvider, audioSignSecret, nil, nil)
+func NewServerWithAudio(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider, audioURLProvider AudioURLProvider, audioSignSecret []byte, level ...*LevelDeps) http.Handler {
+	return assembleServer(repo, processor, uploadProvider, audioURLProvider, audioSignSecret, nil, nil, level...)
 }
 
 // NewServerWithMastery wires the V19 user_skill_mastery aggregate (progress
 // endpoint + per-attempt updater) without enabling the V17 self-serve auth
 // flow. Use this on dev fixture builds where MemoryStore.Login still issues
 // tokens but the mastery aggregate must persist via Postgres.
-func NewServerWithMastery(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider, audioURLProvider AudioURLProvider, audioSignSecret []byte, mastery MasteryDeps) http.Handler {
-	return assembleServer(repo, processor, uploadProvider, audioURLProvider, audioSignSecret, nil, &mastery)
+func NewServerWithMastery(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider, audioURLProvider AudioURLProvider, audioSignSecret []byte, mastery MasteryDeps, level ...*LevelDeps) http.Handler {
+	return assembleServer(repo, processor, uploadProvider, audioURLProvider, audioSignSecret, nil, &mastery, level...)
 }
 
 // assembleServer is the shared builder for the public constructors. Pass a
 // nil authDeps to keep the legacy dev-fixture token path; supply a populated
 // AuthDeps to wire the V17 self-serve auth handlers. masteryDeps is wired
 // independently so dev fixture + V17 callers share the same mastery path.
-func assembleServer(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider, audioURLProvider AudioURLProvider, audioSignSecret []byte, authDeps *AuthDeps, masteryDeps *MasteryDeps) http.Handler {
+// levelDeps is optional; when non-nil it wires the V21 CEFR level gating.
+func assembleServer(repo *store.MemoryStore, processor *processing.Processor, uploadProvider UploadTargetProvider, audioURLProvider AudioURLProvider, audioSignSecret []byte, authDeps *AuthDeps, masteryDeps *MasteryDeps, levelDeps ...*LevelDeps) http.Handler {
 	if processor == nil {
 		processor = processing.NewProcessor(repo, nil, nil, nil, nil)
 	}
@@ -171,6 +172,10 @@ func assembleServer(repo *store.MemoryStore, processor *processing.Processor, up
 		s.processor.WithMasteryUpdater(processing.NewMasteryUpdater(
 			masteryDeps.Store, masteryDeps.Config, nil,
 		))
+	}
+	// V21 level gating — wired when caller supplies deps (optional variadic).
+	if len(levelDeps) > 0 && levelDeps[0] != nil {
+		s.SetLevelDeps(*levelDeps[0])
 	}
 	// Recover any jobs stuck in "running" from a previous server crash.
 	repo.MarkAllRunningJobsFailed("Server restarted while generation was running")

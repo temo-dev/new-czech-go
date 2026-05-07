@@ -133,8 +133,10 @@ func main() {
 	// Build the store + config once and let either constructor (V17 path or
 	// dev fixture path) wire it through.
 	var masteryDeps httpapi.MasteryDeps
+	var masteryStore store.SkillMasteryStore
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
-		masteryStore, err := store.NewPostgresSkillMasteryStore(databaseURL)
+		var err error
+		masteryStore, err = store.NewPostgresSkillMasteryStore(databaseURL)
 		if err != nil {
 			log.Fatalf("V19 skill_mastery store: %v", err)
 		}
@@ -143,7 +145,28 @@ func main() {
 			Config: processing.LoadMasteryConfig(),
 		}
 		log.Printf("V19 skill_mastery aggregate wired (mastery_updater + GET /v1/users/me/progress)")
+	} else {
+		// Dev fixture mode: use in-memory mastery so V21 LevelService has a
+		// non-nil Mastery dependency.
+		masteryStore = store.NewMemorySkillMasteryStore()
 	}
+
+	// V21: CEFR level gating. Always wired (in-memory for dev, Postgres when
+	// available). Required for placement test, promotion exam, and level UI.
+	userLevels := store.NewMemoryUserLevelStore()
+	promo := store.NewMemoryPromotionAttemptsStore()
+	levelDeps := &httpapi.LevelDeps{
+		Service: &processing.LevelService{
+			Config:        processing.LoadLevelConfig(),
+			Mastery:       masteryStore,
+			UserLevels:    userLevels,
+			PromoAttempts: promo,
+			Now:           time.Now,
+		},
+		UserLevels:    userLevels,
+		PromoAttempts: promo,
+	}
+	log.Printf("V21 CEFR level gating wired (level-progress + placement + promotion endpoints)")
 
 	var handler http.Handler
 	switch {
@@ -152,11 +175,11 @@ func main() {
 		// V17 callers populate AuthDeps.SkillMastery so applyTo wires the
 		// updater; passing masteryDeps too would be redundant.
 		authDeps.SkillMastery = masteryDeps.Store
-		handler = httpapi.NewServerWithAuth(repo, processorInst, uploadProvider, audioURLProvider, audioSignSecret, authDeps)
+		handler = httpapi.NewServerWithAuth(repo, processorInst, uploadProvider, audioURLProvider, audioSignSecret, authDeps, levelDeps)
 	case masteryDeps.Store != nil:
-		handler = httpapi.NewServerWithMastery(repo, processorInst, uploadProvider, audioURLProvider, audioSignSecret, masteryDeps)
+		handler = httpapi.NewServerWithMastery(repo, processorInst, uploadProvider, audioURLProvider, audioSignSecret, masteryDeps, levelDeps)
 	default:
-		handler = httpapi.NewServerWithAudio(repo, processorInst, uploadProvider, audioURLProvider, audioSignSecret)
+		handler = httpapi.NewServerWithAudio(repo, processorInst, uploadProvider, audioURLProvider, audioSignSecret, levelDeps)
 	}
 
 	log.Printf("backend listening on %s", addr)
