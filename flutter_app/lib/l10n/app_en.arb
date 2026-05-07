@@ -506,5 +506,23 @@
     "@progressLastAttemptRelativeFormat": {
         "placeholders": { "when": { "type": "String" } }
     },
-    "profileProgressEntry": "Your progress"
+    "profileProgressEntry": "Your progress",
+    "v21LevelBadgeStudying": "Studying {level}",
+    "@v21LevelBadgeStudying": {
+        "placeholders": { "level": { "type": "String" } }
+    },
+    "v21PromotionBannerHeadline": "Ready to test up to {level}",
+    "@v21PromotionBannerHeadline": {
+        "placeholders": { "level": { "type": "String" } }
+    },
+    "v21LockedCourseRequirement": "Reach mastery threshold to unlock",
+    "v21PromotionPassHeadline": "You're now at {level}!",
+    "@v21PromotionPassHeadline": {
+        "placeholders": { "level": { "type": "String" } }
+    },
+    "v21PromotionFailHeadline": "Not yet — keep practicing",
+    "v21PromotionCooldownLabel": "Retry available in {hms}",
+    "@v21PromotionCooldownLabel": {
+        "placeholders": { "hms": { "type": "String" } }
+    }
 }

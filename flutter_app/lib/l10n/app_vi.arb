@@ -551,5 +551,23 @@
     "@progressLastAttemptRelativeFormat": {
         "placeholders": { "when": { "type": "String" } }
     },
-    "profileProgressEntry": "Tiến độ học tập"
+    "profileProgressEntry": "Tiến độ học tập",
+    "v21LevelBadgeStudying": "Đang học {level}",
+    "@v21LevelBadgeStudying": {
+        "placeholders": { "level": { "type": "String" } }
+    },
+    "v21PromotionBannerHeadline": "Sẵn sàng thi nâng cấp lên {level}",
+    "@v21PromotionBannerHeadline": {
+        "placeholders": { "level": { "type": "String" } }
+    },
+    "v21LockedCourseRequirement": "Hoàn thành mastery để mở khoá",
+    "v21PromotionPassHeadline": "Bạn đã lên {level}!",
+    "@v21PromotionPassHeadline": {
+        "placeholders": { "level": { "type": "String" } }
+    },
+    "v21PromotionFailHeadline": "Chưa đạt — luyện thêm nhé",
+    "v21PromotionCooldownLabel": "Có thể thi lại sau {hms}",
+    "@v21PromotionCooldownLabel": {
+        "placeholders": { "hms": { "type": "String" } }
+    }
 }

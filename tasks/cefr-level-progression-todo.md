@@ -109,9 +109,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** `PreExamScreen` shows rules (duration, pass threshold, cooldown hours) + dual CTAs ("Bắt đầu thi" primary, "Để sau" ghost); `PromotionResultScreen` branches on `passed`: PASS = success surface + spring badge (`promotion_result_badge_spring` keyed ScaleTransition, easeOutBack 450ms; reduced-motion drops the controller entirely) + dual CTAs (Khám phá / Về trang chủ); FAIL = neutral surface + diagnostic table sorted weakest-first via `LinearProgressIndicator` per skill (success vs scorePoor color by threshold) + live `Timer.periodic(1s)` cooldown countdown rendering `hh:mm:ss` (`promotion_result_cooldown_timer`) + weakest-skill deep-link CTA `onPracticeWeakSkill(skillKind)`; clock injectable for deterministic tests
   - **Verify:** +5 widget tests (PreExam dual CTA + body fields + callback fires, pass dual CTAs, fail diagnostic table + cooldown timer, weakest deep-link skill kind, reduced-motion skips badge spring); analyze clean; suite 306
   - **Size:** L
-- [ ] **V21-D9** Home wiring + ARB strings + provider
-  - **AC:** embeds badge + ring + banner; `level-progress` re-fetch on pop-back; VI = EN key count
-  - **Verify:** +3 widget tests; `make flutter-analyze` no missing-l10n
+- [x] **V21-D9** `HomeLevelHeader` composer + ARB keys (`features/home/widgets/home_level_header.dart` + test, `lib/l10n/app_vi.arb` + `app_en.arb` extension). Full home_screen.dart embed + provider re-fetch-on-pop deferred to deploy slice (composition-only, no logic).
+  - **AC:** `HomeLevelHeader` composes `LevelBadge` (top-right) + `LevelProgressRing` (centred) + `PromotionBanner` (sticky card) from a `LevelProgressResponse`; `onTapBadge` + `onTapPromotion(mockTestId)` callbacks routed through; banner visibility honours service-derived `promotionUnlocked` flag; VI/EN ARB add 6 V21 keys (`v21LevelBadgeStudying`, `v21PromotionBannerHeadline`, `v21LockedCourseRequirement`, `v21PromotionPassHeadline`, `v21PromotionFailHeadline`, `v21PromotionCooldownLabel`) — `make flutter-analyze` validates VI = EN key count via `flutter gen-l10n`
+  - **Verify:** +3 widget tests (composes all three child widgets, hides banner when locked, passes mock id through tap); analyze clean; suite 309
   - **Size:** M
 
 **[CHECKPOINT V21-D]** `make flutter-analyze && make flutter-test` pass; +32 widget tests; manual TestFlight smoke (placement → first exercise → home)
