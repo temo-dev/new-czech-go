@@ -80,6 +80,112 @@ analysis and structural review (see `CLAUDE.md`).
 If code and docs disagree, update the code to match the documented
 contract unless the human explicitly changes scope.
 
+## Documentation Convention
+
+**Strict.** Don't sprawl docs. Every doc has exactly one home. Don't
+invent new directories. Don't leave drafts at `docs/` root or repo
+root.
+
+### Doc tree (canonical)
+
+```
+ROOT (5 files only — don't add more):
+  README.md           project overview + quick start
+  AGENTS.md           this file — operational contract
+  CLAUDE.md           AI assistant config (imports AGENTS.md)
+  CHANGELOG.md        per-slice history (newest first)
+  SPEC.md             slice digest table (NOT inline content)
+
+docs/
+  reference/   ←  STABLE always-current contracts. Update on every
+                  contract change. Live forever.
+  specs/       ←  FROZEN per-slice specs. Don't backfill after ship.
+  ideas/       ←  Pre-spec one-pagers. Per-slice.
+  plans/       ←  Slice-level implementation briefs (legacy; new
+                  slices use `tasks/<slice>-plan.md` instead).
+  guides/      ←  Dev / deploy / smoke / admin handbooks. Always-current.
+  architecture/ ← Code shape + refactor map. Refresh per major slice.
+  features/    ←  User-facing feature descriptions.
+  design/      ←  Design system + `mockups/` HTML.
+  screens/     ←  Per-screen behaviour notes.
+  content/     ←  Content authoring guidance.
+
+tasks/
+  plan.md             index pointing at per-slice plan files
+  todo.md             active backlog index
+  <slice>-plan.md     per-slice plan with phases A..E
+  <slice>-todo.md     per-slice task checklist
+```
+
+### Where does it go? (decision table)
+
+| What you're writing | Goes in |
+|---|---|
+| New always-current contract (api shape, env var, lifecycle, etc) | `docs/reference/<topic>.md` |
+| New slice's spec (frozen on ship) | `docs/specs/<slice>.md` |
+| Pre-spec idea / one-pager | `docs/ideas/<slice>.md` |
+| Slice plan + tasks | `tasks/<slice>-plan.md` + `tasks/<slice>-todo.md` |
+| Dev / deploy / smoke / admin guide | `docs/guides/<topic>.md` |
+| Code shape snapshot | `docs/architecture/current-code-shape.md` |
+| User-facing feature description | `docs/features/<feature>.md` |
+| Per-screen behaviour | `docs/screens/<surface>-<screen>.md` |
+| Design tokens / mockups | `docs/design/*.md` or `docs/design/mockups/*.html` |
+| Slice summary row | `SPEC.md` table + `CHANGELOG.md` entry |
+
+### Slice doc lifecycle
+
+Each slice produces docs in this order. Don't skip steps; don't
+write docs out of order:
+
+1. **Idea** → `docs/ideas/<slice>.md` (one-pager, decided date stamped)
+2. **Spec** → `docs/specs/<slice>.md` (frozen on ship; can have a
+   paired `<slice>-ux.md`)
+3. **Plan** → `tasks/<slice>-plan.md` + `tasks/<slice>-todo.md`
+4. **Build** → commits per task; CHANGELOG entry on ship
+5. **Fold stable contracts** → if the slice changes a contract that
+   spans slices (api shape, attempt lifecycle, infra env, etc),
+   update the relevant `docs/reference/<topic>.md`. **Do not** wait
+   for a future slice to do this.
+6. **Add summary rows** → one line in `SPEC.md` table; full entry in
+   `CHANGELOG.md`.
+
+### Strict rules
+
+- ❌ **No new top-level files.** Five exist; don't add a sixth. If
+  you need a new doc, it goes inside `docs/`.
+- ❌ **No drafts at `docs/` root.** Pick the right subdirectory or
+  don't write the doc.
+- ❌ **No new top-level directories under `docs/`.** Use one of the
+  existing nine.
+- ❌ **No backfilling frozen slice specs.** When V22 changes V21
+  behaviour, the V22 spec captures the change + the relevant
+  `docs/reference/` doc gets updated. The V21 slice spec stays as-is.
+- ❌ **No inlining V2..V21 spec content into `SPEC.md`.** That's
+  what `SPEC-archive-v2-to-v18.md` exists for. SPEC.md is a digest
+  table.
+- ❌ **No ephemeral notes (next-session.md, scratch.md, todo-temp.md).**
+  Use `tasks/todo.md` for in-flight items.
+- ❌ **No duplicate dirs.** `design/` ≠ `designs/` ≠ `Design/`. Pick
+  one — it's `design/`.
+- ❌ **No absolute paths in markdown links.** Use relative
+  (`../docs/...`) so the repo is portable.
+- ❌ **No "doc-only" feature work.** Don't write a spec without an
+  idea note. Don't ship code without a CHANGELOG entry.
+
+### When in doubt
+
+- "Is this contract going to outlive the slice?" → `docs/reference/`
+- "Is this a snapshot of how V21 was decided?" → `docs/specs/`
+- "Is this a one-pager that predates the spec?" → `docs/ideas/`
+- "Is this a how-to for running / deploying?" → `docs/guides/`
+- "Will I keep updating this every slice?" → `docs/reference/` or
+  `docs/architecture/`
+- "Is this a frozen historical record?" → `docs/specs/` or one of
+  the `*-archive-*.md` files at the appropriate level
+
+If still unsure, check `docs/README.md` § "Pick by what you need" —
+it routes by question.
+
 ## Repo Layout
 
 - `backend/` Go API + processing service
