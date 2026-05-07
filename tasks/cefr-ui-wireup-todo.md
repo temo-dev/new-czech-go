@@ -28,10 +28,11 @@ do not start the next phase before the checkpoint passes.
 
 ## Phase B — Fresh signup flow (vertical slice 1)
 
-- [ ] **B1** `features/onboarding/placement_test_screen.dart` (new) —
-  fetches placement session, renders `MockTestRunner`, pushes
-  `PlacementResultScreen` on submit. Loading + error + submit
-  branches tested.
+- [x] **B1** `features/onboarding/placement_test_screen.dart` (new) —
+  fetches placement session via LevelApi.startPlacement + ApiClient.getMockExam,
+  wraps MockExamScreen with onCompleted → completePlacement → PlacementResultScreen.
+  MockExamScreen gained optional onCompleted(sessionId) hook.
+  4 widget tests (loading, error, ready, retry). Flutter 316 → 320.
 - [ ] **B2** `features/onboarding/cefr_auth_gate.dart` (new) —
   loading / fresh-A0 / already-onboarded branches. Three test cases.
 - [ ] **B3** `main.dart` — `_V17AuthGate.authenticated` branch wraps

@@ -88,6 +88,7 @@ class MockExamScreen extends StatefulWidget {
     required this.client,
     this.initialSession,
     this.mockTest,
+    this.onCompleted,
   });
 
   final ApiClient client;
@@ -97,6 +98,13 @@ class MockExamScreen extends StatefulWidget {
 
   /// Template selected by the learner. Used for title/copy while a session is in progress.
   final MockTest? mockTest;
+
+  /// Optional hook fired once after the session transitions to completed.
+  /// When provided, the caller is responsible for rendering the result screen
+  /// (e.g. PlacementTestScreen → PlacementResultScreen, PreExamScreen →
+  /// PromotionResultScreen). When null the built-in [_MockExamResultView]
+  /// renders as before.
+  final void Function(String sessionId)? onCompleted;
 
   @override
   State<MockExamScreen> createState() => _MockExamScreenState();
@@ -348,6 +356,12 @@ class _MockExamScreenState extends State<MockExamScreen> {
         _sectionReadiness = readiness;
         _analyzing = false;
       });
+      final onCompleted = widget.onCompleted;
+      if (onCompleted != null && completed.isCompleted) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => onCompleted(completed.id),
+        );
+      }
     } catch (err) {
       if (!mounted) return;
       setState(() {
@@ -397,6 +411,11 @@ class _MockExamScreenState extends State<MockExamScreen> {
       (s) => _sectionSkillKind(s) == 'noi',
     );
     if (session.isCompleted) {
+      if (widget.onCompleted != null) {
+        // Caller handles the result screen; show a brief spinner while the
+        // postFrameCallback fires and the route transition completes.
+        return const Center(child: CircularProgressIndicator());
+      }
       return _MockExamResultView(
         client: widget.client,
         session: session,
