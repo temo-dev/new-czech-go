@@ -29,10 +29,28 @@ type LevelDeps struct {
 
 // SetLevelDeps wires the V21 level gating service + stores. Endpoints that
 // require a missing dependency return 404 feature_disabled.
+//
+// Side-effect: when Service is non-nil, we install a default
+// PromotionTestForLevel resolver that looks up the latest published
+// promotion MockTest for a given target level (V21 review I5). The
+// resolver lives on the Server so it can read s.repo at request time
+// rather than capturing a snapshot at boot.
 func (s *Server) SetLevelDeps(d LevelDeps) {
 	s.levelService = d.Service
 	s.userLevelStore = d.UserLevels
 	s.promoAttemptsStore = d.PromoAttempts
+	if s.placementRL == nil {
+		s.placementRL = newPlacementRateLimiter()
+	}
+	if d.Service != nil && d.Service.PromotionTestForLevel == nil {
+		d.Service.PromotionTestForLevel = func(targetLevel string) (string, bool) {
+			mock, ok := s.repo.LatestPromotionMockTest(targetLevel)
+			if !ok {
+				return "", false
+			}
+			return mock.ID, true
+		}
+	}
 }
 
 func (s *Server) handleUserLevelProgress(w http.ResponseWriter, r *http.Request, user contracts.User) {

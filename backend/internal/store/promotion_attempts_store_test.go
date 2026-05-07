@@ -8,6 +8,48 @@ import (
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
 
+func TestMemoryMockTestStore_LatestPromotionMockTest_FiltersByLevelAndStatus(t *testing.T) {
+	store := newMemoryMockTestStore()
+
+	// Draft promotion mock for B1 — must be ignored.
+	if _, err := store.CreateMockTest(contracts.MockTest{
+		Title: "Draft B1 Promote", Status: "draft",
+		IsPromotion: true, TargetLevel: "b1",
+	}); err != nil {
+		t.Fatalf("seed draft: %v", err)
+	}
+	// Published promotion mock for A2 — wrong target.
+	if _, err := store.CreateMockTest(contracts.MockTest{
+		Title: "A2 Promote", Status: "published",
+		IsPromotion: true, TargetLevel: "a2",
+	}); err != nil {
+		t.Fatalf("seed a2: %v", err)
+	}
+	// Published promotion mock for B1 — should win.
+	winner, err := store.CreateMockTest(contracts.MockTest{
+		Title: "B1 Promote", Status: "published",
+		IsPromotion: true, TargetLevel: "b1",
+	})
+	if err != nil {
+		t.Fatalf("seed b1: %v", err)
+	}
+
+	got, ok := store.LatestPromotionMockTest("b1")
+	if !ok {
+		t.Fatal("LatestPromotionMockTest('b1') = (_, false), want hit")
+	}
+	if got.ID != winner.ID {
+		t.Errorf("got %q, want %q (newest published B1 promotion)", got.ID, winner.ID)
+	}
+
+	if _, ok := store.LatestPromotionMockTest("a0"); ok {
+		t.Errorf("LatestPromotionMockTest('a0') matched but no a0 promotion exists")
+	}
+	if _, ok := store.LatestPromotionMockTest(""); ok {
+		t.Errorf("LatestPromotionMockTest('') must miss — empty target is invalid")
+	}
+}
+
 func TestMemoryPromotionAttemptsStore_Create_AssignsIDAndReturnsRow(t *testing.T) {
 	s := newMemoryPromotionAttemptsStore()
 

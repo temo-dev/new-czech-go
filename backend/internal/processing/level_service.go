@@ -189,6 +189,21 @@ func (s *LevelService) ComputeLevelProgress(userID string) (contracts.LevelProgr
 // computeSkillMastery returns one entry per expected skill so the home
 // ring always renders all six slots. Pct is the highest mastery score
 // (across modules) for the skill, rendered as a percentage.
+//
+// Aggregation policy (V21 review I6): V21 takes the **max** across
+// modules per skill, while V19's `GET /v1/users/me/progress` takes the
+// **mean**. The two metrics serve different purposes:
+//
+//   - V19 progress = honest signal (what is the learner's typical
+//     performance across all the work they've done?). Mean is right.
+//   - V21 gating  = threshold predicate ("is the learner ready to test
+//     up?"). Max is right — a learner who has cleared 70% in *any*
+//     module of a skill demonstrates capability; we should not require
+//     them to drag every weak module up to threshold before unlocking
+//     the promotion exam.
+//
+// The two endpoints intentionally show different per-skill numbers.
+// Documented here + in CHANGELOG.md § V21.1.
 func (s *LevelService) computeSkillMastery(rows []contracts.SkillMasteryRow) map[string]contracts.SkillMasteryInfo {
 	maxByKind := make(map[string]float64, len(expectedSkills))
 	for _, k := range expectedSkills {

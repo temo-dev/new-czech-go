@@ -21,6 +21,11 @@ type MockTestStore interface {
 	// MockTest (is_placement=true). Used by the V21 placement-test/start
 	// endpoint to pick the test for an onboarding learner.
 	LatestPlacementMockTest() (contracts.MockTest, bool)
+	// LatestPromotionMockTest returns the most-recently-authored published
+	// promotion MockTest for the given target level. The home screen uses
+	// this to surface the promotion test id on level-progress responses
+	// (V21 review I5) so the client can deep-link straight to PreExam.
+	LatestPromotionMockTest(targetLevel string) (contracts.MockTest, bool)
 }
 
 // defaultMaxPoints maps exercise_type → max speaking score per real A2 exam rubric.
@@ -248,6 +253,27 @@ func (s *memoryMockTestStore) LatestPlacementMockTest() (contracts.MockTest, boo
 	var best *contracts.MockTest
 	for _, t := range s.tests {
 		if !t.IsPlacement || t.Status != "published" {
+			continue
+		}
+		if best == nil || t.ID > best.ID {
+			best = t
+		}
+	}
+	if best == nil {
+		return contracts.MockTest{}, false
+	}
+	return *best, true
+}
+
+func (s *memoryMockTestStore) LatestPromotionMockTest(targetLevel string) (contracts.MockTest, bool) {
+	if targetLevel == "" {
+		return contracts.MockTest{}, false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var best *contracts.MockTest
+	for _, t := range s.tests {
+		if !t.IsPromotion || t.Status != "published" || t.TargetLevel != targetLevel {
 			continue
 		}
 		if best == nil || t.ID > best.ID {

@@ -274,6 +274,31 @@ func TestPlacementHandler_Complete_RejectsNonPlacementSession_404(t *testing.T) 
 	}
 }
 
+// V21 review I2 + I8: /placement-test/start is rate-limited (5/min per
+// user) so concurrent calls cannot exhaust mock_exam_session creation
+// AND the TOCTOU race between two simultaneous "first placement" calls
+// is naturally bounded.
+func TestPlacementHandler_Start_RateLimitedAfter5RequestsPerMinute(t *testing.T) {
+	srv, _, _, _ := newPlacementTestServer(t, time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC), false)
+	defer srv.Close()
+
+	for i := 0; i < 5; i++ {
+		status, _ := placementPost(t, srv, "/v1/users/me/placement-test/start?force=true",
+			"dev-learner-token", nil)
+		if status != http.StatusCreated {
+			t.Fatalf("call #%d status = %d, want 201", i+1, status)
+		}
+	}
+	status, body := placementPost(t, srv, "/v1/users/me/placement-test/start?force=true",
+		"dev-learner-token", nil)
+	if status != http.StatusTooManyRequests {
+		t.Fatalf("6th call status = %d, want 429; body=%v", status, body)
+	}
+	if code := errCode(body); code != "rate_limited" {
+		t.Errorf("error.code = %q, want rate_limited", code)
+	}
+}
+
 func TestPlacementHandler_Complete_MissingBody_400(t *testing.T) {
 	srv, _, _, _ := newPlacementTestServer(t, time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC), false)
 	defer srv.Close()

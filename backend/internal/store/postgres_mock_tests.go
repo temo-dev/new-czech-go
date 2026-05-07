@@ -336,6 +336,42 @@ func (s *postgresMockTestStore) SetMockTestBannerImage(id, storageKey string) bo
 	return n > 0
 }
 
+// LatestPromotionMockTest returns the most-recent published promotion
+// MockTest for a given target_level. Used by the level-progress
+// resolver so the client can deep-link straight to PreExamScreen
+// without an extra round trip (V21 review I5).
+func (s *postgresMockTestStore) LatestPromotionMockTest(targetLevel string) (contracts.MockTest, bool) {
+	if targetLevel == "" {
+		return contracts.MockTest{}, false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var (
+		t           contracts.MockTest
+		levelOut    sql.NullString
+	)
+	err := s.db.QueryRowContext(ctx, `
+SELECT id, title, description, estimated_duration_minutes, status, pass_threshold_percent, exam_mode, banner_image_id,
+       is_promotion, is_placement, target_level
+FROM mock_tests
+WHERE is_promotion = TRUE AND status = 'published' AND target_level = $1
+ORDER BY created_at DESC
+LIMIT 1
+`, targetLevel).Scan(&t.ID, &t.Title, &t.Description, &t.EstimatedDurationMinutes, &t.Status, &t.PassThresholdPercent, &t.ExamMode, &t.BannerImageID,
+		&t.IsPromotion, &t.IsPlacement, &levelOut)
+	if err == sql.ErrNoRows {
+		return contracts.MockTest{}, false
+	}
+	if err != nil {
+		return contracts.MockTest{}, false
+	}
+	if levelOut.Valid {
+		t.TargetLevel = levelOut.String
+	}
+	return t, true
+}
+
 // LatestPlacementMockTest returns the placement-flagged MockTest with the
 // most recent created_at. Drives the V21 placement-test/start endpoint.
 func (s *postgresMockTestStore) LatestPlacementMockTest() (contracts.MockTest, bool) {

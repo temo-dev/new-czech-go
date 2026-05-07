@@ -475,6 +475,9 @@ func (s *MemoryStore) SetMockTestBannerImage(id, storageKey string) bool {
 func (s *MemoryStore) LatestPlacementMockTest() (contracts.MockTest, bool) {
 	return s.mockTests.LatestPlacementMockTest()
 }
+func (s *MemoryStore) LatestPromotionMockTest(targetLevel string) (contracts.MockTest, bool) {
+	return s.mockTests.LatestPromotionMockTest(targetLevel)
+}
 
 func (s *MemoryStore) MockExamByID(id string) (contracts.MockExamSession, bool) {
 	return s.mockExams.MockExamByID(id)

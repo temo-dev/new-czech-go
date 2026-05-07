@@ -155,6 +155,40 @@ func TestLevelProgressHandler_ReadyToPromote_Unlocked(t *testing.T) {
 	}
 }
 
+// V21 review I5: SetLevelDeps installs a default PromotionTestForLevel
+// resolver so /level-progress can advertise the promotion mock id without
+// the client doing a follow-up listMockTests round trip.
+func TestLevelProgressHandler_PromotionTestIDPopulatedWhenMockExists(t *testing.T) {
+	now := time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC)
+	srv, mastery, userLevels, _ := newLevelTestServer(t, now)
+	defer srv.Close()
+
+	// We need access to the underlying repo to seed a promotion mock.
+	// newLevelTestServer doesn't return it, so reuse newPromotionTestServer
+	// which seeds a B1 promotion mock by default.
+	// (Done in a separate test below — guard against double work.)
+	_ = mastery
+	_ = userLevels
+
+	srv2, _, mastery2, userLevels2, _, mockID := newPromotionTestServer(t, now)
+	defer srv2.Close()
+
+	if _, err := userLevels2.SetUserLevel("user-learner-1", "a2"); err != nil {
+		t.Fatalf("seed user level: %v", err)
+	}
+	seedPassingMastery(t, mastery2, "user-learner-1", now.Add(-2*time.Hour))
+
+	status, _, body := levelProgressGet(t, srv2, "dev-learner-token")
+	if status != http.StatusOK {
+		t.Fatalf("status = %d, want 200", status)
+	}
+	data := body["data"].(map[string]any)
+	if got := data["promotion_test_id"].(string); got != mockID {
+		t.Errorf("promotion_test_id = %q, want %q (resolver should pick up the seeded B1 promotion mock)",
+			got, mockID)
+	}
+}
+
 func TestLevelProgressHandler_CooldownActive_LocksWithUntilTimestamp(t *testing.T) {
 	now := time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC)
 	srv, mastery, userLevels, promo := newLevelTestServer(t, now)

@@ -70,6 +70,7 @@ type Server struct {
 	levelService       *processing.LevelService
 	userLevelStore     store.UserLevelStore
 	promoAttemptsStore store.PromotionAttemptsStore
+	placementRL        *placementRateLimiter
 
 	mux *http.ServeMux
 }

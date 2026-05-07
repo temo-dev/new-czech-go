@@ -10,6 +10,73 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V21.1 — V21 review hotfixes — 2026-05-07
+
+Five-axis review on the V21 slice surfaced 2 Critical + 5 Important
+findings. V21.1 lands the lot in two atomic batches.
+
+### V21.1 Batch 1 — Critical + first 2 Important (commit `fix(v21):`)
+
+- **C1 placement non-placement-session**: `placement-test/complete`
+  now validates `session.MockTestID` belongs to a `is_placement=true`
+  MockTest. Without this guard a learner could submit any of their
+  regular `mock_exam_session` ids and have its score map to a level —
+  silently skipping placement.
+- **C2 score scale**: `OverallScore` is raw points (sum of
+  `section_score + pronunciation bonus` per `mock_test_store.computeScoring`),
+  not a percentage. Both the promotion hook and the placement complete
+  handler now route through `processing.OverallScorePctFromSession`,
+  which divides by `sum(MaxPoints)`. Tests updated to use realistic
+  raw inputs.
+- **I1 N+1 in course list**: `handleCourses` reads `userLevelStore.GetUserLevel`
+  once per request, then resolves unlock per course via the new pure
+  helper `processing.ResolveCourseUnlockWith(unlockedLevels, ...)`.
+- **I3 published-only placement mock**: `LatestPlacementMockTest`
+  filters by `status='published'` (memory + Postgres). Drafts no
+  longer leak to learners.
+
+### V21.1 Batch 2 — remaining Important + I6 doc (commit `fix(v21.1):`)
+
+- **I4 FK on full_session_id**: migration 027 drops the `NOT NULL DEFAULT ''`
+  on `promotion_attempts.full_session_id`, normalises sentinel empty
+  rows to NULL, and adds a foreign key to `mock_exam_sessions(id)`
+  with `ON DELETE SET NULL`. Ledger row survives session pruning
+  (audit trail) but never points to a stale id again.
+- **I5 PromotionTestForLevel resolver wired**: `SetLevelDeps` installs
+  a default resolver that calls `MockTestStore.LatestPromotionMockTest(targetLevel)`
+  so `GET /v1/users/me/level-progress` surfaces `promotion_test_id` —
+  the home banner can now deep-link to PreExam without a follow-up
+  `listMockTests` round trip.
+- **I2 + I8 placement rate limit**: new `placementRateLimiter` (5
+  RPM per user) installed by `SetLevelDeps`. Cap closes the TOCTOU
+  race between two concurrent first-placement calls AND throttles
+  malicious / buggy clients hammering `?force=true`. Returns
+  `429 rate_limited` once the window is exhausted.
+- **I6 V19/V21 mastery aggregation policy documented**: V21 takes
+  *max* across modules per skill (gating threshold favours the
+  learner's strongest module so they're not blocked by weak ones);
+  V19 progress takes *mean* (honest signal of typical performance).
+  Different metrics, different purposes — comment in
+  `processing/level_service.go.computeSkillMastery` cross-references
+  this CHANGELOG entry so the divergence stays intentional.
+
+### V21.1 deferred to future slices
+
+- I7 hook short-circuit before `GetByFullSessionID` — accepted as-is;
+  the lookup is O(1) and the cost is acceptable for V21 traffic.
+- S1–S8 — suggestion-tier polish; no behaviour change.
+
+### V21.1 final test counts
+
+- Backend: **647** (V21 baseline 636 → +11 from V21.1: C1+C2 added 7,
+  V21.1 batch 2 added 4: migration shape, LatestPromotionMockTest,
+  promotion_test_id resolver, placement rate limit).
+- Flutter: 309 (no Flutter changes — all V21.1 work is server-side).
+- CMS: 144 (no CMS changes).
+- `make verify` + `make smoke-promotion-flow` both green.
+
+---
+
 ## V21 — CEFR Level Progression (A0 → B1) — 2026-05-07
 
 Pivot from "A2-only sprint" to a level-gated CEFR ladder. Each

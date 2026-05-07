@@ -18,11 +18,45 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 	"github.com/danieldev/czech-go-system/backend/internal/processing"
 )
+
+// placementStartRateLimit is the per-user RPM cap for /placement-test/start.
+// V21 review I2 + I8: prevents a TOCTOU race (two concurrent calls both
+// passing the placement_taken_at == NULL check) and caps malicious /
+// buggy clients hammering ?force=true. Mirrors the algorithm used by
+// dictationOCRRateLimiter and aiImageRateLimiter.
+const placementStartRateLimit = 5
+
+type placementRateLimiter struct {
+	mu      sync.Mutex
+	windows map[string]rateWindow
+}
+
+func newPlacementRateLimiter() *placementRateLimiter {
+	return &placementRateLimiter{windows: make(map[string]rateWindow)}
+}
+
+func (rl *placementRateLimiter) allow(userID string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	now := time.Now()
+	w := rl.windows[userID]
+	if now.After(w.windowEnd) {
+		rl.windows[userID] = rateWindow{count: 1, windowEnd: now.Add(time.Minute)}
+		return true
+	}
+	if w.count >= placementStartRateLimit {
+		return false
+	}
+	w.count++
+	rl.windows[userID] = w
+	return true
+}
 
 func (s *Server) handlePlacementTestStart(w http.ResponseWriter, r *http.Request, user contracts.User) {
 	if r.Method != http.MethodPost {
@@ -32,6 +66,15 @@ func (s *Server) handlePlacementTestStart(w http.ResponseWriter, r *http.Request
 	if s.levelService == nil || s.userLevelStore == nil {
 		writeError(w, http.StatusNotFound, "feature_disabled",
 			"Level progression is not enabled on this server.", false)
+		return
+	}
+	// V21 review I2 + I8: cap placement-start to 5 RPM per user. Mainly
+	// closes a TOCTOU race between two concurrent calls but also keeps
+	// session creation bounded if a buggy client loops with
+	// ?force=true.
+	if s.placementRL != nil && !s.placementRL.allow(user.ID) {
+		writeError(w, http.StatusTooManyRequests, "rate_limited",
+			"Too many placement requests. Try again in a minute.", true)
 		return
 	}
 

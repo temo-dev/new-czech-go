@@ -80,6 +80,27 @@ func TestV21LevelsMigration_FileShapesAllSchema(t *testing.T) {
 	})
 }
 
+// TestV21PromotionFullSessionFK_FileShapesForeignKey validates migration
+// 027 (V21 review I4) — adds the FK from promotion_attempts.full_session_id
+// to mock_exam_sessions(id) ON DELETE SET NULL, after first dropping the
+// NOT NULL + DEFAULT '' constraints from migration 025 so the SET NULL
+// action has somewhere to land.
+func TestV21PromotionFullSessionFK_FileShapesForeignKey(t *testing.T) {
+	path := findMigration(t, "027_v21_promotion_full_session_fk.sql")
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read migration: %v", err)
+	}
+	sql := string(raw)
+	mustContain(t, sql, "DROP NOT NULL")
+	mustContain(t, sql, "DROP DEFAULT")
+	mustContain(t, sql, "promotion_attempts_full_session_fk")
+	mustContain(t, sql, "REFERENCES mock_exam_sessions(id) ON DELETE SET NULL")
+	// Idempotency: pg_constraint guard so re-running is a no-op.
+	mustContain(t, sql, "pg_constraint")
+}
+
 // TestV21LevelsMigration_IsIdempotent validates that the V21 migration file
 // uses idempotent markers everywhere so re-running against an already-migrated
 // DB is safe (the existing postgres_migrate.addColumnIfMissing helper inspects
