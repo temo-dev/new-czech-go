@@ -21,7 +21,7 @@ SMOKE_AUDIO_FILE ?=
 	compose-proxy-up compose-proxy-down compose-proxy-logs compose-ec2-config \
 	compose-ec2-pull compose-ec2-up compose-ec2-down compose-ec2-logs release-images ecr-login check-ec2-env \
 	check-ec2-host check-aws-audio-pipeline package-ec2-deploy smoke-attempt-flow \
-	smoke-course-flow smoke-exam-flow smoke-v17-auth smoke-progress-flow smoke-all \
+	smoke-course-flow smoke-exam-flow smoke-v17-auth smoke-progress-flow smoke-promotion-flow smoke-all \
 	seed-modelovy-test-2 graph-status verify clean
 
 help:
@@ -240,13 +240,19 @@ smoke-dictation-flow:
 smoke-progress-flow:
 	$(RTK) python3 scripts/smoke_progress_flow.py --base-url $(SMOKE_BASE_URL) $(SMOKE_PROGRESS_ARGS)
 
+# V21 — CEFR level progression end-to-end. Runs the in-process Go
+# integration test (level_flow_test.go) so the smoke is sealed against
+# port races / docker bring-up; no running server required.
+smoke-promotion-flow:
+	cd $(GO_DIR) && $(RTK) go test -count=1 -run "TestV21LevelFlow_E2E" ./internal/httpapi/
+
 mastery-sim:
 	$(RTK) python3 scripts/mastery_sim.py $(MASTERY_SIM_ARGS)
 
 mastery-latency:
 	$(RTK) python3 scripts/mastery_latency_snapshot.py --base-url $(SMOKE_BASE_URL) $(MASTERY_LATENCY_ARGS)
 
-smoke-all: smoke-attempt-flow smoke-course-flow smoke-exam-flow smoke-v17-auth smoke-dictation-flow smoke-progress-flow
+smoke-all: smoke-attempt-flow smoke-course-flow smoke-exam-flow smoke-v17-auth smoke-dictation-flow smoke-progress-flow smoke-promotion-flow
 
 seed-modelovy-test-2:
 	$(RTK) python3 scripts/seed-modelovy-test-2.py

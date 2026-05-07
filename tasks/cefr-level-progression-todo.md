@@ -120,9 +120,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
 
 ## Phase E — End-to-end + verify
 
-- [ ] **V21-E1** Smoke `make smoke-promotion-flow` (script or `tests/level_flow_test.go`)
-  - **AC:** signup → skip placement → seed mastery → unlocked → pass → B1 unlocked; also fail → cooldown
-  - **Verify:** `make smoke-promotion-flow` exits 0
+- [x] **V21-E1** End-to-end smoke (`backend/internal/httpapi/level_flow_test.go` (new), `Makefile` `smoke-promotion-flow` target + listed in `.PHONY` + `smoke-all`)
+  - **AC:** in-process Go integration test (preferred for stability over Python script + running server) drives the full flow: skip placement → seed passing mastery → fetch level-progress (asserts `promotion_unlocked=true`) → POST /v1/promotion-attempts (asserts 201 + payload) → simulate session completion + invoke `HandlePromotionOutcome` → assert `current_level=b1` + ledger row passed=true; also covers fail path: failed scoring leaves user level untouched + retry within window returns `400 cooldown_active` with `retry_after`
+  - **Verify:** `make smoke-promotion-flow` exits 0 (2 tests pass); full backend suite stays green
   - **Size:** L
 - [ ] **V21-E2** Manual MAN-1..MAN-10 on TestFlight
   - Per plan E2 — onboarding, placement bands, locked card, demo no-write, banner, pass celebration, fail diagnostic, existing-user backfill, reduced-motion, VoiceOver
