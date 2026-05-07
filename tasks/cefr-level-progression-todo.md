@@ -89,9 +89,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** chip ([A1] pill via `primaryContainer`/`onPrimaryContainer`) + 4-dot ladder (current=`primary`, unlocked=`success`, locked=`surfaceContainerHighest`); "Đang học A2" caption hides at top of ladder; min 48dp tap target; `Semantics(button, label)` reads "Cấp độ X, đang học Y"; no animation (reduced-motion safe by construction)
   - **Verify:** +4 widget tests (renders short code + studying caption, top-of-ladder hides caption, semantics label, tap callback); analyze clean; suite 287
   - **Size:** S
-- [ ] **V21-D4** `LevelProgressRing` widget
-  - **AC:** 6-arc skill ring; scoreband colors; pulse on unlock respects reduced-motion
-  - **Verify:** +4 widget tests
+- [x] **V21-D4** `LevelProgressRing` widget (`features/home/widgets/level_progress_ring.dart` + test)
+  - **AC:** 6-arc CustomPainter ring (one arc per skill — `noi`/`viet`/`nghe`/`doc`/`tu_vung`/`ngu_phap`), arc fill % from `SkillMasteryInfo.pct`, color via existing `AppColors.scoreExcellent`/`Good`/`Fair`/`Poor` thresholds (≥85/≥70/≥50); center label `<current> → <next>` + `<readiness>% sẵn sàng` (avg of skill pcts); top-of-ladder `nextLevel == null` hides arrow + next-level label; pulse via `ScaleTransition` (1.0↔1.04, 800ms reverse-repeat) keyed `level_progress_ring_pulse` when `promotionUnlocked && !disableAnimations`; reduced-motion shows static `Sẵn sàng` pill keyed `level_progress_ring_ready_pill` instead
+  - **Verify:** +4 widget tests (renders ladder + pct, top-of-ladder hides arrow, pulse keyed when unlocked + motion enabled, reduced motion shows static pill); analyze clean; suite 291
   - **Size:** L
 - [ ] **V21-D5** `PromotionBanner` widget
   - **AC:** visible only when unlocked + target not yet in `unlocked_levels`; CTA navigates to `PreExamScreen`
