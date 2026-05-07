@@ -3,6 +3,17 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useS } from '../lib/i18n';
 import AiImageButton from './AiImageButton';
+import { LEVEL_LABELS_VI, type CefrLevel } from '../lib/level';
+import {
+  emptyMockTestFlags,
+  togglePromotion,
+  togglePlacement,
+  setTargetLevel,
+  validateMockTestFlags,
+  mockTestFlagsPayload,
+  CefrLevelOptions,
+  type MockTestFlagsState,
+} from '../lib/mockTestFlags';
 
 type Exercise = {
   id: string;
@@ -28,6 +39,9 @@ type MockTest = {
   exam_mode?: string;
   pass_threshold_percent?: number;
   banner_image_id?: string;
+  is_promotion?: boolean;
+  is_placement?: boolean;
+  target_level?: CefrLevel | '';
   sections: MockTestSection[];
 };
 
@@ -81,6 +95,7 @@ type FormState = {
   status: 'draft' | 'published';
   exam_mode: 'real' | 'practice';
   pass_threshold_percent: number;
+  flags: MockTestFlagsState;
   sections: MockTestSection[];
 };
 
@@ -91,6 +106,7 @@ const emptyForm = (): FormState => ({
   status: 'draft',
   exam_mode: 'practice',
   pass_threshold_percent: 80,
+  flags: emptyMockTestFlags(),
   sections: [],
 });
 
@@ -160,6 +176,9 @@ export function MockTestDashboard() {
 
   function openEdit(t: MockTest) {
     setEditingId(t.id);
+    const initialTarget = t.target_level && (CefrLevelOptions as readonly string[]).includes(t.target_level as string)
+      ? (t.target_level as CefrLevel)
+      : '';
     setForm({
       title: t.title,
       description: t.description,
@@ -167,6 +186,11 @@ export function MockTestDashboard() {
       status: t.status,
       exam_mode: (t.exam_mode === 'real' ? 'real' : 'practice'),
       pass_threshold_percent: t.pass_threshold_percent ?? 80,
+      flags: {
+        is_promotion: !!t.is_promotion,
+        is_placement: !!t.is_placement,
+        target_level: initialTarget,
+      },
       sections: [...(t.sections ?? [])],
     });
     setShowForm(true);
@@ -183,6 +207,12 @@ export function MockTestDashboard() {
     e.preventDefault();
     setSaving(true);
     setError('');
+    const flagsError = validateMockTestFlags(form.flags);
+    if (flagsError) {
+      setError(flagsError);
+      setSaving(false);
+      return;
+    }
     try {
       const payload = {
         title: form.title,
@@ -191,6 +221,7 @@ export function MockTestDashboard() {
         status: form.status,
         exam_mode: form.exam_mode,
         pass_threshold_percent: form.pass_threshold_percent,
+        ...mockTestFlagsPayload(form.flags),
         sections: form.sections,
       };
       const url = editingId ? `${MOCK_TEST_API}/${editingId}` : MOCK_TEST_API;
@@ -444,6 +475,52 @@ export function MockTestDashboard() {
           <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0' }}>
             Sprint luyện tập: 80%. Đề thi chuẩn A2 (full speaking): 60%.
           </p>
+
+          {/* V21 — promotion / placement flags. Mutually exclusive: toggling
+              one clears the other. target_level required when is_promotion. */}
+          <div style={{
+            marginTop: 16, padding: '12px 14px', border: '1px solid #e5e7eb',
+            borderRadius: 8, background: '#fafafa',
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+              CEFR gating (V21)
+            </div>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+              <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  checked={form.flags.is_promotion}
+                  onChange={e => setForm(f => ({ ...f, flags: togglePromotion(f.flags, e.target.checked) }))}
+                />
+                Đề thi nâng cấp (promotion)
+              </label>
+              <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  checked={form.flags.is_placement}
+                  onChange={e => setForm(f => ({ ...f, flags: togglePlacement(f.flags, e.target.checked) }))}
+                />
+                Bài kiểm tra phân loại (placement)
+              </label>
+              {form.flags.is_promotion && (
+                <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+                  Lên cấp:
+                  <select
+                    value={form.flags.target_level}
+                    onChange={e => setForm(f => ({ ...f, flags: setTargetLevel(f.flags, e.target.value) }))}
+                  >
+                    <option value="">— chọn —</option>
+                    {CefrLevelOptions.map(lvl => (
+                      <option key={lvl} value={lvl}>{LEVEL_LABELS_VI[lvl]}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--ink-4)', margin: '6px 0 0' }}>
+              Mỗi mock chỉ chọn 1 trong 2 cờ. Promotion bắt buộc có target level.
+            </p>
+          </div>
 
           <div style={{ marginTop: 20 }}>
             <label style={{ ...labelStyle, fontWeight: 600, marginBottom: 12 }}>

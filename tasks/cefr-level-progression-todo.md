@@ -66,9 +66,9 @@ UX:   `docs/specs/cefr-level-progression-ux.md`
   - **AC:** `<select>` over A0/A1/A2/B1 with VI labels (`Mới bắt đầu` / `Cơ bản` / `Trvalý pobyt (mặc định)` / `Občanství`), default `a2` via `DEFAULT_COURSE_LEVEL`; sanitizeLevel coerces unknown server values; demo_exercise_id text input hidden when `isLowestLevel(form.level)`; `coursePayload` carries `level` + `demo_exercise_id`
   - **Verify:** +6 Vitest (level constants order/default, sanitize fallbacks, isCefrLevel narrowing, label fallback, isLowestLevel only flags a0); `make cms-lint` clean; `make cms-build` ok
   - **Size:** M
-- [ ] **V21-C2** MockTest form `PromotionFlagsField` (+ payload + Vitest)
-  - **AC:** mutex `is_promotion`/`is_placement`; `target_level` required when promotion
-  - **Verify:** +3 Vitest
+- [x] **V21-C2** MockTest form gating flags (`cms/lib/mockTestFlags.ts` (new) + test, `cms/components/mock-test-dashboard.tsx` extension; spec called for split `PromotionFlagsField.tsx` but kept inline matching the existing form-fields convention)
+  - **AC:** two checkboxes for `is_promotion` / `is_placement` enforce mutex (toggling one clears the other; placement also clears `target_level` since placement carries no target); `target_level` `<select>` appears only when `is_promotion` is on, lists A0/A1/A2/B1 with VI labels; `validateMockTestFlags` blocks submit when promotion lacks target or both flags set; `mockTestFlagsPayload` produces clean JSON (target_level omitted unless valid)
+  - **Verify:** +15 Vitest (toggle mutex both directions, target setter coercion, validate happy + 3 error paths, payload shape variants); `make cms-lint` clean; `make cms-build` ok; suite total 144
   - **Size:** M
 
 **[CHECKPOINT V21-C]** `make cms-lint && make cms-build && cd cms && npm test` pass; +6 Vitest
