@@ -445,6 +445,11 @@ class AppLocalizationsVi extends AppLocalizations {
   String get recordHintFailed => 'Attempt gặp lỗi. Thử lại với một lần ghi mới.';
 
   @override
+  String recordErrorRateLimit(String resetTime) {
+    return 'Bạn đã hết lượt luyện miễn phí hôm nay. Hạn mức làm mới lúc $resetTime.';
+  }
+
+  @override
   String get playbackTitle => 'Nghe lại bản ghi';
 
   @override

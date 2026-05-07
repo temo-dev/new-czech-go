@@ -1390,6 +1390,8 @@ List tài khoản học viên đang active (chưa soft-delete), paginate + optio
       "role": "learner",
       "pro_tier": "free",
       "grace_attempts_left": 3,
+      "attempts_today": 4,
+      "attempts_cap": 7,
       "created_at": "2026-05-05T12:12:06Z",
       "updated_at": "2026-05-05T12:12:06Z"
     }
@@ -1397,6 +1399,11 @@ List tài khoản học viên đang active (chưa soft-delete), paginate + optio
   "meta": { "total": 12, "limit": 50, "offset": 0 }
 }
 ```
+
+`attempts_today` is the VN-civil-day counter from `daily_usage`. `attempts_cap`
+is `freeTierAttemptsPerDay` (currently 7) — the same constant the gate uses
+to decide 429. Pro accounts are unlimited; the field is still returned
+(both still numeric) but the CMS hides it behind a Pro badge.
 
 ### Errors
 - `401` — không có Bearer token
@@ -1460,6 +1467,52 @@ Body cap 4 KiB. Password phải đạt strength rule của `auth.ValidatePasswor
 - `404` — user không tồn tại
 
 **Lưu ý vận hành:** Admin nhập password trong CMS modal rồi gửi cho học viên qua kênh tin cậy (chat/sms), KHÔNG bao giờ gửi qua email vì email có thể đã bị compromise.
+
+---
+
+## POST /v1/admin/users/:id/usage/reset
+
+Admin reset `attempts_count` về 0 cho ngày hôm nay (giờ VN) khi học viên hit
+free-tier cap và cần unblock cho QA / support flow. Counter `interviews_count`
+giữ nguyên (interview dùng rolling 7-day window, không phải daily reset).
+
+### Auth
+Admin Bearer.
+
+### Request
+Empty body (POST không cần payload).
+
+### Response
+`204 No Content`
+
+### Side Effects
+1. `daily_usage.attempts_count = 0 WHERE user_id = $1 AND day = vnCivilDay(now)`
+2. Học viên có thể tạo attempt mới ngay lập tức (gate đọc count trước khi increment)
+
+### Errors
+- `404` — user không tồn tại
+- `503 usage_unavailable` — V17 dailyUsageStore chưa wired
+
+---
+
+## Free-tier attempts gate (V21.2 hardening)
+
+`POST /v1/attempts` đi qua `checkAndIncrAttemptQuota` cho mọi non-admin /
+non-pro user. Semantics:
+
+1. Đọc `daily_usage.attempts_count` cho `(user_id, vnCivilDay(now))`.
+2. Nếu count `>= freeTierAttemptsPerDay (7)` → trả `429 attempts_quota_exceeded`
+   với header `X-Limit-Reset: <unix-epoch>` (next VN civil-day midnight).
+3. Nếu count `< cap` → atomic guarded UPSERT bumps count, request proceeds.
+
+**Counter pinned at cap** — trước V21.2, gate increment trước khi check, mỗi
+429 burn 1 slot và counter grow vô hạn (8, 9, 10, ...). V21.2 dùng atomic
+SQL CTE `INSERT ... ON CONFLICT DO UPDATE WHERE attempts_count < $cap` để
+chỉ bump khi dưới cap. Concurrent requests at cap boundary có thể overshoot
+1-2 (race acceptable cho free-tier UX) thay vì leak counter.
+
+Admin reset endpoint phía trên là escape hatch khi cần unblock 1 học viên cụ
+thể (QA, support).
 
 ---
 

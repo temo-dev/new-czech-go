@@ -345,23 +345,50 @@ silently expanding scope.
 
 ## Current Status
 
-All planned slices V2 → V21 shipped. See [CHANGELOG.md](CHANGELOG.md)
+All planned slices V2 → V21.2 shipped. See [CHANGELOG.md](CHANGELOG.md)
 for per-slice file changes, decisions, and final test counts.
 `tasks/todo.md` tracks active backlog.
 
-**Latest** (2026-05-07): V21 CEFR Level Progression (A0 → B1) — pivot
-from "A2-only sprint" to a level-gated CEFR ladder with a 2-gate
-promotion (mastery threshold unlocks a promotion exam, passing the
-exam promotes the learner). MVP ships A2 + B1; A0/A1 schema-ready,
-content deferred. Server is sole authority for `unlock_state` and
-`promotion_unlocked` (client never recomputes gates). Existing users
-backfill to A2 via migration 026 (idempotent — guarded by
-`current_level='a0' AND placement_taken_at IS NULL`). Adds
-`promotion_attempts` ledger, `LevelService` gating math + atomic
-promotion hook (`HandlePromotionOutcome`, idempotent on replay),
-demo-aware `WithDemoCheck` so taste-test runs skip mastery aggregate.
-Backend 636 tests (570 + 66), Flutter 309 (266 + 43), CMS 144 (~123 +
-21). `make verify` + `make smoke-promotion-flow` both green.
+**Latest** (2026-05-07): V21.2 — exam-flow runtime hotfixes from MobAI
+test on iPhone 17 Pro Max simulator. Fixes 1 Critical + 2 Important +
+adds admin escape hatch:
+
+- **Critical** — free-tier gate `checkAndIncrAttemptQuota` no longer
+  leaks `daily_usage.attempts_count` past cap on rejected requests.
+  New `TryIncrementAttempts(userID, day, cap)` does an atomic guarded
+  UPSERT (`ON CONFLICT DO UPDATE WHERE attempts_count < $cap`).
+  Counter pins at cap regardless of how many 429s land.
+- **Important** — speaking screen `_friendlyError` now parses
+  `ApiException` (new subclass of `HttpException` carrying statusCode
+  + headers) and renders `recordErrorRateLimit{resetTime}` from
+  `X-Limit-Reset` instead of `e.toString()`. Existing `catch
+  (HttpException)` callers unaffected.
+- **Important** — Psaní + dictation forms add
+  `MediaQuery.viewInsetsOf(context).bottom` to ListView padding so
+  lower TextFields stay tappable when the soft keyboard is up. Without
+  this fix, tap on field 2 didn't transfer focus and `type` actions
+  leaked into field 1.
+- **Admin escape hatch** — `POST /v1/admin/users/:id/usage/reset`
+  zeros today's `attempts_count` (interview counter untouched). CMS
+  Users desk gains "Hôm nay" column (X/cap, red bold at cap, ∞ for
+  Pro) + "Reset usage" action with confirm dialog. `GET /v1/admin/users`
+  rows now carry `attempts_today` + `attempts_cap`.
+
+Backend 654 tests (was 647 → +7), Flutter 309, CMS 144 in 7 files.
+`make backend-test` + `make cms-{lint,build}` + `npm test` + `make
+flutter-{analyze,test}` all green.
+
+V21 CEFR Level Progression (A0 → B1) — pivot from "A2-only sprint" to
+a level-gated CEFR ladder with a 2-gate promotion (mastery threshold
+unlocks a promotion exam, passing the exam promotes the learner). MVP
+ships A2 + B1; A0/A1 schema-ready, content deferred. Server is sole
+authority for `unlock_state` and `promotion_unlocked` (client never
+recomputes gates). Existing users backfill to A2 via migration 026
+(idempotent — guarded by `current_level='a0' AND placement_taken_at
+IS NULL`). Adds `promotion_attempts` ledger, `LevelService` gating
+math + atomic promotion hook (`HandlePromotionOutcome`, idempotent
+on replay), demo-aware `WithDemoCheck` so taste-test runs skip
+mastery aggregate.
 
 V19 skill mastery aggregate + `GET /v1/users/me/progress` and V20
 Flutter UI ship as in CHANGELOG.

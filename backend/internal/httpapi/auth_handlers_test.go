@@ -1157,6 +1157,22 @@ func TestAttemptQuota_FreeUserBlockedAfter7thAttempt(t *testing.T) {
 	if resp.Header.Get("X-Limit-Reset") == "" {
 		t.Error("expected X-Limit-Reset header on 429")
 	}
+
+	// Subsequent rejected requests MUST NOT keep growing the counter —
+	// the gate now reads then conditionally increments, so spam-tapping
+	// past the cap leaves attempts_count pinned at the cap rather than
+	// climbing forever (regression: earlier impl burned a slot on every
+	// 429, which inflated the row to 8/9/10/... and broke any future
+	// cap raise like a Pro grant honoring the existing counter).
+	for i := 9; i <= 11; i++ {
+		extra := env.postAttempt(t, tok, exID)
+		if extra.StatusCode != http.StatusTooManyRequests {
+			t.Errorf("attempt #%d after cap expected 429, got %d", i, extra.StatusCode)
+		}
+	}
+	if u, _ := env.usage.DailyUsageByUserDay(user.ID, time.Now().UTC()); u.AttemptsCount != 7 {
+		t.Errorf("attempts_count should stay at cap=7, got %d", u.AttemptsCount)
+	}
 }
 
 func TestAttemptQuota_ProUserUnlimited(t *testing.T) {

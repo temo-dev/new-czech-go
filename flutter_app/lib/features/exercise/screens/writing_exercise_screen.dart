@@ -164,7 +164,18 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.x4),
+          // Bottom padding tracks the soft-keyboard inset so that fields
+          // pushed under the IME stay tappable. Without this, tapping a
+          // lower TextField on iOS does not transfer focus and any
+          // following `type` action leaks back into the previously-focused
+          // field (caught by the MobAI exam-flow run on 2026-05-07).
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.x4,
+            AppSpacing.x4,
+            AppSpacing.x4,
+            AppSpacing.x4 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
           children: [
             ExerciseContextImage(detail: d, client: widget.client),
 

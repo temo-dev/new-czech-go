@@ -23,6 +23,16 @@ type DailyUsageStore interface {
 	IncrementAttempts(userID string, day time.Time) (int, error)
 	IncrementInterviews(userID string, day time.Time) (int, error)
 	DailyUsageByUserDay(userID string, day time.Time) (contracts.DailyUsage, bool)
+	// TryIncrementAttempts performs an atomic check-and-increment guarded
+	// by cap. When the existing counter is below cap, it bumps and
+	// returns (newCount, true, nil). When the counter has reached cap, it
+	// leaves the row alone and returns (cap, false, nil) so the gate can
+	// emit 429 without inflating the counter on every rejected request.
+	// Callers must pass cap > 0; cap == 0 is treated as "always blocked".
+	TryIncrementAttempts(userID string, day time.Time, cap int) (int, bool, error)
+	// ResetAttempts clears today's attempts_count for an admin-driven
+	// reset (QA, support flow). Interview count is left intact.
+	ResetAttempts(userID string, day time.Time) error
 }
 
 // ── Memory implementation ────────────────────────────────────────────────
@@ -64,6 +74,37 @@ func (s *memoryDailyUsageStore) IncrementAttempts(userID string, day time.Time) 
 	r := s.row(userID, day)
 	r.AttemptsCount++
 	return r.AttemptsCount, nil
+}
+
+func (s *memoryDailyUsageStore) TryIncrementAttempts(userID string, day time.Time, cap int) (int, bool, error) {
+	if userID == "" {
+		return 0, false, errors.New("user_id required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r := s.row(userID, day)
+	if cap <= 0 || r.AttemptsCount >= cap {
+		return r.AttemptsCount, false, nil
+	}
+	r.AttemptsCount++
+	return r.AttemptsCount, true, nil
+}
+
+func (s *memoryDailyUsageStore) ResetAttempts(userID string, day time.Time) error {
+	if userID == "" {
+		return errors.New("user_id required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	canonical := vnCivilDay(day)
+	bucket, ok := s.buckets[userID]
+	if !ok {
+		return nil
+	}
+	if r, ok := bucket[canonical]; ok {
+		r.AttemptsCount = 0
+	}
+	return nil
 }
 
 func (s *memoryDailyUsageStore) IncrementInterviews(userID string, day time.Time) (int, error) {
@@ -135,6 +176,62 @@ RETURNING attempts_count
 		return 0, fmt.Errorf("increment attempts: %w", err)
 	}
 	return count, nil
+}
+
+// TryIncrementAttempts is the race-safe alternative to IncrementAttempts.
+// The CTE bumps the row only when attempts_count < cap and reports back
+// whether the bump happened. The fallback SELECT covers the
+// already-at-cap case so the caller learns the current value without a
+// second round-trip.
+func (s *postgresDailyUsageStore) TryIncrementAttempts(userID string, day time.Time, cap int) (int, bool, error) {
+	if cap <= 0 {
+		current, _ := s.DailyUsageByUserDay(userID, day)
+		return current.AttemptsCount, false, nil
+	}
+	canonical := vnCivilDay(day)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := s.db.QueryContext(ctx, `
+WITH bump AS (
+  INSERT INTO daily_usage (user_id, day, attempts_count) VALUES ($1, $2, 1)
+  ON CONFLICT (user_id, day) DO UPDATE
+    SET attempts_count = daily_usage.attempts_count + 1
+    WHERE daily_usage.attempts_count < $3
+  RETURNING attempts_count
+)
+SELECT attempts_count, true AS granted FROM bump
+UNION ALL
+SELECT attempts_count, false AS granted FROM daily_usage
+  WHERE user_id = $1 AND day = $2 AND NOT EXISTS (SELECT 1 FROM bump)
+LIMIT 1
+`, userID, canonical, cap)
+	if err != nil {
+		return 0, false, fmt.Errorf("try increment attempts: %w", err)
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return 0, false, nil
+	}
+	var count int
+	var granted bool
+	if err := rows.Scan(&count, &granted); err != nil {
+		return 0, false, fmt.Errorf("try increment attempts scan: %w", err)
+	}
+	return count, granted, nil
+}
+
+func (s *postgresDailyUsageStore) ResetAttempts(userID string, day time.Time) error {
+	canonical := vnCivilDay(day)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := s.db.ExecContext(ctx, `
+UPDATE daily_usage SET attempts_count = 0
+WHERE user_id = $1 AND day = $2
+`, userID, canonical)
+	if err != nil {
+		return fmt.Errorf("reset attempts: %w", err)
+	}
+	return nil
 }
 
 func (s *postgresDailyUsageStore) IncrementInterviews(userID string, day time.Time) (int, error) {

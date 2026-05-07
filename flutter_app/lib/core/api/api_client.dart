@@ -16,6 +16,28 @@ String _resolveBaseUrl(String? override) {
   return _kFallbackBaseUrl;
 }
 
+/// Thrown by [ApiClient._request] for any 4xx/5xx response. Extends
+/// [HttpException] so legacy `catch (HttpException)` sites keep working;
+/// callers that need the status (e.g. distinguishing a 429 rate-limit
+/// from an arbitrary failure) can `is ApiException` and read [statusCode]
+/// + [errorCode].
+class ApiException extends HttpException {
+  ApiException({
+    required this.statusCode,
+    required this.errorCode,
+    required String message,
+    this.headers = const {},
+  }) : super(message);
+
+  final int statusCode;
+  final String errorCode;
+  final Map<String, String> headers;
+
+  /// Case-insensitive lookup so callers do not need to know the
+  /// `_request`-side convention of lowercasing every header name.
+  String? headerValue(String name) => headers[name.toLowerCase()];
+}
+
 class ApiClient {
   ApiClient({String? baseUrl}) : baseUrl = _resolveBaseUrl(baseUrl);
 
@@ -813,11 +835,25 @@ class ApiClient {
         //   {"error":"<code>","message":"<text>"}   (auth gates: email_verify_required, etc.)
         final err = payload['error'];
         String? msg;
+        String? code;
         if (err is Map) {
           msg = err['message'] as String?;
+          code = err['code'] as String?;
+        } else if (err is String) {
+          code = err;
         }
         msg ??= payload['message'] as String?;
-        throw HttpException(msg ?? 'Request failed.');
+        code ??= 'http_${response.statusCode}';
+        final headers = <String, String>{};
+        response.headers.forEach((name, values) {
+          if (values.isNotEmpty) headers[name.toLowerCase()] = values.first;
+        });
+        throw ApiException(
+          statusCode: response.statusCode,
+          errorCode: code,
+          message: msg ?? 'Request failed.',
+          headers: headers,
+        );
       }
       return payload;
     } finally {

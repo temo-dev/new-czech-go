@@ -329,7 +329,16 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.x4),
+          // Pad bottom by the keyboard inset so per-sentence dictation
+          // input stays tappable when the IME is up — same fix as
+          // writing_exercise_screen.dart.
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.x4,
+            AppSpacing.x4,
+            AppSpacing.x4,
+            AppSpacing.x4 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
           children: [
             ExerciseContextImage(detail: d, client: widget.client),
             Row(

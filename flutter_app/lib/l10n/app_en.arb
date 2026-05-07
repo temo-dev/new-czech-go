@@ -180,6 +180,10 @@
     "recordHintProcessing": "Transcribing and building feedback.",
     "recordHintCompleted": "Feedback is ready. Read the result and try again.",
     "recordHintFailed": "This attempt failed. Try again with a new recording.",
+    "recordErrorRateLimit": "You've used today's free practice allowance. Limit resets at {resetTime}.",
+    "@recordErrorRateLimit": {
+        "placeholders": { "resetTime": { "type": "String" } }
+    },
     "playbackTitle": "Listen to your recording",
     "playbackErrorPrefix": "Playback error: {message}",
     "playbackOpenError": "Could not open the recording for playback.",

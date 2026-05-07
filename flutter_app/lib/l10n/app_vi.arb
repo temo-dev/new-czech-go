@@ -195,6 +195,10 @@
     "recordHintProcessing": "Hệ thống đang transcript và tổng hợp feedback.",
     "recordHintCompleted": "Feedback đã sẵn sàng. Hãy đọc kết quả và thử lại.",
     "recordHintFailed": "Attempt gặp lỗi. Thử lại với một lần ghi mới.",
+    "recordErrorRateLimit": "Bạn đã hết lượt luyện miễn phí hôm nay. Hạn mức làm mới lúc {resetTime}.",
+    "@recordErrorRateLimit": {
+        "placeholders": { "resetTime": { "type": "String" } }
+    },
     "playbackTitle": "Nghe lại bản ghi",
     "playbackErrorPrefix": "Playback gặp lỗi: {message}",
     "@playbackErrorPrefix": {

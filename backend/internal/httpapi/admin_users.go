@@ -24,12 +24,14 @@ type adminUserView struct {
 	Role              string     `json:"role"`
 	ProTier           string     `json:"pro_tier"`
 	GraceAttemptsLeft int        `json:"grace_attempts_left"`
+	AttemptsToday     int        `json:"attempts_today"`
+	AttemptsCap       int        `json:"attempts_cap"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 	ProExpiresAt      *time.Time `json:"pro_expires_at,omitempty"`
 }
 
-func toAdminUserView(u contracts.UserAccount) adminUserView {
+func toAdminUserView(u contracts.UserAccount, attemptsToday int) adminUserView {
 	return adminUserView{
 		ID:                u.ID,
 		Email:             u.Email,
@@ -38,6 +40,8 @@ func toAdminUserView(u contracts.UserAccount) adminUserView {
 		Role:              u.Role,
 		ProTier:           u.ProTier,
 		GraceAttemptsLeft: u.GraceAttemptsLeft,
+		AttemptsToday:     attemptsToday,
+		AttemptsCap:       freeTierAttemptsPerDay,
 		CreatedAt:         u.CreatedAt,
 		UpdatedAt:         u.UpdatedAt,
 		ProExpiresAt:      u.ProExpiresAt,
@@ -78,9 +82,16 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request, _ cont
 		writeError(w, http.StatusInternalServerError, "list_failed", err.Error(), false)
 		return
 	}
+	now := time.Now().UTC()
 	views := make([]adminUserView, 0, len(users))
 	for _, u := range users {
-		views = append(views, toAdminUserView(u))
+		var today int
+		if s.dailyUsageStore != nil {
+			if usage, ok := s.dailyUsageStore.DailyUsageByUserDay(u.ID, now); ok {
+				today = usage.AttemptsCount
+			}
+		}
+		views = append(views, toAdminUserView(u, today))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": views,
@@ -108,13 +119,15 @@ func (s *Server) handleAdminUserByID(w http.ResponseWriter, r *http.Request, cal
 		writeError(w, http.StatusBadRequest, "missing_id", "user id required", false)
 		return
 	}
-	// Sub-resource routing: /v1/admin/users/:id/reset-password
+	// Sub-resource routing: /v1/admin/users/:id/{reset-password,usage/reset}
 	if idx := strings.Index(rest, "/"); idx >= 0 {
 		id := rest[:idx]
 		sub := rest[idx+1:]
 		switch sub {
 		case "reset-password":
 			s.handleAdminResetUserPassword(w, r, caller, id)
+		case "usage/reset":
+			s.handleAdminResetUserUsage(w, r, id)
 		default:
 			writeNotFound(w)
 		}
@@ -217,6 +230,34 @@ func (s *Server) handleAdminResetUserPassword(w http.ResponseWriter, r *http.Req
 	}
 	if s.loginRL != nil {
 		s.loginRL.Reset(target.Email)
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleAdminResetUserUsage serves POST /v1/admin/users/:id/usage/reset.
+// Clears the learner's attempts_count for today (VN civil day) so QA /
+// support can unblock a learner who has hit the free-tier daily cap. The
+// interview counter is left intact — interviews use a 7-day rolling
+// window, not a daily reset.
+func (s *Server) handleAdminResetUserUsage(w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	if s.dailyUsageStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "usage_unavailable",
+			"daily usage store is not wired on this backend", false)
+		return
+	}
+	if _, ok := s.userStore.UserAccountByID(id); !ok {
+		writeNotFound(w)
+		return
+	}
+	if err := s.dailyUsageStore.ResetAttempts(id, time.Now().UTC()); err != nil {
+		log.Printf("admin reset usage: user_id=%s err=%v", id, err)
+		writeError(w, http.StatusInternalServerError, "reset_failed",
+			"could not reset usage", false)
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -297,3 +297,78 @@ func TestAdminResetPassword_RequiresAdmin(t *testing.T) {
 		t.Errorf("want 401, got %d", resp.StatusCode)
 	}
 }
+
+func TestAdminListUsers_PopulatesAttemptsToday(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "today@example.com", "Today")
+	now := time.Now().UTC()
+	for i := 0; i < 4; i++ {
+		if _, err := env.usage.IncrementAttempts(u.ID, now); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+	resp, body := adminGet(t, env, "/v1/admin/users?search=today@example.com")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d", resp.StatusCode)
+	}
+	data, _ := body["data"].([]any)
+	if len(data) != 1 {
+		t.Fatalf("want 1 user, got %d", len(data))
+	}
+	row, _ := data[0].(map[string]any)
+	if today, _ := row["attempts_today"].(float64); today != 4 {
+		t.Errorf("attempts_today want 4, got %v", today)
+	}
+	if cap, _ := row["attempts_cap"].(float64); cap != 7 {
+		t.Errorf("attempts_cap want 7, got %v", cap)
+	}
+}
+
+func TestAdminResetUsage_HappyPath_ZeroesAttemptsKeepsInterviews(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "capped@example.com", "Capped")
+
+	now := time.Now().UTC()
+	for i := 0; i < 7; i++ {
+		if _, err := env.usage.IncrementAttempts(u.ID, now); err != nil {
+			t.Fatalf("seed attempts: %v", err)
+		}
+	}
+	if _, err := env.usage.IncrementInterviews(u.ID, now); err != nil {
+		t.Fatalf("seed interview: %v", err)
+	}
+
+	resp := adminPostJSON(t, env, "/v1/admin/users/"+u.ID+"/usage/reset", nil)
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("want 204, got %d", resp.StatusCode)
+	}
+	got, _ := env.usage.DailyUsageByUserDay(u.ID, now)
+	if got.AttemptsCount != 0 {
+		t.Errorf("attempts should be 0, got %d", got.AttemptsCount)
+	}
+	if got.InterviewsCount != 1 {
+		t.Errorf("interviews should be untouched, got %d", got.InterviewsCount)
+	}
+}
+
+func TestAdminResetUsage_NotFound_Returns404(t *testing.T) {
+	env := newAuthTestEnv(t)
+	resp := adminPostJSON(t, env, "/v1/admin/users/u_missing/usage/reset", nil)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("want 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminResetUsage_RequiresAdmin(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "victim@example.com", "Victim")
+
+	resp, err := http.Post(env.srv.URL+"/v1/admin/users/"+u.ID+"/usage/reset", "application/json", nil)
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("want 401, got %d", resp.StatusCode)
+	}
+}

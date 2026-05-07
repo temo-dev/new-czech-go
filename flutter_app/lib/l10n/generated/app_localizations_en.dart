@@ -445,6 +445,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get recordHintFailed => 'This attempt failed. Try again with a new recording.';
 
   @override
+  String recordErrorRateLimit(String resetTime) {
+    return 'You\'ve used today\'s free practice allowance. Limit resets at $resetTime.';
+  }
+
+  @override
   String get playbackTitle => 'Listen to your recording';
 
   @override

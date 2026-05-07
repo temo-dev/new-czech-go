@@ -10,6 +10,98 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V21.2 — Exam-flow runtime hotfixes (MobAI test) — 2026-05-07
+
+Driver: full mock-test flow run via MobAI on iPhone 17 Pro Max simulator
+surfaced 3 user-visible bugs across the speaking + writing surfaces and
+1 latent counter-leak in the free-tier gate. Fixed inline + added admin
+escape hatch the CMS Users desk can call from now on.
+
+### Bugs fixed
+
+- **Critical — free-tier gate counter leak.** `checkAndIncrAttemptQuota`
+  used to increment `daily_usage.attempts_count` THEN compare to cap. Each
+  rejected request burned a slot, so the counter grew past cap (8, 9, 10…)
+  and any future cap raise (Pro grant, env tweak) would honour the
+  inflated value. New `DailyUsageStore.TryIncrementAttempts(userID, day, cap)`
+  performs an atomic guarded UPSERT (`ON CONFLICT DO UPDATE WHERE
+  attempts_count < $cap`) — counter now pins at cap regardless of how many
+  rejected calls land. Memory + Postgres impl. Test asserts attempts 8..11
+  all return 429 with `attempts_count == 7`.
+  ([backend/internal/store/daily_usage_store.go](backend/internal/store/daily_usage_store.go),
+  [backend/internal/httpapi/auth_gates.go](backend/internal/httpapi/auth_gates.go))
+
+- **Important — speaking screen rendered raw `HttpException`.** Tap-mic
+  on a 429 surfaced `HttpException: daily free-tier limit of 7 attempts
+  reached` verbatim in the recording card with no retry path. Added
+  `ApiException extends HttpException` carrying `statusCode` + `errorCode`
+  + headers (case-insensitive `headerValue()` accessor) so the speaking
+  screen can detect 429 and render a friendly localized message
+  `recordErrorRateLimit{resetTime}` parsed from `X-Limit-Reset`. Existing
+  `catch (HttpException)` sites keep working.
+  ([flutter_app/lib/core/api/api_client.dart](flutter_app/lib/core/api/api_client.dart),
+  [flutter_app/lib/features/exercise/screens/exercise_screen.dart](flutter_app/lib/features/exercise/screens/exercise_screen.dart))
+
+- **Important — Psaní form keyboard focus leak.** On iOS the soft keyboard
+  occluded fields 2/3 of `psani_1_formular`; tapping them did not transfer
+  focus and any subsequent `type` action leaked back into field 1. Added
+  bottom padding `MediaQuery.viewInsetsOf(context).bottom` + `keyboardDismissBehavior: onDrag`
+  on the ListView. Same fix landed on `dictation_exercise_screen.dart`.
+  ([flutter_app/lib/features/exercise/screens/writing_exercise_screen.dart](flutter_app/lib/features/exercise/screens/writing_exercise_screen.dart),
+  [flutter_app/lib/features/exercise/screens/dictation_exercise_screen.dart](flutter_app/lib/features/exercise/screens/dictation_exercise_screen.dart))
+
+### Admin reset endpoint
+
+User feedback during the test: "CMS chưa có UI quản lý/reset daily_usage."
+
+- **Backend** — `POST /v1/admin/users/:id/usage/reset` (admin-only). Clears
+  `attempts_count` for today (VN civil day); interview counter untouched.
+  503 when store missing, 404 when user missing, 401 when not admin.
+  `GET /v1/admin/users` response gains `attempts_today` + `attempts_cap`
+  fields populated per row (PK lookup against `daily_usage`).
+  ([backend/internal/httpapi/admin_users.go](backend/internal/httpapi/admin_users.go))
+
+- **CMS** — Users desk gains a "Hôm nay" column (`X/cap`, red bold at cap;
+  `∞` for Pro) and a "Reset usage" action that pops a confirm dialog and
+  POSTs the proxy route. Hidden when `attempts_today == 0` to avoid
+  cluttering rows that don't need it.
+  ([cms/components/users-dashboard.tsx](cms/components/users-dashboard.tsx),
+  [cms/app/api/admin/users/[userId]/usage/reset/route.ts](cms/app/api/admin/users/[userId]/usage/reset/route.ts))
+
+### Decisions worth remembering
+
+- **Race window 1-2 over cap is acceptable** for free-tier UX. The atomic
+  guarded UPSERT eliminates the counter leak but two concurrent requests
+  hitting the gate at `count == cap-1` may both pass through. Trade vs
+  full SERIALIZABLE transaction overhead — the previous "atomic always-bump"
+  was strictly worse because it inflated the counter on every 429.
+- **`IncrementAttempts` legacy method retained** for the interview gate
+  path (which already check-then-increments correctly). Callers must use
+  `TryIncrementAttempts` for any new gate logic.
+- **`attempts_cap` returned even for Pro** (numeric, not omitted) so the
+  CMS can render `∞` based on `pro_tier`, not based on field absence.
+
+### Stable contract updates
+
+- [docs/reference/api-contracts.md](docs/reference/api-contracts.md):
+  GET `/v1/admin/users` response gains `attempts_today` + `attempts_cap`.
+  New section `POST /v1/admin/users/:id/usage/reset`. New section
+  documenting the V21.2 free-tier attempts gate semantics (counter
+  pinned at cap, race trade-off explicit).
+
+### Tests
+
+- Backend: 654 passed in 8 packages (was 647 → +7: `TryIncrementAttempts`
+  honors-cap + cap-zero-blocks, `ResetAttempts` keeps-interviews,
+  `attempts_today` populated, `usage/reset` happy/404/auth, gate counter
+  pinned at cap regression).
+- Flutter: 309 passed (no new tests; bug fixes are UI-layer + caught by
+  manual MobAI run).
+- CMS: 144 passed in 7 files. `cms-lint` + `cms-build` clean — new route
+  `/api/admin/users/[userId]/usage/reset` registered.
+
+---
+
 ## V21.1 — V21 review hotfixes — 2026-05-07
 
 Five-axis review on the V21 slice surfaced 2 Critical + 5 Important

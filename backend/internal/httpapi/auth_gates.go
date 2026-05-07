@@ -52,14 +52,16 @@ func writeGateBlocked(w http.ResponseWriter, ge *gateBlockedError) {
 //   - admin role -> no-op so CMS/QA can hit attempts endpoints freely.
 //   - Pro tier active -> no-op, no counter increment (Pro is unlimited
 //     so we don't need to track usage for them at all).
-//   - Free tier -> increment daily_usage.attempts_count atomically. When
-//     the new count exceeds freeTierAttemptsPerDay return a gate block
-//     with X-Limit-Reset set to the next VN-civil-day midnight epoch.
+//   - Free tier -> read attempts_count first, block at the cap, then
+//     increment ONLY when the request is granted. This prevents the
+//     counter from ballooning past the cap when a learner spam-taps
+//     past their daily allowance (each rejected request used to burn
+//     a counter slot).
 //
 // The gate is invoked BEFORE the attempt is created so a 429 does not
-// leave a stranded attempt row. The atomic INSERT...ON CONFLICT pattern
-// in DailyUsageStore makes the increment race-safe under concurrent
-// requests.
+// leave a stranded attempt row. Two concurrent requests at the cap
+// boundary may both pass the check and increment — that is an
+// acceptable trade for not leaking the counter on every rejection.
 func (s *Server) checkAndIncrAttemptQuota(user contracts.User) error {
 	if s.dailyUsageStore == nil || s.userStore == nil {
 		return nil
@@ -78,15 +80,14 @@ func (s *Server) checkAndIncrAttemptQuota(user contracts.User) error {
 		return nil
 	}
 
-	count, err := s.dailyUsageStore.IncrementAttempts(user.ID, now)
+	_, granted, err := s.dailyUsageStore.TryIncrementAttempts(user.ID, now, freeTierAttemptsPerDay)
 	if err != nil {
-		// Increment failure must not block the request — the worst case
-		// is that a learner sneaks past their cap by a request or two,
-		// which is far better than blocking everyone on a transient DB
-		// issue.
+		// Store failure must not block the request — the worst case is
+		// a learner sneaking past their cap by a request or two, which
+		// is far better than blocking everyone on a transient DB issue.
 		return nil
 	}
-	if count > freeTierAttemptsPerDay {
+	if !granted {
 		return &gateBlockedError{
 			Code:    "attempts_quota_exceeded",
 			Message: fmt.Sprintf("daily free-tier limit of %d attempts reached", freeTierAttemptsPerDay),

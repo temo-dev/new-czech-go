@@ -39,6 +39,7 @@ the archive — it is a historical record.
 | V20.1 | 2026-05-06 | Hotfixes from learner-flow simulation | (CHANGELOG entry) |
 | V21 | 2026-05-07 | CEFR level progression A0→B1 | [docs/specs/cefr-level-progression.md](docs/specs/cefr-level-progression.md) + [docs/specs/cefr-level-progression-ux.md](docs/specs/cefr-level-progression-ux.md) |
 | V21.1 | 2026-05-07 | V21 review hotfixes (C1+C2 + I1+I3 + I4+I5+I2/I8 + I6 doc) | (CHANGELOG entry) |
+| V21.2 | 2026-05-07 | Exam-flow runtime hotfixes (MobAI test) — gate counter pin + Flutter UX + admin usage/reset | (CHANGELOG entry) |
 
 ## Stable contracts
 

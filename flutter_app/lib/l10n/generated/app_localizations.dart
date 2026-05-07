@@ -887,6 +887,12 @@ abstract class AppLocalizations {
   /// **'Attempt gặp lỗi. Thử lại với một lần ghi mới.'**
   String get recordHintFailed;
 
+  /// No description provided for @recordErrorRateLimit.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bạn đã hết lượt luyện miễn phí hôm nay. Hạn mức làm mới lúc {resetTime}.'**
+  String recordErrorRateLimit(String resetTime);
+
   /// No description provided for @playbackTitle.
   ///
   /// In vi, this message translates to:

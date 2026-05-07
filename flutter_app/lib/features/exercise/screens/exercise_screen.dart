@@ -148,9 +148,30 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     } catch (err) {
       setState(() {
         _status = 'ready';
-        _error = err.toString();
+        _error = _friendlyError(err);
       });
     }
+  }
+
+  String _friendlyError(Object err) {
+    if (err is ApiException && err.statusCode == 429) {
+      final reset = err.headerValue('X-Limit-Reset');
+      final resetEpoch = reset == null ? null : int.tryParse(reset);
+      final when = resetEpoch == null
+          ? '00:00'
+          : _formatLocalClock(
+              DateTime.fromMillisecondsSinceEpoch(resetEpoch * 1000),
+            );
+      return AppLocalizations.of(context).recordErrorRateLimit(when);
+    }
+    return err.toString();
+  }
+
+  String _formatLocalClock(DateTime t) {
+    final local = t.toLocal();
+    final hh = local.hour.toString().padLeft(2, '0');
+    final mm = local.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
   }
 
   Future<void> _stopRecording() async {
@@ -176,7 +197,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
       if (!mounted) return;
       setState(() {
         _status = 'ready';
-        _error = err.toString();
+        _error = _friendlyError(err);
       });
     }
   }
