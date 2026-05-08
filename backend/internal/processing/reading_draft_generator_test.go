@@ -39,8 +39,8 @@ func TestMockReadingDraftGenerator_PropagatesError(t *testing.T) {
 func TestClaudeReadingDraftGenerator_NotImplementedForUnshippedTypes(t *testing.T) {
 	gen := NewClaudeReadingDraftGenerator("dummy-key", DefaultReadingDraftModel)
 
-	// cteni_2 (B1), cteni_4 (B2), cteni_5 (B3), cteni_6 (B4) shipped; remaining types still skeleton.
-	for _, exType := range []string{"cteni_1", "cteni_3"} {
+	// cteni_2 (B1), cteni_4 (B2), cteni_5 (B3), cteni_6 (B4), cteni_3 (B5) shipped; cteni_1 still skeleton.
+	for _, exType := range []string{"cteni_1"} {
 		t.Run(exType, func(t *testing.T) {
 			_, err := gen.Generate(context.Background(), contracts.ReadingDraftInput{ExerciseType: exType})
 			if !errors.Is(err, ErrReadingDraftNotImplemented) {
@@ -297,6 +297,43 @@ func TestParseReadingDraftDetail_Cteni6_RoundTrips(t *testing.T) {
 	}
 	if d.MaxPoints != 1 || d.CorrectAnswers["1"] != "NE" {
 		t.Fatalf("decode mismatch: %+v", d)
+	}
+}
+
+func TestBuildReadingDraftToolSchema_Cteni3_HasFiveDistinctPersons(t *testing.T) {
+	schema := buildReadingDraftToolSchema("cteni_3")
+	if schema == nil {
+		t.Fatal("expected schema for cteni_3")
+	}
+	props, _ := schema["properties"].(map[string]any)
+	persons, _ := props["persons"].(map[string]any)
+	if persons["minItems"] != 5 || persons["maxItems"] != 5 {
+		t.Errorf("persons bounds = [%v, %v], want [5, 5]", persons["minItems"], persons["maxItems"])
+	}
+	answers, _ := props["correct_answers"].(map[string]any)
+	addProps, _ := answers["additionalProperties"].(map[string]any)
+	enum, _ := addProps["enum"].([]string)
+	if len(enum) != 5 {
+		t.Errorf("expected enum A-E (5 keys), got %v", enum)
+	}
+}
+
+func TestParseReadingDraftDetail_Cteni3_RoundTrips(t *testing.T) {
+	raw := []byte(`{
+		"texts": [{"item_no": 1, "text": "A"}],
+		"persons": [{"key": "A", "name": "Pavel"}],
+		"correct_answers": {"1": "A"}
+	}`)
+	detail, err := parseReadingDraftDetail("cteni_3", raw)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	d, ok := detail.(contracts.Cteni3Detail)
+	if !ok {
+		t.Fatalf("expected Cteni3Detail, got %T", detail)
+	}
+	if d.Persons[0].Name != "Pavel" {
+		t.Fatalf("name mismatch: %q", d.Persons[0].Name)
 	}
 }
 

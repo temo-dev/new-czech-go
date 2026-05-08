@@ -519,6 +519,13 @@ func readingDraftStructuralRequirements(exerciseType string) string {
 			"- Set max_points equal to the number of statements",
 			"- Mix at least one ANO and one NE when N ≥ 2 to keep the exercise discriminating",
 		}, "\n")
+	case "cteni_3":
+		return strings.Join([]string{
+			"- Generate exactly 4 short text items (item_no = 1..4), each 30-60 words, expressing a personal preference or routine",
+			"- Generate exactly 5 persons (keys A-E) with `name` and short `description`; one person is a distractor not matched by any text",
+			"- correct_answers map: keys \"1\"..\"4\", values are unique person keys A-E (each person matches at most one text)",
+			"- Persons must be distinguishable by description (different hobby, profession, or trait)",
+		}, "\n")
 	}
 	return ""
 }

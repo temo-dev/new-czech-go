@@ -42,6 +42,12 @@ func ValidateReadingDraft(d *contracts.ReadingDraft) error {
 			return fmt.Errorf("cteni_6: expected AnoNeDetail, got %T", d.Detail)
 		}
 		return validateCteni6(detail)
+	case "cteni_3":
+		detail, ok := d.Detail.(contracts.Cteni3Detail)
+		if !ok {
+			return fmt.Errorf("cteni_3: expected Cteni3Detail, got %T", d.Detail)
+		}
+		return validateCteni3(detail)
 	default:
 		return fmt.Errorf("reading draft: unsupported exercise_type %q", d.ExerciseType)
 	}
@@ -100,6 +106,49 @@ func validateCteni5(d contracts.Cteni5Detail) error {
 	}
 	if len(d.CorrectAnswers) != len(d.Questions) {
 		return fmt.Errorf("cteni_5: correct_answers should cover %d questions, got %d entries", len(d.Questions), len(d.CorrectAnswers))
+	}
+	return nil
+}
+
+// ── cteni_3 ───────────────────────────────────────────────────────────────────
+
+func validateCteni3(d contracts.Cteni3Detail) error {
+	if len(d.Texts) != 4 {
+		return fmt.Errorf("cteni_3: expected 4 texts, got %d", len(d.Texts))
+	}
+	for i, txt := range d.Texts {
+		if strings.TrimSpace(txt.Text) == "" {
+			return fmt.Errorf("cteni_3: text item %d must be non-empty", i+1)
+		}
+	}
+	if len(d.Persons) != 5 {
+		return fmt.Errorf("cteni_3: expected 5 persons, got %d", len(d.Persons))
+	}
+	allowedKeys := map[string]bool{"A": true, "B": true, "C": true, "D": true, "E": true}
+	seenKeys := map[string]bool{}
+	for i, p := range d.Persons {
+		if !allowedKeys[p.Key] {
+			return fmt.Errorf("cteni_3: person %d key must be A-E, got %q", i+1, p.Key)
+		}
+		if seenKeys[p.Key] {
+			return fmt.Errorf("cteni_3: person %d has duplicate key %q", i+1, p.Key)
+		}
+		seenKeys[p.Key] = true
+		if strings.TrimSpace(p.Name) == "" {
+			return fmt.Errorf("cteni_3: person %s has empty name", p.Key)
+		}
+	}
+	if err := requireCorrectAnswers(d.CorrectAnswers, len(d.Texts), "cteni_3", "A-E", []string{"A", "B", "C", "D", "E"}); err != nil {
+		return err
+	}
+	// each person matches at most one text → correct_answers values must be unique.
+	seenValues := map[string]bool{}
+	for i := 1; i <= len(d.Texts); i++ {
+		v := d.CorrectAnswers[strconv.Itoa(i)]
+		if seenValues[v] {
+			return fmt.Errorf("cteni_3: duplicate correct_answer value %q (each person matches at most one text)", v)
+		}
+		seenValues[v] = true
 	}
 	return nil
 }

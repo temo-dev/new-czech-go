@@ -126,6 +126,102 @@ func TestValidateReadingDraft_Cteni2_RejectsWrongDetailType(t *testing.T) {
 	}
 }
 
+// ── cteni_3 fixtures ──────────────────────────────────────────────────────────
+
+func validCteni3Detail() contracts.Cteni3Detail {
+	return contracts.Cteni3Detail{
+		Texts: []contracts.TextItem{
+			{ItemNo: 1, Text: "Mám rád kávu a knihy."},
+			{ItemNo: 2, Text: "Hraju fotbal každý víkend."},
+			{ItemNo: 3, Text: "Pracuju jako učitelka."},
+			{ItemNo: 4, Text: "Cestuji rád po Evropě."},
+		},
+		Persons: []contracts.PersonOption{
+			{Key: "A", Name: "Pavel", Description: "sportovec"},
+			{Key: "B", Name: "Marie", Description: "učitelka"},
+			{Key: "C", Name: "Jan", Description: "intelektuál"},
+			{Key: "D", Name: "Eva", Description: "cestovatelka"},
+			{Key: "E", Name: "Tomáš", Description: "kuchař"},
+		},
+		CorrectAnswers: map[string]string{"1": "C", "2": "A", "3": "B", "4": "D"},
+	}
+}
+
+func TestValidateReadingDraft_Cteni3_AcceptsValid(t *testing.T) {
+	draft := &contracts.ReadingDraft{ExerciseType: "cteni_3", Detail: validCteni3Detail()}
+	if err := ValidateReadingDraft(draft); err != nil {
+		t.Fatalf("expected valid draft to pass, got %v", err)
+	}
+}
+
+func TestValidateReadingDraft_Cteni3_RejectsMalformed(t *testing.T) {
+	cases := []struct {
+		name    string
+		mutate  func(d *contracts.Cteni3Detail)
+		wantSub string
+	}{
+		{
+			name:    "wrong text count",
+			mutate:  func(d *contracts.Cteni3Detail) { d.Texts = d.Texts[:3] },
+			wantSub: "4 texts",
+		},
+		{
+			name:    "wrong person count",
+			mutate:  func(d *contracts.Cteni3Detail) { d.Persons = d.Persons[:4] },
+			wantSub: "5 persons",
+		},
+		{
+			name:    "person key out of A-E",
+			mutate:  func(d *contracts.Cteni3Detail) { d.Persons[2].Key = "Z" },
+			wantSub: "A-E",
+		},
+		{
+			name:    "duplicate person keys",
+			mutate:  func(d *contracts.Cteni3Detail) { d.Persons[1].Key = "A" },
+			wantSub: "duplicate",
+		},
+		{
+			name:    "empty person name",
+			mutate:  func(d *contracts.Cteni3Detail) { d.Persons[3].Name = "" },
+			wantSub: "name",
+		},
+		{
+			name:    "correct_answer value out of A-E",
+			mutate:  func(d *contracts.Cteni3Detail) { d.CorrectAnswers["1"] = "Z" },
+			wantSub: "A-E",
+		},
+		{
+			name:    "missing correct_answer",
+			mutate:  func(d *contracts.Cteni3Detail) { delete(d.CorrectAnswers, "3") },
+			wantSub: "missing correct_answer",
+		},
+		{
+			name:    "duplicate correct_answer values",
+			mutate:  func(d *contracts.Cteni3Detail) { d.CorrectAnswers["2"] = "C" },
+			wantSub: "duplicate",
+		},
+		{
+			name:    "empty text item",
+			mutate:  func(d *contracts.Cteni3Detail) { d.Texts[0].Text = "" },
+			wantSub: "text",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			detail := validCteni3Detail()
+			tc.mutate(&detail)
+			draft := &contracts.ReadingDraft{ExerciseType: "cteni_3", Detail: detail}
+			err := ValidateReadingDraft(draft)
+			if err == nil {
+				t.Fatalf("expected validation error containing %q, got nil", tc.wantSub)
+			}
+			if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Fatalf("expected error containing %q, got %q", tc.wantSub, err.Error())
+			}
+		})
+	}
+}
+
 // ── cteni_4 fixtures ──────────────────────────────────────────────────────────
 
 func validCteni4Detail() contracts.Cteni4Detail {

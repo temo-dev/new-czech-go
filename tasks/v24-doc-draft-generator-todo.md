@@ -62,9 +62,13 @@ Each task: tool schema + prompt branch + validator (≥5 reject + 1 accept fixtu
   - [x] Generator dispatch + parser branch wired
   - [x] Tests +13 (validator: 1 accept + 8 reject + 2 boundary, prompt content, schema enum + bounds, parser round-trip)
   - [x] Commit `feat(v24-B4): cteni_6 draft generator + validator`
-- [ ] **B5** cteni_3 — 4 texts → persons A-E
-  - [ ] Validator: 4 texts, 5 persons (1 distractor), unique correct keys
-  - [ ] Commit `feat(v24-B5): cteni_3 draft generator + validator`
+- [x] **B5** cteni_3 — 4 texts → persons A-E
+  - [x] Tool schema (`cteni3ToolSchema`) — 4 TextItem + 5 PersonOption (key A-E enum) + correct_answers A-E enum
+  - [x] Prompt branch — 30-60 word personal-preference texts, 5 distinct persons (1 distractor), unique answers
+  - [x] Validator (`validateCteni3`) — 4 texts non-empty, 5 persons unique A-E + non-empty name, unique correct values (each person at most one match)
+  - [x] Generator dispatch + parser branch wired
+  - [x] Tests +11 (1 accept + 9 reject + schema bounds + parser round-trip)
+  - [x] Commit `feat(v24-B5): cteni_3 draft generator + validator`
 - [ ] **B6** cteni_1 — 5 items → A-H text-only
   - [ ] Prompt explicitly forbids `asset_id`
   - [ ] Validator: 5 items, 8 options A-H, 5 unique correct values
