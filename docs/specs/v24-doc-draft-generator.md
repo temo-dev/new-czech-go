@@ -505,9 +505,12 @@ Slice ships when:
 ## 13. Rollout
 
 1. Merge migration 027 first; verify column added on staging + prod
-2. Merge backend with feature flag-style env: if
-   `LLM_READING_DRAFT_MODEL=""` set explicitly to empty, return 503
-   from endpoint (off switch). Default: enabled.
+2. Merge backend. Off-switch is the existing `ANTHROPIC_API_KEY`
+   variable: when unset the handler returns 503 `not_configured` and no
+   Claude calls happen. (Earlier draft considered an explicit empty
+   `LLM_READING_DRAFT_MODEL=""` flag, but the shared `env()` helper
+   falls back to default on empty so that approach cannot work without
+   an additional sentinel — not worth the complexity.)
 3. Merge CMS — panel only renders when admin has `cms_role` (existing).
 4. Soft launch to internal admins for 1 week
 5. Track via `exercises.created_by_llm` count + endpoint p99 latency
