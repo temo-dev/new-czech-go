@@ -145,14 +145,14 @@ gate; if gate fails the CMS UI can be feature-flagged off via missing
 
 ## Phase E — Ship docs
 
-- [ ] **E1** smoke-course-flow extended with generate-draft step
-- [ ] **E2** `docs/reference/api-contracts.md` updated with new endpoint
-- [ ] **E3** `docs/reference/infrastructure-baseline.md` LLM env table adds `LLM_READING_DRAFT_MODEL`
-- [ ] **E4** `SPEC.md` digest row added for V24
-- [ ] **E5** `CHANGELOG.md` entry (file count, test deltas, decisions)
-- [ ] **E6** `tasks/plan.md` + `tasks/todo.md` indexes updated with V24 row
-- [ ] **E7** `make verify` green
-- [ ] **Final commit** `chore(v24-E): docs + smoke + indexes for V24`
+- [x] **E1** Smoke target — `make smoke-draft-flow` runs `TestV24DraftFlow_E2E_AdminGeneratesAndSavesCteni2` (in-process, mock LLM, no real API key). Folded into `smoke-all`. **Note**: chosen over extending `scripts/smoke_course_flow.py` for the same reason V21 used a Go test — zero network deps, no docker bring-up
+- [x] **E2** `docs/reference/api-contracts.md` — V24 section (endpoint shape, 8 error codes, created_by_llm note on POST /v1/admin/exercises)
+- [x] **E3** `docs/reference/infrastructure-baseline.md` — `LLM_READING_DRAFT_MODEL` row added
+- [x] **E4** `SPEC.md` — V24 digest row added
+- [x] **E5** `CHANGELOG.md` — V24 entry (decisions, file changes, test counts, C4 gate notice, deferred-to-V25)
+- [x] **E6** `tasks/plan.md` + `tasks/todo.md` — V24 row added (in earlier commit `5388970`)
+- [x] **E7** Verify — backend `go build ./...` + `go test ./...` green, `make smoke-draft-flow` green, `cd cms && npm run lint && npm test && npm run build` green
+- [ ] **Final commit** `chore(v24-E): docs + smoke + indexes for V24` (pending)
 
 ## Open questions (resolve during implementation)
 

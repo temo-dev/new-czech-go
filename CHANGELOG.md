@@ -10,6 +10,182 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V24 — Reading-Exercise AI Draft Generator — 2026-05-08
+
+V23 polished authoring ergonomics, but the structural cost of writing a
+new cteni passage (100-200 words of natural Czech + 5 questions × 4
+options + correct answers) was still 20-40 min/exercise. V24 cuts that
+to ~5 min by letting Claude draft the payload from a `(topic, grammar,
+level)` triple. Admin reviews + edits the populated form fields and
+saves manually — no auto-publish.
+
+Spec: `docs/specs/v24-doc-draft-generator.md`. Plan + todo:
+`tasks/v24-doc-draft-generator-{plan,todo}.md`. UX one-pager:
+`docs/ideas/exercise-draft-generator-ux.md`.
+
+### Key changes
+
+- **Backend endpoint** `POST /v1/admin/exercises/generate-draft`. Body:
+  `{exercise_type, topic, grammar_point_ids, level, extra_instructions}`.
+  Resolves grammar IDs against the existing `grammar_rules` store,
+  rate-limits at 5 calls/min/admin (separate window from the AI image
+  endpoint), calls `processing.ReadingDraftGenerator.Generate` with a
+  30s context timeout, validates the AI output via
+  `processing.ValidateReadingDraft`, returns `{data: ReadingDraft}` on
+  200. 8 distinct error codes covered by tests: 400 invalid_request, 404
+  grammar_point_not_found, 405 method_not_allowed, 422 schema_mismatch,
+  429 rate_limited, 502 llm_error, 503 not_configured, 504 timeout.
+
+- **Per-cteni-type tool_use schemas** (one per task B1..B6). Each cteni
+  type has its own JSON schema, prompt branch, validator, and parser:
+  cteni_2 (text + 5×4MC A-D), cteni_4 (optional context + 6×4MC),
+  cteni_5 (text + 5 fill-info ≤30 chars), cteni_6 (passage + 1-5 ANO/NE
+  with strict UPPERCASE), cteni_3 (4 texts → 5 persons A-E with unique
+  match), cteni_1 (5 text-only items + 8 options A-H, no asset_id —
+  admin uploads images post-fill, schema sets
+  `additionalProperties:false` to prevent leakage). All schemas use
+  Anthropic `tool_use` enforcement so malformed output is rejected by
+  Claude before it leaves the API.
+
+- **`ReadingDraftSystemPrompt`** in `llm_prompts.go` covers cross-cutting
+  rules: CEFR-appropriate vocabulary, distractor plausibility, no
+  English/Vietnamese leakage in Czech text, ANO/NE casing, no asset_id.
+
+- **Per-type structural requirements** in `BuildReadingDraftUserPrompt`
+  (`llm_user_prompts.go`) — passage length, question count, option
+  enforcement, distractor rules per cteni type.
+
+- **`Exercise.CreatedByLLM bool`** field (migration: inline `ALTER TABLE
+  exercises ADD COLUMN IF NOT EXISTS created_by_llm BOOLEAN NOT NULL
+  DEFAULT FALSE` in `postgres_exercises.go ensureSchema`). **Sticky on
+  upsert** — `created_by_llm = exercises.created_by_llm OR
+  EXCLUDED.created_by_llm` so admin edits cannot strip the flag.
+  `POST /v1/admin/exercises` accepts the flag in the request body.
+
+- **CMS `AiDraftPanel`** mounted at the top of `CteniFields.tsx` for
+  cteni_1..5. State machine (`reduceDraftState`): idle → loading →
+  success / error / confirm-overwrite. AbortController cancels in-flight
+  fetch on Hủy. Server error codes mapped to inline VI messages via
+  `mapServerError`. Direct-fill goes through the existing `initState`
+  decoder — same path as exercise edit, no new mapping logic to keep
+  in sync.
+
+- **Off-switch**: `ANTHROPIC_API_KEY` unset → handler returns 503
+  `not_configured`. (Earlier draft considered an explicit
+  `LLM_READING_DRAFT_MODEL=""` flag, but the shared `env()` helper
+  short-circuits empty values to default; the API-key gate is simpler
+  and consistent with other AI endpoints.)
+
+### File changes
+
+Backend (new):
+- `internal/processing/reading_draft_generator.go` (Claude impl + tool
+  schemas + parser + dispatch)
+- `internal/processing/reading_draft_validator.go` (per-type validators
+  + shared helpers)
+- `internal/processing/reading_draft_generator_test.go`,
+  `reading_draft_validator_test.go`, `llm_config_test.go`
+- `internal/httpapi/admin_draft_handler.go` + `_test.go`
+- `internal/httpapi/draft_flow_test.go` (E2E smoke)
+
+Backend (modified):
+- `internal/contracts/types.go` — Exercise.CreatedByLLM, ReadingDraft*,
+  ReadingDraftMeta, ReadingDraftInput
+- `internal/processing/llm_prompts.go` — ReadingDraftSystemPrompt
+- `internal/processing/llm_user_prompts.go` — BuildReadingDraftUserPrompt
+  + readingDraftStructuralRequirements per type
+- `internal/processing/llm_config.go` — LLM_READING_DRAFT_MODEL env +
+  default
+- `internal/store/postgres_exercises.go` — ALTER TABLE + INSERT/UPSERT/
+  SELECT/scan threading the flag through with sticky-on-upsert semantics
+- `internal/store/memory_test.go` — TestCreateExercisePreservesCreatedByLLM
+- `internal/httpapi/server.go` — readingDraftGenerator field + DI in
+  assembleServer + route + created_by_llm in admin create body
+
+CMS (new):
+- `cms/app/api/admin/exercises/generate-draft/route.ts` (Next.js POST
+  proxy)
+- `cms/lib/ai-draft-utils.ts` (pure helpers: validation, error map,
+  reducer, payload mapper)
+- `cms/components/ai-draft/AiDraftPanel.tsx`
+- `cms/components/ai-draft/GrammarPointPicker.tsx`
+- `cms/components/ai-draft/LevelRadio.tsx`
+- `cms/__tests__/ai-draft-utils.test.ts`,
+  `cms/__tests__/cteni-dirty.test.ts`
+
+CMS (modified):
+- `cms/components/exercise-form/CteniFields.tsx` — mount AiDraftPanel +
+  export isCteniDirty for the overwrite check + handleAiApply re-runs
+  initState
+
+Docs:
+- `docs/ideas/exercise-draft-generator.md` (idea)
+- `docs/ideas/exercise-draft-generator-ux.md` (UX)
+- `docs/specs/v24-doc-draft-generator.md` (spec)
+- `docs/reference/api-contracts.md` (endpoint + created_by_llm note)
+- `docs/reference/infrastructure-baseline.md` (LLM env table row)
+- `tasks/v24-doc-draft-generator-{plan,todo}.md`
+- `Makefile` (`make smoke-draft-flow` target wired into `smoke-all`)
+- `SPEC.md` (digest row), `tasks/{plan,todo}.md` (indexes)
+
+### Decisions
+
+- **Sync endpoint, not async via `content_generation_jobs`** —
+  generating a single 1-exercise draft in <10s doesn't benefit from
+  async + polling. Keeps UX direct-fill (per UX spec).
+- **No preview pane / variant picker** — admin edits inline; 3× token
+  cost on variants doesn't justify the marginal value.
+- **cteni_1 text-only**, image upload deferred — Replicate Flux for
+  per-item images would 5× the cost + add a flaky dependency. Admin
+  uploads images after fill, same as today.
+- **cteni_6 backend ships, CMS panel deferred** — `AnoNeFields` host
+  was out of scope for the V24 surgical-precision target. Backend
+  endpoint accepts cteni_6 today; UI in V25.
+- **Exercise.CreatedByLLM sticky on upsert** so manual edits can never
+  silently re-classify an AI-drafted exercise as human-authored.
+- **Off-switch via ANTHROPIC_API_KEY presence**, not a separate flag.
+- **Skip `LLM_READING_DRAFT_MODEL=""` honoring** — `env()` helper
+  semantics make that approach unimplementable without an extra
+  sentinel; not worth the complexity.
+
+### C4 Czech-quality gate (NOT YET RUN)
+
+Plan §C4 calls for a manual review of 30 drafts (5 × 6 cteni types)
+by a Czech native or qualified A2/B1 teacher before promoting V24 on
+production. PASS = ≥21/30 usable as-is or with minor edits. Until
+that gate runs, leave `ANTHROPIC_API_KEY` unset on prod — the handler
+returns 503 and the panel shows "Tính năng AI chưa được cấu hình".
+
+If <21/30 with Haiku 4.5: retest with `LLM_READING_DRAFT_MODEL=claude-sonnet-4-6`.
+If still <21/30: revert V24 (the panel is opt-in via the API key gate
+so no learner-facing impact remains).
+
+Result placeholder in `tasks/v24-doc-draft-generator-todo.md` §C4.
+
+### Test counts
+
+- Backend: ~+78 tests across A1..C2 (memory store + llm_config +
+  reading_draft_validator + reading_draft_generator + admin_draft_handler
+  + draft_flow E2E). Full `make backend-test` green.
+- CMS: +37 tests (29 ai-draft-utils + 8 cteni-dirty regression). Total
+  256 pass via `cd cms && npm test`. Lint clean. Production build green;
+  `/api/admin/exercises/generate-draft` route registered.
+- Smoke: `make smoke-draft-flow` runs `TestV24DraftFlow_E2E` in-process
+  end-to-end; folded into `make smoke-all`.
+
+### Out of scope (deferred)
+
+- `viet`/`nghe`/`noi` generators → V25+
+- Bulk module generator (one topic → all 7 skills) → future
+- ExerciseListView ✨ badge + AI-drafted filter chip → V25 (flag already
+  round-trips, no backend change needed)
+- AnoNeFields cteni_6 panel host → V25
+- Variant picker, preview pane, image generation for cteni_1 → out of
+  V24 scope per spec §14
+- Auto grammar/level second-pass quality verification → out
+
+---
+
 ## V23 — Exercise Authoring Polish — 2026-05-08
 
 V22 closed the admin debug + content-health gap, but exercise

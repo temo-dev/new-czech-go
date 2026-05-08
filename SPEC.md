@@ -43,6 +43,7 @@ the archive — it is a historical record.
 | V21.3 | 2026-05-07 | CEFR UI wire-up — auth gate, placement test, existing-A2 dialog, HomeLevelHeader, locked courses, promotion exam end-to-end | [docs/specs/cefr-ui-wireup.md](docs/specs/cefr-ui-wireup.md) |
 | V22 | 2026-05-07 | CMS catch-up — Learner X-Ray (admin debug screen), promotion / placement badge + filter + uniqueness guard, on-demand Content Health Report (6 rules) | [docs/specs/v22-cms-catch-up.md](docs/specs/v22-cms-catch-up.md) |
 | V23 | 2026-05-08 | Exercise authoring polish — quick-clone row action, validation_flags inline badges + quick-fix modal, inline preview pane MVP (top 5 type) | [docs/specs/v23-exercise-authoring-polish.md](docs/specs/v23-exercise-authoring-polish.md) |
+| V24 | 2026-05-08 | Reading-exercise AI draft generator — admin enters topic + grammar + level; backend `POST /v1/admin/exercises/generate-draft` calls Claude with per-cteni-type tool_use schema; CMS AiDraftPanel direct-fills CteniFields. cteni_1..6 backend; cteni_1..5 CMS (cteni_6 panel deferred). C4 Czech-quality kill switch gated on real Claude key | [docs/specs/v24-doc-draft-generator.md](docs/specs/v24-doc-draft-generator.md) |
 
 ## Stable contracts
 

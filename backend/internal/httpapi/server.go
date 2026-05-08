@@ -2090,6 +2090,7 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 			SkillKind             string          `json:"skill_kind"`
 			Detail                json.RawMessage `json:"detail"`
 			Questions             []string        `json:"questions"`
+			CreatedByLLM          bool            `json:"created_by_llm"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Title == "" || req.ExerciseType == "" {
 			writeError(w, http.StatusBadRequest, "validation_error", "Title and exercise type are required.", false)
@@ -2115,6 +2116,7 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 			SampleAnswerEnabled:    req.SampleAnswerEnabled,
 			SampleAnswerText:       strings.TrimSpace(req.SampleAnswerText),
 			Status:                 status,
+			CreatedByLLM:           req.CreatedByLLM,
 			ScoringTemplatePreview: &contracts.ScoringPreview{RubricVersion: "v1", FeedbackStyle: "supportive_direct_vi"},
 		}
 		detail, err := parseExerciseDetail(req.ExerciseType, req.Title, req.Questions, req.Detail)

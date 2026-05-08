@@ -389,6 +389,7 @@ LLM provider degrades gracefully: when `LLM_PROVIDER=claude` but `ANTHROPIC_API_
 | `LLM_MODEL` | Claude feedback model (per-attempt, real-time) | `claude-haiku-4-5-20251001` |
 | `LLM_REVIEW_MODEL` | Claude review artifact model | → `LLM_MODEL` |
 | `LLM_CONTENT_MODEL` | Claude vocab/grammar batch generation | `claude-haiku-4-5-20251001` |
+| `LLM_READING_DRAFT_MODEL` | Claude reading-draft generator (V24, admin-triggered) | `claude-haiku-4-5-20251001` |
 | `REPLICATE_IMAGE_MODEL` | Replicate image-gen model (admin AI image) | `black-forest-labs/flux-schnell` |
 | `ELEVENLABS_MODEL_ID` | ElevenLabs TTS model | `eleven_multilingual_v2` |
 | `ELEVENLABS_OUTPUT_FORMAT` | ElevenLabs output format | `mp3_22050_32` |

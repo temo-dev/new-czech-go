@@ -1516,6 +1516,78 @@ thể (QA, support).
 
 ---
 
+## V24 Reading Draft Generator
+
+### POST /v1/admin/exercises/generate-draft
+
+Admin-only. Generates a draft cteni payload (text + questions + correct
+answers) for a given `(topic, grammar, level)` triple via Claude
+`tool_use`. Returns the draft for the CMS to fill into the form. The
+endpoint never persists; admin reviews + saves manually via the existing
+`POST /v1/admin/exercises` (which now also accepts `created_by_llm:true`).
+
+Full schema spec: [docs/specs/v24-doc-draft-generator.md](../specs/v24-doc-draft-generator.md) §4.
+
+**Request body**:
+
+```json
+{
+  "exercise_type": "cteni_2",
+  "topic": "đi khám bác sĩ",
+  "grammar_point_ids": ["<uuid>"],
+  "level": "A2",
+  "extra_instructions": "tone neutral"
+}
+```
+
+| Field | Constraint |
+|---|---|
+| `exercise_type` | `cteni_1` … `cteni_6` |
+| `topic` | 3–200 chars, trimmed |
+| `grammar_point_ids` | 1–3 uuids; each must resolve via `s.repo.GetGrammarRule` |
+| `level` | `A0` \| `A1` \| `A2` \| `B1` |
+| `extra_instructions` | optional, ≤500 chars |
+
+**Response 200**:
+
+```json
+{
+  "data": {
+    "exercise_type": "cteni_2",
+    "detail": { /* one of Cteni1Detail … Cteni5Detail or AnoNeDetail */ },
+    "metadata": {
+      "model": "claude-haiku-4-5-20251001",
+      "duration_ms": 6234,
+      "input_tokens": 412,
+      "output_tokens": 891
+    }
+  }
+}
+```
+
+**Errors**:
+
+| Status | code | Trigger |
+|---|---|---|
+| 400 | `invalid_request` | Field validation (8 cases — bad enum, topic length, grammar count, etc.) |
+| 404 | `grammar_point_not_found` | Any `grammar_point_ids` entry missing |
+| 405 | `method_not_allowed` | Non-POST |
+| 422 | `schema_mismatch` | LLM output rejected by `processing.ValidateReadingDraft` |
+| 429 | `rate_limited` | >5 calls/min for the same admin email |
+| 502 | `llm_error` | Generator returned an error |
+| 503 | `not_configured` | `ANTHROPIC_API_KEY` unset (V24 off-switch) |
+| 504 | `timeout` | LLM call exceeded 30s |
+
+### POST /v1/admin/exercises (V24 addition)
+
+`POST /v1/admin/exercises` accepts an optional `created_by_llm` boolean
+in the request body. Default `false`. The flag is sticky on update —
+once `true` an admin edit cannot clear it (`postgres_exercises.upsertExercise`
+uses `created_by_llm = exercises.created_by_llm OR EXCLUDED.created_by_llm`).
+Used for analytics + dashboard filtering of AI-drafted content.
+
+---
+
 ## Open Questions
 - Do we want `POST /v1/auth/magic-link` later for pilot onboarding, or is email/password enough for now?
 - Keep `GET /v1/attempts/:attempt_id/audio/file` as the playback surface, or later fold playback URLs into the attempt payload if cloud-only playback becomes simpler?
