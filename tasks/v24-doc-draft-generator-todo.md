@@ -41,9 +41,13 @@ Each task: tool schema + prompt branch + validator (≥5 reject + 1 accept fixtu
   - [x] Tool schema unit test asserts shape
   - [x] `parseReadingDraftDetail("cteni_2", ...)` round-trip test
   - [x] Commit `feat(v24-B1): cteni_2 draft generator + validator` (commit `<pending>`)
-- [ ] **B2** cteni_4 — 6×4MC + optional context
-  - [ ] Same checklist as B1
-  - [ ] Commit `feat(v24-B2): cteni_4 draft generator + validator`
+- [x] **B2** cteni_4 — 6×4MC + optional context
+  - [x] Tool schema (`cteni4ToolSchema`) — context optional, 6 questions × 4 options A-D
+  - [x] Prompt branch in `readingDraftStructuralRequirements` (60-120 word context recommended)
+  - [x] Validator (`validateCteni4`) reuses shared `validateMultiChoiceQuestions` helper extracted from cteni_2
+  - [x] Generator dispatch wired (cteni_2 + cteni_4 share `callClaude` path)
+  - [x] Tests +5 (validator accept w/ + w/o context, 5 reject fixtures, schema bounds, prompt content, parser round-trip)
+  - [x] Commit `feat(v24-B2): cteni_4 draft generator + validator`
 - [ ] **B3** cteni_5 — text + 5 fill-info
   - [ ] Validator rejects answer >30 chars or empty
   - [ ] Same checklist as B1

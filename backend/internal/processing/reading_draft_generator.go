@@ -61,9 +61,9 @@ var ErrReadingDraftNotImplemented = fmt.Errorf("reading draft generator: exercis
 // Generate dispatches by exercise_type. Phase B fills in each branch.
 func (g *ClaudeReadingDraftGenerator) Generate(ctx context.Context, in contracts.ReadingDraftInput) (*contracts.ReadingDraft, error) {
 	switch in.ExerciseType {
-	case "cteni_2":
+	case "cteni_2", "cteni_4":
 		return g.callClaude(ctx, in)
-	case "cteni_1", "cteni_3", "cteni_4", "cteni_5", "cteni_6":
+	case "cteni_1", "cteni_3", "cteni_5", "cteni_6":
 		return nil, fmt.Errorf("%w: %s", ErrReadingDraftNotImplemented, in.ExerciseType)
 	default:
 		return nil, fmt.Errorf("reading draft generator: unsupported exercise_type %q", in.ExerciseType)
@@ -156,11 +156,15 @@ func buildReadingDraftToolSchema(exerciseType string) map[string]any {
 	switch exerciseType {
 	case "cteni_2":
 		return cteni2ToolSchema()
+	case "cteni_4":
+		return cteni4ToolSchema()
 	}
 	return nil
 }
 
-func cteni2ToolSchema() map[string]any {
+// multiChoiceQuestionSchema is the shared question shape for cteni_2 + cteni_4.
+// 4 options keyed A-D, non-empty option text, integer question_no.
+func multiChoiceQuestionSchema(maxQuestionNo int) map[string]any {
 	option := map[string]any{
 		"type":     "object",
 		"required": []string{"key", "text"},
@@ -169,11 +173,11 @@ func cteni2ToolSchema() map[string]any {
 			"text": map[string]any{"type": "string", "minLength": 1},
 		},
 	}
-	question := map[string]any{
+	return map[string]any{
 		"type":     "object",
 		"required": []string{"question_no", "prompt", "options"},
 		"properties": map[string]any{
-			"question_no": map[string]any{"type": "integer", "minimum": 1, "maximum": 5},
+			"question_no": map[string]any{"type": "integer", "minimum": 1, "maximum": maxQuestionNo},
 			"prompt":      map[string]any{"type": "string", "minLength": 1},
 			"options": map[string]any{
 				"type":     "array",
@@ -183,6 +187,9 @@ func cteni2ToolSchema() map[string]any {
 			},
 		},
 	}
+}
+
+func cteni2ToolSchema() map[string]any {
 	return map[string]any{
 		"type":     "object",
 		"required": []string{"text", "questions", "correct_answers"},
@@ -192,7 +199,30 @@ func cteni2ToolSchema() map[string]any {
 				"type":     "array",
 				"minItems": 5,
 				"maxItems": 5,
-				"items":    question,
+				"items":    multiChoiceQuestionSchema(5),
+			},
+			"correct_answers": map[string]any{
+				"type": "object",
+				"additionalProperties": map[string]any{
+					"type": "string",
+					"enum": []string{"A", "B", "C", "D"},
+				},
+			},
+		},
+	}
+}
+
+func cteni4ToolSchema() map[string]any {
+	return map[string]any{
+		"type":     "object",
+		"required": []string{"questions", "correct_answers"},
+		"properties": map[string]any{
+			"context": map[string]any{"type": "string"},
+			"questions": map[string]any{
+				"type":     "array",
+				"minItems": 6,
+				"maxItems": 6,
+				"items":    multiChoiceQuestionSchema(6),
 			},
 			"correct_answers": map[string]any{
 				"type": "object",
@@ -251,6 +281,12 @@ func parseReadingDraftDetail(exerciseType string, raw json.RawMessage) (any, err
 		var d contracts.Cteni2Detail
 		if err := json.Unmarshal(raw, &d); err != nil {
 			return nil, fmt.Errorf("unmarshal cteni_2 detail: %w", err)
+		}
+		return d, nil
+	case "cteni_4":
+		var d contracts.Cteni4Detail
+		if err := json.Unmarshal(raw, &d); err != nil {
+			return nil, fmt.Errorf("unmarshal cteni_4 detail: %w", err)
 		}
 		return d, nil
 	}

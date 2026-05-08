@@ -495,6 +495,14 @@ func readingDraftStructuralRequirements(exerciseType string) string {
 			"- correct_answers map: keys \"1\"..\"5\", values are A, B, C, or D matching the correct option key",
 			"- Distractors must be plausible (same semantic field, same grammatical category as the correct answer)",
 		}, "\n")
+	case "cteni_4":
+		return strings.Join([]string{
+			"- Optionally include a short reading context (60-120 words) in field `context`; questions may stand alone",
+			"- Generate exactly 6 questions; each question_no = 1..6",
+			"- Each question has exactly 4 options with keys A, B, C, D and non-empty option `text`",
+			"- correct_answers map: keys \"1\"..\"6\", values are A, B, C, or D matching the correct option key",
+			"- Distractors must be plausible (same semantic field, same grammatical category as the correct answer)",
+		}, "\n")
 	}
 	return ""
 }

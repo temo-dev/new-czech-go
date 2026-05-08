@@ -24,6 +24,12 @@ func ValidateReadingDraft(d *contracts.ReadingDraft) error {
 			return fmt.Errorf("cteni_2: expected Cteni2Detail, got %T", d.Detail)
 		}
 		return validateCteni2(detail)
+	case "cteni_4":
+		detail, ok := d.Detail.(contracts.Cteni4Detail)
+		if !ok {
+			return fmt.Errorf("cteni_4: expected Cteni4Detail, got %T", d.Detail)
+		}
+		return validateCteni4(detail)
 	default:
 		return fmt.Errorf("reading draft: unsupported exercise_type %q", d.ExerciseType)
 	}
@@ -35,29 +41,48 @@ func validateCteni2(d contracts.Cteni2Detail) error {
 	if strings.TrimSpace(d.Text) == "" {
 		return fmt.Errorf("cteni_2: text must be non-empty")
 	}
-	if len(d.Questions) != 5 {
-		return fmt.Errorf("cteni_2: expected 5 questions, got %d", len(d.Questions))
+	if err := validateMultiChoiceQuestions(d.Questions, 5, "cteni_2"); err != nil {
+		return err
 	}
-	for i, q := range d.Questions {
+	return requireCorrectAnswers(d.CorrectAnswers, len(d.Questions), "cteni_2", "A-D", []string{"A", "B", "C", "D"})
+}
+
+// ── cteni_4 ───────────────────────────────────────────────────────────────────
+
+func validateCteni4(d contracts.Cteni4Detail) error {
+	// context is optional per spec §4 — no non-empty check.
+	if err := validateMultiChoiceQuestions(d.Questions, 6, "cteni_4"); err != nil {
+		return err
+	}
+	return requireCorrectAnswers(d.CorrectAnswers, len(d.Questions), "cteni_4", "A-D", []string{"A", "B", "C", "D"})
+}
+
+// ── shared multi-choice question validator ────────────────────────────────────
+
+// validateMultiChoiceQuestions enforces the cteni_2 / cteni_4 question shape:
+// exactly expectedCount questions, each with exactly 4 options keyed A-D
+// (unique) and non-empty option text.
+func validateMultiChoiceQuestions(questions []contracts.ReadingQuestion, expectedCount int, label string) error {
+	if len(questions) != expectedCount {
+		return fmt.Errorf("%s: expected %d questions, got %d", label, expectedCount, len(questions))
+	}
+	for i, q := range questions {
 		if len(q.Options) != 4 {
-			return fmt.Errorf("cteni_2: question %d must have 4 options, got %d", i+1, len(q.Options))
+			return fmt.Errorf("%s: question %d must have 4 options, got %d", label, i+1, len(q.Options))
 		}
 		seenKeys := map[string]bool{}
 		for _, opt := range q.Options {
 			if opt.Key != "A" && opt.Key != "B" && opt.Key != "C" && opt.Key != "D" {
-				return fmt.Errorf("cteni_2: question %d option key must be A-D, got %q", i+1, opt.Key)
+				return fmt.Errorf("%s: question %d option key must be A-D, got %q", label, i+1, opt.Key)
 			}
 			if seenKeys[opt.Key] {
-				return fmt.Errorf("cteni_2: question %d has duplicate option key %q", i+1, opt.Key)
+				return fmt.Errorf("%s: question %d has duplicate option key %q", label, i+1, opt.Key)
 			}
 			seenKeys[opt.Key] = true
 			if strings.TrimSpace(opt.Text) == "" {
-				return fmt.Errorf("cteni_2: question %d option %s has empty option text", i+1, opt.Key)
+				return fmt.Errorf("%s: question %d option %s has empty option text", label, i+1, opt.Key)
 			}
 		}
-	}
-	if err := requireCorrectAnswers(d.CorrectAnswers, len(d.Questions), "cteni_2", "A-D", []string{"A", "B", "C", "D"}); err != nil {
-		return err
 	}
 	return nil
 }
