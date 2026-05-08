@@ -46,6 +46,13 @@ dependencies:
   google_fonts: ^6.2.1
   image_picker: ^1.1.2
   http: ^1.2.2
+  # V25 IAP wire — production StoreKit + Sign-in with Apple. Pinned to
+  # the major versions verified against iOS 16+ during the V25 sandbox
+  # smoke test (see tasks/v25-iap-wire-real-todo.md § H1).
+  in_app_purchase: ^3.2.0
+  sign_in_with_apple: ^6.1.0
+  url_launcher: ^6.3.0
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:

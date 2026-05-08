@@ -21,8 +21,11 @@ class _FakeAuthService extends AuthService {
   AuthException? signupError;
   AuthSession? loginResult;
   AuthException? loginError;
+  AuthSession? appleResult;
+  AuthException? appleError;
   int signupCalls = 0;
   int loginCalls = 0;
+  int appleCalls = 0;
 
   @override
   Future<AuthSession> signup({
@@ -63,6 +66,24 @@ class _FakeAuthService extends AuthService {
     adoptUser(s.user);
     return s;
   }
+
+  @override
+  Future<AuthSession> signInWithApple() async {
+    appleCalls++;
+    if (appleError != null) throw appleError!;
+    final s = appleResult ??
+        AuthSession.fromJson({
+          'user': {
+            'id': 'u_apple', 'email': 'apple@x.com', 'email_verified': true,
+            'display_name': 'Apple User', 'role': 'learner',
+            'pro_tier': 'free', 'grace_attempts_left': 999,
+          },
+          'session_token': 'apple-tok',
+          'expires_at': DateTime.now().toIso8601String(),
+        });
+    adoptUser(s.user);
+    return s;
+  }
 }
 
 Future<_FakeAuthService> _newFake() async {
@@ -74,7 +95,10 @@ Future<_FakeAuthService> _newFake() async {
 
 void main() {
   testWidgets('WelcomeScreen renders both CTAs', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: WelcomeScreen()));
+    final svc = await _newFake();
+    await tester.pumpWidget(
+      MaterialApp(home: WelcomeScreen(authServiceOverride: svc)),
+    );
     expect(find.text('Đăng ký miễn phí'), findsOneWidget);
     expect(find.text('Đăng nhập'), findsOneWidget);
     expect(find.text('Czech Go'), findsOneWidget);
@@ -156,5 +180,89 @@ void main() {
     await tester.pump();
     final after = tester.widget<TextField>(find.widgetWithText(TextField, 'Mật khẩu'));
     expect(after.obscureText, isFalse);
+  });
+
+  // ── V25 Sign-in with Apple ─────────────────────────────────────────────
+
+  testWidgets('WelcomeScreen renders Apple button + tap dispatches signInWithApple',
+      (tester) async {
+    final svc = await _newFake();
+    await tester.pumpWidget(
+      MaterialApp(home: WelcomeScreen(authServiceOverride: svc)),
+    );
+    final apple = find.byKey(const Key('sign_in_with_apple_button'));
+    expect(apple, findsOneWidget, reason: 'Apple button must render on Welcome');
+    expect(find.text('hoặc'), findsOneWidget,
+        reason: 'OrDivider separator must render');
+
+    await tester.tap(apple);
+    // signInWithApple is async; pump twice so the future resolves.
+    await tester.pump();
+    await tester.pump();
+    expect(svc.appleCalls, 1);
+  });
+
+  testWidgets('LoginScreen renders Apple button + tap dispatches signInWithApple',
+      (tester) async {
+    final svc = await _newFake();
+    await tester.pumpWidget(
+      MaterialApp(home: LoginScreen(authServiceOverride: svc)),
+    );
+    final apple = find.byKey(const Key('sign_in_with_apple_button'));
+    expect(apple, findsOneWidget);
+
+    await tester.tap(apple);
+    await tester.pump();
+    await tester.pump();
+    expect(svc.appleCalls, 1);
+  });
+
+  testWidgets('SignupScreen renders Apple button + tap dispatches signInWithApple',
+      (tester) async {
+    final svc = await _newFake();
+    await tester.pumpWidget(
+      MaterialApp(home: SignupScreen(authServiceOverride: svc)),
+    );
+    final apple = find.byKey(const Key('sign_in_with_apple_button'));
+    expect(apple, findsOneWidget);
+
+    await tester.tap(apple);
+    await tester.pump();
+    await tester.pump();
+    expect(svc.appleCalls, 1);
+  });
+
+  testWidgets('Apple button surfaces backend error inline', (tester) async {
+    final svc = await _newFake();
+    svc.appleError = AuthException(
+      statusCode: 400,
+      code: 'invalid_token',
+      message: 'identity_token did not validate',
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: LoginScreen(authServiceOverride: svc)),
+    );
+
+    await tester.tap(find.byKey(const Key('sign_in_with_apple_button')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('không hợp lệ'), findsOneWidget);
+  });
+
+  testWidgets('Apple button cancel does NOT show error band', (tester) async {
+    final svc = await _newFake();
+    svc.appleError = AuthException(
+      statusCode: 0,
+      code: 'sign_in_canceled',
+      message: 'user dismissed',
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: LoginScreen(authServiceOverride: svc)),
+    );
+
+    await tester.tap(find.byKey(const Key('sign_in_with_apple_button')));
+    await tester.pumpAndSettle();
+    // Cancel is a normal action — no inline error visible.
+    expect(find.textContaining('không hợp lệ'), findsNothing);
+    expect(find.textContaining('thất bại'), findsNothing);
   });
 }

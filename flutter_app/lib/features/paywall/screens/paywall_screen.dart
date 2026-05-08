@@ -1,24 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/auth/auth_service.dart';
+import '../../../core/config/legal_urls.dart';
 import '../../../core/iap/iap_models.dart';
 import '../../../core/iap/iap_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/screens/signup_screen.dart' show AuthServiceProvider;
 import 'pro_success_screen.dart';
 
+/// Indirection for the platform `url_launcher` so the paywall test can
+/// assert the right URI is dispatched without spawning an external
+/// browser inside the harness.
+typedef PaywallUrlLauncher = Future<bool> Function(Uri uri);
+
+Future<bool> _defaultLaunchUrl(Uri uri) =>
+    launchUrl(uri, mode: LaunchMode.externalApplication);
+
 /// Paywall — the only place V17 sells Pro from. Two-tier toggle
 /// (monthly / yearly with savings badge), a feature comparison
 /// table, the buy CTA, and Apple's mandatory restore-purchase
 /// button.
 class PaywallScreen extends StatefulWidget {
-  const PaywallScreen({super.key, required this.iap, this.authServiceOverride});
+  const PaywallScreen({
+    super.key,
+    required this.iap,
+    this.authServiceOverride,
+    this.urlLauncher,
+  });
 
   final IAPService iap;
 
   /// Optional override for tests. Production reaches AuthService via
   /// the AppShell-level provider.
   final AuthService? authServiceOverride;
+
+  /// Optional launcher seam for tests; production code reaches
+  /// `package:url_launcher`. The signature matches [launchUrl] so the
+  /// default reference can pass through untouched.
+  final PaywallUrlLauncher? urlLauncher;
 
   @override
   State<PaywallScreen> createState() => _PaywallScreenState();
@@ -131,7 +151,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
         title: const Text('Nâng cấp Pro'),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -166,7 +186,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   ),
                 ),
               ],
-              const Spacer(),
+              const SizedBox(height: 16),
+              const _SubscriptionDisclosure(),
+              const SizedBox(height: 24),
               FilledButton(
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primary,
@@ -186,10 +208,105 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 onPressed: _busy ? null : _restore,
                 child: const Text('Khôi phục giao dịch trước'),
               ),
+              _LegalLinksRow(launcher: widget.urlLauncher ?? _defaultLaunchUrl),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Subscription auto-renewal disclosure required by App Store
+/// guideline 3.1.2(a). Renders unconditionally — including while
+/// loadProducts() is in flight — so reviewers see it on every paywall
+/// state.
+class _SubscriptionDisclosure extends StatelessWidget {
+  const _SubscriptionDisclosure();
+
+  @override
+  Widget build(BuildContext context) {
+    const lines = <String>[
+      'Tự động gia hạn cho đến khi bạn hủy ≥24h trước hết kỳ.',
+      'Thanh toán qua Apple ID khi xác nhận mua.',
+      'Quản lý/hủy: Cài đặt → Apple ID → Đăng ký.',
+    ];
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final line in lines)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 6, right: 8),
+                    child: Icon(Icons.circle, size: 4, color: AppColors.onSurfaceVariant),
+                  ),
+                  Expanded(
+                    child: Text(
+                      line,
+                      style: const TextStyle(
+                        color: AppColors.onSurfaceVariant,
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Terms + Privacy text-button row required by App Store metadata
+/// review. [Wrap] lets the buttons line-break on narrow phones (e.g.
+/// 320pt iPhone SE) so neither falls below the safe area.
+class _LegalLinksRow extends StatelessWidget {
+  const _LegalLinksRow({required this.launcher});
+
+  final PaywallUrlLauncher launcher;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = TextButton.styleFrom(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      minimumSize: const Size(0, 32),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+    );
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        TextButton(
+          key: const Key('paywall_terms_button'),
+          style: compact,
+          onPressed: () => launcher(Uri.parse(LegalUrls.eula)),
+          child: const Text('Điều khoản'),
+        ),
+        const Text(
+          '·',
+          style: TextStyle(color: AppColors.onSurfaceVariant),
+        ),
+        TextButton(
+          key: const Key('paywall_privacy_button'),
+          style: compact,
+          onPressed: () => launcher(Uri.parse(LegalUrls.privacy)),
+          child: const Text('Chính sách bảo mật'),
+        ),
+      ],
     );
   }
 }

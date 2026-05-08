@@ -262,6 +262,36 @@ class ApiClient {
     return session;
   }
 
+  /// V25 — Sign in with Apple. The `nonce` is the SHA256-hashed value
+  /// the caller already passed to `SignInWithApple.getAppleIDCredential`;
+  /// the backend re-uses it as the identity_token replay guard.
+  /// `givenName` / `familyName` are only populated on the very first
+  /// sign-in and are forwarded as-is.
+  ///
+  /// Spec: docs/specs/iap-wire-real.md §4.2
+  Future<AuthSession> signInWithAppleV25({
+    required String identityToken,
+    required String authorizationCode,
+    required String nonce,
+    String? givenName,
+    String? familyName,
+  }) async {
+    final payload = await _v17Request(
+      method: 'POST',
+      path: '/v1/auth/apple',
+      body: {
+        'identity_token': identityToken,
+        'authorization_code': authorizationCode,
+        'nonce': nonce,
+        if (givenName != null && givenName.isNotEmpty) 'given_name': givenName,
+        if (familyName != null && familyName.isNotEmpty) 'family_name': familyName,
+      },
+    );
+    final session = AuthSession.fromJson(payload);
+    _token = session.token;
+    return session;
+  }
+
   Future<void> logoutV17() async {
     if (_token == null) return;
     try {

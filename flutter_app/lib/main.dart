@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -7,6 +9,9 @@ import 'core/api/api_client.dart';
 import 'core/auth/auth_models.dart';
 import 'core/auth/auth_service.dart';
 import 'core/auth/auth_storage.dart';
+import 'core/iap/iap_service.dart';
+import 'core/iap/iap_service_provider.dart';
+import 'core/iap/real_iap_service.dart';
 import 'core/interview/interview_preference_service.dart';
 import 'core/locale/locale_provider.dart';
 import 'core/locale/locale_scope.dart';
@@ -37,6 +42,35 @@ import 'shared/widgets/app_bottom_nav.dart';
 /// `--dart-define=USE_V17_AUTH=true`.
 const bool kUseV17Auth = bool.fromEnvironment('USE_V17_AUTH');
 
+/// V25 production StoreKit binding. The default is on; pass
+/// `--dart-define=IAP_ENABLED=false` to force the in-memory stub
+/// (useful for sandbox-less smoke runs and Android branches that
+/// have not yet shipped Billing).
+const bool kIapEnabled = bool.fromEnvironment(
+  'IAP_ENABLED',
+  defaultValue: true,
+);
+
+/// Returns the real plugin-backed [IAPService] only when iOS + V17
+/// auth are both wired. Anywhere else (Android, web, dev shell
+/// without V17) falls back to the stub so Buy renders the existing
+/// "coming soon" path. The wired AuthService is the verify bridge.
+IAPService _buildIAPService(AuthService? authService) {
+  final isIosProd = kIapEnabled && !kIsWeb && Platform.isIOS;
+  if (!isIosProd || authService == null) {
+    return StubIAPService();
+  }
+  return RealIAPService(
+    verifyReceipt: ({required String receipt, required String productId}) async {
+      await authService.apiClientForScreens.verifyAppleReceiptV17(
+        receipt: receipt,
+        productId: productId,
+      );
+      await authService.refresh();
+    },
+  )..start();
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final localeProvider = await LocaleProvider.load();
@@ -51,22 +85,64 @@ Future<void> main() async {
     unawaited(authService.bootstrap());
   }
 
-  runApp(MluveniSprintApp(localeProvider: localeProvider, authService: authService));
+  final iapService = _buildIAPService(authService);
+
+  runApp(MluveniSprintApp(
+    localeProvider: localeProvider,
+    authService: authService,
+    iapService: iapService,
+  ));
 }
 
-class MluveniSprintApp extends StatelessWidget {
-  const MluveniSprintApp({super.key, required this.localeProvider, this.authService});
+class MluveniSprintApp extends StatefulWidget {
+  const MluveniSprintApp({
+    super.key,
+    required this.localeProvider,
+    this.authService,
+    this.iapService,
+  });
 
   final LocaleProvider localeProvider;
   final AuthService? authService;
 
+  /// Optional override; when null the widget creates a [StubIAPService]
+  /// so legacy widget tests + dev builds keep working unchanged.
+  final IAPService? iapService;
+
+  @override
+  State<MluveniSprintApp> createState() => _MluveniSprintAppState();
+}
+
+class _MluveniSprintAppState extends State<MluveniSprintApp> {
+  late final IAPService _iapService;
+
+  @override
+  void initState() {
+    super.initState();
+    _iapService = widget.iapService ?? StubIAPService();
+  }
+
+  @override
+  void dispose() {
+    // Production [RealIAPService] holds a long-lived purchaseStream
+    // subscription; tear it down so hot-restart in dev does not pile
+    // up duplicate listeners. The stub has no resources to release.
+    final iap = _iapService;
+    if (iap is RealIAPService) {
+      iap.dispose();
+    }
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final home = authService != null ? _V17AuthGate(service: authService!) : const LearnerShell();
+    final home = widget.authService != null
+        ? _V17AuthGate(service: widget.authService!)
+        : const LearnerShell();
     final app = LocaleScope(
-      notifier: localeProvider,
+      notifier: widget.localeProvider,
       child: AnimatedBuilder(
-        animation: localeProvider,
+        animation: widget.localeProvider,
         builder:
             (context, _) => MaterialApp(
               title: 'A2 Mluveni Sprint',
@@ -74,11 +150,15 @@ class MluveniSprintApp extends StatelessWidget {
               home: home,
               builder: (context, child) {
                 if (child == null) return const SizedBox.shrink();
-                return authService != null
-                    ? AuthServiceProvider(service: authService!, child: child)
-                    : child;
+                final wrapped = IAPServiceProvider(
+                  service: _iapService,
+                  child: child,
+                );
+                return widget.authService != null
+                    ? AuthServiceProvider(service: widget.authService!, child: wrapped)
+                    : wrapped;
               },
-              locale: Locale(localeProvider.code),
+              locale: Locale(widget.localeProvider.code),
               supportedLocales: AppLocalizations.supportedLocales,
               localizationsDelegates: const [
                 AppLocalizations.delegate,

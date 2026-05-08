@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -176,4 +178,92 @@ void main() {
     await tester.tap(find.byType(QuotaIndicator));
     expect(taps, 1);
   });
+
+  // ── V25 F1: subscription disclosure + legal links ───────────────────────
+
+  testWidgets('PaywallScreen disclosure block visible while loadProducts loads',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(420, 1100));
+    // _SlowIAP delays loadProducts so the test can assert the
+    // disclosure renders BEFORE products resolve.
+    final iap = _SlowIAP();
+    final svc = await _newService();
+    await tester.pumpWidget(MaterialApp(
+      home: PaywallScreen(iap: iap, authServiceOverride: svc),
+    ));
+    // Pump only one frame — _products is still null at this point.
+    await tester.pump();
+
+    // Disclosure copy must be visible.
+    expect(
+      find.textContaining('Tự động gia hạn cho đến khi bạn hủy'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Thanh toán qua Apple ID'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Quản lý/hủy: Cài đặt'),
+      findsOneWidget,
+    );
+    // Loading spinner is also present at this stage.
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    // Let loadProducts resolve so the test tears down cleanly.
+    iap.completer.complete();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('PaywallScreen Terms + Privacy buttons dispatch external URLs',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(420, 1100));
+    final iap = _RecorderIAP();
+    final svc = await _newService();
+    final launched = <Uri>[];
+    await tester.pumpWidget(MaterialApp(
+      home: PaywallScreen(
+        iap: iap,
+        authServiceOverride: svc,
+        urlLauncher: (uri) async {
+          launched.add(uri);
+          return true;
+        },
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // The legal row must render both buttons.
+    expect(find.byKey(const Key('paywall_terms_button')), findsOneWidget);
+    expect(find.byKey(const Key('paywall_privacy_button')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('paywall_terms_button')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('paywall_privacy_button')));
+    await tester.pump();
+
+    expect(launched.length, 2);
+    expect(launched[0].toString(), contains('/legal/eula'));
+    expect(launched[1].toString(), contains('/legal/privacy'));
+  });
+}
+
+/// Fake IAP whose loadProducts hangs until the test completes the
+/// internal completer. Keeps the paywall in its loading state long
+/// enough to assert the disclosure renders without products.
+class _SlowIAP implements IAPService {
+  final completer = Completer<void>();
+
+  @override
+  Future<List<IAPProduct>> loadProducts() async {
+    await completer.future;
+    return const [];
+  }
+
+  @override
+  Future<IAPPurchase> buy(String productId) async =>
+      throw IAPException(code: 'not_implemented', message: 'unused');
+
+  @override
+  Future<List<IAPPurchase>> restorePurchases() async => const [];
 }

@@ -6,10 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:record/record.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/iap/iap_service_provider.dart';
 import '../../../core/interview/interview_preference_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../paywall/widgets/upgrade_prompt_dialog.dart';
 import '../services/elevenlabs_ws_client.dart';
 import '../services/pcm_audio_player.dart';
 import '../services/simli_config.dart';
@@ -660,8 +662,18 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       _wsClient.firstMessage =
           'Dobrý den! Jsem Jana Nováková, váš zkušební komisař. Jak se jmenujete?';
       await _wsClient.connect(signedUrl);
-    } catch (_) {
+    } catch (err) {
       if (!mounted) return;
+      // V25-F2: 429 from getInterviewToken means the free-tier
+      // weekly interview cap is hit. Surface the upgrade modal in
+      // addition to the generic connect-error snackbar so the
+      // learner has a one-tap path to Pro.
+      if (err is ApiException && err.statusCode == 429) {
+        final iap = IAPServiceProvider.maybeOf(context);
+        if (iap != null) {
+          UpgradePromptDialog.showForInterviewQuota(context, iap);
+        }
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(AppLocalizations.of(context).interviewConnectError),

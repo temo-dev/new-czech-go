@@ -1,0 +1,136 @@
+{
+  "identifier" : "BB07C2C3-V25-CZECHGO-PRO",
+  "nonRenewingSubscriptions" : [],
+  "products" : [],
+  "settings" : {
+    "_applicationInternalID" : "0",
+    "_developerTeamID" : "97L8A9665B",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 0,
+    "_locale" : "vi_VN",
+    "_storefront" : "VNM",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21565432",
+      "localizations" : [
+        {
+          "description" : "Czech Go Pro — luyện tiếng Czech A2 không giới hạn",
+          "displayName" : "Czech Go Pro",
+          "locale" : "vi_VN"
+        },
+        {
+          "description" : "Czech Go Pro — unlimited Czech A2 practice",
+          "displayName" : "Czech Go Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "Czech Go Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "99000",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "98765001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Mở khóa toàn bộ tính năng. Tự động gia hạn hàng tháng cho đến khi hủy.",
+              "displayName" : "Pro hàng tháng",
+              "locale" : "vi_VN"
+            },
+            {
+              "description" : "Unlock all features. Auto-renews monthly until canceled.",
+              "displayName" : "Pro Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "eu.hadoo.czechgo.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pro Monthly",
+          "subscriptionGroupID" : "21565432",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "790000",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "98765002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Tiết kiệm 33% so với gói tháng. Tự động gia hạn hàng năm cho đến khi hủy.",
+              "displayName" : "Pro hàng năm",
+              "locale" : "vi_VN"
+            },
+            {
+              "description" : "Save 33% versus monthly. Auto-renews yearly until canceled.",
+              "displayName" : "Pro Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "eu.hadoo.czechgo.pro.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Pro Yearly",
+          "subscriptionGroupID" : "21565432",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

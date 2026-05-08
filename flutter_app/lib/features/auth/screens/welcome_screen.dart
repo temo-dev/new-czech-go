@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../widgets/apple_sign_in_button.dart';
 import 'login_screen.dart';
-import 'signup_screen.dart';
+import 'signup_screen.dart' show AuthServiceProvider, SignupScreen;
 
 /// First-impression screen. Two CTAs (Đăng ký + Đăng nhập) and a brand
 /// statement. Renders edge-to-edge on the brand cream surface so the
 /// learner immediately sees the product personality before any form
 /// asks for input.
 class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({super.key});
+  const WelcomeScreen({super.key, this.authServiceOverride});
+
+  /// Tests pass this directly; production wires AuthService via the
+  /// AppShell -> AuthServiceProvider widget.
+  final AuthService? authServiceOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +71,13 @@ class WelcomeScreen extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                 ),
                 child: const Text('Đăng nhập'),
+              ),
+              const OrDivider(),
+              AppleSignInButton(
+                authService:
+                    authServiceOverride ?? AuthServiceProvider.of(context),
+                onSuccess: () =>
+                    Navigator.of(context).popUntil((r) => r.isFirst),
               ),
               const SizedBox(height: 32),
             ],

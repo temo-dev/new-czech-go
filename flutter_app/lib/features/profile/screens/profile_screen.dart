@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/progress_api.dart';
+import '../../../core/auth/auth_service.dart';
+import '../../../core/iap/iap_service_provider.dart';
 import '../../../core/interview/interview_preference_service.dart';
 import '../../../core/locale/locale_scope.dart';
 import '../../../core/locale/supported_locales.dart';
@@ -14,6 +17,8 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/voice/voice_option.dart';
 import '../../../core/voice/voice_preference_service.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../auth/screens/signup_screen.dart' show AuthServiceProvider;
+import '../../paywall/screens/paywall_screen.dart';
 import '../../progress/screens/progress_detail_screen.dart';
 import '../../progress/skill_labels.dart';
 import '../widgets/v17_account_section.dart';
@@ -46,6 +51,8 @@ class ProfileScreen extends StatelessWidget {
           _LegacyAvatarPlaceholder(),
         ],
         const SizedBox(height: AppSpacing.x6),
+        const _ProUpgradeTile(),
+        const SizedBox(height: AppSpacing.x4),
         _ProgressEntryTile(client: client),
         const SizedBox(height: AppSpacing.x5),
         _SectionLabel(l.profileLanguageSection),
@@ -661,6 +668,111 @@ class _AboutCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// V25 — Pro upsell / management tile. Free learners see the upgrade
+/// CTA card that pushes [PaywallScreen]; Pro learners see a "manage
+/// subscription" link that deep-links to iOS Settings → Apple ID →
+/// Subscriptions.
+class _ProUpgradeTile extends StatelessWidget {
+  const _ProUpgradeTile();
+
+  @override
+  Widget build(BuildContext context) {
+    AuthService? auth;
+    try {
+      auth = AuthServiceProvider.of(context);
+    } catch (_) {
+      // Legacy build without V17 auth — hide the tile.
+      return const SizedBox.shrink();
+    }
+    final user = auth.currentUser;
+    if (user == null) return const SizedBox.shrink();
+
+    final iap = IAPServiceProvider.maybeOf(context);
+    if (iap == null) return const SizedBox.shrink();
+
+    if (user.isPro) {
+      return Material(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: AppRadius.lgAll,
+        child: InkWell(
+          key: const Key('profile_manage_subscription'),
+          onTap: () => launchUrl(
+            Uri.parse('https://apps.apple.com/account/subscriptions'),
+            mode: LaunchMode.externalApplication,
+          ),
+          borderRadius: AppRadius.lgAll,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.x4,
+              vertical: AppSpacing.x3,
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.workspace_premium_rounded,
+                    size: 22, color: AppColors.primary),
+                SizedBox(width: AppSpacing.x3),
+                Expanded(
+                  child: Text(
+                    'Quản lý đăng ký Pro',
+                    style: AppTypography.titleSmall,
+                  ),
+                ),
+                Icon(Icons.open_in_new_rounded, size: 18),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Material(
+      color: AppColors.primaryContainer,
+      borderRadius: AppRadius.lgAll,
+      child: InkWell(
+        key: const Key('profile_upgrade_pro'),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => PaywallScreen(iap: iap)),
+        ),
+        borderRadius: AppRadius.lgAll,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.x4,
+            vertical: AppSpacing.x4,
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.workspace_premium_outlined,
+                  size: 28, color: AppColors.primary),
+              SizedBox(width: AppSpacing.x3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Nâng cấp Pro',
+                      style: AppTypography.titleSmall,
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Luyện không giới hạn · Mock test đầy đủ · Streak grace pass',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.onSurfaceVariant,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, size: 22),
+            ],
+          ),
+        ),
       ),
     );
   }

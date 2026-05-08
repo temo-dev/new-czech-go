@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/auth/auth_models.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../widgets/apple_sign_in_button.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/password_field.dart';
 import 'forgot_password_screen.dart';
@@ -156,6 +157,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
                         )
                       : const Text('Đăng nhập', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                ),
+                const OrDivider(),
+                AppleSignInButton(
+                  authService: _service,
+                  onSuccess: () =>
+                      Navigator.of(context).popUntil((r) => r.isFirst),
                 ),
                 const SizedBox(height: 16),
                 TextButton(

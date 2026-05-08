@@ -4,16 +4,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/level_api.dart';
 import '../../../core/api/progress_api.dart';
+import '../../../core/iap/iap_service_provider.dart';
 import '../../../core/level_utils.dart';
+import '../../../core/streak/streak_models.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../auth/screens/signup_screen.dart' show AuthServiceProvider;
 import '../../courses/widgets/locked_course_sheet.dart';
 import '../../courses/widgets/locked_course_tile.dart';
 import '../../home/widgets/home_level_header.dart';
+import '../../home/widgets/quota_indicator.dart';
+import '../../paywall/screens/paywall_screen.dart';
 import '../../promotion/promotion_exam_flow.dart';
 import '../../progress/screens/progress_detail_screen.dart';
 import '../../progress/skill_labels.dart';
@@ -49,14 +54,48 @@ class _CourseListScreenState extends State<CourseListScreen> {
   // V21.3 D1: level progress for HomeLevelHeader + locked-tile rendering.
   Future<LevelProgressResponse>? _levelFuture;
 
+  // V25-F2: surface free-tier daily usage so the home tab can nudge a
+  // hard-blocked free learner toward upgrade. Pro learners see this
+  // counter hidden via `proHide`.
+  DailyUsageSummary? _usage;
+
   @override
   void initState() {
     super.initState();
     _load();
     _initProgressApi();
+    _loadUsage();
     if (widget.levelApi != null) {
       _levelFuture = widget.levelApi!.fetchLevelProgress();
     }
+  }
+
+  Future<void> _loadUsage() async {
+    try {
+      final result = await widget.client.fetchStreakAndUsageV17();
+      if (!mounted) return;
+      setState(() => _usage = result.usage);
+    } catch (_) {
+      // V17 endpoint absent (legacy fixture build) or transient
+      // failure — silently skip; QuotaIndicator stays unrendered.
+    }
+  }
+
+  bool _resolveIsPro(BuildContext context) {
+    try {
+      final auth = AuthServiceProvider.of(context);
+      return auth.currentUser?.isPro ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _openPaywall(BuildContext context) {
+    final iap = IAPServiceProvider.maybeOf(context);
+    if (iap == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => PaywallScreen(iap: iap)),
+    );
   }
 
   Future<void> _refreshLevelProgress() async {
@@ -219,6 +258,16 @@ class _CourseListScreenState extends State<CourseListScreen> {
               );
             },
           ),
+
+        // ── V25-F2: free-tier daily quota banner ──
+        if (_usage != null) ...[
+          const SizedBox(height: AppSpacing.x3),
+          QuotaIndicator(
+            usage: _usage!,
+            proHide: _resolveIsPro(context),
+            onTapWhenFull: () => _openPaywall(context),
+          ),
+        ],
 
         // ── Header ──────────────────────────────────────────────────────────
         const SizedBox(height: AppSpacing.x5),

@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/iap/iap_service_provider.dart';
 import '../../../core/locale/locale_scope.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
@@ -15,6 +16,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../../../shared/widgets/info_pill.dart';
+import '../../paywall/widgets/upgrade_prompt_dialog.dart';
 import '../widgets/uloha_prompt.dart';
 import '../widgets/recording_card.dart';
 import 'analysis_screen.dart';
@@ -150,7 +152,19 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         _status = 'ready';
         _error = _friendlyError(err);
       });
+      _maybeShowUpgradePrompt(err);
     }
+  }
+
+  /// V25-F2: when the backend gates the action with 429, surface the
+  /// upgrade modal so a free learner has a one-tap path to Pro instead
+  /// of just seeing the limit-reset toast underneath.
+  void _maybeShowUpgradePrompt(Object err) {
+    if (!mounted) return;
+    if (err is! ApiException || err.statusCode != 429) return;
+    final iap = IAPServiceProvider.maybeOf(context);
+    if (iap == null) return;
+    UpgradePromptDialog.showForAttemptQuota(context, iap);
   }
 
   String _friendlyError(Object err) {
@@ -199,6 +213,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         _status = 'ready';
         _error = _friendlyError(err);
       });
+      _maybeShowUpgradePrompt(err);
     }
   }
 
