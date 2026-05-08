@@ -7,6 +7,7 @@ import { AnswerSelect } from './AnswerSelect';
 import { ItemRepeater } from './ItemRepeater';
 import { OptionRow } from './OptionRow';
 import AiImageButton from '../AiImageButton';
+import { AiDraftPanel } from '../ai-draft/AiDraftPanel';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -158,6 +159,26 @@ function buildDetail(state: CteniState): Record<string, unknown> {
   };
 }
 
+// isCteniDirty returns true when any user-visible field on the form has
+// content. Used by the AI draft panel to decide whether regenerating
+// requires an overwrite confirmation.
+export function isCteniDirty(state: CteniState): boolean {
+  switch (state.type) {
+    case 'cteni_1':
+      return (
+        state.items.some((i) => i.text || i.answer || i.assetId) ||
+        state.options.some((o) => o.text)
+      );
+    case 'cteni_2':
+    case 'cteni_4':
+      return Boolean(state.text) || state.questions.some((q) => q.prompt || q.optA || q.optB || q.optC || q.optD || q.answer);
+    case 'cteni_3':
+      return state.texts.some((t) => t.text || t.answer) || state.persons.some((p) => p.name);
+    case 'cteni_5':
+      return Boolean(state.text) || state.slots.some((sl) => sl.prompt || sl.answer);
+  }
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 type Props = {
@@ -181,6 +202,11 @@ export function CteniFields({ exerciseType, initialData, onChange, exerciseId }:
   useEffect(() => { setState(initState(exerciseType, initialData)); }, [exerciseType, JSON.stringify(initialData)]);
 
   function update(next: CteniState) { setState(next); onChange(buildDetail(next)); }
+
+  function handleAiApply(detail: Record<string, unknown>) {
+    const next = initState(exerciseType, detail);
+    update(next);
+  }
 
   async function handleC1ImageUpload(file: File, itemIndex: number) {
     if (!exerciseId) { setUploadError('Lưu bài tập trước rồi upload ảnh.'); return; }
@@ -211,8 +237,16 @@ export function CteniFields({ exerciseType, initialData, onChange, exerciseId }:
   const c3    = state.type === 'cteni_3' ? state : null;
   const c5    = state.type === 'cteni_5' ? state : null;
 
+  const formDirty = isCteniDirty(state);
+
   return (
     <div style={{ display: 'grid', gap: 16 }}>
+
+      <AiDraftPanel
+        exerciseType={exerciseType}
+        formDirty={formDirty}
+        onApply={handleAiApply}
+      />
 
       {/* ── Čtení 1 — images/msgs → A-H ───────────────────────────── */}
       {c1 && (

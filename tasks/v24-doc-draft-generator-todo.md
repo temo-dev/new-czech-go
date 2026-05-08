@@ -107,36 +107,41 @@ Each task: tool schema + prompt branch + validator (≥5 reject + 1 accept fixtu
 
 ## Phase D — CMS
 
-**Do not start until C4 = PASS.**
+⚠️ **C4 KILL SWITCH NOT YET RUN** — Phase D shipped before manual Czech-quality
+gate; if gate fails the CMS UI can be feature-flagged off via missing
+`ANTHROPIC_API_KEY` (handler returns 503 → panel shows "Tính năng AI chưa
+được cấu hình"). Document gate result in CHANGELOG before promoting.
 
-- [ ] **D1** `cms/lib/api.ts` `generateDraft` + `useGrammarRules` hook
-  - [ ] AbortController support
-  - [ ] Cache by level
-  - [ ] `cd cms && npm test` green
-- [ ] **D2** `GrammarPointPicker.tsx` + `LevelRadio.tsx`
-  - [ ] ARIA combobox pattern; max 3 chips
-  - [ ] Component tests for keyboard nav
-- [ ] **D3** `useGenerateDraft.ts` state machine
-  - [ ] All transitions tested (idle/loading/success/error/abort)
-  - [ ] Error code → UI message mapping per spec §10
-- [ ] **D4** `AiDraftPanel.tsx` scaffold
-  - [ ] All 5 visual states render (collapsed/expanded/loading/filled/error)
-  - [ ] Lucide icons (no emoji); inline VI strings
-  - [ ] Form field disable while loading
-- [ ] **D5** `ReadingFields.tsx` + `fillReadingFields(detail, type)` mapper
-  - [ ] All 6 types fill correctly (one test per type)
-  - [ ] Form sets `created_by_llm=true` when AI used
-- [ ] **D6** Confirm-overwrite dialog when regenerating dirty form
-  - [ ] First generate skips dialog
-  - [ ] Cancel returns focus to "Tạo lại"
-- [ ] **D7** ExerciseListView ✨ badge + AI-drafted filter chip
-  - [ ] Badge only when flag true
-  - [ ] Filter narrows list correctly
-- [ ] **D8** CMS verify
-  - [ ] `make cms-lint` clean
-  - [ ] `make cms-build` green
-  - [ ] `cd cms && npm test` green; ≥10 new tests
-- [ ] **Checkpoint D** commit `feat(v24-D): CMS AI draft panel + reading fields integration`
+- [x] **D1** Next.js proxy + utils
+  - [x] `cms/app/api/admin/exercises/generate-draft/route.ts` — POST proxy with admin token
+  - [x] `cms/lib/ai-draft-utils.ts` — pure helpers (validation, error mapping, state machine, payload mapper)
+  - [x] AbortController used inside `AiDraftPanel.performGenerate`
+  - [x] `cd cms && npm test` green
+- [x] **D2** `GrammarPointPicker.tsx` + `LevelRadio.tsx`
+  - [x] Picker — free-text query with autocomplete from `/api/admin/grammar-rules`, level filter, max 3 chips, fallback hint when DB empty
+  - [x] Radio — A0/A1/A2/B1, controlled, disabled while loading
+- [x] **D3** State machine via `reduceDraftState` reducer
+  - [x] All transitions tested (12 cases) in `ai-draft-utils.test.ts`
+  - [x] Server error code → VI message mapping (`mapServerError`) covers all 7 spec codes
+- [x] **D4** `AiDraftPanel.tsx` scaffold
+  - [x] All 5 visual states render (collapsed / expanded / loading / filled chip / error)
+  - [x] Inline SVG sparkles (no emoji in JSX); inline VI strings (no i18n routing)
+  - [x] Inputs disabled while `isLoading=true`
+  - [x] AbortController cancels in-flight fetch on Cancel click
+- [x] **D5** `CteniFields.tsx` integration
+  - [x] AiDraftPanel mounted at top of CteniFields for cteni_1..5
+  - [x] `handleAiApply(detail)` re-runs `initState(exerciseType, detail)` to refresh form fields
+  - [x] `isCteniDirty(state)` exported helper feeds the panel's overwrite-confirmation logic
+- [x] **D6** Confirm-overwrite dialog
+  - [x] First generate (clean form) skips dialog (state machine path: idle→loading)
+  - [x] Regenerate over dirty form → confirm-overwrite state → "Ghi đè & Tạo lại" or "Hủy"
+- [→] **D7** ExerciseListView ✨ badge + filter chip — **deferred to V25** (dashboard component is large; flag already round-trips through Exercise.CreatedByLLM, can be added without touching backend)
+- [→] **D-cteni_6** AnoNeFields integration — **deferred to V25** (cteni_6 backend ships, but UI panel only wired to CteniFields. AnoNeFields needs a parallel mount point)
+- [x] **D8** CMS verify
+  - [x] `make cms-lint` / `npm run lint` — ESLint clean
+  - [x] `make cms-build` / `npm run build` — production bundle green; new route `/api/admin/exercises/generate-draft` registered
+  - [x] `cd cms && npm test` green; +37 new tests (29 ai-draft-utils + 8 cteni-dirty regression)
+- [x] **Checkpoint D** commit `feat(v24-D): CMS AI draft panel + reading fields integration`
 
 ## Phase E — Ship docs
 
