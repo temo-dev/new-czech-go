@@ -7,7 +7,7 @@ frozen).
 For per-slice task lists with `[x]` / `[ ]` checkboxes, see the
 matching `<slice>-todo.md` file:
 
-- [v25-iap-wire-real-todo.md](v25-iap-wire-real-todo.md) — V25 IAP Wire Real (plan ready, not started; awaiting human approve)
+- [v25-iap-wire-real-todo.md](v25-iap-wire-real-todo.md) — V25 IAP Wire Real (implemented Phase A-G + H1; H2/H3 operator-side remain)
 - [v24-doc-draft-generator-todo.md](v24-doc-draft-generator-todo.md) — V24 Doc Draft Generator (implemented; C4 manual Czech-quality gate pending)
 - [v23-exercise-authoring-polish-todo.md](v23-exercise-authoring-polish-todo.md) — V23 Exercise Authoring Polish (implemented, C8 wire deferred V24; awaiting commit + manual smoke)
 - [v22-cms-catch-up-todo.md](v22-cms-catch-up-todo.md) — V22 CMS Catch-Up (implemented, awaiting commit + manual smoke)

@@ -10,6 +10,250 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V25 — IAP Wire Real — 2026-05-08
+
+V17 shipped backend `/v1/iap/apple/verify` + `/webhook` + `pro_purchases`
+table but Flutter held a `StubIAPService` that threw `not_implemented`
+on every Buy. V25 wires production StoreKit, adds Sign-in with Apple
+(App Store guideline 4.8), closes V18-polish webhook gaps that mattered
+for downgrade, and ships the 3.1.2(a) disclosure copy + 4 upgrade entry
+points so a free learner has a one-tap path to Pro.
+
+Spec: `docs/specs/iap-wire-real.md`. Plan + todo:
+`tasks/v25-iap-wire-real-{plan,todo}.md`. Idea:
+`docs/ideas/iap-wire-real.md`. Pricing decision (D4): 99k VND/month +
+790k VND/year (-33% saving) — Apple Pricing Tier 19 + ~159, threshold
+< 100k for "thử được" + < 800k undercutting Mondly equivalents.
+
+### Backend (Phase A-C)
+
+- **Migration 028** (`backend/db/migrations/028_v25_user_apple_sub.sql`)
+  + ensureSchema mirror in `postgres_users.go`: `users.apple_sub TEXT`
+  + partial unique index `WHERE apple_sub IS NOT NULL AND deleted_at IS
+  NULL`. Idempotent.
+- **`UserStore.UpsertByAppleSub(sub, email, displayName)`**: Apple-
+  verified email auto-flagged (`email_verified_at = now`,
+  `grace_attempts_left = graceAfterVerify`). Placeholder
+  `password_hash = "apple_oauth:<sub>"` so the legacy `password_hash
+  required` guard accepts the row but bcrypt-compare against any
+  password always fails. Idempotent: replay returns existing user
+  untouched (Apple only emits email/name on the first sign-in).
+- **`iap.AppleJWKSVerifier`** (`backend/internal/iap/apple_jwks.go`):
+  wraps `lestrrat-go/jwx/v2/jwk.Cache` (24h refresh, auto rotation).
+  `Verify(ctx, idToken)` enforces `iss=https://appleid.apple.com`,
+  `aud=<bundle_id>`, `exp > now`, claim signature against cached
+  JWKS. Two constructors: production cache-backed
+  (`NewAppleJWKSVerifier`) + offline static-set
+  (`NewAppleJWKSVerifierWithSet`) for tests.
+- **`POST /v1/auth/apple`** (`auth_handlers_apple.go`): body
+  `{identity_token, authorization_code, nonce, given_name?,
+  family_name?}` → JWS verify → nonce match (SHA256-hashed both
+  sides) → `UpsertByAppleSub(claims.Sub, claims.Email, given+family)`
+  → mint 90-day session token. Errors collapse to `invalid_token` /
+  `nonce_mismatch` / `expired_token` / `invalid_audience` /
+  `issuer_mismatch` / `invalid_credential`. Unregistered when
+  `appleJWKS = nil` (legacy + dev fixture builds).
+- **`ProPurchaseStore.FindByTransactionID(txn)`**: returns the row
+  even after `MarkProPurchaseInactive` so REFUND-after-EXPIRED
+  replays still resolve `user_id`.
+- **Webhook downgrade stitch** (`applyWebhookExpiration` rewrite +
+  `applyWebhookRefund` reuse): `FindByTransactionID(notif.txn).user_id`
+  → `MarkProPurchaseInactive` → `downgradeIfExpired(user_id)`. Apple
+  ASSN no longer needs the Flutter `purchaseStream` observer to fire
+  for a free-tier flip — EXPIRED auto-flips `pro_tier=free` even
+  when the user is offline.
+
+### Flutter (Phase D-F + H1)
+
+- **Pubspec**: `+in_app_purchase: ^3.2.0` `+sign_in_with_apple: ^6.1.0`
+  `+url_launcher: ^6.3.0` `+crypto: ^3.0.3`. iOS `Runner.entitlements`
+  adds `com.apple.developer.applesignin` (Default scope). pbxproj
+  threads `CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements`
+  through Profile/Debug/Release.
+- **`RealIAPService`** (`lib/core/iap/real_iap_service.dart`): owns
+  the singleton `purchaseStream` observer; `start()` is idempotent,
+  `dispose()` cancels. `loadProducts()` uses
+  `InAppPurchase.queryProductDetails(IAPProducts.all.toSet())`.
+  `buy()` parks a `Completer` keyed by productId; the observer
+  resolves on `purchased`/`restored` (after firing the verifyReceipt
+  callback) and rejects on `error`/`canceled`. Every event with
+  `pendingCompletePurchase=true` triggers `completePurchase()` so
+  StoreKit's transaction queue does not flood. `InAppPurchaseClient`
+  seam lets unit tests drive the flow without a real plugin.
+- **`VerifyReceiptFn` typedef** plus `IAPServiceProvider`
+  InheritedWidget: production wires `RealIAPService(verifyReceipt:
+  (r,p) => apiClient.verifyAppleReceiptV17 + authService.refresh)`
+  via `_buildIAPService` in `main.dart`, guarded by `kIapEnabled =
+  bool.fromEnvironment('IAP_ENABLED', defaultValue: true) && !kIsWeb
+  && Platform.isIOS`. Web, Android, legacy fixture builds + widget
+  tests fall back to `StubIAPService`. `MluveniSprintApp` flipped to
+  `StatefulWidget` so the Real service is disposed on tear-down (no
+  zombie StoreKit listeners across hot-restart).
+- **`AuthService.signInWithApple()`** (`lib/core/auth/auth_service.dart`):
+  generates 32-char URL-safe nonce, SHA256-hashes once, passes the
+  hash to both `SignInWithApple.getAppleIDCredential(nonce: hashed)`
+  and the backend payload. `AppleCredentialFn` typedef injected into
+  the constructor for unit tests. `SignInWithAppleAuthorizationException`
+  → `AuthException(code: sign_in_canceled | apple_sign_in_failed)`;
+  missing identity_token → `invalid_credential`. Backend errors
+  surface verbatim via `AuthException` from `_v17Request`.
+- **`ApiClient.signInWithAppleV25(...)`**: thin wrapper around
+  `_v17Request` POST `/v1/auth/apple` that parses `AuthSession` and
+  attaches the session token to the client.
+- **`AppleSignInButton` + `OrDivider`** (`lib/features/auth/widgets/`):
+  shared widgets so Welcome / Login / Signup don't reinvent the
+  busy + error band. `SignInWithAppleButton` package widget at
+  `style: .black`, `height: 52`, `borderRadius: 12` — equal
+  prominence with the email FilledButton (App Store 4.8). Cancel
+  silently dismisses (no error band); `invalid_token`/`nonce_mismatch`
+  surface localized "Phiên đăng nhập Apple không hợp lệ" copy.
+- **PaywallScreen disclosure compliance** (App Store 3.1.2(a)):
+  `_SubscriptionDisclosure` block (auto-renewal text, billing-via-
+  Apple-ID, manage-cancellation path) renders unconditionally —
+  including while `loadProducts()` is in flight, so reviewers see it
+  on every paywall state. `_LegalLinksRow` Wrap with Terms +
+  Privacy `paywall_terms_button` / `paywall_privacy_button` keys
+  dispatch through `PaywallUrlLauncher` typedef (default
+  `launchUrl(externalApplication)`). `LegalUrls` const is the
+  swap-in-one-place when ops moves the marketing host. Body
+  rewrapped in `SingleChildScrollView` (replace `Spacer` →
+  `SizedBox(24)`) so 320pt iPhone SE no longer overflows.
+- **Upgrade entry points (F2)**: 4 surfaces wire toward the paywall
+  so a free learner can always reach it.
+  - **Profile**: `_ProUpgradeTile` between v17 account section and
+    progress entry. Free user sees a CTA card → push
+    `PaywallScreen`. Pro user sees "Quản lý đăng ký Pro" → external
+    deep link to `apps.apple.com/account/subscriptions`.
+  - **Exercise screen 429**: `_maybeShowUpgradePrompt` fires
+    `UpgradePromptDialog.showForAttemptQuota` on top of the existing
+    `recordErrorRateLimit` toast — modal CTA in addition to text.
+  - **Interview start 429**: `getInterviewToken` catch detects
+    `ApiException(429)` → `UpgradePromptDialog.showForInterviewQuota`
+    above the connect-error snackbar.
+  - **Home (`course_list_screen`)**: `_loadUsage` calls
+    `fetchStreakAndUsageV17`; `QuotaIndicator` banner renders below
+    the level header, hidden for Pro via `proHide`. `onTapWhenFull`
+    pushes paywall.
+
+### iOS sandbox (Phase H1)
+
+- `flutter_app/ios/Configuration/CzechGoPro.storekit` mirrors App
+  Store Connect: monthly 99.000 ₫ + yearly 790.000 ₫ in Subscription
+  Group "Czech Go Pro" (`P1M` + `P1Y`, storefront VNM, VI + EN
+  localizations). Run scheme `<StoreKitConfigurationFileReference>`
+  points 3 levels up to the .storekit so simulator buys don't need
+  a sandbox tester or signed Paid Apps Agreement.
+- `docs/guides/v25-iap-sandbox-smoke.md`: 7-step playbook (verify
+  scheme → run with `--dart-define=USE_V17_AUTH=true
+  --dart-define=IAP_ENABLED=true` → buy monthly → restore → cancel
+  via Settings + handcraft EXPIRED to /webhook → buy yearly), with
+  pitfall table (loader hangs, 401, webhook secret mismatch,
+  apple_disabled 503, simulator-vs-prod receipt).
+
+### Legal docs (Phase G)
+
+- `docs/reference/legal-eula.md` (245 lines, VI primary + EN
+  section): subscription auto-renewal, refund-via-Apple, intellectual
+  property, Apple Standard EULA-required clauses (Apple as
+  third-party beneficiary, no maintenance liability), Czech Republic
+  / Vietnam jurisdiction. Operator TBD on owner name + support email
+  + EULA hosting URL.
+- `docs/reference/legal-privacy.md` (313 lines, GDPR + Vietnam
+  Decree 13/2023 aligned): declared data cross-checked with V17/V25
+  actual collection — `users.{email, password_hash, apple_sub,
+  display_name, avatar_asset_id, push_token, timezone}`,
+  `pro_purchases.{apple_transaction_id, …, receipt_payload}`,
+  `attempts`/`feedback`/`streak_days`/`daily_usage`,
+  `auth_tokens.{user_agent, ip_address}`. Sub-processor table:
+  Apple, Anthropic (US), AWS Polly+Transcribe+S3+SES (Singapore /
+  Frankfurt), ElevenLabs (US), Replicate (US — no user data sent).
+  Retention windows: account ∞, recordings 90d, OCR 24h, receipts
+  7y, audit 12m. Account deletion exposed in-app via
+  `Profile → Delete Account` (V17 §10 / App Store 5.1.1(v) compliant).
+
+### Defer V25.1
+
+JWS verify ASSN webhook (Apple public-key JWT verify) — currently
+guarded by `IAP_WEBHOOK_SECRET` shared-secret stopgap + IP allowlist;
+`FindByOriginalTransactionID` for webhook activation upsert (covers
+the offline-renewal edge); refund email via SES; Family Sharing toggle;
+Apple Sign-In account merge for existing email users.
+
+### Decisions worth remembering
+
+- **D3 Apple Sign-In creates a separate account per `apple_sub`** —
+  no auto-merge with existing email accounts, even on email
+  collision. Boring path; Apple's "Hide my email" relay (`*@privaterelay.appleid.com`)
+  stored verbatim. Manual link-via-Profile deferred V26.
+- **D4 pricing 99k/790k VND** (saving badge "Tiết kiệm 33%") chosen
+  over 17% (V17 default) to push annual commit; A/B sweep deferred
+  until 100 conversions baseline.
+- **D5 defer ALL 4 V25.1 polish items** (JWS verifier, webhook
+  activation upsert, refund email, Family Sharing) — Flutter
+  observer covers ~80% renewal flow; refund email is low priority.
+- **Apple new user → `current_level='a0'`** (DB default), goes through
+  V21 onboarding/placement same as email signup. Spec §4.2 wording
+  ('a2' default) was imprecise — only the V21 backfill (mig 026)
+  promoted *existing pre-V21 users* to a2; new V21+ users start a0.
+- **Spec `com.apple.developer.in-app-payments` entitlement struck**:
+  that's Apple Pay merchant, NOT StoreKit IAP. StoreKit needs no
+  entitlement file; only Sign-in-with-Apple does.
+- **`PaywallUrlLauncher` typedef** + injectable `urlLauncher` ctor
+  param — same testability pattern as `AppleCredentialFn`.
+
+### File changes
+
+Backend (17 files): migration 028, contracts/user_account.go,
+httpapi/{auth_handlers, auth_handlers_apple[+test], iap_handlers,
+iap_webhook_v25_test, server}, iap/{apple_jwks[+test]},
+store/{postgres_users, pro_purchase_store[+test], user_store[+test]},
+go.mod / go.sum (`+lestrrat-go/jwx/v2 v2.1.6` + transitive).
+
+Flutter (29 files): pubspec.yaml/lock, ios/Runner/Runner.entitlements,
+ios/Runner.xcodeproj/{project.pbxproj, xcshareddata/xcschemes/Runner.xcscheme},
+ios/Configuration/CzechGoPro.storekit, ios/Podfile.lock,
+android GeneratedPluginRegistrant (auto), lib/core/{api/api_client,
+auth/auth_service, config/legal_urls, iap/{iap_service_provider,
+real_iap_service}}, lib/features/auth/{screens/{login, signup,
+welcome}_screen, widgets/apple_sign_in_button}, lib/features/{exercise,
+home, interview, paywall, profile}/screens/* (5 entry-point edits),
+lib/main.dart, 6 test files.
+
+Docs (5 + 4 task index): `docs/{ideas, specs}/iap-wire-real.md`,
+`docs/reference/legal-{eula, privacy}.md`,
+`docs/guides/v25-iap-sandbox-smoke.md`, `tasks/v25-iap-wire-real-{plan,
+todo}.md`, `tasks/{plan, todo}.md` index updates.
+
+### Test counts
+
+- Backend: 822 → **845** (+23) — 3 UpsertByAppleSub, 4 AppleJWKS, 2
+  FindByTransactionID, 8 handleAuthApple (incl 2 happy + 4 error
+  shape + missing-fields + disabled-when-nil), 1 server integration
+  smoke, 3 webhook downgrade.
+- Flutter: 309 → **366** (+57; V25 contributes ~22) — 7
+  RealIAPService observer flows, 4 AuthService.signInWithApple, 5
+  Apple button render+dispatch (3 screens + error inline + cancel
+  silent), 2 paywall disclosure + Terms launcher, 2 ProUpgradeTile
+  free/pro variants, 1 IAPServiceProvider smoke.
+- CMS: 144 (no change).
+- `make verify` green; iOS `flutter build ios --debug --no-codesign`
+  passes 11.8s.
+
+### Out of scope (operator gate, V25-H2/H3)
+
+- App Store Connect tax/banking submission (Paid Apps Agreement) —
+  1-2 week Apple lead time, blocks production launch but not
+  sandbox/TestFlight.
+- Subscription products created with the V25 tier numbers + VI/EN
+  localization, sandbox testers ≥ 2.
+- App Privacy declarations (must mirror `legal-privacy.md` §3).
+- TestFlight beta build upload + Apple beta review.
+- Manual smoke pass on iPhone 17 Pro Max simulator: 5 flows
+  (sign-in email + Apple, buy monthly + yearly, restore, cancel +
+  expire).
+
+---
+
 ## V24 — Reading-Exercise AI Draft Generator — 2026-05-08
 
 V23 polished authoring ergonomics, but the structural cost of writing a
