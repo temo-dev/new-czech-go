@@ -72,6 +72,10 @@ type Exercise struct {
 	SourceType      string `json:"source_type,omitempty"` // vocabulary_set | grammar_rule | custom
 	SourceID        string `json:"source_id,omitempty"`
 	GenerationJobID string `json:"generation_job_id,omitempty"`
+	// V24: marker for exercises authored via the AI draft generator. Set on
+	// create only; not toggleable through update. Used for analytics + list
+	// view filtering.
+	CreatedByLLM bool `json:"created_by_llm,omitempty"`
 }
 
 type PromptAsset struct {
@@ -313,6 +317,38 @@ type AnoNeStatement struct {
 	QuestionNo int    `json:"question_no"`
 	Statement  string `json:"statement"`
 }
+
+// --- V24 Reading draft generator ---
+
+// ReadingDraftInput is the resolved input passed to ReadingDraftGenerator.
+// grammar_point_ids from the HTTP request are resolved to GrammarRule rows
+// in the handler before reaching the generator.
+type ReadingDraftInput struct {
+	ExerciseType      string        // cteni_1..cteni_6
+	Topic             string        // 3-200 chars
+	GrammarPoints     []GrammarRule // 1-3 rules
+	Level             string        // A0 | A1 | A2 | B1
+	ExtraInstructions string        // optional, ≤500 chars
+}
+
+// ReadingDraft is the response payload of POST /v1/admin/exercises/generate-draft.
+// Detail holds one of Cteni1Detail..Cteni5Detail or AnoNeDetail (cteni_6).
+type ReadingDraft struct {
+	ExerciseType string           `json:"exercise_type"`
+	Detail       any              `json:"detail"`
+	Metadata     ReadingDraftMeta `json:"metadata"`
+}
+
+// ReadingDraftMeta carries observability data on each generation call.
+type ReadingDraftMeta struct {
+	Model        string `json:"model"`
+	DurationMs   int    `json:"duration_ms"`
+	InputTokens  int    `json:"input_tokens,omitempty"`
+	OutputTokens int    `json:"output_tokens,omitempty"`
+}
+
+// PersonOption is used by Cteni3Detail (match texts → people A-E). Defined
+// here for completeness alongside the other reading types it pairs with.
 
 // --- Interview (V14) ---
 

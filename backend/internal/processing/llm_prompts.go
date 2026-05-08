@@ -8,6 +8,7 @@ package processing
 //   - Interview scoring tone          → edit InterviewSystemPrompt
 //   - Vocabulary exercise generation  → edit VocabGenerationPrompt
 //   - Grammar exercise generation     → edit GrammarGenerationPrompt
+//   - Reading draft generation (V24)  → edit ReadingDraftSystemPrompt + BuildReadingDraftUserPrompt
 //
 // User-prompt builders (per-attempt context fed into the system prompt) live in
 // llm_user_prompts.go. Fallback feedback strings live in llm_fallbacks.go.
@@ -261,3 +262,23 @@ Rules:
 		constraints,
 	)
 }
+
+// ── Reading draft generation (V24) ────────────────────────────────────────────
+
+// ReadingDraftSystemPrompt is the system prompt for the V24 reading-draft
+// generator. It applies to all six cteni exercise types; type-specific
+// structural requirements live in BuildReadingDraftUserPrompt
+// (llm_user_prompts.go).
+const ReadingDraftSystemPrompt = `You are a Czech language content creator producing reading-comprehension exercises for Vietnamese learners preparing for the trvalý pobyt A2 / B1 exams.
+
+Output rules:
+- Generate authentic, natural Czech matching the requested CEFR level
+- Use vocabulary and grammar appropriate for that level only
+- Demonstrate the requested grammar point(s) explicitly in the passage; use each point at least 2 times when feasible
+- Keep tone neutral and exam-appropriate
+- Do NOT mention you are an AI or reference the prompt
+- All Czech text must be free of English/Vietnamese/transliteration
+- Distractors in multiple-choice questions must be plausible — same semantic field, same grammatical category as the correct answer
+- correct_answers map keys are stringified question_no ("1", "2", ...)
+- For cteni_6 (Ano/Ne), correct_answers values must be UPPERCASE "ANO" or "NE"
+- Do NOT produce asset_id values for cteni_1; the admin uploads images after the draft is filled into the form`

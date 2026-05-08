@@ -203,6 +203,47 @@ func TestCreateAndUpdateExercisePreservesPromptAndPreview(t *testing.T) {
 	}
 }
 
+func TestCreateExercisePreservesCreatedByLLM(t *testing.T) {
+	repo := NewMemoryStore()
+
+	created := repo.CreateExercise(contracts.Exercise{
+		ModuleID:             "module-day-1",
+		SkillKind:            "doc",
+		ExerciseType:         "cteni_2",
+		Title:                "AI-drafted reading",
+		ShortInstruction:     "Doc text a vyber spravnou odpoved.",
+		EstimatedDurationSec: 180,
+		CreatedByLLM:         true,
+	})
+
+	if created.ID == "" {
+		t.Fatal("expected created exercise id")
+	}
+	if !created.CreatedByLLM {
+		t.Fatal("expected CreatedByLLM=true on returned exercise")
+	}
+
+	fetched, ok := repo.Exercise(created.ID)
+	if !ok {
+		t.Fatalf("expected to fetch exercise %s", created.ID)
+	}
+	if !fetched.CreatedByLLM {
+		t.Fatal("expected CreatedByLLM=true after refetch")
+	}
+
+	manual := repo.CreateExercise(contracts.Exercise{
+		ModuleID:             "module-day-1",
+		SkillKind:            "doc",
+		ExerciseType:         "cteni_2",
+		Title:                "Manual reading",
+		ShortInstruction:     "x",
+		EstimatedDurationSec: 180,
+	})
+	if manual.CreatedByLLM {
+		t.Fatal("expected CreatedByLLM=false (default) on manual exercise")
+	}
+}
+
 func TestCreateExercisePreservesUloha2DetailType(t *testing.T) {
 	repo := NewMemoryStore()
 

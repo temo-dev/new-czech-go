@@ -52,9 +52,10 @@ CREATE TABLE IF NOT EXISTS exercises (
 	detail_json JSONB,
 	scoring_template_preview_json JSONB
 );
-ALTER TABLE exercises ADD COLUMN IF NOT EXISTS pool       TEXT NOT NULL DEFAULT 'course';
-ALTER TABLE exercises ADD COLUMN IF NOT EXISTS module_id  TEXT NOT NULL DEFAULT '';
-ALTER TABLE exercises ADD COLUMN IF NOT EXISTS skill_kind TEXT NOT NULL DEFAULT '';
+ALTER TABLE exercises ADD COLUMN IF NOT EXISTS pool           TEXT NOT NULL DEFAULT 'course';
+ALTER TABLE exercises ADD COLUMN IF NOT EXISTS module_id      TEXT NOT NULL DEFAULT '';
+ALTER TABLE exercises ADD COLUMN IF NOT EXISTS skill_kind     TEXT NOT NULL DEFAULT '';
+ALTER TABLE exercises ADD COLUMN IF NOT EXISTS created_by_llm BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE exercises DROP COLUMN IF EXISTS skill_id;
 `)
 	return err
@@ -177,11 +178,13 @@ func (s *postgresExerciseStore) insertExercise(ctx context.Context, exercise con
 		`INSERT INTO exercises (
 			id, module_id, skill_kind, pool, exercise_type, title, short_instruction, learner_instruction,
 			estimated_duration_sec, prep_time_sec, recording_time_limit_sec, sample_answer_enabled,
-			sample_answer_text, status, sequence_no, prompt_json, assets_json, detail_json, scoring_template_preview_json
+			sample_answer_text, status, sequence_no, prompt_json, assets_json, detail_json, scoring_template_preview_json,
+			created_by_llm
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8,
 			$9, $10, $11, $12,
-			$13, $14, $15, $16, $17, $18, $19
+			$13, $14, $15, $16, $17, $18, $19,
+			$20
 		)`,
 		exercise.ID,
 		exercise.ModuleID,
@@ -202,6 +205,7 @@ func (s *postgresExerciseStore) insertExercise(ctx context.Context, exercise con
 		jsonValue(exercise.Assets),
 		jsonValue(exercise.Detail),
 		jsonValue(exercise.ScoringTemplatePreview),
+		exercise.CreatedByLLM,
 	)
 	return err
 }
@@ -215,11 +219,13 @@ func (s *postgresExerciseStore) upsertExercise(ctx context.Context, exercise con
 		`INSERT INTO exercises (
 			id, module_id, skill_kind, pool, exercise_type, title, short_instruction, learner_instruction,
 			estimated_duration_sec, prep_time_sec, recording_time_limit_sec, sample_answer_enabled,
-			sample_answer_text, status, sequence_no, prompt_json, assets_json, detail_json, scoring_template_preview_json
+			sample_answer_text, status, sequence_no, prompt_json, assets_json, detail_json, scoring_template_preview_json,
+			created_by_llm
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8,
 			$9, $10, $11, $12,
-			$13, $14, $15, $16, $17, $18, $19
+			$13, $14, $15, $16, $17, $18, $19,
+			$20
 		)
 		ON CONFLICT (id) DO UPDATE SET
 			module_id = EXCLUDED.module_id,
@@ -239,7 +245,8 @@ func (s *postgresExerciseStore) upsertExercise(ctx context.Context, exercise con
 			prompt_json = EXCLUDED.prompt_json,
 			assets_json = EXCLUDED.assets_json,
 			detail_json = EXCLUDED.detail_json,
-			scoring_template_preview_json = EXCLUDED.scoring_template_preview_json`,
+			scoring_template_preview_json = EXCLUDED.scoring_template_preview_json,
+			created_by_llm = exercises.created_by_llm OR EXCLUDED.created_by_llm`,
 		exercise.ID,
 		exercise.ModuleID,
 		exercise.SkillKind,
@@ -259,6 +266,7 @@ func (s *postgresExerciseStore) upsertExercise(ctx context.Context, exercise con
 		jsonValue(exercise.Assets),
 		jsonValue(exercise.Detail),
 		jsonValue(exercise.ScoringTemplatePreview),
+		exercise.CreatedByLLM,
 	)
 	return err
 }
@@ -283,7 +291,8 @@ SELECT
 	e.prompt_json,
 	e.assets_json,
 	e.detail_json,
-	e.scoring_template_preview_json
+	e.scoring_template_preview_json,
+	COALESCE(e.created_by_llm, FALSE)
 FROM exercises e
 `
 
@@ -331,6 +340,7 @@ func scanExercise(scan scanFunc) (contracts.Exercise, error) {
 		&assetsJSON,
 		&detailJSON,
 		&scoringTemplatePreviewJSON,
+		&exercise.CreatedByLLM,
 	)
 	if err != nil {
 		return contracts.Exercise{}, err

@@ -21,9 +21,10 @@ const (
 // Content generation uses a more capable model since it runs in batch (admin-triggered).
 const (
 	// Claude (Anthropic) — text feedback + content generation
-	DefaultFeedbackModel = "claude-haiku-4-5-20251001" // real-time, per-attempt
-	DefaultContentModel  = "claude-haiku-4-5-20251001" // batch, admin-triggered
-	DefaultOCRModel      = "claude-opus-4-7"           // V18.1 dictation handwriting OCR (vision)
+	DefaultFeedbackModel     = "claude-haiku-4-5-20251001" // real-time, per-attempt
+	DefaultContentModel      = "claude-haiku-4-5-20251001" // batch, admin-triggered
+	DefaultReadingDraftModel = "claude-haiku-4-5-20251001" // V24 reading draft generator
+	DefaultOCRModel          = "claude-opus-4-7"           // V18.1 dictation handwriting OCR (vision)
 
 	// Replicate (Flux) — admin AI image generation
 	DefaultReplicateImageModel = "black-forest-labs/flux-schnell"
@@ -52,6 +53,7 @@ const (
 //	LLM_MODEL                 speaking/writing feedback  (default: DefaultFeedbackModel)
 //	LLM_REVIEW_MODEL          review artifact generation (default: LLM_MODEL → DefaultFeedbackModel)
 //	LLM_CONTENT_MODEL         vocab/grammar generation   (default: DefaultContentModel)
+//	LLM_READING_DRAFT_MODEL   V24 reading draft generator (default: DefaultReadingDraftModel)
 //	REPLICATE_IMAGE_MODEL     admin AI image generation  (default: DefaultReplicateImageModel)
 //	ELEVENLABS_MODEL_ID       TTS model for ElevenLabs   (default: DefaultElevenLabsTTSModel)
 //	ELEVENLABS_OUTPUT_FORMAT  TTS output format          (default: DefaultElevenLabsOutputFormat)
@@ -61,6 +63,7 @@ type LLMModels struct {
 	Dictation           string // ClaudeDictationFeedbackProvider (V18)
 	OCR                 string // ClaudeVisionOCR (V18.1)
 	Content             string // ClaudeContentGenerator
+	ReadingDraft        string // ClaudeReadingDraftGenerator (V24)
 	ReplicateImage      string // Replicate Flux (admin AI image)
 	ElevenLabsTTS       string // ElevenLabsTTSProvider
 	ElevenLabsOutputFmt string // ElevenLabs TTS output format
@@ -75,6 +78,7 @@ func LoadLLMModels() LLMModels {
 		Dictation:           env("LLM_DICTATION_MODEL", env("LLM_MODEL", DefaultFeedbackModel)),
 		OCR:                 env("LLM_OCR_MODEL", DefaultOCRModel),
 		Content:             env("LLM_CONTENT_MODEL", DefaultContentModel),
+		ReadingDraft:        env("LLM_READING_DRAFT_MODEL", DefaultReadingDraftModel),
 		ReplicateImage:      env("REPLICATE_IMAGE_MODEL", DefaultReplicateImageModel),
 		ElevenLabsTTS:       env("ELEVENLABS_MODEL_ID", DefaultElevenLabsTTSModel),
 		ElevenLabsOutputFmt: env("ELEVENLABS_OUTPUT_FORMAT", DefaultElevenLabsOutputFormat),
