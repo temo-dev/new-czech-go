@@ -1,6 +1,8 @@
 package processing
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -222,6 +224,118 @@ func TestValidateReadingDraft_Cteni5_RejectsMalformed(t *testing.T) {
 			detail := validCteni5Detail()
 			tc.mutate(&detail)
 			draft := &contracts.ReadingDraft{ExerciseType: "cteni_5", Detail: detail}
+			err := ValidateReadingDraft(draft)
+			if err == nil {
+				t.Fatalf("expected validation error containing %q, got nil", tc.wantSub)
+			}
+			if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Fatalf("expected error containing %q, got %q", tc.wantSub, err.Error())
+			}
+		})
+	}
+}
+
+// ── cteni_6 fixtures ──────────────────────────────────────────────────────────
+
+func validCteni6Detail() contracts.AnoNeDetail {
+	return contracts.AnoNeDetail{
+		Passage: "Pavel byl nemocný a šel k lékaři ve čtvrtek.",
+		Statements: []contracts.AnoNeStatement{
+			{QuestionNo: 1, Statement: "Pavel je doktor."},
+			{QuestionNo: 2, Statement: "Pavel byl nemocný."},
+			{QuestionNo: 3, Statement: "Pavel šel v pondělí."},
+		},
+		CorrectAnswers: map[string]string{"1": "NE", "2": "ANO", "3": "NE"},
+		MaxPoints:      3,
+	}
+}
+
+func TestValidateReadingDraft_Cteni6_AcceptsValid(t *testing.T) {
+	draft := &contracts.ReadingDraft{ExerciseType: "cteni_6", Detail: validCteni6Detail()}
+	if err := ValidateReadingDraft(draft); err != nil {
+		t.Fatalf("expected valid draft to pass, got %v", err)
+	}
+}
+
+func TestValidateReadingDraft_Cteni6_AcceptsBoundary(t *testing.T) {
+	for _, n := range []int{1, 5} {
+		t.Run(fmt.Sprintf("statements=%d", n), func(t *testing.T) {
+			d := contracts.AnoNeDetail{Passage: "x"}
+			d.CorrectAnswers = map[string]string{}
+			for i := 1; i <= n; i++ {
+				d.Statements = append(d.Statements, contracts.AnoNeStatement{QuestionNo: i, Statement: "s"})
+				d.CorrectAnswers[strconv.Itoa(i)] = "ANO"
+			}
+			d.MaxPoints = n
+			draft := &contracts.ReadingDraft{ExerciseType: "cteni_6", Detail: d}
+			if err := ValidateReadingDraft(draft); err != nil {
+				t.Fatalf("expected boundary count to pass, got %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateReadingDraft_Cteni6_RejectsMalformed(t *testing.T) {
+	cases := []struct {
+		name    string
+		mutate  func(d *contracts.AnoNeDetail)
+		wantSub string
+	}{
+		{
+			name:    "empty passage",
+			mutate:  func(d *contracts.AnoNeDetail) { d.Passage = "" },
+			wantSub: "passage",
+		},
+		{
+			name:    "zero statements",
+			mutate:  func(d *contracts.AnoNeDetail) { d.Statements = nil; d.CorrectAnswers = map[string]string{}; d.MaxPoints = 0 },
+			wantSub: "1-5",
+		},
+		{
+			name: "six statements",
+			mutate: func(d *contracts.AnoNeDetail) {
+				d.Statements = append(d.Statements,
+					contracts.AnoNeStatement{QuestionNo: 4, Statement: "s4"},
+					contracts.AnoNeStatement{QuestionNo: 5, Statement: "s5"},
+					contracts.AnoNeStatement{QuestionNo: 6, Statement: "s6"})
+				d.CorrectAnswers["4"] = "ANO"
+				d.CorrectAnswers["5"] = "NE"
+				d.CorrectAnswers["6"] = "ANO"
+				d.MaxPoints = 6
+			},
+			wantSub: "1-5",
+		},
+		{
+			name:    "lowercase ano",
+			mutate:  func(d *contracts.AnoNeDetail) { d.CorrectAnswers["1"] = "ano" },
+			wantSub: "ANO",
+		},
+		{
+			name:    "value not ANO/NE",
+			mutate:  func(d *contracts.AnoNeDetail) { d.CorrectAnswers["1"] = "YES" },
+			wantSub: "ANO",
+		},
+		{
+			name:    "max_points mismatch",
+			mutate:  func(d *contracts.AnoNeDetail) { d.MaxPoints = 99 },
+			wantSub: "max_points",
+		},
+		{
+			name:    "missing correct_answer",
+			mutate:  func(d *contracts.AnoNeDetail) { delete(d.CorrectAnswers, "2") },
+			wantSub: "missing correct_answer",
+		},
+		{
+			name:    "empty statement text",
+			mutate:  func(d *contracts.AnoNeDetail) { d.Statements[0].Statement = "" },
+			wantSub: "statement",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			detail := validCteni6Detail()
+			tc.mutate(&detail)
+			draft := &contracts.ReadingDraft{ExerciseType: "cteni_6", Detail: detail}
 			err := ValidateReadingDraft(draft)
 			if err == nil {
 				t.Fatalf("expected validation error containing %q, got nil", tc.wantSub)

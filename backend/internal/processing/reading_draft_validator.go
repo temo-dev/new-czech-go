@@ -36,6 +36,12 @@ func ValidateReadingDraft(d *contracts.ReadingDraft) error {
 			return fmt.Errorf("cteni_5: expected Cteni5Detail, got %T", d.Detail)
 		}
 		return validateCteni5(detail)
+	case "cteni_6":
+		detail, ok := d.Detail.(contracts.AnoNeDetail)
+		if !ok {
+			return fmt.Errorf("cteni_6: expected AnoNeDetail, got %T", d.Detail)
+		}
+		return validateCteni6(detail)
 	default:
 		return fmt.Errorf("reading draft: unsupported exercise_type %q", d.ExerciseType)
 	}
@@ -94,6 +100,29 @@ func validateCteni5(d contracts.Cteni5Detail) error {
 	}
 	if len(d.CorrectAnswers) != len(d.Questions) {
 		return fmt.Errorf("cteni_5: correct_answers should cover %d questions, got %d entries", len(d.Questions), len(d.CorrectAnswers))
+	}
+	return nil
+}
+
+// ── cteni_6 ───────────────────────────────────────────────────────────────────
+
+func validateCteni6(d contracts.AnoNeDetail) error {
+	if strings.TrimSpace(d.Passage) == "" {
+		return fmt.Errorf("cteni_6: passage must be non-empty")
+	}
+	if len(d.Statements) < 1 || len(d.Statements) > 5 {
+		return fmt.Errorf("cteni_6: expected 1-5 statements, got %d", len(d.Statements))
+	}
+	for i, s := range d.Statements {
+		if strings.TrimSpace(s.Statement) == "" {
+			return fmt.Errorf("cteni_6: statement %d text must be non-empty", i+1)
+		}
+	}
+	if err := requireCorrectAnswers(d.CorrectAnswers, len(d.Statements), "cteni_6", "ANO/NE", []string{"ANO", "NE"}); err != nil {
+		return err
+	}
+	if d.MaxPoints != len(d.Statements) {
+		return fmt.Errorf("cteni_6: max_points (%d) must equal statement count (%d)", d.MaxPoints, len(d.Statements))
 	}
 	return nil
 }

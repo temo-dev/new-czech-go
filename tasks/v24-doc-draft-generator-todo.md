@@ -55,9 +55,13 @@ Each task: tool schema + prompt branch + validator (≥5 reject + 1 accept fixtu
   - [x] Generator dispatch + parser branch wired
   - [x] Tests +9 (validator accept + 6 reject, prompt content, schema bounds, parser round-trip)
   - [x] Commit `feat(v24-B3): cteni_5 draft generator + validator`
-- [ ] **B4** cteni_6 — Ano/Ne (1-5 statements)
-  - [ ] Validator: UPPERCASE ANO/NE; max_points == len(statements); 1-5 range
-  - [ ] Commit `feat(v24-B4): cteni_6 draft generator + validator`
+- [x] **B4** cteni_6 — Ano/Ne (1-5 statements)
+  - [x] Tool schema (`cteni6ToolSchema`) — passage + 1-5 statements + correct_answers enum [ANO, NE] + max_points 1-5
+  - [x] Prompt branch — uppercase ANO/NE rule, max_points = len(statements), encourage mixing ANO/NE
+  - [x] Validator (`validateCteni6`) — UPPERCASE ANO/NE strict, max_points == len(statements), 1-5 statements range
+  - [x] Generator dispatch + parser branch wired
+  - [x] Tests +13 (validator: 1 accept + 8 reject + 2 boundary, prompt content, schema enum + bounds, parser round-trip)
+  - [x] Commit `feat(v24-B4): cteni_6 draft generator + validator`
 - [ ] **B5** cteni_3 — 4 texts → persons A-E
   - [ ] Validator: 4 texts, 5 persons (1 distractor), unique correct keys
   - [ ] Commit `feat(v24-B5): cteni_3 draft generator + validator`

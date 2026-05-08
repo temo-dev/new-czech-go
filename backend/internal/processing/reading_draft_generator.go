@@ -61,9 +61,9 @@ var ErrReadingDraftNotImplemented = fmt.Errorf("reading draft generator: exercis
 // Generate dispatches by exercise_type. Phase B fills in each branch.
 func (g *ClaudeReadingDraftGenerator) Generate(ctx context.Context, in contracts.ReadingDraftInput) (*contracts.ReadingDraft, error) {
 	switch in.ExerciseType {
-	case "cteni_2", "cteni_4", "cteni_5":
+	case "cteni_2", "cteni_4", "cteni_5", "cteni_6":
 		return g.callClaude(ctx, in)
-	case "cteni_1", "cteni_3", "cteni_6":
+	case "cteni_1", "cteni_3":
 		return nil, fmt.Errorf("%w: %s", ErrReadingDraftNotImplemented, in.ExerciseType)
 	default:
 		return nil, fmt.Errorf("reading draft generator: unsupported exercise_type %q", in.ExerciseType)
@@ -160,8 +160,42 @@ func buildReadingDraftToolSchema(exerciseType string) map[string]any {
 		return cteni4ToolSchema()
 	case "cteni_5":
 		return cteni5ToolSchema()
+	case "cteni_6":
+		return cteni6ToolSchema()
 	}
 	return nil
+}
+
+func cteni6ToolSchema() map[string]any {
+	statement := map[string]any{
+		"type":     "object",
+		"required": []string{"question_no", "statement"},
+		"properties": map[string]any{
+			"question_no": map[string]any{"type": "integer", "minimum": 1, "maximum": 5},
+			"statement":   map[string]any{"type": "string", "minLength": 1},
+		},
+	}
+	return map[string]any{
+		"type":     "object",
+		"required": []string{"passage", "statements", "correct_answers", "max_points"},
+		"properties": map[string]any{
+			"passage": map[string]any{"type": "string", "minLength": 1},
+			"statements": map[string]any{
+				"type":     "array",
+				"minItems": 1,
+				"maxItems": 5,
+				"items":    statement,
+			},
+			"correct_answers": map[string]any{
+				"type": "object",
+				"additionalProperties": map[string]any{
+					"type": "string",
+					"enum": []string{"ANO", "NE"},
+				},
+			},
+			"max_points": map[string]any{"type": "integer", "minimum": 1, "maximum": 5},
+		},
+	}
 }
 
 func cteni5ToolSchema() map[string]any {
@@ -327,6 +361,12 @@ func parseReadingDraftDetail(exerciseType string, raw json.RawMessage) (any, err
 		var d contracts.Cteni5Detail
 		if err := json.Unmarshal(raw, &d); err != nil {
 			return nil, fmt.Errorf("unmarshal cteni_5 detail: %w", err)
+		}
+		return d, nil
+	case "cteni_6":
+		var d contracts.AnoNeDetail
+		if err := json.Unmarshal(raw, &d); err != nil {
+			return nil, fmt.Errorf("unmarshal cteni_6 detail: %w", err)
 		}
 		return d, nil
 	}

@@ -511,6 +511,14 @@ func readingDraftStructuralRequirements(exerciseType string) string {
 			"- correct_answers map: keys \"1\"..\"5\", values are short factual strings (single noun, number, or date) ≤30 characters",
 			"- Answers must be findable verbatim in the passage",
 		}, "\n")
+	case "cteni_6":
+		return strings.Join([]string{
+			"- Generate exactly one passage of natural Czech, 80-150 words, in field `passage`",
+			"- Generate between 1 and 5 Ano/Ne statements; each question_no = 1..N",
+			"- correct_answers map: keys \"1\"..\"N\"; values must be UPPERCASE \"ANO\" or \"NE\"",
+			"- Set max_points equal to the number of statements",
+			"- Mix at least one ANO and one NE when N ≥ 2 to keep the exercise discriminating",
+		}, "\n")
 	}
 	return ""
 }

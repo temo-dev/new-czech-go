@@ -39,8 +39,8 @@ func TestMockReadingDraftGenerator_PropagatesError(t *testing.T) {
 func TestClaudeReadingDraftGenerator_NotImplementedForUnshippedTypes(t *testing.T) {
 	gen := NewClaudeReadingDraftGenerator("dummy-key", DefaultReadingDraftModel)
 
-	// cteni_2 ships in B1, cteni_4 in B2, cteni_5 in B3; remaining types still skeleton.
-	for _, exType := range []string{"cteni_1", "cteni_3", "cteni_6"} {
+	// cteni_2 (B1), cteni_4 (B2), cteni_5 (B3), cteni_6 (B4) shipped; remaining types still skeleton.
+	for _, exType := range []string{"cteni_1", "cteni_3"} {
 		t.Run(exType, func(t *testing.T) {
 			_, err := gen.Generate(context.Background(), contracts.ReadingDraftInput{ExerciseType: exType})
 			if !errors.Is(err, ErrReadingDraftNotImplemented) {
@@ -249,6 +249,54 @@ func TestParseReadingDraftDetail_Cteni5_RoundTrips(t *testing.T) {
 	}
 	if d.CorrectAnswers["1"] != "Pavel" {
 		t.Fatalf("answer mismatch: %v", d.CorrectAnswers)
+	}
+}
+
+func TestBuildReadingDraftUserPrompt_Cteni6_RequiresAnoNeUppercase(t *testing.T) {
+	in := contracts.ReadingDraftInput{ExerciseType: "cteni_6", Topic: "x", Level: "A2"}
+	got := BuildReadingDraftUserPrompt(in)
+	for _, sub := range []string{"cteni_6", "1 and 5", "UPPERCASE", "ANO", "NE", "max_points"} {
+		if !strings.Contains(got, sub) {
+			t.Errorf("user prompt missing %q\nfull:\n%s", sub, got)
+		}
+	}
+}
+
+func TestBuildReadingDraftToolSchema_Cteni6_EnforcesAnoNeEnum(t *testing.T) {
+	schema := buildReadingDraftToolSchema("cteni_6")
+	if schema == nil {
+		t.Fatal("expected schema for cteni_6")
+	}
+	props, _ := schema["properties"].(map[string]any)
+	answers, _ := props["correct_answers"].(map[string]any)
+	addProps, _ := answers["additionalProperties"].(map[string]any)
+	enum, _ := addProps["enum"].([]string)
+	if len(enum) != 2 || enum[0] != "ANO" || enum[1] != "NE" {
+		t.Errorf("expected enum [ANO NE], got %v", enum)
+	}
+	statements, _ := props["statements"].(map[string]any)
+	if statements["minItems"] != 1 || statements["maxItems"] != 5 {
+		t.Errorf("statements bounds = [%v, %v], want [1, 5]", statements["minItems"], statements["maxItems"])
+	}
+}
+
+func TestParseReadingDraftDetail_Cteni6_RoundTrips(t *testing.T) {
+	raw := []byte(`{
+		"passage": "Pavel byl nemocný.",
+		"statements": [{"question_no": 1, "statement": "Pavel je doktor."}],
+		"correct_answers": {"1": "NE"},
+		"max_points": 1
+	}`)
+	detail, err := parseReadingDraftDetail("cteni_6", raw)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	d, ok := detail.(contracts.AnoNeDetail)
+	if !ok {
+		t.Fatalf("expected AnoNeDetail, got %T", detail)
+	}
+	if d.MaxPoints != 1 || d.CorrectAnswers["1"] != "NE" {
+		t.Fatalf("decode mismatch: %+v", d)
 	}
 }
 
