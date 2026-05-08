@@ -7,6 +7,7 @@ frozen).
 For per-slice task lists with `[x]` / `[ ]` checkboxes, see the
 matching `<slice>-todo.md` file:
 
+- [v24-doc-draft-generator-todo.md](v24-doc-draft-generator-todo.md) — V24 Doc Draft Generator (planned)
 - [v23-exercise-authoring-polish-todo.md](v23-exercise-authoring-polish-todo.md) — V23 Exercise Authoring Polish (implemented, C8 wire deferred V24; awaiting commit + manual smoke)
 - [v22-cms-catch-up-todo.md](v22-cms-catch-up-todo.md) — V22 CMS Catch-Up (implemented, awaiting commit + manual smoke)
 - [cefr-ui-wireup-todo.md](cefr-ui-wireup-todo.md) — V21.3 wire-up (shipped)
