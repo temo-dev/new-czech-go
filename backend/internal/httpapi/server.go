@@ -52,6 +52,7 @@ type Server struct {
 	signupRL         *signupRateLimiter
 	resendCooldown   *resendCooldownTracker
 	appleVerifier    AppleVerifier
+	appleJWKS        AppleIdentityVerifier // V25 Sign-in-with-Apple identity_token verifier
 	webhookSeen      *webhookDedupe
 
 	voiceRegistry      *processing.VoiceRegistry

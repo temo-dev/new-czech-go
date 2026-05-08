@@ -48,6 +48,17 @@ type UserStore interface {
 	// DecrementUserGrace lowers GraceAttemptsLeft by one, clamping at zero,
 	// and returns the new value. Used by the verify-on-Nth-attempt gate.
 	DecrementUserGrace(id string) (int, bool)
+
+	// UpsertByAppleSub returns the active account linked to the given Apple
+	// subject claim, creating it on first sight. New accounts default to
+	// learner role, free tier, current_level=a2 (V21 default for new email
+	// accounts), and email_verified=true (Apple has already verified the
+	// address). The placeholder PasswordHash is never accepted by the email
+	// login path because it does not begin with the bcrypt prefix; it exists
+	// only so the legacy "password_hash required" guard does not reject the
+	// row. Subsequent calls return the existing account untouched —
+	// idempotent on replay.
+	UpsertByAppleSub(sub, email, displayName string) (contracts.UserAccount, error)
 }
 
 // ErrDuplicateEmail is returned when CreateUser is called with an email that
@@ -273,6 +284,46 @@ func (s *memoryUserStore) DecrementUserGrace(id string) (int, bool) {
 		u.UpdatedAt = time.Now().UTC()
 	}
 	return u.GraceAttemptsLeft, true
+}
+
+func (s *memoryUserStore) UpsertByAppleSub(sub, email, displayName string) (contracts.UserAccount, error) {
+	sub = strings.TrimSpace(sub)
+	if sub == "" {
+		return contracts.UserAccount{}, errors.New("apple_sub required")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, existing := range s.users {
+		if existing.DeletedAt != nil {
+			continue
+		}
+		if existing.AppleSub == sub {
+			return *existing, nil
+		}
+	}
+
+	now := time.Now().UTC()
+	verified := now
+	account := contracts.UserAccount{
+		ID:                newUserID(),
+		Email:             email,
+		EmailNormalized:   normalizeEmail(email),
+		EmailVerifiedAt:   &verified,
+		PasswordHash:      "apple_oauth:" + sub, // unusable for password login
+		DisplayName:       strings.TrimSpace(displayName),
+		Role:              "learner",
+		ProTier:           "free",
+		Timezone:          "Asia/Ho_Chi_Minh",
+		GraceAttemptsLeft: graceAfterVerify, // Apple-verified, skip the email-verify gate
+		AppleSub:          sub,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+	cp := account
+	s.users[account.ID] = &cp
+	return account, nil
 }
 
 // newUserID returns a 16-hex-char identifier prefixed with "u_". Collisions

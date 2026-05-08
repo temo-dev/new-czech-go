@@ -21,6 +21,10 @@ import (
 // can name the dependency without importing the iap package directly.
 type AppleVerifier = iap.AppleVerifier
 
+// AppleIdentityVerifier is the V25 identity_token verifier for Sign-in
+// with Apple. Re-exported alongside AppleVerifier for the same reason.
+type AppleIdentityVerifier = iap.AppleIdentityVerifier
+
 // ── Server fields + AuthDeps wiring ──────────────────────────────────────
 
 // webhookSeen deduplicates ASSN notificationUUIDs in memory so a replay
@@ -324,19 +328,23 @@ func (s *Server) applyWebhookActivation(notif *iap.Notification) {
 }
 
 func (s *Server) applyWebhookExpiration(notif *iap.Notification) {
-	// Mark the matching purchase inactive so ActiveProPurchaseByUser no
-	// longer surfaces it, then downgrade if no other active row.
-	if !s.proPurchaseStore.MarkProPurchaseInactive(notif.TransactionID) {
+	// V25 stitch: look up the owning user_id via FindByTransactionID
+	// before mutating, so we can drive a real downgrade even though
+	// Apple does NOT include the user identifier in ASSN payloads.
+	purchase, ok := s.proPurchaseStore.FindByTransactionID(notif.TransactionID)
+	if !ok {
 		log.Printf("iap-webhook: expiration for unknown txn=%s", notif.TransactionID)
 		return
 	}
-	// Best-effort downgrade: we don't have the user_id on the
-	// notification directly, but proPurchaseStore could surface it via
-	// a future per-txn lookup. V18 polish.
-	_ = notif
+	// MarkProPurchaseInactive is idempotent: a no-op when the row is
+	// already inactive (e.g. REFUND following a prior EXPIRED). The
+	// downgrade still runs because another active row could in theory
+	// have appeared between events.
+	s.proPurchaseStore.MarkProPurchaseInactive(notif.TransactionID)
+	s.downgradeIfExpired(purchase.UserID)
 }
 
 func (s *Server) applyWebhookRefund(notif *iap.Notification) {
 	s.applyWebhookExpiration(notif)
-	// V18 polish: send refund-notification email to the affected user.
+	// V25.1 polish: send refund-notification email to the affected user.
 }

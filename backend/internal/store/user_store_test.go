@@ -184,6 +184,84 @@ func TestMemoryUserStore_DecrementGrace(t *testing.T) {
 	}
 }
 
+func TestMemoryUserStore_UpsertByAppleSub_NewUser(t *testing.T) {
+	s := newMemoryUserStore()
+
+	u, err := s.UpsertByAppleSub("apple_sub_001", "anh@privaterelay.appleid.com", "Anh Nguyễn")
+	if err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	if u.ID == "" {
+		t.Fatal("expected generated id")
+	}
+	if u.AppleSub != "apple_sub_001" {
+		t.Errorf("expected apple_sub stored, got %q", u.AppleSub)
+	}
+	if u.EmailNormalized != "anh@privaterelay.appleid.com" {
+		t.Errorf("expected email_normalized lowercased, got %q", u.EmailNormalized)
+	}
+	if u.EmailVerifiedAt == nil {
+		t.Error("expected email_verified_at to be set (Apple has verified)")
+	}
+	if u.GraceAttemptsLeft <= 3 {
+		t.Errorf("expected grace lifted past default after Apple verify, got %d", u.GraceAttemptsLeft)
+	}
+	if u.Role != "learner" {
+		t.Errorf("expected default role=learner, got %q", u.Role)
+	}
+	if u.ProTier != "free" {
+		t.Errorf("expected default pro_tier=free, got %q", u.ProTier)
+	}
+	if u.PasswordHash == "" {
+		t.Error("expected placeholder password_hash so legacy guard accepts the row")
+	}
+	if u.DisplayName != "Anh Nguyễn" {
+		t.Errorf("expected display name preserved, got %q", u.DisplayName)
+	}
+
+	// Lookup by id confirms the row was persisted.
+	got, ok := s.UserAccountByID(u.ID)
+	if !ok {
+		t.Fatal("expected upserted user findable by id")
+	}
+	if got.AppleSub != "apple_sub_001" {
+		t.Errorf("expected apple_sub round-trip, got %q", got.AppleSub)
+	}
+}
+
+func TestMemoryUserStore_UpsertByAppleSub_Idempotent(t *testing.T) {
+	s := newMemoryUserStore()
+
+	first, err := s.UpsertByAppleSub("apple_sub_002", "bao@example.com", "Bảo")
+	if err != nil {
+		t.Fatalf("first upsert: %v", err)
+	}
+
+	// Subsequent calls — Apple only returns email + name on the very first
+	// sign-in, so the handler may pass empty strings on later calls. The
+	// existing row must be returned untouched.
+	second, err := s.UpsertByAppleSub("apple_sub_002", "", "")
+	if err != nil {
+		t.Fatalf("second upsert: %v", err)
+	}
+	if second.ID != first.ID {
+		t.Errorf("expected same id on replay, got %q vs %q", second.ID, first.ID)
+	}
+	if second.Email != "bao@example.com" {
+		t.Errorf("expected original email preserved on replay, got %q", second.Email)
+	}
+	if second.DisplayName != "Bảo" {
+		t.Errorf("expected original display name preserved on replay, got %q", second.DisplayName)
+	}
+}
+
+func TestMemoryUserStore_UpsertByAppleSub_EmptySubRejected(t *testing.T) {
+	s := newMemoryUserStore()
+	if _, err := s.UpsertByAppleSub("  ", "x@y.com", "X"); err == nil {
+		t.Fatal("expected empty/whitespace sub to be rejected")
+	}
+}
+
 func TestMemoryUserStore_UnknownID_ReturnsFalse(t *testing.T) {
 	s := newMemoryUserStore()
 

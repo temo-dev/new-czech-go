@@ -91,6 +91,16 @@ CREATE INDEX IF NOT EXISTS users_pro_expires_at_idx
 ALTER TABLE users ADD COLUMN IF NOT EXISTS current_level TEXT NOT NULL DEFAULT 'a0';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS unlocked_levels TEXT[] NOT NULL DEFAULT ARRAY['a0'];
 ALTER TABLE users ADD COLUMN IF NOT EXISTS placement_taken_at TIMESTAMPTZ;
+
+-- Migration 028 (V25): Sign-in-with-Apple subject claim. Nullable so
+-- existing email-only rows stay valid; partial unique index prevents
+-- two Apple-linked accounts from sharing a sub while still allowing
+-- arbitrarily many NULL rows.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS apple_sub TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_apple_sub_uniq
+    ON users (apple_sub)
+    WHERE apple_sub IS NOT NULL AND deleted_at IS NULL;
 `)
 	if err != nil {
 		return err
@@ -106,6 +116,7 @@ const userColumns = `
     COALESCE(onboarding_goal, ''), COALESCE(onboarding_level, ''),
     COALESCE(daily_reminder_at, ''), COALESCE(push_token, ''),
     COALESCE(push_token_platform, ''), timezone, grace_attempts_left,
+    COALESCE(apple_sub, ''),
     created_at, updated_at, deleted_at
 `
 
@@ -120,6 +131,7 @@ func scanUser(row interface {
 		&u.OnboardingGoal, &u.OnboardingLevel,
 		&u.DailyReminderAt, &u.PushToken,
 		&u.PushTokenPlatform, &u.Timezone, &u.GraceAttemptsLeft,
+		&u.AppleSub,
 		&u.CreatedAt, &u.UpdatedAt, &deletedAt,
 	)
 	if err != nil {
@@ -374,6 +386,69 @@ RETURNING grace_attempts_left
 		return 0, false
 	}
 	return left, true
+}
+
+func (s *postgresUserStore) UpsertByAppleSub(sub, email, displayName string) (contracts.UserAccount, error) {
+	sub = strings.TrimSpace(sub)
+	if sub == "" {
+		return contracts.UserAccount{}, errors.New("apple_sub required")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Existing-row fast path. Avoids racing with INSERT and keeps the
+	// returned struct identical to subsequent reads (no field churn).
+	row := s.db.QueryRowContext(ctx,
+		`SELECT `+userColumns+` FROM users WHERE apple_sub = $1 AND deleted_at IS NULL`, sub,
+	)
+	if u, err := scanUser(row); err == nil {
+		return u, nil
+	}
+
+	now := time.Now().UTC()
+	account := contracts.UserAccount{
+		ID:                newUserID(),
+		Email:             email,
+		EmailNormalized:   normalizeEmail(email),
+		EmailVerifiedAt:   &now,
+		PasswordHash:      "apple_oauth:" + sub,
+		DisplayName:       strings.TrimSpace(displayName),
+		Role:              "learner",
+		ProTier:           "free",
+		Timezone:          "Asia/Ho_Chi_Minh",
+		GraceAttemptsLeft: graceAfterVerify,
+		AppleSub:          sub,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+
+	_, err := s.db.ExecContext(ctx, `
+INSERT INTO users (
+    id, email, email_normalized, email_verified_at, password_hash,
+    display_name, role, pro_tier, timezone, grace_attempts_left,
+    apple_sub, created_at, updated_at
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+ON CONFLICT (apple_sub) WHERE apple_sub IS NOT NULL AND deleted_at IS NULL DO NOTHING
+`,
+		account.ID, account.Email, account.EmailNormalized, account.EmailVerifiedAt,
+		account.PasswordHash, account.DisplayName,
+		account.Role, account.ProTier, account.Timezone, account.GraceAttemptsLeft,
+		account.AppleSub, account.CreatedAt, account.UpdatedAt,
+	)
+	if err != nil {
+		return contracts.UserAccount{}, fmt.Errorf("insert apple user: %w", err)
+	}
+
+	// Re-fetch to cover the race where another caller won ON CONFLICT.
+	row = s.db.QueryRowContext(ctx,
+		`SELECT `+userColumns+` FROM users WHERE apple_sub = $1 AND deleted_at IS NULL`, sub,
+	)
+	u, err := scanUser(row)
+	if err != nil {
+		return contracts.UserAccount{}, fmt.Errorf("re-fetch apple user: %w", err)
+	}
+	return u, nil
 }
 
 // nullTime converts an optional time pointer to a sql-compatible value

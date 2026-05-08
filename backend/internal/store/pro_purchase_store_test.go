@@ -137,3 +137,56 @@ func TestMemoryProPurchaseStore_NoActive_ReturnsFalse(t *testing.T) {
 		t.Error("expected no active purchase for unknown user")
 	}
 }
+
+func TestMemoryProPurchaseStore_FindByTransactionID_Hit(t *testing.T) {
+	s := newMemoryProPurchaseStore()
+
+	now := time.Now().UTC()
+	created, err := s.CreateProPurchase(contracts.ProPurchase{
+		UserID:                     "u_42",
+		AppleTransactionID:         "txn_abc",
+		AppleOriginalTransactionID: "orig_abc",
+		ProductID:                  "eu.hadoo.czechgo.pro.monthly",
+		PurchasedAt:                now,
+		ExpiresAt:                  now.Add(30 * 24 * time.Hour),
+		ReceiptPayload:             []byte(`{}`),
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	got, ok := s.FindByTransactionID("txn_abc")
+	if !ok {
+		t.Fatal("expected lookup hit")
+	}
+	if got.UserID != "u_42" {
+		t.Errorf("expected owner round-trip, got %q", got.UserID)
+	}
+	if got.ID != created.ID {
+		t.Errorf("expected same id, got %q vs %q", got.ID, created.ID)
+	}
+
+	// V25 webhook downgrade path: row stays findable after MarkInactive
+	// so REFUND-after-EXPIRED replay can still resolve the user_id.
+	if !s.MarkProPurchaseInactive("txn_abc") {
+		t.Fatal("mark inactive failed")
+	}
+	stillThere, ok := s.FindByTransactionID("txn_abc")
+	if !ok {
+		t.Fatal("expected lookup hit even when inactive")
+	}
+	if stillThere.IsActive {
+		t.Error("expected row to reflect inactive state on lookup")
+	}
+}
+
+func TestMemoryProPurchaseStore_FindByTransactionID_Miss(t *testing.T) {
+	s := newMemoryProPurchaseStore()
+
+	if _, ok := s.FindByTransactionID("txn_nope"); ok {
+		t.Error("expected miss for unknown txn")
+	}
+	if _, ok := s.FindByTransactionID(""); ok {
+		t.Error("expected miss for empty txn")
+	}
+}

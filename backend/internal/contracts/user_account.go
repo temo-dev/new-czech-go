@@ -28,6 +28,7 @@ type UserAccount struct {
 	PushTokenPlatform string     `json:"push_token_platform,omitempty"`
 	Timezone          string     `json:"timezone"`
 	GraceAttemptsLeft int        `json:"grace_attempts_left"`
+	AppleSub          string     `json:"apple_sub,omitempty"` // V25 Sign-in-with-Apple subject claim; empty for email accounts
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 	DeletedAt         *time.Time `json:"deleted_at,omitempty"`

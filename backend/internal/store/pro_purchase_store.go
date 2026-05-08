@@ -23,6 +23,13 @@ type ProPurchaseStore interface {
 	CreateProPurchase(p contracts.ProPurchase) (contracts.ProPurchase, error)
 	ActiveProPurchaseByUser(userID string) (contracts.ProPurchase, bool)
 	MarkProPurchaseInactive(appleTransactionID string) bool
+
+	// FindByTransactionID returns the row keyed by Apple's transaction id
+	// regardless of is_active. The webhook downgrade path needs the
+	// owning user_id even when the same transaction has already been
+	// marked inactive (e.g. a REFUND following an EXPIRED for the same
+	// txn). Returns (zero, false) when no row matches.
+	FindByTransactionID(appleTransactionID string) (contracts.ProPurchase, bool)
 }
 
 // ErrDuplicateAppleTxn is returned when CreateProPurchase is called with a
@@ -101,6 +108,19 @@ func (s *memoryProPurchaseStore) ActiveProPurchaseByUser(userID string) (contrac
 		return contracts.ProPurchase{}, false
 	}
 	return *best, true
+}
+
+func (s *memoryProPurchaseStore) FindByTransactionID(appleTransactionID string) (contracts.ProPurchase, bool) {
+	if appleTransactionID == "" {
+		return contracts.ProPurchase{}, false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	p, ok := s.purchases[appleTransactionID]
+	if !ok {
+		return contracts.ProPurchase{}, false
+	}
+	return *p, true
 }
 
 func (s *memoryProPurchaseStore) MarkProPurchaseInactive(appleTransactionID string) bool {
@@ -221,6 +241,29 @@ WHERE user_id = $1 AND is_active = TRUE AND expires_at > now()
 ORDER BY expires_at DESC
 LIMIT 1
 `, userID)
+	var p contracts.ProPurchase
+	if err := row.Scan(
+		&p.ID, &p.UserID, &p.AppleTransactionID, &p.AppleOriginalTransactionID,
+		&p.ProductID, &p.PurchasedAt, &p.ExpiresAt, &p.ReceiptPayload, &p.IsActive, &p.CreatedAt,
+	); err != nil {
+		return contracts.ProPurchase{}, false
+	}
+	return p, true
+}
+
+func (s *postgresProPurchaseStore) FindByTransactionID(appleTransactionID string) (contracts.ProPurchase, bool) {
+	if appleTransactionID == "" {
+		return contracts.ProPurchase{}, false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	row := s.db.QueryRowContext(ctx, `
+SELECT id, user_id, apple_transaction_id, apple_original_transaction_id,
+       product_id, purchased_at, expires_at, receipt_payload, is_active, created_at
+FROM pro_purchases
+WHERE apple_transaction_id = $1
+LIMIT 1
+`, appleTransactionID)
 	var p contracts.ProPurchase
 	if err := row.Scan(
 		&p.ID, &p.UserID, &p.AppleTransactionID, &p.AppleOriginalTransactionID,
