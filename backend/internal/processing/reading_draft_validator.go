@@ -30,6 +30,12 @@ func ValidateReadingDraft(d *contracts.ReadingDraft) error {
 			return fmt.Errorf("cteni_4: expected Cteni4Detail, got %T", d.Detail)
 		}
 		return validateCteni4(detail)
+	case "cteni_5":
+		detail, ok := d.Detail.(contracts.Cteni5Detail)
+		if !ok {
+			return fmt.Errorf("cteni_5: expected Cteni5Detail, got %T", d.Detail)
+		}
+		return validateCteni5(detail)
 	default:
 		return fmt.Errorf("reading draft: unsupported exercise_type %q", d.ExerciseType)
 	}
@@ -55,6 +61,41 @@ func validateCteni4(d contracts.Cteni4Detail) error {
 		return err
 	}
 	return requireCorrectAnswers(d.CorrectAnswers, len(d.Questions), "cteni_4", "A-D", []string{"A", "B", "C", "D"})
+}
+
+// ── cteni_5 ───────────────────────────────────────────────────────────────────
+
+const cteni5MaxAnswerLen = 30
+
+func validateCteni5(d contracts.Cteni5Detail) error {
+	if strings.TrimSpace(d.Text) == "" {
+		return fmt.Errorf("cteni_5: text must be non-empty")
+	}
+	if len(d.Questions) != 5 {
+		return fmt.Errorf("cteni_5: expected 5 questions, got %d", len(d.Questions))
+	}
+	for i, q := range d.Questions {
+		if strings.TrimSpace(q.Prompt) == "" {
+			return fmt.Errorf("cteni_5: question %d prompt must be non-empty", i+1)
+		}
+	}
+	for i := 1; i <= len(d.Questions); i++ {
+		key := strconv.Itoa(i)
+		v, ok := d.CorrectAnswers[key]
+		if !ok {
+			return fmt.Errorf("cteni_5: missing correct_answer for question %d", i)
+		}
+		if strings.TrimSpace(v) == "" {
+			return fmt.Errorf("cteni_5: correct_answer for question %d is empty", i)
+		}
+		if len(v) > cteni5MaxAnswerLen {
+			return fmt.Errorf("cteni_5: correct_answer for question %d exceeds %d characters", i, cteni5MaxAnswerLen)
+		}
+	}
+	if len(d.CorrectAnswers) != len(d.Questions) {
+		return fmt.Errorf("cteni_5: correct_answers should cover %d questions, got %d entries", len(d.Questions), len(d.CorrectAnswers))
+	}
+	return nil
 }
 
 // ── shared multi-choice question validator ────────────────────────────────────

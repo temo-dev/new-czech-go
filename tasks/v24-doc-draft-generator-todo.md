@@ -48,10 +48,13 @@ Each task: tool schema + prompt branch + validator (≥5 reject + 1 accept fixtu
   - [x] Generator dispatch wired (cteni_2 + cteni_4 share `callClaude` path)
   - [x] Tests +5 (validator accept w/ + w/o context, 5 reject fixtures, schema bounds, prompt content, parser round-trip)
   - [x] Commit `feat(v24-B2): cteni_4 draft generator + validator`
-- [ ] **B3** cteni_5 — text + 5 fill-info
-  - [ ] Validator rejects answer >30 chars or empty
-  - [ ] Same checklist as B1
-  - [ ] Commit `feat(v24-B3): cteni_5 draft generator + validator`
+- [x] **B3** cteni_5 — text + 5 fill-info
+  - [x] Tool schema (`cteni5ToolSchema`) — text + 5 FillQuestion + correct_answers minLength:1, maxLength:30
+  - [x] Prompt branch — 80-150 word passage, 5 fill questions, answers verbatim from passage, ≤30 chars
+  - [x] Validator (`validateCteni5`) rejects empty/long answers, missing keys, empty prompts
+  - [x] Generator dispatch + parser branch wired
+  - [x] Tests +9 (validator accept + 6 reject, prompt content, schema bounds, parser round-trip)
+  - [x] Commit `feat(v24-B3): cteni_5 draft generator + validator`
 - [ ] **B4** cteni_6 — Ano/Ne (1-5 statements)
   - [ ] Validator: UPPERCASE ANO/NE; max_points == len(statements); 1-5 range
   - [ ] Commit `feat(v24-B4): cteni_6 draft generator + validator`

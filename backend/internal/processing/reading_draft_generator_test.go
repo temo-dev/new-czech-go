@@ -39,8 +39,8 @@ func TestMockReadingDraftGenerator_PropagatesError(t *testing.T) {
 func TestClaudeReadingDraftGenerator_NotImplementedForUnshippedTypes(t *testing.T) {
 	gen := NewClaudeReadingDraftGenerator("dummy-key", DefaultReadingDraftModel)
 
-	// cteni_2 ships in B1, cteni_4 in B2; remaining types still skeleton.
-	for _, exType := range []string{"cteni_1", "cteni_3", "cteni_5", "cteni_6"} {
+	// cteni_2 ships in B1, cteni_4 in B2, cteni_5 in B3; remaining types still skeleton.
+	for _, exType := range []string{"cteni_1", "cteni_3", "cteni_6"} {
 		t.Run(exType, func(t *testing.T) {
 			_, err := gen.Generate(context.Background(), contracts.ReadingDraftInput{ExerciseType: exType})
 			if !errors.Is(err, ErrReadingDraftNotImplemented) {
@@ -194,6 +194,61 @@ func TestParseReadingDraftDetail_Cteni4_RoundTrips(t *testing.T) {
 	}
 	if d.Context != "Pavel byl nemocný." {
 		t.Fatalf("context mismatch: %q", d.Context)
+	}
+}
+
+func TestBuildReadingDraftUserPrompt_Cteni5_HasFillRequirements(t *testing.T) {
+	in := contracts.ReadingDraftInput{
+		ExerciseType:  "cteni_5",
+		Topic:         "u doktora",
+		Level:         "A2",
+		GrammarPoints: []contracts.GrammarRule{{Title: "minulý čas"}},
+	}
+	got := BuildReadingDraftUserPrompt(in)
+	for _, sub := range []string{"cteni_5", "5 fill-information", "≤30 characters", "verbatim"} {
+		if !strings.Contains(got, sub) {
+			t.Errorf("user prompt missing %q\nfull:\n%s", sub, got)
+		}
+	}
+}
+
+func TestBuildReadingDraftToolSchema_Cteni5_EnforcesShortAnswers(t *testing.T) {
+	schema := buildReadingDraftToolSchema("cteni_5")
+	if schema == nil {
+		t.Fatal("expected schema for cteni_5")
+	}
+	props, _ := schema["properties"].(map[string]any)
+	answers, _ := props["correct_answers"].(map[string]any)
+	addProps, _ := answers["additionalProperties"].(map[string]any)
+	if addProps["maxLength"] != cteni5MaxAnswerLen {
+		t.Errorf("correct_answers maxLength = %v, want %d", addProps["maxLength"], cteni5MaxAnswerLen)
+	}
+	if addProps["minLength"] != 1 {
+		t.Errorf("correct_answers minLength = %v, want 1", addProps["minLength"])
+	}
+}
+
+func TestParseReadingDraftDetail_Cteni5_RoundTrips(t *testing.T) {
+	raw := []byte(`{
+		"text": "Pavel byl nemocný.",
+		"questions": [
+			{"question_no": 1, "prompt": "Jméno:"}
+		],
+		"correct_answers": {"1": "Pavel"}
+	}`)
+	detail, err := parseReadingDraftDetail("cteni_5", raw)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	d, ok := detail.(contracts.Cteni5Detail)
+	if !ok {
+		t.Fatalf("expected Cteni5Detail, got %T", detail)
+	}
+	if d.Questions[0].Prompt != "Jméno:" {
+		t.Fatalf("prompt mismatch: %q", d.Questions[0].Prompt)
+	}
+	if d.CorrectAnswers["1"] != "Pavel" {
+		t.Fatalf("answer mismatch: %v", d.CorrectAnswers)
 	}
 }
 

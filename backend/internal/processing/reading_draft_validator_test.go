@@ -157,6 +157,82 @@ func TestValidateReadingDraft_Cteni4_AcceptsValidWithoutContext(t *testing.T) {
 	}
 }
 
+// ── cteni_5 fixtures ──────────────────────────────────────────────────────────
+
+func validCteni5Detail() contracts.Cteni5Detail {
+	return contracts.Cteni5Detail{
+		Text: "Pavel byl nemocný a šel k lékaři ve čtvrtek.",
+		Questions: []contracts.FillQuestion{
+			{QuestionNo: 1, Prompt: "Jméno autora:"},
+			{QuestionNo: 2, Prompt: "Kam šel:"},
+			{QuestionNo: 3, Prompt: "Den:"},
+			{QuestionNo: 4, Prompt: "Co bolelo:"},
+			{QuestionNo: 5, Prompt: "Stav:"},
+		},
+		CorrectAnswers: map[string]string{"1": "Pavel", "2": "lékař", "3": "čtvrtek", "4": "hlava", "5": "nemocný"},
+	}
+}
+
+func TestValidateReadingDraft_Cteni5_AcceptsValid(t *testing.T) {
+	draft := &contracts.ReadingDraft{ExerciseType: "cteni_5", Detail: validCteni5Detail()}
+	if err := ValidateReadingDraft(draft); err != nil {
+		t.Fatalf("expected valid draft to pass, got %v", err)
+	}
+}
+
+func TestValidateReadingDraft_Cteni5_RejectsMalformed(t *testing.T) {
+	cases := []struct {
+		name    string
+		mutate  func(d *contracts.Cteni5Detail)
+		wantSub string
+	}{
+		{
+			name:    "empty text",
+			mutate:  func(d *contracts.Cteni5Detail) { d.Text = "" },
+			wantSub: "text",
+		},
+		{
+			name:    "wrong question count",
+			mutate:  func(d *contracts.Cteni5Detail) { d.Questions = d.Questions[:4] },
+			wantSub: "5 questions",
+		},
+		{
+			name:    "empty prompt",
+			mutate:  func(d *contracts.Cteni5Detail) { d.Questions[2].Prompt = "" },
+			wantSub: "prompt",
+		},
+		{
+			name:    "missing correct_answer for question 4",
+			mutate:  func(d *contracts.Cteni5Detail) { delete(d.CorrectAnswers, "4") },
+			wantSub: "missing correct_answer",
+		},
+		{
+			name:    "empty correct_answer value",
+			mutate:  func(d *contracts.Cteni5Detail) { d.CorrectAnswers["1"] = "" },
+			wantSub: "empty",
+		},
+		{
+			name:    "correct_answer value too long",
+			mutate:  func(d *contracts.Cteni5Detail) { d.CorrectAnswers["3"] = strings.Repeat("a", 31) },
+			wantSub: "30 characters",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			detail := validCteni5Detail()
+			tc.mutate(&detail)
+			draft := &contracts.ReadingDraft{ExerciseType: "cteni_5", Detail: detail}
+			err := ValidateReadingDraft(draft)
+			if err == nil {
+				t.Fatalf("expected validation error containing %q, got nil", tc.wantSub)
+			}
+			if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Fatalf("expected error containing %q, got %q", tc.wantSub, err.Error())
+			}
+		})
+	}
+}
+
 func TestValidateReadingDraft_Cteni4_RejectsMalformed(t *testing.T) {
 	cases := []struct {
 		name    string

@@ -503,6 +503,14 @@ func readingDraftStructuralRequirements(exerciseType string) string {
 			"- correct_answers map: keys \"1\"..\"6\", values are A, B, C, or D matching the correct option key",
 			"- Distractors must be plausible (same semantic field, same grammatical category as the correct answer)",
 		}, "\n")
+	case "cteni_5":
+		return strings.Join([]string{
+			"- Generate exactly one passage of natural Czech, 80-150 words, in field `text`",
+			"- Generate exactly 5 fill-information questions; each question_no = 1..5",
+			"- Each question has a non-empty `prompt` describing the slot (e.g. \"Jméno autora:\", \"Den:\")",
+			"- correct_answers map: keys \"1\"..\"5\", values are short factual strings (single noun, number, or date) ≤30 characters",
+			"- Answers must be findable verbatim in the passage",
+		}, "\n")
 	}
 	return ""
 }
