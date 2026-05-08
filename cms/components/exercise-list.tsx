@@ -77,6 +77,7 @@ export function ExerciseList({
   );
 
   const [problemOnly, setProblemOnly] = useState(false);
+  const [aiOnly, setAiOnly] = useState(false);
 
   const filteredItems = useMemo(() => items.filter((item) => {
     if (skillKind && item.skill_kind !== skillKind) return false;
@@ -92,8 +93,9 @@ export function ExerciseList({
       !item.exercise_type.toLowerCase().includes(text.toLowerCase())
     ) return false;
     if (problemOnly && !hasAnyIssue(item.validation_flags)) return false;
+    if (aiOnly && !item.created_by_llm) return false;
     return true;
-  }), [items, skillKind, moduleId, courseId, moduleMap, mtExerciseIds, text, problemOnly]);
+  }), [items, skillKind, moduleId, courseId, moduleMap, mtExerciseIds, text, problemOnly, aiOnly]);
 
   function clearFilters() {
     onFilterChange({ courseId: '', moduleId: '', skillKind: '', mockTestId: '', text: '' });
@@ -298,6 +300,23 @@ export function ExerciseList({
           />
           Chỉ hiện vấn đề
         </label>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 12,
+            color: 'var(--ink-2)',
+            cursor: 'pointer',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={aiOnly}
+            onChange={(e) => setAiOnly(e.target.checked)}
+          />
+          ✨ AI-drafted
+        </label>
         <span
           style={{
             fontSize: 12,
@@ -413,6 +432,20 @@ export function ExerciseList({
                   >
                     {item.title}
                   </strong>
+                  {item.created_by_llm && (
+                    <span
+                      title="Đã tạo bằng AI draft generator"
+                      aria-label="AI-drafted"
+                      style={{
+                        marginLeft: 6,
+                        fontSize: 11,
+                        color: 'var(--brand, #7c3aed)',
+                        flexShrink: 0,
+                      }}
+                    >
+                      ✨
+                    </span>
+                  )}
                 </div>
                 {item.short_instruction && (
                   <span

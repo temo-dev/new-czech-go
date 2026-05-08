@@ -135,8 +135,8 @@ gate; if gate fails the CMS UI can be feature-flagged off via missing
 - [x] **D6** Confirm-overwrite dialog
   - [x] First generate (clean form) skips dialog (state machine path: idle→loading)
   - [x] Regenerate over dirty form → confirm-overwrite state → "Ghi đè & Tạo lại" or "Hủy"
-- [→] **D7** ExerciseListView ✨ badge + filter chip — **deferred to V25** (dashboard component is large; flag already round-trips through Exercise.CreatedByLLM, can be added without touching backend)
-- [→] **D-cteni_6** AnoNeFields integration — **deferred to V25** (cteni_6 backend ships, but UI panel only wired to CteniFields. AnoNeFields needs a parallel mount point)
+- [x] **D7** ExerciseList ✨ badge + AI-drafted filter — `cms/components/exercise-list.tsx` adds an `aiOnly` checkbox next to "Chỉ hiện vấn đề" + a small ✨ marker next to each AI-drafted title. Exercise type extended with `created_by_llm?: boolean`. Filter predicate covered by `cms/__tests__/exercise-list-ai-filter.test.ts`
+- [x] **D-cteni_6** AnoNeFields integration — `AiDraftPanel` mounted at top of `AnoNeFields.tsx` only when `exerciseType === 'cteni_6'` (poslech_6 stays out of V24 scope). `handleAiApply` runs `formStateFromAnoNe` → `emit` so the AI payload re-uses the existing decoder; `formDirty` derives from non-empty passage or any non-empty statement
 - [x] **D8** CMS verify
   - [x] `make cms-lint` / `npm run lint` — ESLint clean
   - [x] `make cms-build` / `npm run build` — production bundle green; new route `/api/admin/exercises/generate-draft` registered

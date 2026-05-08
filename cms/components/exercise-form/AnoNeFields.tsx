@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { buildAnoNePayload, formStateFromAnoNe, type AnoNeStatementRow } from '../exercise-utils';
+import { AiDraftPanel } from '../ai-draft/AiDraftPanel';
 
 type AnoNeType = 'cteni_6' | 'poslech_6';
 
@@ -89,10 +90,28 @@ export function AnoNeFields({
     emit({ ...state, statements: state.statements.filter((_, idx) => idx !== i) });
   }
 
+  function handleAiApply(detail: Record<string, unknown>) {
+    const next = formStateFromAnoNe(detail);
+    if (next.statements.length === 0) return;
+    emit(next);
+  }
+
   const isPoslech = exerciseType === 'poslech_6';
+  const formDirty =
+    state.passage.trim().length > 0 ||
+    state.statements.some((s) => s.statement.trim().length > 0);
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
+
+      {/* V24 AI draft generator — cteni_6 only. poslech_6 ships in V25. */}
+      {exerciseType === 'cteni_6' && (
+        <AiDraftPanel
+          exerciseType="cteni_6"
+          formDirty={formDirty}
+          onApply={handleAiApply}
+        />
+      )}
 
       {/* Passage */}
       <div style={sectionStyle}>

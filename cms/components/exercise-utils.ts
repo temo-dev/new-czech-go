@@ -44,6 +44,9 @@ export type Exercise = {
     missing_sample: boolean;
     unpublished: boolean;
   };
+  // V24 — admin authored via the AI draft generator. Sticky on update;
+  // omitted on responses where it has no value.
+  created_by_llm?: boolean;
 };
 
 export type ExerciseType =
