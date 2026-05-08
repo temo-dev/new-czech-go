@@ -15,13 +15,13 @@ func validCteni2Detail() contracts.Cteni2Detail {
 	return contracts.Cteni2Detail{
 		Text: "Pavel byl nemocný a šel k lékaři. Lékař se ho zeptal, co ho bolí. Pavel řekl, že ho bolí hlava a v krku.",
 		Questions: []contracts.ReadingQuestion{
-			cteni2Q(1, "Kam šel Pavel?"),
-			cteni2Q(2, "Co se zeptal lékař?"),
-			cteni2Q(3, "Co bolí Pavla?"),
-			cteni2Q(4, "Kdo je Pavel?"),
-			cteni2Q(5, "Co dostal Pavel?"),
+			cteni2Q(6, "Kam šel Pavel?"),
+			cteni2Q(7, "Co se zeptal lékař?"),
+			cteni2Q(8, "Co bolí Pavla?"),
+			cteni2Q(9, "Kdo je Pavel?"),
+			cteni2Q(10, "Co dostal Pavel?"),
 		},
-		CorrectAnswers: map[string]string{"1": "A", "2": "B", "3": "C", "4": "D", "5": "A"},
+		CorrectAnswers: map[string]string{"6": "A", "7": "B", "8": "C", "9": "D", "10": "A"},
 	}
 }
 
@@ -67,13 +67,13 @@ func TestValidateReadingDraft_Cteni2_RejectsMalformed(t *testing.T) {
 		{
 			name: "correct_answer key out of A-D",
 			mutate: func(d *contracts.Cteni2Detail) {
-				d.CorrectAnswers["1"] = "E"
+				d.CorrectAnswers["6"] = "E"
 			},
 			wantSub: "A-D",
 		},
 		{
-			name:    "missing correct_answer for question 3",
-			mutate:  func(d *contracts.Cteni2Detail) { delete(d.CorrectAnswers, "3") },
+			name:    "missing correct_answer for question 8",
+			mutate:  func(d *contracts.Cteni2Detail) { delete(d.CorrectAnswers, "8") },
 			wantSub: "missing correct_answer",
 		},
 		{
@@ -328,14 +328,14 @@ func validCteni4Detail() contracts.Cteni4Detail {
 	return contracts.Cteni4Detail{
 		Context: "Pavel byl nemocný a šel k lékaři.",
 		Questions: []contracts.ReadingQuestion{
-			cteni2Q(1, "Q1?"),
-			cteni2Q(2, "Q2?"),
-			cteni2Q(3, "Q3?"),
-			cteni2Q(4, "Q4?"),
-			cteni2Q(5, "Q5?"),
-			cteni2Q(6, "Q6?"),
+			cteni2Q(15, "Q1?"),
+			cteni2Q(16, "Q2?"),
+			cteni2Q(17, "Q3?"),
+			cteni2Q(18, "Q4?"),
+			cteni2Q(19, "Q5?"),
+			cteni2Q(20, "Q6?"),
 		},
-		CorrectAnswers: map[string]string{"1": "A", "2": "B", "3": "C", "4": "D", "5": "A", "6": "B"},
+		CorrectAnswers: map[string]string{"15": "A", "16": "B", "17": "C", "18": "D", "19": "A", "20": "B"},
 	}
 }
 
@@ -361,13 +361,13 @@ func validCteni5Detail() contracts.Cteni5Detail {
 	return contracts.Cteni5Detail{
 		Text: "Pavel byl nemocný a šel k lékaři ve čtvrtek.",
 		Questions: []contracts.FillQuestion{
-			{QuestionNo: 1, Prompt: "Jméno autora:"},
-			{QuestionNo: 2, Prompt: "Kam šel:"},
-			{QuestionNo: 3, Prompt: "Den:"},
-			{QuestionNo: 4, Prompt: "Co bolelo:"},
-			{QuestionNo: 5, Prompt: "Stav:"},
+			{QuestionNo: 21, Prompt: "Jméno autora:"},
+			{QuestionNo: 22, Prompt: "Kam šel:"},
+			{QuestionNo: 23, Prompt: "Den:"},
+			{QuestionNo: 24, Prompt: "Co bolelo:"},
+			{QuestionNo: 25, Prompt: "Stav:"},
 		},
-		CorrectAnswers: map[string]string{"1": "Pavel", "2": "lékař", "3": "čtvrtek", "4": "hlava", "5": "nemocný"},
+		CorrectAnswers: map[string]string{"21": "Pavel", "22": "lékař", "23": "čtvrtek", "24": "hlava", "25": "nemocný"},
 	}
 }
 
@@ -400,18 +400,18 @@ func TestValidateReadingDraft_Cteni5_RejectsMalformed(t *testing.T) {
 			wantSub: "prompt",
 		},
 		{
-			name:    "missing correct_answer for question 4",
-			mutate:  func(d *contracts.Cteni5Detail) { delete(d.CorrectAnswers, "4") },
+			name:    "missing correct_answer for question 24",
+			mutate:  func(d *contracts.Cteni5Detail) { delete(d.CorrectAnswers, "24") },
 			wantSub: "missing correct_answer",
 		},
 		{
 			name:    "empty correct_answer value",
-			mutate:  func(d *contracts.Cteni5Detail) { d.CorrectAnswers["1"] = "" },
+			mutate:  func(d *contracts.Cteni5Detail) { d.CorrectAnswers["21"] = "" },
 			wantSub: "empty",
 		},
 		{
 			name:    "correct_answer value too long",
-			mutate:  func(d *contracts.Cteni5Detail) { d.CorrectAnswers["3"] = strings.Repeat("a", 31) },
+			mutate:  func(d *contracts.Cteni5Detail) { d.CorrectAnswers["23"] = strings.Repeat("a", 31) },
 			wantSub: "30 characters",
 		},
 	}
@@ -561,12 +561,12 @@ func TestValidateReadingDraft_Cteni4_RejectsMalformed(t *testing.T) {
 		},
 		{
 			name:    "correct_answer key out of A-D",
-			mutate:  func(d *contracts.Cteni4Detail) { d.CorrectAnswers["1"] = "Z" },
+			mutate:  func(d *contracts.Cteni4Detail) { d.CorrectAnswers["15"] = "Z" },
 			wantSub: "A-D",
 		},
 		{
-			name:    "missing correct_answer for question 6",
-			mutate:  func(d *contracts.Cteni4Detail) { delete(d.CorrectAnswers, "6") },
+			name:    "missing correct_answer for question 20",
+			mutate:  func(d *contracts.Cteni4Detail) { delete(d.CorrectAnswers, "20") },
 			wantSub: "missing correct_answer",
 		},
 		{

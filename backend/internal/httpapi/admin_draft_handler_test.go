@@ -26,13 +26,13 @@ func validReadingDraft() *contracts.ReadingDraft {
 		Detail: contracts.Cteni2Detail{
 			Text: "Pavel byl nemocný a šel k lékaři.",
 			Questions: []contracts.ReadingQuestion{
-				{QuestionNo: 1, Prompt: "Q1?", Options: fourOptions()},
-				{QuestionNo: 2, Prompt: "Q2?", Options: fourOptions()},
-				{QuestionNo: 3, Prompt: "Q3?", Options: fourOptions()},
-				{QuestionNo: 4, Prompt: "Q4?", Options: fourOptions()},
-				{QuestionNo: 5, Prompt: "Q5?", Options: fourOptions()},
+				{QuestionNo: 6, Prompt: "Q1?", Options: fourOptions()},
+				{QuestionNo: 7, Prompt: "Q2?", Options: fourOptions()},
+				{QuestionNo: 8, Prompt: "Q3?", Options: fourOptions()},
+				{QuestionNo: 9, Prompt: "Q4?", Options: fourOptions()},
+				{QuestionNo: 10, Prompt: "Q5?", Options: fourOptions()},
 			},
-			CorrectAnswers: map[string]string{"1": "A", "2": "B", "3": "C", "4": "D", "5": "A"},
+			CorrectAnswers: map[string]string{"6": "A", "7": "B", "8": "C", "9": "D", "10": "A"},
 		},
 		Metadata: contracts.ReadingDraftMeta{Model: "mock", DurationMs: 1},
 	}

@@ -490,25 +490,25 @@ func readingDraftStructuralRequirements(exerciseType string) string {
 	case "cteni_2":
 		return strings.Join([]string{
 			"- Generate exactly one passage of natural Czech, 100-200 words, in field `text`",
-			"- Generate exactly 5 questions; each question_no = 1..5",
+			"- Generate exactly 5 questions; question_no = 6, 7, 8, 9, 10 (matches A2 exam ordering after cteni_1 items 1-5)",
 			"- Each question has exactly 4 options with keys A, B, C, D and non-empty option `text`",
-			"- correct_answers map: keys \"1\"..\"5\", values are A, B, C, or D matching the correct option key",
+			"- correct_answers map: keys \"6\"..\"10\", values are A, B, C, or D matching the correct option key",
 			"- Distractors must be plausible (same semantic field, same grammatical category as the correct answer)",
 		}, "\n")
 	case "cteni_4":
 		return strings.Join([]string{
 			"- Optionally include a short reading context (60-120 words) in field `context`; questions may stand alone",
-			"- Generate exactly 6 questions; each question_no = 1..6",
+			"- Generate exactly 6 questions; question_no = 15, 16, 17, 18, 19, 20 (matches A2 exam ordering)",
 			"- Each question has exactly 4 options with keys A, B, C, D and non-empty option `text`",
-			"- correct_answers map: keys \"1\"..\"6\", values are A, B, C, or D matching the correct option key",
+			"- correct_answers map: keys \"15\"..\"20\", values are A, B, C, or D matching the correct option key",
 			"- Distractors must be plausible (same semantic field, same grammatical category as the correct answer)",
 		}, "\n")
 	case "cteni_5":
 		return strings.Join([]string{
 			"- Generate exactly one passage of natural Czech, 80-150 words, in field `text`",
-			"- Generate exactly 5 fill-information questions; each question_no = 1..5",
+			"- Generate exactly 5 fill-information questions; question_no = 21, 22, 23, 24, 25 (matches A2 exam ordering)",
 			"- Each question has a non-empty `prompt` describing the slot (e.g. \"Jméno autora:\", \"Den:\")",
-			"- correct_answers map: keys \"1\"..\"5\", values are short factual strings (single noun, number, or date) ≤30 characters",
+			"- correct_answers map: keys \"21\"..\"25\", values are short factual strings (single noun, number, or date) ≤30 characters",
 			"- Answers must be findable verbatim in the passage",
 		}, "\n")
 	case "cteni_6":

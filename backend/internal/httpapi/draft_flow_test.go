@@ -37,10 +37,10 @@ func TestV24DraftFlow_E2E_AdminGeneratesAndSavesCteni2(t *testing.T) {
 		Detail: contracts.Cteni2Detail{
 			Text: "Pavel byl nemocný a šel k lékaři.",
 			Questions: []contracts.ReadingQuestion{
-				draftQ(1, "Q1?"), draftQ(2, "Q2?"), draftQ(3, "Q3?"),
-				draftQ(4, "Q4?"), draftQ(5, "Q5?"),
+				draftQ(6, "Q1?"), draftQ(7, "Q2?"), draftQ(8, "Q3?"),
+				draftQ(9, "Q4?"), draftQ(10, "Q5?"),
 			},
-			CorrectAnswers: map[string]string{"1": "A", "2": "B", "3": "C", "4": "D", "5": "A"},
+			CorrectAnswers: map[string]string{"6": "A", "7": "B", "8": "C", "9": "D", "10": "A"},
 		},
 		Metadata: contracts.ReadingDraftMeta{Model: "mock", DurationMs: 1},
 	}

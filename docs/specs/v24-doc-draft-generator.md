@@ -178,7 +178,7 @@ no duplicate values. `asset_id` omitted — admin uploads images post-fill.
   "text": "Pavel byl nemocný a šel k lékaři...",
   "questions": [
     {
-      "question_no": 1,
+      "question_no": 6,
       "prompt": "Kam šel Pavel?",
       "options": [
         {"key": "A", "text": "..."},
@@ -187,14 +187,15 @@ no duplicate values. `asset_id` omitted — admin uploads images post-fill.
         {"key": "D", "text": "..."}
       ]
     }
-    /* total 5 */
+    /* total 5; question_no = 6, 7, 8, 9, 10 */
   ],
-  "correct_answers": {"1": "B", "2": "A", "3": "D", "4": "C", "5": "A"}
+  "correct_answers": {"6": "B", "7": "A", "8": "D", "9": "C", "10": "A"}
 }
 ```
 
 Validation: 5 questions, exactly 4 options each, all correct keys A-D.
-`text` 100-200 words.
+`text` 100-200 words. **`question_no` uses A2 exam-aligned numbering 6..10**
+(cteni_1 occupies items 1..5); `correct_answers` keys must match.
 
 ### cteni_3 — match 4 texts → persons A-E
 
@@ -224,12 +225,13 @@ Validation: 4 texts, 5 persons (1 distractor), 4 correct keys A-E unique.
 ```json
 {
   "context": "...",
-  "questions": [ /* 6 items, same shape as cteni_2 */ ],
-  "correct_answers": {"1": "...", "2": "...", "3": "...", "4": "...", "5": "...", "6": "..."}
+  "questions": [ /* 6 items, same shape as cteni_2; question_no = 15..20 */ ],
+  "correct_answers": {"15": "...", "16": "...", "17": "...", "18": "...", "19": "...", "20": "..."}
 }
 ```
 
 Validation: 6 questions, 4 options each. `context` optional but recommended.
+**`question_no` uses A2 exam-aligned numbering 15..20**.
 
 ### cteni_5 — text + 5 fill-info questions
 
@@ -237,15 +239,15 @@ Validation: 6 questions, 4 options each. `context` optional but recommended.
 {
   "text": "...",
   "questions": [
-    {"question_no": 1, "prompt": "Jméno autora:"}
-    /* total 5 */
+    {"question_no": 21, "prompt": "Jméno autora:"}
+    /* total 5; question_no = 21, 22, 23, 24, 25 */
   ],
-  "correct_answers": {"1": "Pavel", "2": "lékař", "3": "30", "4": "Praha", "5": "úterý"}
+  "correct_answers": {"21": "Pavel", "22": "lékař", "23": "30", "24": "Praha", "25": "úterý"}
 }
 ```
 
 Validation: 5 questions, all correct values are short strings (1-30 chars).
-`text` 80-150 words.
+`text` 80-150 words. **`question_no` uses A2 exam-aligned numbering 21..25**.
 
 ### cteni_6 — Ano/Ne (1-5 statements)
 

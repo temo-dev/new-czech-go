@@ -134,6 +134,36 @@ func TestBuildReadingDraftToolSchema_Cteni2_HasExpectedShape(t *testing.T) {
 	if questions["minItems"] != 5 || questions["maxItems"] != 5 {
 		t.Errorf("questions array bounds = [%v, %v], want [5, 5]", questions["minItems"], questions["maxItems"])
 	}
+	qItem, _ := questions["items"].(map[string]any)
+	qProps, _ := qItem["properties"].(map[string]any)
+	qNo, _ := qProps["question_no"].(map[string]any)
+	if qNo["minimum"] != 6 || qNo["maximum"] != 10 {
+		t.Errorf("question_no range = [%v, %v], want [6, 10] (exam-aligned)", qNo["minimum"], qNo["maximum"])
+	}
+}
+
+func TestBuildReadingDraftToolSchema_Cteni4_HasExamAlignedQuestionNo(t *testing.T) {
+	schema := buildReadingDraftToolSchema("cteni_4")
+	props, _ := schema["properties"].(map[string]any)
+	questions, _ := props["questions"].(map[string]any)
+	qItem, _ := questions["items"].(map[string]any)
+	qProps, _ := qItem["properties"].(map[string]any)
+	qNo, _ := qProps["question_no"].(map[string]any)
+	if qNo["minimum"] != 15 || qNo["maximum"] != 20 {
+		t.Errorf("question_no range = [%v, %v], want [15, 20] (exam-aligned)", qNo["minimum"], qNo["maximum"])
+	}
+}
+
+func TestBuildReadingDraftToolSchema_Cteni5_HasExamAlignedQuestionNo(t *testing.T) {
+	schema := buildReadingDraftToolSchema("cteni_5")
+	props, _ := schema["properties"].(map[string]any)
+	questions, _ := props["questions"].(map[string]any)
+	qItem, _ := questions["items"].(map[string]any)
+	qProps, _ := qItem["properties"].(map[string]any)
+	qNo, _ := qProps["question_no"].(map[string]any)
+	if qNo["minimum"] != 21 || qNo["maximum"] != 25 {
+		t.Errorf("question_no range = [%v, %v], want [21, 25] (exam-aligned)", qNo["minimum"], qNo["maximum"])
+	}
 }
 
 func TestBuildReadingDraftToolSchema_UnknownTypeReturnsNil(t *testing.T) {
@@ -179,12 +209,12 @@ func TestParseReadingDraftDetail_Cteni4_RoundTrips(t *testing.T) {
 	raw := []byte(`{
 		"context": "Pavel byl nemocný.",
 		"questions": [
-			{"question_no": 1, "prompt": "Q1?", "options": [
+			{"question_no": 15, "prompt": "Q1?", "options": [
 				{"key": "A", "text": "a"}, {"key": "B", "text": "b"},
 				{"key": "C", "text": "c"}, {"key": "D", "text": "d"}
 			]}
 		],
-		"correct_answers": {"1": "A"}
+		"correct_answers": {"15": "A"}
 	}`)
 	detail, err := parseReadingDraftDetail("cteni_4", raw)
 	if err != nil {
@@ -234,9 +264,9 @@ func TestParseReadingDraftDetail_Cteni5_RoundTrips(t *testing.T) {
 	raw := []byte(`{
 		"text": "Pavel byl nemocný.",
 		"questions": [
-			{"question_no": 1, "prompt": "Jméno:"}
+			{"question_no": 21, "prompt": "Jméno:"}
 		],
-		"correct_answers": {"1": "Pavel"}
+		"correct_answers": {"21": "Pavel"}
 	}`)
 	detail, err := parseReadingDraftDetail("cteni_5", raw)
 	if err != nil {
@@ -249,7 +279,7 @@ func TestParseReadingDraftDetail_Cteni5_RoundTrips(t *testing.T) {
 	if d.Questions[0].Prompt != "Jméno:" {
 		t.Fatalf("prompt mismatch: %q", d.Questions[0].Prompt)
 	}
-	if d.CorrectAnswers["1"] != "Pavel" {
+	if d.CorrectAnswers["21"] != "Pavel" {
 		t.Fatalf("answer mismatch: %v", d.CorrectAnswers)
 	}
 }
@@ -383,12 +413,12 @@ func TestParseReadingDraftDetail_Cteni2_RoundTrips(t *testing.T) {
 	raw := []byte(`{
 		"text": "Pavel byl nemocný.",
 		"questions": [
-			{"question_no": 1, "prompt": "?", "options": [
+			{"question_no": 6, "prompt": "?", "options": [
 				{"key": "A", "text": "a"}, {"key": "B", "text": "b"},
 				{"key": "C", "text": "c"}, {"key": "D", "text": "d"}
 			]}
 		],
-		"correct_answers": {"1": "A"}
+		"correct_answers": {"6": "A"}
 	}`)
 	detail, err := parseReadingDraftDetail("cteni_2", raw)
 	if err != nil {
@@ -404,7 +434,10 @@ func TestParseReadingDraftDetail_Cteni2_RoundTrips(t *testing.T) {
 	if len(d.Questions) != 1 || d.Questions[0].Options[0].Key != "A" {
 		t.Fatalf("questions decoded incorrectly: %+v", d.Questions)
 	}
-	if d.CorrectAnswers["1"] != "A" {
+	if d.Questions[0].QuestionNo != 6 {
+		t.Fatalf("expected question_no=6 (exam-aligned), got %d", d.Questions[0].QuestionNo)
+	}
+	if d.CorrectAnswers["6"] != "A" {
 		t.Fatalf("correct_answers mismatch: %v", d.CorrectAnswers)
 	}
 }

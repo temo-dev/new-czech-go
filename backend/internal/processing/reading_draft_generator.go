@@ -297,7 +297,7 @@ func cteni5ToolSchema() map[string]any {
 		"type":     "object",
 		"required": []string{"question_no", "prompt"},
 		"properties": map[string]any{
-			"question_no": map[string]any{"type": "integer", "minimum": 1, "maximum": 5},
+			"question_no": map[string]any{"type": "integer", "minimum": cteni5QuestionStart, "maximum": cteni5QuestionStart + 4},
 			"prompt":      map[string]any{"type": "string", "minLength": 1},
 		},
 	}
@@ -325,8 +325,11 @@ func cteni5ToolSchema() map[string]any {
 }
 
 // multiChoiceQuestionSchema is the shared question shape for cteni_2 + cteni_4.
-// 4 options keyed A-D, non-empty option text, integer question_no.
-func multiChoiceQuestionSchema(maxQuestionNo int) map[string]any {
+// 4 options keyed A-D, non-empty option text, integer question_no in the
+// inclusive [minQuestionNo, maxQuestionNo] range. cteni_2 and cteni_4 use
+// exam-aligned numbering (6..10 and 15..20 respectively); see
+// reading_draft_validator.go for the constants.
+func multiChoiceQuestionSchema(minQuestionNo, maxQuestionNo int) map[string]any {
 	option := map[string]any{
 		"type":     "object",
 		"required": []string{"key", "text"},
@@ -339,7 +342,7 @@ func multiChoiceQuestionSchema(maxQuestionNo int) map[string]any {
 		"type":     "object",
 		"required": []string{"question_no", "prompt", "options"},
 		"properties": map[string]any{
-			"question_no": map[string]any{"type": "integer", "minimum": 1, "maximum": maxQuestionNo},
+			"question_no": map[string]any{"type": "integer", "minimum": minQuestionNo, "maximum": maxQuestionNo},
 			"prompt":      map[string]any{"type": "string", "minLength": 1},
 			"options": map[string]any{
 				"type":     "array",
@@ -361,7 +364,7 @@ func cteni2ToolSchema() map[string]any {
 				"type":     "array",
 				"minItems": 5,
 				"maxItems": 5,
-				"items":    multiChoiceQuestionSchema(5),
+				"items":    multiChoiceQuestionSchema(cteni2QuestionStart, cteni2QuestionStart+4),
 			},
 			"correct_answers": map[string]any{
 				"type": "object",
@@ -384,7 +387,7 @@ func cteni4ToolSchema() map[string]any {
 				"type":     "array",
 				"minItems": 6,
 				"maxItems": 6,
-				"items":    multiChoiceQuestionSchema(6),
+				"items":    multiChoiceQuestionSchema(cteni4QuestionStart, cteni4QuestionStart+5),
 			},
 			"correct_answers": map[string]any{
 				"type": "object",

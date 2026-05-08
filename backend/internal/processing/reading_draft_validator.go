@@ -59,6 +59,16 @@ func ValidateReadingDraft(d *contracts.ReadingDraft) error {
 	}
 }
 
+// Numbering follows the A2 exam ordering used by the existing CMS form
+// (see cms/components/exercise-form/CteniFields.tsx). The generator emits
+// these keys so AI-drafted exercises round-trip through the form's
+// existing decoder without a remap step.
+const (
+	cteni2QuestionStart = 6  // questions 6..10
+	cteni4QuestionStart = 15 // questions 15..20
+	cteni5QuestionStart = 21 // questions 21..25
+)
+
 // ── cteni_2 ───────────────────────────────────────────────────────────────────
 
 func validateCteni2(d contracts.Cteni2Detail) error {
@@ -68,7 +78,7 @@ func validateCteni2(d contracts.Cteni2Detail) error {
 	if err := validateMultiChoiceQuestions(d.Questions, 5, "cteni_2"); err != nil {
 		return err
 	}
-	return requireCorrectAnswers(d.CorrectAnswers, len(d.Questions), "cteni_2", "A-D", []string{"A", "B", "C", "D"})
+	return requireCorrectAnswers(d.CorrectAnswers, cteni2QuestionStart, len(d.Questions), "cteni_2", "A-D", []string{"A", "B", "C", "D"})
 }
 
 // ── cteni_4 ───────────────────────────────────────────────────────────────────
@@ -78,7 +88,7 @@ func validateCteni4(d contracts.Cteni4Detail) error {
 	if err := validateMultiChoiceQuestions(d.Questions, 6, "cteni_4"); err != nil {
 		return err
 	}
-	return requireCorrectAnswers(d.CorrectAnswers, len(d.Questions), "cteni_4", "A-D", []string{"A", "B", "C", "D"})
+	return requireCorrectAnswers(d.CorrectAnswers, cteni4QuestionStart, len(d.Questions), "cteni_4", "A-D", []string{"A", "B", "C", "D"})
 }
 
 // ── cteni_5 ───────────────────────────────────────────────────────────────────
@@ -97,17 +107,18 @@ func validateCteni5(d contracts.Cteni5Detail) error {
 			return fmt.Errorf("cteni_5: question %d prompt must be non-empty", i+1)
 		}
 	}
-	for i := 1; i <= len(d.Questions); i++ {
-		key := strconv.Itoa(i)
+	for i := 0; i < len(d.Questions); i++ {
+		qNo := cteni5QuestionStart + i
+		key := strconv.Itoa(qNo)
 		v, ok := d.CorrectAnswers[key]
 		if !ok {
-			return fmt.Errorf("cteni_5: missing correct_answer for question %d", i)
+			return fmt.Errorf("cteni_5: missing correct_answer for question %d", qNo)
 		}
 		if strings.TrimSpace(v) == "" {
-			return fmt.Errorf("cteni_5: correct_answer for question %d is empty", i)
+			return fmt.Errorf("cteni_5: correct_answer for question %d is empty", qNo)
 		}
 		if len(v) > cteni5MaxAnswerLen {
-			return fmt.Errorf("cteni_5: correct_answer for question %d exceeds %d characters", i, cteni5MaxAnswerLen)
+			return fmt.Errorf("cteni_5: correct_answer for question %d exceeds %d characters", qNo, cteni5MaxAnswerLen)
 		}
 	}
 	if len(d.CorrectAnswers) != len(d.Questions) {
@@ -147,7 +158,7 @@ func validateCteni1(d contracts.Cteni1Detail) error {
 			return fmt.Errorf("cteni_1: option %s has empty option text", opt.Key)
 		}
 	}
-	if err := requireCorrectAnswers(d.CorrectAnswers, len(d.Items), "cteni_1", "A-H", []string{"A", "B", "C", "D", "E", "F", "G", "H"}); err != nil {
+	if err := requireCorrectAnswers(d.CorrectAnswers, 1, len(d.Items), "cteni_1", "A-H", []string{"A", "B", "C", "D", "E", "F", "G", "H"}); err != nil {
 		return err
 	}
 	// each option matches at most one item → correct_answers values unique.
@@ -190,7 +201,7 @@ func validateCteni3(d contracts.Cteni3Detail) error {
 			return fmt.Errorf("cteni_3: person %s has empty name", p.Key)
 		}
 	}
-	if err := requireCorrectAnswers(d.CorrectAnswers, len(d.Texts), "cteni_3", "A-E", []string{"A", "B", "C", "D", "E"}); err != nil {
+	if err := requireCorrectAnswers(d.CorrectAnswers, 1, len(d.Texts), "cteni_3", "A-E", []string{"A", "B", "C", "D", "E"}); err != nil {
 		return err
 	}
 	// each person matches at most one text → correct_answers values must be unique.
@@ -219,7 +230,7 @@ func validateCteni6(d contracts.AnoNeDetail) error {
 			return fmt.Errorf("cteni_6: statement %d text must be non-empty", i+1)
 		}
 	}
-	if err := requireCorrectAnswers(d.CorrectAnswers, len(d.Statements), "cteni_6", "ANO/NE", []string{"ANO", "NE"}); err != nil {
+	if err := requireCorrectAnswers(d.CorrectAnswers, 1, len(d.Statements), "cteni_6", "ANO/NE", []string{"ANO", "NE"}); err != nil {
 		return err
 	}
 	if d.MaxPoints != len(d.Statements) {
@@ -260,25 +271,28 @@ func validateMultiChoiceQuestions(questions []contracts.ReadingQuestion, expecte
 
 // ── shared helpers ────────────────────────────────────────────────────────────
 
-// requireCorrectAnswers verifies the correct_answers map has exactly one entry
-// per question_no (1..n) and each value is one of allowed.
-func requireCorrectAnswers(answers map[string]string, questionCount int, label, allowedDescription string, allowed []string) error {
+// requireCorrectAnswers verifies the correct_answers map covers exactly
+// startNo..startNo+count-1 (one entry each) and that every value is in the
+// allowed set. startNo lets cteni_2 / cteni_4 / cteni_5 use exam-aligned
+// numbering (6, 15, 21) instead of the implicit 1-based scheme.
+func requireCorrectAnswers(answers map[string]string, startNo, count int, label, allowedDescription string, allowed []string) error {
 	allow := map[string]bool{}
 	for _, v := range allowed {
 		allow[v] = true
 	}
-	for i := 1; i <= questionCount; i++ {
-		key := strconv.Itoa(i)
+	for i := 0; i < count; i++ {
+		qNo := startNo + i
+		key := strconv.Itoa(qNo)
 		v, ok := answers[key]
 		if !ok {
-			return fmt.Errorf("%s: missing correct_answer for question %d", label, i)
+			return fmt.Errorf("%s: missing correct_answer for question %d", label, qNo)
 		}
 		if !allow[v] {
-			return fmt.Errorf("%s: correct_answer for question %d must be one of %s, got %q", label, i, allowedDescription, v)
+			return fmt.Errorf("%s: correct_answer for question %d must be one of %s, got %q", label, qNo, allowedDescription, v)
 		}
 	}
-	if len(answers) != questionCount {
-		return fmt.Errorf("%s: correct_answers should cover %d questions, got %d entries", label, questionCount, len(answers))
+	if len(answers) != count {
+		return fmt.Errorf("%s: correct_answers should cover %d questions, got %d entries", label, count, len(answers))
 	}
 	return nil
 }
