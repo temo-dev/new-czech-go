@@ -36,10 +36,11 @@ func TestMockReadingDraftGenerator_PropagatesError(t *testing.T) {
 	}
 }
 
-func TestClaudeReadingDraftGenerator_NotImplementedForAllCteniTypes(t *testing.T) {
+func TestClaudeReadingDraftGenerator_NotImplementedForUnshippedTypes(t *testing.T) {
 	gen := NewClaudeReadingDraftGenerator("dummy-key", DefaultReadingDraftModel)
 
-	for _, exType := range []string{"cteni_1", "cteni_2", "cteni_3", "cteni_4", "cteni_5", "cteni_6"} {
+	// cteni_2 ships in B1; all other cteni types are still skeleton.
+	for _, exType := range []string{"cteni_1", "cteni_3", "cteni_4", "cteni_5", "cteni_6"} {
 		t.Run(exType, func(t *testing.T) {
 			_, err := gen.Generate(context.Background(), contracts.ReadingDraftInput{ExerciseType: exType})
 			if !errors.Is(err, ErrReadingDraftNotImplemented) {
@@ -76,5 +77,95 @@ func mustContain(t *testing.T, haystack, needle string) {
 	t.Helper()
 	if !strings.Contains(haystack, needle) {
 		t.Errorf("system prompt missing required substring %q", needle)
+	}
+}
+
+func TestBuildReadingDraftUserPrompt_Cteni2_EchoesInput(t *testing.T) {
+	in := contracts.ReadingDraftInput{
+		ExerciseType: "cteni_2",
+		Topic:        "đi khám bác sĩ",
+		Level:        "A2",
+		GrammarPoints: []contracts.GrammarRule{
+			{Title: "minulý čas", ExplanationVI: "thì quá khứ", RuleTable: map[string]string{"já": "byl jsem"}},
+		},
+		ExtraInstructions: "tone neutral",
+	}
+	got := BuildReadingDraftUserPrompt(in)
+
+	for _, sub := range []string{
+		"cteni_2",
+		"đi khám bác sĩ",
+		"A2",
+		"minulý čas",
+		"thì quá khứ",
+		"já→byl jsem",
+		"tone neutral",
+		"5 questions",
+		"4 options",
+		"A, B, C, D",
+	} {
+		if !strings.Contains(got, sub) {
+			t.Errorf("user prompt missing %q\nfull:\n%s", sub, got)
+		}
+	}
+}
+
+func TestBuildReadingDraftToolSchema_Cteni2_HasExpectedShape(t *testing.T) {
+	schema := buildReadingDraftToolSchema("cteni_2")
+	if schema == nil {
+		t.Fatal("expected schema for cteni_2")
+	}
+	props, ok := schema["properties"].(map[string]any)
+	if !ok {
+		t.Fatal("schema missing properties")
+	}
+	for _, key := range []string{"text", "questions", "correct_answers"} {
+		if _, ok := props[key]; !ok {
+			t.Errorf("schema missing top-level property %q", key)
+		}
+	}
+	required, _ := schema["required"].([]string)
+	if len(required) != 3 {
+		t.Errorf("schema required len = %d, want 3", len(required))
+	}
+	questions, _ := props["questions"].(map[string]any)
+	if questions["minItems"] != 5 || questions["maxItems"] != 5 {
+		t.Errorf("questions array bounds = [%v, %v], want [5, 5]", questions["minItems"], questions["maxItems"])
+	}
+}
+
+func TestBuildReadingDraftToolSchema_UnknownTypeReturnsNil(t *testing.T) {
+	if schema := buildReadingDraftToolSchema("cteni_99"); schema != nil {
+		t.Fatalf("expected nil schema for unknown type, got %v", schema)
+	}
+}
+
+func TestParseReadingDraftDetail_Cteni2_RoundTrips(t *testing.T) {
+	raw := []byte(`{
+		"text": "Pavel byl nemocný.",
+		"questions": [
+			{"question_no": 1, "prompt": "?", "options": [
+				{"key": "A", "text": "a"}, {"key": "B", "text": "b"},
+				{"key": "C", "text": "c"}, {"key": "D", "text": "d"}
+			]}
+		],
+		"correct_answers": {"1": "A"}
+	}`)
+	detail, err := parseReadingDraftDetail("cteni_2", raw)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	d, ok := detail.(contracts.Cteni2Detail)
+	if !ok {
+		t.Fatalf("expected Cteni2Detail, got %T", detail)
+	}
+	if d.Text != "Pavel byl nemocný." {
+		t.Fatalf("text mismatch: %q", d.Text)
+	}
+	if len(d.Questions) != 1 || d.Questions[0].Options[0].Key != "A" {
+		t.Fatalf("questions decoded incorrectly: %+v", d.Questions)
+	}
+	if d.CorrectAnswers["1"] != "A" {
+		t.Fatalf("correct_answers mismatch: %v", d.CorrectAnswers)
 	}
 }

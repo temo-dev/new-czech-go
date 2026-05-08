@@ -1,9 +1,13 @@
 package processing
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
@@ -55,11 +59,200 @@ func NewClaudeReadingDraftGenerator(apiKey, model string) *ClaudeReadingDraftGen
 var ErrReadingDraftNotImplemented = fmt.Errorf("reading draft generator: exercise_type not yet implemented")
 
 // Generate dispatches by exercise_type. Phase B fills in each branch.
-func (g *ClaudeReadingDraftGenerator) Generate(_ context.Context, in contracts.ReadingDraftInput) (*contracts.ReadingDraft, error) {
+func (g *ClaudeReadingDraftGenerator) Generate(ctx context.Context, in contracts.ReadingDraftInput) (*contracts.ReadingDraft, error) {
 	switch in.ExerciseType {
-	case "cteni_1", "cteni_2", "cteni_3", "cteni_4", "cteni_5", "cteni_6":
+	case "cteni_2":
+		return g.callClaude(ctx, in)
+	case "cteni_1", "cteni_3", "cteni_4", "cteni_5", "cteni_6":
 		return nil, fmt.Errorf("%w: %s", ErrReadingDraftNotImplemented, in.ExerciseType)
 	default:
 		return nil, fmt.Errorf("reading draft generator: unsupported exercise_type %q", in.ExerciseType)
 	}
+}
+
+// callClaude issues the tool_use request and parses the response into a
+// per-type Detail struct. Validation is the caller's responsibility (handler
+// invokes ValidateReadingDraft).
+func (g *ClaudeReadingDraftGenerator) callClaude(ctx context.Context, in contracts.ReadingDraftInput) (*contracts.ReadingDraft, error) {
+	schema := buildReadingDraftToolSchema(in.ExerciseType)
+	if schema == nil {
+		return nil, fmt.Errorf("reading draft generator: no tool schema for %s", in.ExerciseType)
+	}
+
+	reqBody := map[string]any{
+		"model":      g.model,
+		"max_tokens": 4096,
+		"system":     ReadingDraftSystemPrompt,
+		"tools": []map[string]any{
+			{
+				"name":         "save_reading_draft",
+				"description":  "Save the generated reading-comprehension draft as structured data.",
+				"input_schema": schema,
+			},
+		},
+		"tool_choice": map[string]string{"type": "tool", "name": "save_reading_draft"},
+		"messages":    []map[string]any{{"role": "user", "content": BuildReadingDraftUserPrompt(in)}},
+	}
+
+	payload, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal claude request: %w", err)
+	}
+
+	start := time.Now()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, claudeAPIEndpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("build claude request: %w", err)
+	}
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("x-api-key", g.apiKey)
+	req.Header.Set("anthropic-version", claudeAPIVersion)
+
+	resp, err := g.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("call claude: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("claude api status %d: %s", resp.StatusCode, string(body))
+	}
+
+	raw, usage, err := extractReadingDraftToolUse(body)
+	if err != nil {
+		return nil, err
+	}
+
+	detail, err := parseReadingDraftDetail(in.ExerciseType, raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return &contracts.ReadingDraft{
+		ExerciseType: in.ExerciseType,
+		Detail:       detail,
+		Metadata: contracts.ReadingDraftMeta{
+			Model:        g.model,
+			DurationMs:   int(time.Since(start).Milliseconds()),
+			InputTokens:  usage.input,
+			OutputTokens: usage.output,
+		},
+	}, nil
+}
+
+// ── Tool schemas ──────────────────────────────────────────────────────────────
+
+// buildReadingDraftToolSchema returns the per-cteni-type JSON schema fed to
+// Claude's tool_use parameter. Each schema mirrors the expected
+// contracts.Cteni*Detail / AnoNeDetail wire shape so the model is forced to
+// produce a payload our parser understands.
+//
+// Returns nil for an unsupported exercise_type; callers must handle that.
+func buildReadingDraftToolSchema(exerciseType string) map[string]any {
+	switch exerciseType {
+	case "cteni_2":
+		return cteni2ToolSchema()
+	}
+	return nil
+}
+
+func cteni2ToolSchema() map[string]any {
+	option := map[string]any{
+		"type":     "object",
+		"required": []string{"key", "text"},
+		"properties": map[string]any{
+			"key":  map[string]any{"type": "string", "enum": []string{"A", "B", "C", "D"}},
+			"text": map[string]any{"type": "string", "minLength": 1},
+		},
+	}
+	question := map[string]any{
+		"type":     "object",
+		"required": []string{"question_no", "prompt", "options"},
+		"properties": map[string]any{
+			"question_no": map[string]any{"type": "integer", "minimum": 1, "maximum": 5},
+			"prompt":      map[string]any{"type": "string", "minLength": 1},
+			"options": map[string]any{
+				"type":     "array",
+				"minItems": 4,
+				"maxItems": 4,
+				"items":    option,
+			},
+		},
+	}
+	return map[string]any{
+		"type":     "object",
+		"required": []string{"text", "questions", "correct_answers"},
+		"properties": map[string]any{
+			"text": map[string]any{"type": "string", "minLength": 1},
+			"questions": map[string]any{
+				"type":     "array",
+				"minItems": 5,
+				"maxItems": 5,
+				"items":    question,
+			},
+			"correct_answers": map[string]any{
+				"type": "object",
+				"additionalProperties": map[string]any{
+					"type": "string",
+					"enum": []string{"A", "B", "C", "D"},
+				},
+			},
+		},
+	}
+}
+
+// ── Response parsing ──────────────────────────────────────────────────────────
+
+type readingDraftUsage struct {
+	input  int
+	output int
+}
+
+// extractReadingDraftToolUse pulls the tool_use block out of the Claude
+// response and returns its raw input JSON + token usage.
+func extractReadingDraftToolUse(body []byte) (json.RawMessage, readingDraftUsage, error) {
+	var resp struct {
+		Content []struct {
+			Type  string          `json:"type"`
+			Input json.RawMessage `json:"input"`
+		} `json:"content"`
+		Usage struct {
+			InputTokens  int `json:"input_tokens"`
+			OutputTokens int `json:"output_tokens"`
+		} `json:"usage"`
+		Error *struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, readingDraftUsage{}, fmt.Errorf("unmarshal response: %w", err)
+	}
+	if resp.Error != nil {
+		return nil, readingDraftUsage{}, fmt.Errorf("claude api error %s: %s", resp.Error.Type, resp.Error.Message)
+	}
+	for _, c := range resp.Content {
+		if c.Type == "tool_use" {
+			return c.Input, readingDraftUsage{input: resp.Usage.InputTokens, output: resp.Usage.OutputTokens}, nil
+		}
+	}
+	return nil, readingDraftUsage{}, fmt.Errorf("no tool_use block in response")
+}
+
+// parseReadingDraftDetail unmarshals the tool_use input JSON into the per-type
+// Detail struct.
+func parseReadingDraftDetail(exerciseType string, raw json.RawMessage) (any, error) {
+	switch exerciseType {
+	case "cteni_2":
+		var d contracts.Cteni2Detail
+		if err := json.Unmarshal(raw, &d); err != nil {
+			return nil, fmt.Errorf("unmarshal cteni_2 detail: %w", err)
+		}
+		return d, nil
+	}
+	return nil, fmt.Errorf("parse reading draft: unsupported exercise_type %q", exerciseType)
 }

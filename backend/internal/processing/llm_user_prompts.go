@@ -445,3 +445,56 @@ func buildDictationOCRUserPrompt() string {
 		"If unreadable, return {\"text\": \"\"}.",
 	}, " ")
 }
+
+// ── V24 Reading draft generation ─────────────────────────────────────────────
+
+// BuildReadingDraftUserPrompt renders the per-cteni-type user message paired
+// with ReadingDraftSystemPrompt. Type-specific structural requirements live
+// in each branch; cross-cutting rules (CEFR fidelity, distractor quality,
+// ANO/NE casing) live in the system prompt.
+//
+// Each branch must echo the topic, grammar points + their rule_table, level,
+// and any extra_instructions provided by the admin.
+func BuildReadingDraftUserPrompt(in contracts.ReadingDraftInput) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Exercise type: %s\n", in.ExerciseType)
+	fmt.Fprintf(&b, "Topic: %s\n", strings.TrimSpace(in.Topic))
+	fmt.Fprintf(&b, "Level: %s\n", in.Level)
+	b.WriteString("Grammar points to demonstrate:\n")
+	for _, gp := range in.GrammarPoints {
+		fmt.Fprintf(&b, "- %s", gp.Title)
+		if gp.ExplanationVI != "" {
+			fmt.Fprintf(&b, " (note: %s)", gp.ExplanationVI)
+		}
+		b.WriteString("\n")
+		if len(gp.RuleTable) > 0 {
+			b.WriteString("  forms: ")
+			pairs := make([]string, 0, len(gp.RuleTable))
+			for k, v := range gp.RuleTable {
+				pairs = append(pairs, fmt.Sprintf("%s→%s", k, v))
+			}
+			b.WriteString(strings.Join(pairs, ", "))
+			b.WriteString("\n")
+		}
+	}
+	if extra := strings.TrimSpace(in.ExtraInstructions); extra != "" {
+		fmt.Fprintf(&b, "Extra admin instructions: %s\n", extra)
+	}
+	b.WriteString("\nStructural requirements for this exercise type:\n")
+	b.WriteString(readingDraftStructuralRequirements(in.ExerciseType))
+	return b.String()
+}
+
+func readingDraftStructuralRequirements(exerciseType string) string {
+	switch exerciseType {
+	case "cteni_2":
+		return strings.Join([]string{
+			"- Generate exactly one passage of natural Czech, 100-200 words, in field `text`",
+			"- Generate exactly 5 questions; each question_no = 1..5",
+			"- Each question has exactly 4 options with keys A, B, C, D and non-empty option `text`",
+			"- correct_answers map: keys \"1\"..\"5\", values are A, B, C, or D matching the correct option key",
+			"- Distractors must be plausible (same semantic field, same grammatical category as the correct answer)",
+		}, "\n")
+	}
+	return ""
+}

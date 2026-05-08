@@ -27,18 +27,20 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done · `[→]` deferred
   - [x] All 6 cteni types return `ErrReadingDraftNotImplemented` initially
   - [x] Unknown exercise_type rejected with distinct error
   - [x] Mock returns canned struct + propagates error
-- [ ] **Checkpoint A** commit `feat(v24-A): foundation — migration 027 + reading draft types/config/interface`
+- [x] **Checkpoint A** commit `feat(v24-A): foundation — migration 027 + reading draft types/config/interface` (commit `0af995f`)
 
 ## Phase B — Per-cteni type generators
 
 Each task: tool schema + prompt branch + validator (≥5 reject + 1 accept fixture) + tests + no leak of prompt/model strings.
 
-- [ ] **B1** cteni_2 — text + 5×4MC
-  - [ ] Tool schema matches spec §4
-  - [ ] Prompt branch in `BuildReadingDraftUserPrompt`
-  - [ ] Validator + 5 reject fixtures + 1 accept fixture
-  - [ ] Mock dispatch returns Cteni2Detail
-  - [ ] Commit `feat(v24-B1): cteni_2 draft generator + validator`
+- [x] **B1** cteni_2 — text + 5×4MC
+  - [x] Tool schema (`cteni2ToolSchema`) matches spec §4: text, 5 questions × 4 options A-D, correct_answers map
+  - [x] Prompt branch in `BuildReadingDraftUserPrompt` — echoes topic/level/grammar/extra + structural rules
+  - [x] Validator (`validateCteni2`) + 7 reject fixtures (count, options, key range, missing key, empty text, empty option text, duplicate keys) + 1 accept fixture
+  - [x] Generator dispatch wired (`Generate` calls `callClaude` for cteni_2; other types still skeleton)
+  - [x] Tool schema unit test asserts shape
+  - [x] `parseReadingDraftDetail("cteni_2", ...)` round-trip test
+  - [x] Commit `feat(v24-B1): cteni_2 draft generator + validator` (commit `<pending>`)
 - [ ] **B2** cteni_4 — 6×4MC + optional context
   - [ ] Same checklist as B1
   - [ ] Commit `feat(v24-B2): cteni_4 draft generator + validator`
