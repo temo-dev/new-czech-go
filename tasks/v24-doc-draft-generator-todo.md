@@ -140,29 +140,49 @@ gate; if gate fails the CMS UI can be feature-flagged off via missing
 - [x] **D8** CMS verify
   - [x] `make cms-lint` / `npm run lint` — ESLint clean
   - [x] `make cms-build` / `npm run build` — production bundle green; new route `/api/admin/exercises/generate-draft` registered
-  - [x] `cd cms && npm test` green; +37 new tests (29 ai-draft-utils + 8 cteni-dirty regression)
+  - [x] `cd cms && npm test` green; total 267 tests after ai-draft markup, validation, and cteni mapping regressions
 - [x] **Checkpoint D** commit `feat(v24-D): CMS AI draft panel + reading fields integration`
 
 ## Phase E — Ship docs
 
-- [x] **E1** Smoke target — `make smoke-draft-flow` runs `TestV24DraftFlow_E2E_AdminGeneratesAndSavesCteni2` (in-process, mock LLM, no real API key). Folded into `smoke-all`. **Note**: chosen over extending `scripts/smoke_course_flow.py` for the same reason V21 used a Go test — zero network deps, no docker bring-up
+- [x] **E1** Smoke target — `make smoke-draft-flow` runs `TestV24DraftFlow_E2E_AdminGeneratesAndSavesCteni2` via `rtk proxy env GOTOOLCHAIN=auto go test` (in-process, mock LLM, no real API key). Folded into `smoke-all`. **Note**: chosen over extending `scripts/smoke_course_flow.py` for the same reason V21 used a Go test — zero network deps, no docker bring-up
 - [x] **E2** `docs/reference/api-contracts.md` — V24 section (endpoint shape, 8 error codes, created_by_llm note on POST /v1/admin/exercises)
 - [x] **E3** `docs/reference/infrastructure-baseline.md` — `LLM_READING_DRAFT_MODEL` row added
 - [x] **E4** `SPEC.md` — V24 digest row added
-- [x] **E5** `CHANGELOG.md` — V24 entry (decisions, file changes, test counts, C4 gate notice, deferred-to-V25)
+- [x] **E5** `CHANGELOG.md` — V24 entry (decisions, file changes, test counts, C4 gate notice, smoke regression fixes)
 - [x] **E6** `tasks/plan.md` + `tasks/todo.md` — V24 row added (in earlier commit `5388970`)
 - [x] **E7** Verify — backend `go build ./...` + `go test ./...` green, `make smoke-draft-flow` green, `cd cms && npm run lint && npm test && npm run build` green
-- [ ] **Final commit** `chore(v24-E): docs + smoke + indexes for V24` (pending)
+- [ ] **Final commit** `chore(v24): docs + smoke + regression fixes` (pending)
 
-## Open questions (resolve during implementation)
+## Phase F — Smoke Regression Fixes
+
+- [x] **F1** Backend validator tightened after end-to-end review
+  - [x] Enforce generated passage lengths: `cteni_2` 100-200 words, `cteni_5`/`cteni_6` 80-150 words
+  - [x] Enforce sequential exam numbering for generated items/questions/statements
+  - [x] Regression tests cover wrong numbering and word-count bounds
+- [x] **F2** CMS cteni mapping made testable
+  - [x] Extracted `cms/components/exercise-form/cteni-model.ts`
+  - [x] `cteni_4` round-trips `context` and still reads legacy `text`
+  - [x] `cteni_3` preserves AI-provided person descriptions
+  - [x] Form validation keeps `cteni_4` context optional while requiring `cteni_2` text
+- [x] **F3** AI draft submit fixed
+  - [x] Removed nested `<form>` from `AiDraftPanel`; "Sinh nháp" is a `type="button"` that explicitly calls submit logic
+  - [x] Added source-level regression test so the panel cannot reintroduce nested form markup
+- [x] **F4** AI draft CMS styling fixed for the non-Tailwind app
+  - [x] Converted AI draft controls to inline styles
+  - [x] Fixed oversized sparkles icon
+  - [x] Grammar picker now explains that typing only searches; click a result or press Enter to select a grammar ID
+
+## Open questions
 
 - [ ] When does `extra_instructions` get cleared in the panel? (Spec
       §UX open: persist within session, clear on form unmount.)
-- [ ] Should `LLM_READING_DRAFT_MODEL=""` empty truly disable the
+- [x] Should `LLM_READING_DRAFT_MODEL=""` empty truly disable the
       endpoint (503), or just fall back to default? (Spec rollout §1
-      says off-switch — confirm behavior in C2 implementation.)
-- [ ] Czech native reviewer identified for C4? Schedule before B is
-      complete.
+      says off-switch — resolved in C2: empty env falls back; off-switch
+      is missing `ANTHROPIC_API_KEY`.)
+- [ ] Czech native reviewer identified for C4? Required before prod
+      promotion.
 
 ## Deferred (out of scope V24)
 

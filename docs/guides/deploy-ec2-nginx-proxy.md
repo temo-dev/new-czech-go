@@ -124,7 +124,7 @@ make package-ec2-deploy EC2_ENV_FILE=.env.ec2
 Copy it to EC2:
 
 ```bash
-scp dist/czech-go-system-ec2-deploy.tar.gz ec2-user@<ec2-host>:~/
+scp -i "czech-app-key.pem" dist/czech-go-system-ec2-deploy.tar.gz ec2-user@ec2-35-156-93-163.eu-central-1.compute.amazonaws.com:~/
 ```
 
 ## Create ECR Repositories

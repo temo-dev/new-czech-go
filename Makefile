@@ -252,7 +252,7 @@ smoke-promotion-flow:
 # created_by_llm:true, then refetched via GET to confirm round-trip.
 # No real ANTHROPIC_API_KEY required.
 smoke-draft-flow:
-	cd $(GO_DIR) && $(RTK) go test -count=1 -run "TestV24DraftFlow_E2E" ./internal/httpapi/
+	cd $(GO_DIR) && $(RTK) proxy env GOTOOLCHAIN=auto go test ./internal/httpapi -run TestV24DraftFlow_E2E -count=1
 
 mastery-sim:
 	$(RTK) python3 scripts/mastery_sim.py $(MASTERY_SIM_ARGS)

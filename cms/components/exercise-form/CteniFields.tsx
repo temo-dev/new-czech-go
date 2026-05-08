@@ -8,176 +8,16 @@ import { ItemRepeater } from './ItemRepeater';
 import { OptionRow } from './OptionRow';
 import AiImageButton from '../AiImageButton';
 import { AiDraftPanel } from '../ai-draft/AiDraftPanel';
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type CteniType = 'cteni_1' | 'cteni_2' | 'cteni_3' | 'cteni_4' | 'cteni_5';
-
-// cteni_1: 5 items (each is either an uploaded image or a short text message) → match A-H
-type C1Item = { mode: 'image' | 'text'; text: string; assetId: string; answer: string };
-type C1State = {
-  type: 'cteni_1';
-  items: C1Item[];
-  options: { key: string; text: string }[];
-};
-
-// cteni_2 / cteni_4: reading passage → questions → A-D
-type CQItem = { prompt: string; optA: string; optB: string; optC: string; optD: string; answer: string };
-type C24State = { type: 'cteni_2' | 'cteni_4'; text: string; questions: CQItem[] };
-
-// cteni_3: 4 text blocks → match persons A-E
-type C3State = {
-  type: 'cteni_3';
-  texts: { text: string; answer: string }[];      // 4 text blocks
-  persons: { key: string; name: string }[];        // A-E persons
-};
-
-// cteni_5: reading passage → fill-in 5 slots
-type C5State = { type: 'cteni_5'; text: string; slots: { prompt: string; answer: string }[] };
-
-type CteniState = C1State | C24State | C3State | C5State;
-
-// ── Defaults ──────────────────────────────────────────────────────────────────
-
-const OPTION_KEYS_1 = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-const OPTION_KEYS_3 = ['A', 'B', 'C', 'D', 'E'];
-const emptyQ = (): CQItem => ({ prompt: '', optA: '', optB: '', optC: '', optD: '', answer: '' });
-
-// ── Init from exercise.detail ─────────────────────────────────────────────────
-
-function initState(type: CteniType, detail: Record<string, unknown>): CteniState {
-  const ca = (detail.correct_answers ?? {}) as Record<string, string>;
-
-  if (type === 'cteni_1') {
-    const rawItems = (detail.items ?? []) as Array<{ item_no?: number; text?: string; asset_id?: string }>;
-    const rawOpts  = (detail.options ?? []) as Array<{ key?: string; text?: string }>;
-    const items: C1Item[] = Array.from({ length: 5 }, (_, i) => {
-      const raw = rawItems[i];
-      const assetId = raw?.asset_id ?? '';
-      return {
-        mode: assetId ? 'image' : 'text',
-        text: raw?.text ?? '',
-        assetId,
-        answer: ca[String(i + 1)] ?? '',
-      };
-    });
-    const options = OPTION_KEYS_1.map((k, i) => ({
-      key: k,
-      text: rawOpts.find(o => o.key === k)?.text ?? rawOpts[i]?.text ?? '',
-    }));
-    return { type, items, options };
-  }
-
-  if (type === 'cteni_2' || type === 'cteni_4') {
-    const startNo = type === 'cteni_4' ? 15 : 6;
-    const count   = type === 'cteni_4' ? 6 : 5;
-    const rawQs   = (detail.questions ?? []) as Array<Record<string, unknown>>;
-    const questions: CQItem[] = Array.from({ length: count }, (_, i) => {
-      const rq  = rawQs[i] as Record<string, unknown> | undefined;
-      const opts = (rq?.options ?? []) as Array<{ key: string; text: string }>;
-      const get  = (k: string) => opts.find(o => o.key === k)?.text ?? '';
-      return {
-        prompt: String(rq?.prompt ?? ''),
-        optA: get('A'), optB: get('B'), optC: get('C'), optD: get('D'),
-        answer: ca[String(startNo + i)] ?? '',
-      };
-    });
-    return { type, text: String(detail.text ?? ''), questions };
-  }
-
-  if (type === 'cteni_3') {
-    const rawTexts  = (detail.texts ?? []) as Array<{ item_no?: number; text?: string }>;
-    const rawPerson = (detail.persons ?? []) as Array<{ key?: string; name?: string }>;
-    const texts = Array.from({ length: 4 }, (_, i) => ({
-      text: rawTexts[i]?.text ?? '',
-      answer: ca[String(i + 1)] ?? '',
-    }));
-    const persons = OPTION_KEYS_3.map((k, i) => ({
-      key: k,
-      name: rawPerson.find(p => p.key === k)?.name ?? rawPerson[i]?.name ?? '',
-    }));
-    return { type, texts, persons };
-  }
-
-  // cteni_5
-  const rawQs = (detail.questions ?? []) as Array<{ question_no?: number; prompt?: string }>;
-  const slots = Array.from({ length: 5 }, (_, i) => ({
-    prompt: rawQs[i]?.prompt ?? '',
-    answer: ca[String(21 + i)] ?? '',
-  }));
-  return { type: 'cteni_5', text: String(detail.text ?? ''), slots };
-}
-
-// ── Serialization ─────────────────────────────────────────────────────────────
-
-function buildDetail(state: CteniState): Record<string, unknown> {
-  if (state.type === 'cteni_1') {
-    const correct: Record<string, string> = {};
-    state.items.forEach((item, i) => { if (item.answer) correct[String(i + 1)] = item.answer; });
-    return {
-      items: state.items.map((it, i) => ({
-        item_no: i + 1,
-        ...(it.mode === 'image' && it.assetId ? { asset_id: it.assetId } : { text: it.text }),
-      })),
-      options: state.options.map(o => ({ key: o.key, text: o.text })),
-      correct_answers: correct,
-    };
-  }
-
-  if (state.type === 'cteni_2' || state.type === 'cteni_4') {
-    const startNo = state.type === 'cteni_4' ? 15 : 6;
-    const correct: Record<string, string> = {};
-    const questions = state.questions.map((q, i) => {
-      if (q.answer) correct[String(startNo + i)] = q.answer;
-      return {
-        question_no: startNo + i,
-        prompt: q.prompt,
-        options: [{ key: 'A', text: q.optA }, { key: 'B', text: q.optB }, { key: 'C', text: q.optC }, { key: 'D', text: q.optD }],
-      };
-    });
-    return { text: state.text, questions, correct_answers: correct };
-  }
-
-  if (state.type === 'cteni_3') {
-    const correct: Record<string, string> = {};
-    state.texts.forEach((t, i) => { if (t.answer) correct[String(i + 1)] = t.answer; });
-    return {
-      texts: state.texts.map((t, i) => ({ item_no: i + 1, text: t.text })),
-      persons: state.persons.map(p => ({ key: p.key, name: p.name })),
-      correct_answers: correct,
-    };
-  }
-
-  // cteni_5
-  const s5 = state as C5State;
-  const correct: Record<string, string> = {};
-  s5.slots.forEach((slot, i) => { if (slot.answer) correct[String(21 + i)] = slot.answer; });
-  return {
-    text: s5.text,
-    questions: s5.slots.map((slot, i) => ({ question_no: 21 + i, prompt: slot.prompt })),
-    correct_answers: correct,
-  };
-}
-
-// isCteniDirty returns true when any user-visible field on the form has
-// content. Used by the AI draft panel to decide whether regenerating
-// requires an overwrite confirmation.
-export function isCteniDirty(state: CteniState): boolean {
-  switch (state.type) {
-    case 'cteni_1':
-      return (
-        state.items.some((i) => i.text || i.answer || i.assetId) ||
-        state.options.some((o) => o.text)
-      );
-    case 'cteni_2':
-    case 'cteni_4':
-      return Boolean(state.text) || state.questions.some((q) => q.prompt || q.optA || q.optB || q.optC || q.optD || q.answer);
-    case 'cteni_3':
-      return state.texts.some((t) => t.text || t.answer) || state.persons.some((p) => p.name);
-    case 'cteni_5':
-      return Boolean(state.text) || state.slots.some((sl) => sl.prompt || sl.answer);
-  }
-}
+import {
+  buildCteniDetail,
+  emptyQ,
+  initCteniState,
+  isCteniDirty,
+  type C1Item,
+  type CQItem,
+  type CteniState,
+  type CteniType,
+} from './cteni-model';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -193,18 +33,18 @@ const sectionStyle: React.CSSProperties = { border: '1px solid var(--border)', b
 const txStyle: React.CSSProperties = { padding: '8px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, resize: 'vertical' as const, fontFamily: 'inherit' };
 
 export function CteniFields({ exerciseType, initialData, onChange, exerciseId }: Props) {
-  const [state, setState] = useState<CteniState>(() => initState(exerciseType, initialData));
+  const [state, setState] = useState<CteniState>(() => initCteniState(exerciseType, initialData));
   const [uploadingItem, setUploadingItem] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setState(initState(exerciseType, initialData)); }, [exerciseType, JSON.stringify(initialData)]);
+  useEffect(() => { setState(initCteniState(exerciseType, initialData)); }, [exerciseType, JSON.stringify(initialData)]);
 
-  function update(next: CteniState) { setState(next); onChange(buildDetail(next)); }
+  function update(next: CteniState) { setState(next); onChange(buildCteniDetail(next)); }
 
   function handleAiApply(detail: Record<string, unknown>) {
-    const next = initState(exerciseType, detail);
+    const next = initCteniState(exerciseType, detail);
     update(next);
   }
 
@@ -424,11 +264,14 @@ export function CteniFields({ exerciseType, initialData, onChange, exerciseId }:
           <div style={{ display: 'grid', gap: 6 }}>
             <span style={labelStyle}>Nhân vật A-E</span>
             {c3.persons.map((p, pi) => (
-              <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div key={p.key} style={{ display: 'grid', gridTemplateColumns: '28px minmax(0, 1fr) minmax(0, 1fr)', alignItems: 'center', gap: 8 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{p.key}</span>
                 <input type="text" value={p.name} onChange={e => { const next = [...c3.persons]; next[pi] = { ...next[pi], name: e.target.value }; update({ ...c3, persons: next }); }}
-                  placeholder={`Tên nhân vật ${p.key} (nghề nghiệp)...`}
-                  style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }} />
+                  placeholder={`Tên nhân vật ${p.key}...`}
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }} />
+                <input type="text" value={p.description} onChange={e => { const next = [...c3.persons]; next[pi] = { ...next[pi], description: e.target.value }; update({ ...c3, persons: next }); }}
+                  placeholder="Mô tả / nghề nghiệp..."
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }} />
               </div>
             ))}
           </div>

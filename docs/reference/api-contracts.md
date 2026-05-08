@@ -1544,7 +1544,7 @@ Full schema spec: [docs/specs/v24-doc-draft-generator.md](../specs/v24-doc-draft
 |---|---|
 | `exercise_type` | `cteni_1` … `cteni_6` |
 | `topic` | 3–200 chars, trimmed |
-| `grammar_point_ids` | 1–3 uuids; each must resolve via `s.repo.GetGrammarRule` |
+| `grammar_point_ids` | 1–3 uuids; each must resolve via `s.repo.GetGrammarRule`; free-text grammar labels are not accepted |
 | `level` | `A0` \| `A1` \| `A2` \| `B1` |
 | `extra_instructions` | optional, ≤500 chars |
 
@@ -1564,6 +1564,21 @@ Full schema spec: [docs/specs/v24-doc-draft-generator.md](../specs/v24-doc-draft
   }
 }
 ```
+
+**Generated detail invariants**:
+
+| Type | Server-side validator requirements |
+|---|---|
+| `cteni_1` | `items[].item_no` exactly `1..5`; 8 options keyed `A..H`; no generated `asset_id`; correct answers cover `1..5` with unique values in `A..H`. |
+| `cteni_2` | `text` 100-200 words; 5 questions with `question_no` exactly `6..10`; each question has options `A..D`; correct answers cover `6..10`. |
+| `cteni_3` | `texts[].item_no` exactly `1..4`; 5 persons keyed `A..E` with names and optional descriptions; correct answers cover `1..4` with unique values in `A..E`. |
+| `cteni_4` | `context` is optional and is the canonical context field; 6 questions with `question_no` exactly `15..20`; each question has options `A..D`; correct answers cover `15..20`. |
+| `cteni_5` | `text` 80-150 words; 5 questions with `question_no` exactly `21..25`; correct answers cover `21..25`; each answer is 1-30 chars. |
+| `cteni_6` | `passage` 80-150 words; 1-5 statements with `question_no` exactly `1..N`; correct answers are uppercase `ANO`/`NE`; `max_points == len(statements)`. |
+
+CMS compatibility note: older local `cteni_4` drafts that used `text`
+are read as context on edit, but newly saved `cteni_4` payloads use
+`context`.
 
 **Errors**:
 

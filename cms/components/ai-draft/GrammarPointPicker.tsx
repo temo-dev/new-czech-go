@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { adminFetch } from '../../lib/api';
 import { DRAFT_LIMITS } from '../../lib/ai-draft-utils';
 
@@ -18,10 +18,63 @@ type Props = {
   disabled?: boolean;
 };
 
+const wrapStyle: CSSProperties = { display: 'grid', gap: 6 };
+const labelStyle: CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--ink-2)' };
+const requiredStyle: CSSProperties = { color: '#dc2626' };
+const countStyle: CSSProperties = { marginLeft: 4, color: 'var(--ink-3)', fontSize: 12, fontWeight: 400 };
+const chipRowStyle: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 6 };
+const chipStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  border: '1px solid #c4b5fd',
+  borderRadius: 999,
+  background: '#f5f3ff',
+  color: '#4c1d95',
+  cursor: 'pointer',
+  fontSize: 12,
+  padding: '3px 8px',
+};
+const inputStyle: CSSProperties = {
+  width: '100%',
+  border: '1px solid var(--border-strong)',
+  borderRadius: 8,
+  padding: '8px 10px',
+  fontSize: 14,
+  fontFamily: 'inherit',
+  background: '#fff',
+};
+const hintStyle: CSSProperties = { margin: 0, color: 'var(--ink-3)', fontSize: 12 };
+const warningStyle: CSSProperties = { margin: 0, color: '#b45309', fontSize: 12 };
+const listStyle: CSSProperties = {
+  maxHeight: 176,
+  overflowY: 'auto',
+  border: '1px solid var(--border)',
+  borderRadius: 8,
+  background: '#fff',
+  boxShadow: '0 6px 20px rgba(15,23,42,0.08)',
+  listStyle: 'none',
+  margin: 0,
+  padding: 0,
+};
+const optionButtonStyle: CSSProperties = {
+  width: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
+  border: 0,
+  background: 'transparent',
+  cursor: 'pointer',
+  padding: '8px 10px',
+  textAlign: 'left',
+  fontSize: 13,
+};
+const selectedOptionStyle: CSSProperties = { ...optionButtonStyle, cursor: 'not-allowed', opacity: 0.5 };
+
 // GrammarPointPicker — free-text autocomplete that picks from
-// /api/admin/grammar-rules. Falls back to free text when no rules in DB
-// (admin can still type a label that the backend will reject as
-// grammar_point_not_found, prompting them to create a rule first).
+// /api/admin/grammar-rules. The backend requires IDs, so typed text is only
+// a search query until the admin selects a row.
 export function GrammarPointPicker({ selectedIds, onChange, level, disabled }: Props) {
   const [rules, setRules] = useState<GrammarRule[]>([]);
   const [loading, setLoading] = useState(false);
@@ -67,24 +120,24 @@ export function GrammarPointPicker({ selectedIds, onChange, level, disabled }: P
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-slate-700">
-        Điểm ngữ pháp <span className="text-rose-600">*</span>
-        <span className="ml-1 text-xs font-normal text-slate-500">
+    <div style={wrapStyle}>
+      <label style={labelStyle}>
+        Điểm ngữ pháp <span style={requiredStyle}>*</span>
+        <span style={countStyle}>
           ({selectedIds.length}/{DRAFT_LIMITS.grammarMax})
         </span>
       </label>
 
       {/* selected chips */}
       {selected.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        <div style={chipRowStyle}>
           {selected.map((r) => (
             <button
               key={r.id}
               type="button"
               onClick={() => remove(r.id)}
               disabled={disabled}
-              className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs text-violet-900 hover:bg-violet-100"
+              style={chipStyle}
               aria-label={`Bỏ ${r.title}`}
             >
               <span>{r.title}</span>
@@ -98,33 +151,49 @@ export function GrammarPointPicker({ selectedIds, onChange, level, disabled }: P
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          const first = filtered.find((r) => !selectedIds.includes(r.id));
+          if (first) add(first.id);
+        }}
         disabled={disabled || atCap}
-        placeholder={atCap ? 'Đã đủ 3 điểm' : 'Tìm theo tên (vd: minulý čas)...'}
-        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:bg-slate-100"
+        placeholder={atCap ? 'Đã đủ 3 điểm' : 'Gõ để tìm, bấm vào kết quả để chọn...'}
+        style={{ ...inputStyle, background: disabled || atCap ? 'var(--surface-muted)' : '#fff' }}
       />
 
-      {loading && <p className="text-xs text-slate-500">Đang tải danh sách...</p>}
+      {loading && <p style={hintStyle}>Đang tải danh sách...</p>}
 
       {!loading && rules.length === 0 && (
-        <p className="text-xs text-amber-700">
+        <p style={warningStyle}>
           Chưa có grammar nào trong DB. Tạo grammar trước rồi quay lại.
         </p>
       )}
 
+      {!loading && rules.length > 0 && query && filtered.length === 0 && (
+        <p style={warningStyle}>
+          Không tìm thấy điểm ngữ pháp khớp với &quot;{query}&quot;. Hãy chọn một grammar có sẵn trong danh sách.
+        </p>
+      )}
+
+      {!loading && rules.length > 0 && selectedIds.length === 0 && !query && (
+        <p style={hintStyle}>Gõ tên grammar rồi bấm vào một kết quả. Chỉ nhập chữ chưa được tính là đã chọn.</p>
+      )}
+
       {!loading && filtered.length > 0 && query && (
-        <ul className="max-h-44 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-sm">
+        <ul style={listStyle}>
           {filtered.map((r) => {
             const isSelected = selectedIds.includes(r.id);
             return (
-              <li key={r.id}>
+              <li key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
                 <button
                   type="button"
                   onClick={() => add(r.id)}
                   disabled={isSelected || atCap || disabled}
-                  className="flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-slate-50 disabled:opacity-50"
+                  style={isSelected || atCap || disabled ? selectedOptionStyle : optionButtonStyle}
                 >
                   <span>{r.title}</span>
-                  {r.level && <span className="text-xs text-slate-500">{r.level}</span>}
+                  {r.level && <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>{r.level}</span>}
                 </button>
               </li>
             );

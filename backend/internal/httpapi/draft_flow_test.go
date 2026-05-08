@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
@@ -35,7 +36,7 @@ func TestV24DraftFlow_E2E_AdminGeneratesAndSavesCteni2(t *testing.T) {
 	mockDraft := &contracts.ReadingDraft{
 		ExerciseType: "cteni_2",
 		Detail: contracts.Cteni2Detail{
-			Text: "Pavel byl nemocný a šel k lékaři.",
+			Text: strings.TrimSpace(strings.Repeat("slovo ", 120)),
 			Questions: []contracts.ReadingQuestion{
 				draftQ(6, "Q1?"), draftQ(7, "Q2?"), draftQ(8, "Q3?"),
 				draftQ(9, "Q4?"), draftQ(10, "Q5?"),

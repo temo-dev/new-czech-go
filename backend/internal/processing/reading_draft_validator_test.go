@@ -9,11 +9,20 @@ import (
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
 
+func sampleCzechWords(n int) string {
+	words := []string{"Pavel", "šel", "ráno", "na", "úřad", "protože", "potřeboval", "nový", "formulář", "a", "mluvil", "pomalu"}
+	out := make([]string, n)
+	for i := range out {
+		out[i] = words[i%len(words)]
+	}
+	return strings.Join(out, " ")
+}
+
 // ── cteni_2 fixtures ──────────────────────────────────────────────────────────
 
 func validCteni2Detail() contracts.Cteni2Detail {
 	return contracts.Cteni2Detail{
-		Text: "Pavel byl nemocný a šel k lékaři. Lékař se ho zeptal, co ho bolí. Pavel řekl, že ho bolí hlava a v krku.",
+		Text: sampleCzechWords(120),
 		Questions: []contracts.ReadingQuestion{
 			cteni2Q(6, "Kam šel Pavel?"),
 			cteni2Q(7, "Co se zeptal lékař?"),
@@ -80,6 +89,21 @@ func TestValidateReadingDraft_Cteni2_RejectsMalformed(t *testing.T) {
 			name:    "empty text",
 			mutate:  func(d *contracts.Cteni2Detail) { d.Text = "" },
 			wantSub: "text",
+		},
+		{
+			name:    "text too short",
+			mutate:  func(d *contracts.Cteni2Detail) { d.Text = sampleCzechWords(cteni2MinWords - 1) },
+			wantSub: "100-200 words",
+		},
+		{
+			name:    "text too long",
+			mutate:  func(d *contracts.Cteni2Detail) { d.Text = sampleCzechWords(cteni2MaxWords + 1) },
+			wantSub: "100-200 words",
+		},
+		{
+			name:    "wrong question_no sequence",
+			mutate:  func(d *contracts.Cteni2Detail) { d.Questions[0].QuestionNo = 1 },
+			wantSub: "question_no",
 		},
 		{
 			name: "empty option text",
@@ -195,6 +219,11 @@ func TestValidateReadingDraft_Cteni1_RejectsMalformed(t *testing.T) {
 			wantSub: "text",
 		},
 		{
+			name:    "wrong item_no sequence",
+			mutate:  func(d *contracts.Cteni1Detail) { d.Items[1].ItemNo = 9 },
+			wantSub: "item_no",
+		},
+		{
 			name:    "correct_answer value out of A-H",
 			mutate:  func(d *contracts.Cteni1Detail) { d.CorrectAnswers["1"] = "Z" },
 			wantSub: "A-H",
@@ -305,6 +334,11 @@ func TestValidateReadingDraft_Cteni3_RejectsMalformed(t *testing.T) {
 			mutate:  func(d *contracts.Cteni3Detail) { d.Texts[0].Text = "" },
 			wantSub: "text",
 		},
+		{
+			name:    "wrong item_no sequence",
+			mutate:  func(d *contracts.Cteni3Detail) { d.Texts[2].ItemNo = 8 },
+			wantSub: "item_no",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -359,7 +393,7 @@ func TestValidateReadingDraft_Cteni4_AcceptsValidWithoutContext(t *testing.T) {
 
 func validCteni5Detail() contracts.Cteni5Detail {
 	return contracts.Cteni5Detail{
-		Text: "Pavel byl nemocný a šel k lékaři ve čtvrtek.",
+		Text: sampleCzechWords(90),
 		Questions: []contracts.FillQuestion{
 			{QuestionNo: 21, Prompt: "Jméno autora:"},
 			{QuestionNo: 22, Prompt: "Kam šel:"},
@@ -393,6 +427,16 @@ func TestValidateReadingDraft_Cteni5_RejectsMalformed(t *testing.T) {
 			name:    "wrong question count",
 			mutate:  func(d *contracts.Cteni5Detail) { d.Questions = d.Questions[:4] },
 			wantSub: "5 questions",
+		},
+		{
+			name:    "text too short",
+			mutate:  func(d *contracts.Cteni5Detail) { d.Text = sampleCzechWords(cteni5MinWords - 1) },
+			wantSub: "80-150 words",
+		},
+		{
+			name:    "wrong question_no sequence",
+			mutate:  func(d *contracts.Cteni5Detail) { d.Questions[1].QuestionNo = 99 },
+			wantSub: "question_no",
 		},
 		{
 			name:    "empty prompt",
@@ -435,7 +479,7 @@ func TestValidateReadingDraft_Cteni5_RejectsMalformed(t *testing.T) {
 
 func validCteni6Detail() contracts.AnoNeDetail {
 	return contracts.AnoNeDetail{
-		Passage: "Pavel byl nemocný a šel k lékaři ve čtvrtek.",
+		Passage: sampleCzechWords(90),
 		Statements: []contracts.AnoNeStatement{
 			{QuestionNo: 1, Statement: "Pavel je doktor."},
 			{QuestionNo: 2, Statement: "Pavel byl nemocný."},
@@ -456,7 +500,7 @@ func TestValidateReadingDraft_Cteni6_AcceptsValid(t *testing.T) {
 func TestValidateReadingDraft_Cteni6_AcceptsBoundary(t *testing.T) {
 	for _, n := range []int{1, 5} {
 		t.Run(fmt.Sprintf("statements=%d", n), func(t *testing.T) {
-			d := contracts.AnoNeDetail{Passage: "x"}
+			d := contracts.AnoNeDetail{Passage: sampleCzechWords(cteni6MinWords)}
 			d.CorrectAnswers = map[string]string{}
 			for i := 1; i <= n; i++ {
 				d.Statements = append(d.Statements, contracts.AnoNeStatement{QuestionNo: i, Statement: "s"})
@@ -483,9 +527,18 @@ func TestValidateReadingDraft_Cteni6_RejectsMalformed(t *testing.T) {
 			wantSub: "passage",
 		},
 		{
-			name:    "zero statements",
-			mutate:  func(d *contracts.AnoNeDetail) { d.Statements = nil; d.CorrectAnswers = map[string]string{}; d.MaxPoints = 0 },
+			name: "zero statements",
+			mutate: func(d *contracts.AnoNeDetail) {
+				d.Statements = nil
+				d.CorrectAnswers = map[string]string{}
+				d.MaxPoints = 0
+			},
 			wantSub: "1-5",
+		},
+		{
+			name:    "passage too short",
+			mutate:  func(d *contracts.AnoNeDetail) { d.Passage = sampleCzechWords(cteni6MinWords - 1) },
+			wantSub: "80-150 words",
 		},
 		{
 			name: "six statements",
@@ -520,6 +573,11 @@ func TestValidateReadingDraft_Cteni6_RejectsMalformed(t *testing.T) {
 			name:    "missing correct_answer",
 			mutate:  func(d *contracts.AnoNeDetail) { delete(d.CorrectAnswers, "2") },
 			wantSub: "missing correct_answer",
+		},
+		{
+			name:    "wrong question_no sequence",
+			mutate:  func(d *contracts.AnoNeDetail) { d.Statements[1].QuestionNo = 9 },
+			wantSub: "question_no",
 		},
 		{
 			name:    "empty statement text",
@@ -573,6 +631,11 @@ func TestValidateReadingDraft_Cteni4_RejectsMalformed(t *testing.T) {
 			name:    "duplicate option keys",
 			mutate:  func(d *contracts.Cteni4Detail) { d.Questions[0].Options[1].Key = "A" },
 			wantSub: "duplicate",
+		},
+		{
+			name:    "wrong question_no sequence",
+			mutate:  func(d *contracts.Cteni4Detail) { d.Questions[3].QuestionNo = 99 },
+			wantSub: "question_no",
 		},
 	}
 	for _, tc := range cases {

@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { DRAFT_LEVELS, type DraftLevel } from '../../lib/ai-draft-utils';
 
 type Props = {
@@ -8,13 +9,19 @@ type Props = {
   disabled?: boolean;
 };
 
+const fieldsetStyle: CSSProperties = { border: 0, display: 'grid', gap: 6, margin: 0, padding: 0 };
+const legendStyle: CSSProperties = { color: 'var(--ink-2)', fontSize: 13, fontWeight: 600, marginBottom: 2 };
+const requiredStyle: CSSProperties = { color: '#dc2626' };
+const rowStyle: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 12 };
+const optionStyle: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--ink-2)', cursor: 'pointer', fontSize: 13, fontWeight: 600 };
+
 export function LevelRadio({ value, onChange, disabled }: Props) {
   return (
-    <fieldset className="flex flex-col gap-1.5">
-      <legend className="text-sm font-medium text-slate-700">Cấp độ <span className="text-rose-600">*</span></legend>
-      <div className="flex flex-wrap gap-3">
+    <fieldset style={fieldsetStyle}>
+      <legend style={legendStyle}>Cấp độ <span style={requiredStyle}>*</span></legend>
+      <div style={rowStyle}>
         {DRAFT_LEVELS.map((lvl) => (
-          <label key={lvl} className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-slate-700">
+          <label key={lvl} style={{ ...optionStyle, cursor: disabled ? 'not-allowed' : 'pointer' }}>
             <input
               type="radio"
               name="ai-draft-level"
@@ -22,9 +29,9 @@ export function LevelRadio({ value, onChange, disabled }: Props) {
               checked={value === lvl}
               disabled={disabled}
               onChange={() => onChange(lvl)}
-              className="h-4 w-4 accent-violet-600"
+              style={{ accentColor: '#7c3aed' }}
             />
-            <span className="font-medium">{lvl}</span>
+            <span>{lvl}</span>
           </label>
         ))}
       </div>

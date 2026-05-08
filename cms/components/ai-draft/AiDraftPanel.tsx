@@ -1,6 +1,6 @@
 'use client';
 
-import { useReducer, useRef, useState } from 'react';
+import { useReducer, useRef, useState, type CSSProperties } from 'react';
 import { adminFetch } from '../../lib/api';
 import {
   reduceDraftState,
@@ -30,6 +30,77 @@ const initialInput = (exerciseType: CteniDraftType): DraftFormInput => ({
 });
 
 const initialState: DraftState = { status: 'idle' };
+
+const panelStyle: CSSProperties = {
+  display: 'grid',
+  gap: 10,
+  marginBottom: 16,
+  padding: 12,
+  borderRadius: 12,
+  border: '1px solid #c4b5fd',
+  background: '#f5f3ff',
+};
+const headerStyle: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 };
+const titleWrapStyle: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };
+const titleStyle: CSSProperties = { margin: 0, fontSize: 14, fontWeight: 700, color: '#4c1d95' };
+const toggleStyle: CSSProperties = { border: 0, background: 'transparent', color: '#6d28d9', cursor: 'pointer', fontSize: 12, fontWeight: 700 };
+const bodyStyle: CSSProperties = { display: 'grid', gap: 12 };
+const fieldStyle: CSSProperties = { display: 'grid', gap: 6 };
+const labelStyle: CSSProperties = { fontSize: 13, fontWeight: 600, color: 'var(--ink-2)' };
+const requiredStyle: CSSProperties = { color: '#dc2626' };
+const inputStyle: CSSProperties = {
+  width: '100%',
+  border: '1px solid var(--border-strong)',
+  borderRadius: 8,
+  padding: '8px 10px',
+  fontSize: 14,
+  fontFamily: 'inherit',
+  background: '#fff',
+};
+const helperStyle: CSSProperties = { margin: 0, fontSize: 12, color: '#5b21b6' };
+const errorStyle: CSSProperties = { margin: 0, fontSize: 12, color: '#be123c' };
+const alertStyle: CSSProperties = {
+  border: '1px solid #fda4af',
+  borderRadius: 8,
+  background: '#fff1f2',
+  color: '#881337',
+  padding: '8px 10px',
+  fontSize: 12,
+};
+const actionsStyle: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 };
+const primaryButtonStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  border: 0,
+  borderRadius: 8,
+  background: '#7c3aed',
+  color: '#fff',
+  cursor: 'pointer',
+  fontSize: 13,
+  fontWeight: 700,
+  padding: '8px 12px',
+};
+const secondaryButtonStyle: CSSProperties = {
+  border: '1px solid var(--border-strong)',
+  borderRadius: 8,
+  background: '#fff',
+  color: 'var(--ink-2)',
+  cursor: 'pointer',
+  fontSize: 13,
+  fontWeight: 600,
+  padding: '8px 12px',
+};
+const filledChipStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  borderRadius: 999,
+  background: '#d1fae5',
+  color: '#065f46',
+  fontSize: 12,
+  padding: '2px 8px',
+};
 
 // AiDraftPanel — collapsible inline panel sitting at the top of a reading
 // exercise form. Submitting fires POST /api/admin/exercises/generate-draft;
@@ -111,14 +182,14 @@ export function AiDraftPanel({ exerciseType, formDirty, onApply }: Props) {
   return (
     <section
       aria-label="Tạo nháp bằng AI"
-      className="mb-4 rounded-lg border border-violet-200 bg-violet-50 p-3"
+      style={panelStyle}
     >
-      <header className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <SparklesIcon className="h-4 w-4 text-violet-600" />
-          <h3 className="text-sm font-semibold text-violet-900">Tạo nháp bằng AI</h3>
+      <header style={headerStyle}>
+        <div style={titleWrapStyle}>
+          <SparklesIcon style={{ width: 18, height: 18, color: '#6d28d9', flexShrink: 0 }} />
+          <h3 style={titleStyle}>Tạo nháp bằng AI</h3>
           {isFilled && (
-            <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-900">
+            <span style={filledChipStyle}>
               ✨ Đã sinh nháp
             </span>
           )}
@@ -126,7 +197,7 @@ export function AiDraftPanel({ exerciseType, formDirty, onApply }: Props) {
         <button
           type="button"
           onClick={() => setExpanded((x) => !x)}
-          className="text-xs font-medium text-violet-700 hover:underline"
+          style={toggleStyle}
           aria-expanded={expanded}
         >
           {expanded ? 'Thu gọn' : 'Mở rộng'}
@@ -134,16 +205,16 @@ export function AiDraftPanel({ exerciseType, formDirty, onApply }: Props) {
       </header>
 
       {!expanded && (
-        <p className="mt-1 text-xs text-violet-800">
+        <p style={helperStyle}>
           Nhập chủ đề + ngữ pháp + cấp độ, AI sinh đoạn văn + câu hỏi để bạn duyệt.
         </p>
       )}
 
       {expanded && (
-        <form onSubmit={handleSubmit} className="mt-3 flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">
-              Chủ đề <span className="text-rose-600">*</span>
+        <div style={bodyStyle}>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>
+              Chủ đề <span style={requiredStyle}>*</span>
             </label>
             <input
               type="text"
@@ -152,7 +223,7 @@ export function AiDraftPanel({ exerciseType, formDirty, onApply }: Props) {
               disabled={isLoading}
               maxLength={200}
               placeholder="vd: đi khám bác sĩ, mua hàng, đi du lịch Praha..."
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:bg-slate-100"
+              style={inputStyle}
             />
           </div>
 
@@ -169,8 +240,8 @@ export function AiDraftPanel({ exerciseType, formDirty, onApply }: Props) {
             disabled={isLoading}
           />
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">Hướng dẫn thêm (tùy chọn)</label>
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Hướng dẫn thêm (tùy chọn)</label>
             <textarea
               value={input.extraInstructions}
               onChange={(e) => setInput({ ...input, extraInstructions: e.target.value })}
@@ -178,45 +249,46 @@ export function AiDraftPanel({ exerciseType, formDirty, onApply }: Props) {
               maxLength={500}
               rows={2}
               placeholder="vd: dùng giọng văn thân mật, có 2 nhân vật..."
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:bg-slate-100"
+              style={{ ...inputStyle, resize: 'vertical', minHeight: 72 }}
             />
           </div>
 
-          {validationErr && <p className="text-xs text-rose-700">{validationErr}</p>}
+          {validationErr && <p style={errorStyle}>{validationErr}</p>}
 
           {state.status === 'error' && (
-            <div role="alert" className="rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+            <div role="alert" style={alertStyle}>
               {state.message}
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-2">
+          <div style={actionsStyle}>
             {isLoading ? (
               <>
-                <div aria-live="polite" className="text-xs text-violet-800">
+                <div aria-live="polite" style={helperStyle}>
                   AI đang sinh nội dung... (~10s)
                 </div>
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+                  style={secondaryButtonStyle}
                 >
                   Hủy
                 </button>
               </>
             ) : (
               <button
-                type="submit"
+                type="button"
+                onClick={() => handleSubmit()}
                 disabled={isLoading}
                 aria-busy={isLoading}
-                className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:bg-violet-300"
+                style={{ ...primaryButtonStyle, opacity: isLoading ? 0.6 : 1 }}
               >
-                <SparklesIcon className="h-4 w-4" />
+                <SparklesIcon style={{ width: 16, height: 16, flexShrink: 0 }} />
                 {isFilled ? 'Tạo lại' : 'Sinh nháp'}
               </button>
             )}
           </div>
-        </form>
+        </div>
       )}
 
       {state.status === 'confirm-overwrite' && (
@@ -233,24 +305,24 @@ export function AiDraftPanel({ exerciseType, formDirty, onApply }: Props) {
 
 function ConfirmOverwriteDialog({ onConfirm, onDismiss }: { onConfirm: () => void; onDismiss: () => void }) {
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
-        <h4 className="text-base font-semibold text-slate-900">Ghi đè nội dung hiện tại?</h4>
-        <p className="mt-2 text-sm text-slate-700">
+    <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.4)', padding: 16 }}>
+      <div style={{ width: '100%', maxWidth: 420, borderRadius: 12, background: '#fff', padding: 20, boxShadow: '0 20px 50px rgba(15,23,42,0.2)' }}>
+        <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>Ghi đè nội dung hiện tại?</h4>
+        <p style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--ink-2)' }}>
           Đoạn văn và câu hỏi đang có trên form sẽ bị thay thế. Không thể hoàn tác.
         </p>
-        <div className="mt-4 flex justify-end gap-2">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button
             type="button"
             onClick={onDismiss}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+            style={secondaryButtonStyle}
           >
             Hủy
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-700"
+            style={{ ...primaryButtonStyle, background: '#e11d48' }}
           >
             Ghi đè & Tạo lại
           </button>
@@ -260,9 +332,9 @@ function ConfirmOverwriteDialog({ onConfirm, onDismiss }: { onConfirm: () => voi
   );
 }
 
-function SparklesIcon({ className }: { className?: string }) {
+function SparklesIcon({ style }: { style?: CSSProperties }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={style} aria-hidden>
       <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
     </svg>
   );

@@ -53,10 +53,13 @@ export function validateExercise(exerciseType: ExerciseType, payload: AnyPayload
     if (options.length < 8) errors.push(`Čtení 1 cần 8 options A-H (hiện có ${options.length}).`);
   }
 
-  // Cteni 2/4: need reading text + questions + answers
+  // Cteni 2 needs a reading text. Cteni 4 context is optional per V24,
+  // so it only needs the six A-D questions.
   if (exerciseType === 'cteni_2' || exerciseType === 'cteni_4') {
-    const text = String(detail.text ?? '').trim();
-    if (!text) errors.push('Cần nhập đoạn văn đọc.');
+    if (exerciseType === 'cteni_2') {
+      const text = String(detail.text ?? '').trim();
+      if (!text) errors.push('Cần nhập đoạn văn đọc.');
+    }
     const questions = (detail.questions ?? []) as unknown[];
     const minQ = exerciseType === 'cteni_4' ? 6 : 5;
     if (questions.length < minQ) errors.push(`${exerciseType.toUpperCase()} cần ${minQ} câu hỏi (hiện có ${questions.length}).`);

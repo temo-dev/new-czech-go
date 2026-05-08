@@ -69,13 +69,25 @@ const (
 	cteni5QuestionStart = 21 // questions 21..25
 )
 
+const (
+	cteni2MinWords = 100
+	cteni2MaxWords = 200
+	cteni5MinWords = 80
+	cteni5MaxWords = 150
+	cteni6MinWords = 80
+	cteni6MaxWords = 150
+)
+
 // ── cteni_2 ───────────────────────────────────────────────────────────────────
 
 func validateCteni2(d contracts.Cteni2Detail) error {
 	if strings.TrimSpace(d.Text) == "" {
 		return fmt.Errorf("cteni_2: text must be non-empty")
 	}
-	if err := validateMultiChoiceQuestions(d.Questions, 5, "cteni_2"); err != nil {
+	if err := requireWordCount(d.Text, cteni2MinWords, cteni2MaxWords, "cteni_2", "text"); err != nil {
+		return err
+	}
+	if err := validateMultiChoiceQuestions(d.Questions, 5, cteni2QuestionStart, "cteni_2"); err != nil {
 		return err
 	}
 	return requireCorrectAnswers(d.CorrectAnswers, cteni2QuestionStart, len(d.Questions), "cteni_2", "A-D", []string{"A", "B", "C", "D"})
@@ -85,7 +97,7 @@ func validateCteni2(d contracts.Cteni2Detail) error {
 
 func validateCteni4(d contracts.Cteni4Detail) error {
 	// context is optional per spec §4 — no non-empty check.
-	if err := validateMultiChoiceQuestions(d.Questions, 6, "cteni_4"); err != nil {
+	if err := validateMultiChoiceQuestions(d.Questions, 6, cteni4QuestionStart, "cteni_4"); err != nil {
 		return err
 	}
 	return requireCorrectAnswers(d.CorrectAnswers, cteni4QuestionStart, len(d.Questions), "cteni_4", "A-D", []string{"A", "B", "C", "D"})
@@ -99,10 +111,17 @@ func validateCteni5(d contracts.Cteni5Detail) error {
 	if strings.TrimSpace(d.Text) == "" {
 		return fmt.Errorf("cteni_5: text must be non-empty")
 	}
+	if err := requireWordCount(d.Text, cteni5MinWords, cteni5MaxWords, "cteni_5", "text"); err != nil {
+		return err
+	}
 	if len(d.Questions) != 5 {
 		return fmt.Errorf("cteni_5: expected 5 questions, got %d", len(d.Questions))
 	}
 	for i, q := range d.Questions {
+		expectedNo := cteni5QuestionStart + i
+		if q.QuestionNo != expectedNo {
+			return fmt.Errorf("cteni_5: question %d question_no must be %d, got %d", i+1, expectedNo, q.QuestionNo)
+		}
 		if strings.TrimSpace(q.Prompt) == "" {
 			return fmt.Errorf("cteni_5: question %d prompt must be non-empty", i+1)
 		}
@@ -134,6 +153,10 @@ func validateCteni1(d contracts.Cteni1Detail) error {
 		return fmt.Errorf("cteni_1: expected 5 items, got %d", len(d.Items))
 	}
 	for i, it := range d.Items {
+		expectedNo := i + 1
+		if it.ItemNo != expectedNo {
+			return fmt.Errorf("cteni_1: item %d item_no must be %d, got %d", i+1, expectedNo, it.ItemNo)
+		}
 		if it.AssetID != "" {
 			return fmt.Errorf("cteni_1: item %d must not include asset_id (admin uploads images post-fill)", i+1)
 		}
@@ -180,6 +203,10 @@ func validateCteni3(d contracts.Cteni3Detail) error {
 		return fmt.Errorf("cteni_3: expected 4 texts, got %d", len(d.Texts))
 	}
 	for i, txt := range d.Texts {
+		expectedNo := i + 1
+		if txt.ItemNo != expectedNo {
+			return fmt.Errorf("cteni_3: text item %d item_no must be %d, got %d", i+1, expectedNo, txt.ItemNo)
+		}
 		if strings.TrimSpace(txt.Text) == "" {
 			return fmt.Errorf("cteni_3: text item %d must be non-empty", i+1)
 		}
@@ -222,10 +249,17 @@ func validateCteni6(d contracts.AnoNeDetail) error {
 	if strings.TrimSpace(d.Passage) == "" {
 		return fmt.Errorf("cteni_6: passage must be non-empty")
 	}
+	if err := requireWordCount(d.Passage, cteni6MinWords, cteni6MaxWords, "cteni_6", "passage"); err != nil {
+		return err
+	}
 	if len(d.Statements) < 1 || len(d.Statements) > 5 {
 		return fmt.Errorf("cteni_6: expected 1-5 statements, got %d", len(d.Statements))
 	}
 	for i, s := range d.Statements {
+		expectedNo := i + 1
+		if s.QuestionNo != expectedNo {
+			return fmt.Errorf("cteni_6: statement %d question_no must be %d, got %d", i+1, expectedNo, s.QuestionNo)
+		}
 		if strings.TrimSpace(s.Statement) == "" {
 			return fmt.Errorf("cteni_6: statement %d text must be non-empty", i+1)
 		}
@@ -242,13 +276,17 @@ func validateCteni6(d contracts.AnoNeDetail) error {
 // ── shared multi-choice question validator ────────────────────────────────────
 
 // validateMultiChoiceQuestions enforces the cteni_2 / cteni_4 question shape:
-// exactly expectedCount questions, each with exactly 4 options keyed A-D
-// (unique) and non-empty option text.
-func validateMultiChoiceQuestions(questions []contracts.ReadingQuestion, expectedCount int, label string) error {
+// exactly expectedCount questions, sequential exam-aligned question_no values,
+// and exactly 4 options keyed A-D (unique) with non-empty option text.
+func validateMultiChoiceQuestions(questions []contracts.ReadingQuestion, expectedCount, startNo int, label string) error {
 	if len(questions) != expectedCount {
 		return fmt.Errorf("%s: expected %d questions, got %d", label, expectedCount, len(questions))
 	}
 	for i, q := range questions {
+		expectedNo := startNo + i
+		if q.QuestionNo != expectedNo {
+			return fmt.Errorf("%s: question %d question_no must be %d, got %d", label, i+1, expectedNo, q.QuestionNo)
+		}
 		if len(q.Options) != 4 {
 			return fmt.Errorf("%s: question %d must have 4 options, got %d", label, i+1, len(q.Options))
 		}
@@ -270,6 +308,14 @@ func validateMultiChoiceQuestions(questions []contracts.ReadingQuestion, expecte
 }
 
 // ── shared helpers ────────────────────────────────────────────────────────────
+
+func requireWordCount(s string, minWords, maxWords int, label, field string) error {
+	count := len(strings.Fields(s))
+	if count < minWords || count > maxWords {
+		return fmt.Errorf("%s: %s must be %d-%d words, got %d", label, field, minWords, maxWords, count)
+	}
+	return nil
+}
 
 // requireCorrectAnswers verifies the correct_answers map covers exactly
 // startNo..startNo+count-1 (one entry each) and that every value is in the

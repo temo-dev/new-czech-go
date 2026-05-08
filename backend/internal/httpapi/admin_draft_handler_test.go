@@ -26,7 +26,7 @@ func validReadingDraft() *contracts.ReadingDraft {
 	return &contracts.ReadingDraft{
 		ExerciseType: "cteni_2",
 		Detail: contracts.Cteni2Detail{
-			Text: "Pavel byl nemocný a šel k lékaři.",
+			Text: testDraftPassage(120),
 			Questions: []contracts.ReadingQuestion{
 				{QuestionNo: 6, Prompt: "Q1?", Options: fourOptions()},
 				{QuestionNo: 7, Prompt: "Q2?", Options: fourOptions()},
@@ -38,6 +38,10 @@ func validReadingDraft() *contracts.ReadingDraft {
 		},
 		Metadata: contracts.ReadingDraftMeta{Model: "mock", DurationMs: 1},
 	}
+}
+
+func testDraftPassage(words int) string {
+	return strings.TrimSpace(strings.Repeat("slovo ", words))
 }
 
 func fourOptions() []contracts.MultipleChoiceOption {

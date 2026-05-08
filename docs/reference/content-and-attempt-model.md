@@ -241,6 +241,7 @@ The main learner-facing content unit. Each exercise belongs to a Skill (course e
 | `prep_time_sec` | `int` | no | Optional countdown before recording |
 | `recording_time_limit_sec` | `int` | no | Optional hard limit |
 | `sample_answer_enabled` | `bool` | yes | V1 can default to true |
+| `created_by_llm` | `bool` | yes | Default `false`; set `true` for admin AI-drafted exercises. Sticky on update so later manual edits do not erase provenance. |
 | `status` | `ExerciseStatus` | yes | Draft/published/archive |
 | `sequence_no` | `int` | yes | Ordering within skill |
 | `created_at` | `timestamp` | yes | Audit |
