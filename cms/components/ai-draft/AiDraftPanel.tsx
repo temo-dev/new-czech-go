@@ -57,7 +57,11 @@ export function AiDraftPanel({ exerciseType, formDirty, onApply }: Props) {
         body: JSON.stringify(toGenerateDraftRequest(submitted)),
         signal: ctrl.signal,
       });
+      // Guard: admin clicked Cancel after the response had already settled.
+      // Without this, dispatch would push success/error over the idle state.
+      if (ctrl.signal.aborted) return;
       const body: any = await res.json().catch(() => ({}));
+      if (ctrl.signal.aborted) return;
       if (!res.ok) {
         const code: string | undefined = body?.error?.code;
         const message: string | undefined = body?.error?.message;
@@ -73,6 +77,7 @@ export function AiDraftPanel({ exerciseType, formDirty, onApply }: Props) {
       dispatch({ type: 'response-ok', input: submitted });
     } catch (err: unknown) {
       if ((err as Error)?.name === 'AbortError') return;
+      if (ctrl.signal.aborted) return;
       dispatch({ type: 'response-error', message: mapServerError('llm_error') });
     }
   }

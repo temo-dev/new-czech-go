@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -288,6 +290,41 @@ func TestGenerateDraft_WrongMethod_Returns405(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Fatalf("expected 405, got %d", resp.StatusCode)
+	}
+}
+
+// I3: ensure withRole("admin") middleware actually enforces the role gate.
+func TestGenerateDraft_NoToken_Returns401(t *testing.T) {
+	mock := &processing.MockReadingDraftGenerator{Draft: validReadingDraft()}
+	srv, _, gid := adminDraftServer(t, mock)
+
+	body, err := json.Marshal(validDraftBody(gid))
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+adminDraftPath, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	// no Authorization header
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func TestGenerateDraft_LearnerToken_Returns403(t *testing.T) {
+	mock := &processing.MockReadingDraftGenerator{Draft: validReadingDraft()}
+	srv, _, gid := adminDraftServer(t, mock)
+
+	status, body := postJSONAllowErrorWithToken(t, srv, adminDraftPath, "dev-learner-token", validDraftBody(gid))
+	if status != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d (resp=%v)", status, body)
+	}
+	if errCode(body) != "forbidden" {
+		t.Fatalf("expected forbidden, got %v", body["error"])
 	}
 }
 
