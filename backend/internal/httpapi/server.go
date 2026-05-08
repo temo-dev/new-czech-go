@@ -33,8 +33,10 @@ type Server struct {
 	uploadProvider   UploadTargetProvider
 	audioURLProvider AudioURLProvider
 	audioSignSecret  []byte
-	audioGenerator   processing.ExerciseAudioGenerator
-	contentGenerator processing.ContentGenerator
+	audioGenerator        processing.ExerciseAudioGenerator
+	contentGenerator      processing.ContentGenerator
+	readingDraftGenerator processing.ReadingDraftGenerator // V24
+	readingDraftRL        *readingDraftRateLimiter         // V24
 
 	// V17 self-serve learner — populated by NewServerWithAuth, nil for
 	// the legacy dev-fixture path.
@@ -119,6 +121,13 @@ func assembleServer(repo *store.MemoryStore, processor *processing.Processor, up
 	if apiKey := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY")); apiKey != "" {
 		contentGen = processing.NewClaudeContentGenerator(apiKey)
 	}
+	var readingDraftGen processing.ReadingDraftGenerator
+	if apiKey := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY")); apiKey != "" {
+		// V24 reading-draft generator. The endpoint is the off-switch:
+		// without ANTHROPIC_API_KEY the field stays nil and the handler
+		// returns 503 ("not_configured") instead of attempting a Claude call.
+		readingDraftGen = processing.NewClaudeReadingDraftGenerator(apiKey, processing.LoadLLMModels().ReadingDraft)
+	}
 	// Exercise audio generator: Polly when TTS is configured, dev otherwise.
 	var audioGen processing.ExerciseAudioGenerator = processing.DevExerciseAudioGenerator{}
 	if ttsProvider := processor.TTSProvider(); ttsProvider != nil {
@@ -148,7 +157,9 @@ func assembleServer(repo *store.MemoryStore, processor *processing.Processor, up
 		audioURLProvider:   audioURLProvider,
 		audioSignSecret:    audioSignSecret,
 		audioGenerator:     audioGen,
-		contentGenerator:   contentGen,
+		contentGenerator:      contentGen,
+		readingDraftGenerator: readingDraftGen,
+		readingDraftRL:        newReadingDraftRateLimiter(),
 		voiceRegistry:      voiceRegistry,
 		elevenLabsAPIKey:   strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")),
 		elevenLabsAgentID:  strings.TrimSpace(os.Getenv("ELEVENLABS_AGENT_ID")),
@@ -263,6 +274,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/courses/", s.withAuth(s.handleCourseByID))
 	// Admin APIs
 	s.mux.HandleFunc("/v1/admin/exercises", s.withRole("admin", s.handleAdminExercises))
+	// V24 reading-draft generator. Specific path registered before the
+	// generic prefix so ServeMux's longest-prefix match routes here.
+	s.mux.HandleFunc("/v1/admin/exercises/generate-draft", s.withRole("admin", s.handleAdminGenerateDraft))
 	s.mux.HandleFunc("/v1/admin/exercises/", s.withRole("admin", s.handleAdminExerciseByID))
 	s.mux.HandleFunc("/v1/admin/mock-tests", s.withRole("admin", s.handleAdminMockTests))
 	s.mux.HandleFunc("/v1/admin/mock-tests/", s.withRole("admin", s.handleAdminMockTestByID))

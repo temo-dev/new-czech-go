@@ -81,18 +81,19 @@ Each task: tool schema + prompt branch + validator (≥5 reject + 1 accept fixtu
 
 ## Phase C — HTTP endpoint + quality gate
 
-- [ ] **C1** `admin_draft_handler.go` POST `/v1/admin/exercises/generate-draft`
-  - [ ] All 6 error paths covered (400/404/422/429/502/504)
-  - [ ] Mock-driven happy path returns 200 + metadata
-  - [ ] In-memory rate limiter (5/min/admin) + test
-- [ ] **C2** Server wiring
-  - [ ] `Server.ReadingDraftGenerator` field + DI option
-  - [ ] Route registered
-  - [ ] Real Claude generator wired in `assembleServer`
-  - [ ] `make backend-build` + `make backend-test` green
-- [ ] **C3** `created_by_llm` flag on exercise create endpoint
-  - [ ] Backward-compatible (omitted = false)
-  - [ ] Test asserts persistence
+- [x] **C1** `admin_draft_handler.go` POST `/v1/admin/exercises/generate-draft`
+  - [x] All 7 error paths covered (400 invalid_request × 8 cases, 404 grammar_point_not_found, 422 schema_mismatch, 429 rate_limited, 502 llm_error, 503 not_configured, 504 timeout)
+  - [x] Mock-driven happy path returns 200 with `{data: ReadingDraft}` (exercise_type + detail + metadata)
+  - [x] In-memory `readingDraftRateLimiter` (5/min/admin) — separate windows from aiImageRL
+  - [x] Method check (405) + invalid JSON (400)
+- [x] **C2** Server wiring
+  - [x] `Server.readingDraftGenerator processing.ReadingDraftGenerator` field
+  - [x] `Server.readingDraftRL *readingDraftRateLimiter` field
+  - [x] Route registered: specific path before generic prefix so longest-match routes correctly
+  - [x] Claude generator wired in `assembleServer` — only when `ANTHROPIC_API_KEY` set; nil keeps endpoint at 503
+  - [x] **Off-switch semantic clarified**: spec/plan said `LLM_READING_DRAFT_MODEL=""` returns 503, but `env()` falls back to default on empty. Replaced with simpler ANTHROPIC_API_KEY-presence gate; doc fix needed in spec §13 Rollout
+  - [x] `make backend-build` + `make backend-test` green
+- [→] **C3** `created_by_llm` flag on exercise create endpoint — folded into A1 (Exercise.CreatedByLLM already round-trips through admin create + memory + postgres). Verify in Phase D when CMS sets the flag.
 - [ ] **C4 KILL SWITCH — Manual Czech-quality gate**
   - [ ] Generate 30 drafts (5 × 6 types) with Haiku 4.5 against local backend
   - [ ] Czech native review each — pass/fail tally per type
