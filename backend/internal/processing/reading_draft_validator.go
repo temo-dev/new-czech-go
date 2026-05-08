@@ -48,6 +48,12 @@ func ValidateReadingDraft(d *contracts.ReadingDraft) error {
 			return fmt.Errorf("cteni_3: expected Cteni3Detail, got %T", d.Detail)
 		}
 		return validateCteni3(detail)
+	case "cteni_1":
+		detail, ok := d.Detail.(contracts.Cteni1Detail)
+		if !ok {
+			return fmt.Errorf("cteni_1: expected Cteni1Detail, got %T", d.Detail)
+		}
+		return validateCteni1(detail)
 	default:
 		return fmt.Errorf("reading draft: unsupported exercise_type %q", d.ExerciseType)
 	}
@@ -106,6 +112,52 @@ func validateCteni5(d contracts.Cteni5Detail) error {
 	}
 	if len(d.CorrectAnswers) != len(d.Questions) {
 		return fmt.Errorf("cteni_5: correct_answers should cover %d questions, got %d entries", len(d.Questions), len(d.CorrectAnswers))
+	}
+	return nil
+}
+
+// ── cteni_1 (text-only — admin uploads images post-fill, V24 §1) ──────────────
+
+func validateCteni1(d contracts.Cteni1Detail) error {
+	if len(d.Items) != 5 {
+		return fmt.Errorf("cteni_1: expected 5 items, got %d", len(d.Items))
+	}
+	for i, it := range d.Items {
+		if it.AssetID != "" {
+			return fmt.Errorf("cteni_1: item %d must not include asset_id (admin uploads images post-fill)", i+1)
+		}
+		if strings.TrimSpace(it.Text) == "" {
+			return fmt.Errorf("cteni_1: item %d text must be non-empty", i+1)
+		}
+	}
+	if len(d.Options) != 8 {
+		return fmt.Errorf("cteni_1: expected 8 options, got %d", len(d.Options))
+	}
+	allowedKeys := map[string]bool{"A": true, "B": true, "C": true, "D": true, "E": true, "F": true, "G": true, "H": true}
+	seenKeys := map[string]bool{}
+	for i, opt := range d.Options {
+		if !allowedKeys[opt.Key] {
+			return fmt.Errorf("cteni_1: option %d key must be A-H, got %q", i+1, opt.Key)
+		}
+		if seenKeys[opt.Key] {
+			return fmt.Errorf("cteni_1: option %d has duplicate key %q", i+1, opt.Key)
+		}
+		seenKeys[opt.Key] = true
+		if strings.TrimSpace(opt.Text) == "" {
+			return fmt.Errorf("cteni_1: option %s has empty option text", opt.Key)
+		}
+	}
+	if err := requireCorrectAnswers(d.CorrectAnswers, len(d.Items), "cteni_1", "A-H", []string{"A", "B", "C", "D", "E", "F", "G", "H"}); err != nil {
+		return err
+	}
+	// each option matches at most one item → correct_answers values unique.
+	seenValues := map[string]bool{}
+	for i := 1; i <= len(d.Items); i++ {
+		v := d.CorrectAnswers[strconv.Itoa(i)]
+		if seenValues[v] {
+			return fmt.Errorf("cteni_1: duplicate correct_answer value %q (each option matches at most one item)", v)
+		}
+		seenValues[v] = true
 	}
 	return nil
 }

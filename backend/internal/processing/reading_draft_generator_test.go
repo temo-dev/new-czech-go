@@ -36,15 +36,17 @@ func TestMockReadingDraftGenerator_PropagatesError(t *testing.T) {
 	}
 }
 
-func TestClaudeReadingDraftGenerator_NotImplementedForUnshippedTypes(t *testing.T) {
+func TestClaudeReadingDraftGenerator_DispatchesAllCteniTypesToCallClaude(t *testing.T) {
 	gen := NewClaudeReadingDraftGenerator("dummy-key", DefaultReadingDraftModel)
 
-	// cteni_2 (B1), cteni_4 (B2), cteni_5 (B3), cteni_6 (B4), cteni_3 (B5) shipped; cteni_1 still skeleton.
-	for _, exType := range []string{"cteni_1"} {
+	// All 6 cteni types shipped in B1..B6. Each type must NOT return
+	// ErrReadingDraftNotImplemented; with a dummy key the call fails at the
+	// HTTP layer instead, which is acceptable for a dispatch-only test.
+	for _, exType := range []string{"cteni_1", "cteni_2", "cteni_3", "cteni_4", "cteni_5", "cteni_6"} {
 		t.Run(exType, func(t *testing.T) {
 			_, err := gen.Generate(context.Background(), contracts.ReadingDraftInput{ExerciseType: exType})
-			if !errors.Is(err, ErrReadingDraftNotImplemented) {
-				t.Fatalf("expected ErrReadingDraftNotImplemented, got %v", err)
+			if errors.Is(err, ErrReadingDraftNotImplemented) {
+				t.Fatalf("expected dispatch to callClaude, got ErrReadingDraftNotImplemented")
 			}
 		})
 	}
@@ -334,6 +336,46 @@ func TestParseReadingDraftDetail_Cteni3_RoundTrips(t *testing.T) {
 	}
 	if d.Persons[0].Name != "Pavel" {
 		t.Fatalf("name mismatch: %q", d.Persons[0].Name)
+	}
+}
+
+func TestBuildReadingDraftToolSchema_Cteni1_HasNoAssetIdProperty(t *testing.T) {
+	schema := buildReadingDraftToolSchema("cteni_1")
+	if schema == nil {
+		t.Fatal("expected schema for cteni_1")
+	}
+	props, _ := schema["properties"].(map[string]any)
+	items, _ := props["items"].(map[string]any)
+	itemSchema, _ := items["items"].(map[string]any)
+	itemProps, _ := itemSchema["properties"].(map[string]any)
+	if _, hasAsset := itemProps["asset_id"]; hasAsset {
+		t.Error("cteni_1 item schema must NOT contain asset_id (V24 generates text-only)")
+	}
+	if itemSchema["additionalProperties"] != false {
+		t.Error("cteni_1 item schema should set additionalProperties:false to forbid asset_id leakage")
+	}
+	options, _ := props["options"].(map[string]any)
+	if options["minItems"] != 8 || options["maxItems"] != 8 {
+		t.Errorf("options bounds = [%v, %v], want [8, 8]", options["minItems"], options["maxItems"])
+	}
+}
+
+func TestParseReadingDraftDetail_Cteni1_RoundTrips(t *testing.T) {
+	raw := []byte(`{
+		"items": [{"item_no": 1, "text": "x"}],
+		"options": [{"key": "A", "text": "info"}],
+		"correct_answers": {"1": "A"}
+	}`)
+	detail, err := parseReadingDraftDetail("cteni_1", raw)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	d, ok := detail.(contracts.Cteni1Detail)
+	if !ok {
+		t.Fatalf("expected Cteni1Detail, got %T", detail)
+	}
+	if d.Items[0].Text != "x" {
+		t.Fatalf("text mismatch")
 	}
 }
 

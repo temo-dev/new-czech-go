@@ -69,11 +69,15 @@ Each task: tool schema + prompt branch + validator (≥5 reject + 1 accept fixtu
   - [x] Generator dispatch + parser branch wired
   - [x] Tests +11 (1 accept + 9 reject + schema bounds + parser round-trip)
   - [x] Commit `feat(v24-B5): cteni_3 draft generator + validator`
-- [ ] **B6** cteni_1 — 5 items → A-H text-only
-  - [ ] Prompt explicitly forbids `asset_id`
-  - [ ] Validator: 5 items, 8 options A-H, 5 unique correct values
-  - [ ] Commit `feat(v24-B6): cteni_1 draft generator + validator (text-only)`
-- [ ] **Checkpoint B** all 6 types green via mock; backend test count +30; no HTTP route yet
+- [x] **B6** cteni_1 — 5 items → A-H text-only
+  - [x] Tool schema (`cteni1ToolSchema`) — 5 ReadingItem with `additionalProperties:false` to forbid asset_id leakage + 8 TextOption A-H + correct_answers A-H enum
+  - [x] Prompt branch explicitly forbids `asset_id`; specifies 10-25 word SMS/sign/notice texts
+  - [x] Validator (`validateCteni1`) — 5 items text-only (rejects asset_id), 8 options unique A-H, unique correct values
+  - [x] Generator dispatch + parser branch wired (cteni_1 = last cteni type)
+  - [x] Skeleton `NotImplementedForUnshippedTypes` test replaced with positive `DispatchesAllCteniTypesToCallClaude`
+  - [x] Tests +11 (1 accept + 9 reject + schema bounds + parser round-trip)
+  - [x] Commit `feat(v24-B6): cteni_1 draft generator + validator (text-only)`
+- [x] **Checkpoint B** all 6 types green via mock; backend test count +50 across B1-B6; no HTTP route yet
 
 ## Phase C — HTTP endpoint + quality gate
 

@@ -526,6 +526,14 @@ func readingDraftStructuralRequirements(exerciseType string) string {
 			"- correct_answers map: keys \"1\"..\"4\", values are unique person keys A-E (each person matches at most one text)",
 			"- Persons must be distinguishable by description (different hobby, profession, or trait)",
 		}, "\n")
+	case "cteni_1":
+		return strings.Join([]string{
+			"- Generate exactly 5 short text items (item_no = 1..5), each one short message (10-25 words) the learner reads (e.g. SMS, sign, notice)",
+			"- Each item has only `text` — DO NOT produce `asset_id`; the admin uploads accompanying images later",
+			"- Generate exactly 8 options (keys A-H) summarising the message theme (e.g. \"info o schůzce\", \"info o cestování\")",
+			"- correct_answers map: keys \"1\"..\"5\", values are unique option keys A-H (each option matches at most one item; 3 options are distractors)",
+			"- Options must be plausible competing summaries — not obvious to the eye, requiring the learner to read the text",
+		}, "\n")
 	}
 	return ""
 }
