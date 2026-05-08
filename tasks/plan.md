@@ -8,7 +8,8 @@ mega-file, frozen). V19+ slices each have their own plan/todo pair.
 
 | Slice | Plan | Todo | Spec | Status |
 |---|---|---|---|---|
-| V24 Doc Draft Generator | [v24-doc-draft-generator-plan.md](v24-doc-draft-generator-plan.md) | [v24-doc-draft-generator-todo.md](v24-doc-draft-generator-todo.md) | [docs/specs/v24-doc-draft-generator.md](../docs/specs/v24-doc-draft-generator.md) | 📋 planned |
+| V25 IAP Wire Real | [v25-iap-wire-real-plan.md](v25-iap-wire-real-plan.md) | [v25-iap-wire-real-todo.md](v25-iap-wire-real-todo.md) | [docs/specs/iap-wire-real.md](../docs/specs/iap-wire-real.md) | 📝 plan ready — chờ human approve |
+| V24 Doc Draft Generator | [v24-doc-draft-generator-plan.md](v24-doc-draft-generator-plan.md) | [v24-doc-draft-generator-todo.md](v24-doc-draft-generator-todo.md) | [docs/specs/v24-doc-draft-generator.md](../docs/specs/v24-doc-draft-generator.md) | ✅ implemented (C4 manual Czech-quality gate pending before prod promotion) |
 | V23 Exercise Authoring Polish | [v23-exercise-authoring-polish-plan.md](v23-exercise-authoring-polish-plan.md) | [v23-exercise-authoring-polish-todo.md](v23-exercise-authoring-polish-todo.md) | [docs/specs/v23-exercise-authoring-polish.md](../docs/specs/v23-exercise-authoring-polish.md) | ✅ implemented (C8 deferred V24; awaiting commit + manual smoke) |
 | V22 CMS Catch-Up | [v22-cms-catch-up-plan.md](v22-cms-catch-up-plan.md) | [v22-cms-catch-up-todo.md](v22-cms-catch-up-todo.md) | [docs/specs/v22-cms-catch-up.md](../docs/specs/v22-cms-catch-up.md) | ✅ implemented (awaiting commit + manual smoke) |
 | V21.3 CEFR UI Wire-up | [cefr-ui-wireup-plan.md](cefr-ui-wireup-plan.md) | [cefr-ui-wireup-todo.md](cefr-ui-wireup-todo.md) | [docs/specs/cefr-ui-wireup.md](../docs/specs/cefr-ui-wireup.md) | ✅ shipped |
