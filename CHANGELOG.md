@@ -10,6 +10,50 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V30 — Poslech 1 Image Wire Hotfix — 2026-05-10
+
+Smoke test V29 found Flutter showed letter placeholders (A/B/C/D) in
+the 2×2 image grid instead of actual images. Root cause: V28 + V29
+wire stored the asset's **id** into `imgK`, but Flutter
+`mediaUri(imgK)` queries `/v1/media/file?key=<imgK>` and the server
+resolves that key as a **storage_key** (not an asset_id). So
+`localExerciseAssetPath(assetId)` 404'd every request and the
+image grid fell through to `_LetterPlaceholder` via `errorBuilder`.
+
+Hotfix only touches the CMS wire. Backend + Flutter unchanged. No
+new spec — semantic clarification for V28/V29 callbacks.
+
+### CMS
+
+- `poslech-model.ts` `parseUploadResponse(json)`: now extracts
+  `data.asset.storage_key` instead of `data.asset.id`. Throw message
+  references `asset.storage_key`.
+- `PoslechFields.tsx` AiImageButton callback (V28 path): replace
+  `setImg(result.assetId)` with `setImg(result.storageKey)`. Asset
+  registration via `POST /api/admin/exercises/:id/assets` still
+  passes both id + storage_key so the registry stays consistent
+  with cteni_1.
+- Manual paste placeholder text updated to mention storage_key
+  format (`exercises/<id>/<asset>.jpg`) so admins paste the right
+  string when bypassing the AI / upload buttons.
+
+### Tests
+
+CMS: 290 tests pass (count unchanged; existing V29 tests adjusted
+to assert storage_key extraction). Lint clean.
+
+### Audio note (not a bug)
+
+Same smoke also reported "audio still 1 file". V26 path is correct
+but only engages **after** admin clicks "Tạo audio" on the new
+5-item seed. Existing exercises keep the legacy single audio.mp3
+until regenerated — backward-compat by design (V26 D5). To upgrade:
+open exercise in CMS → click "Tạo audio (Polly TTS)" → backend
+loops 5 items + writes per-item asset_ids → Flutter renders 5
+mini-players on next load.
+
+---
+
 ## V29 — Poslech 1 Image Upload Button — 2026-05-10
 
 V28 ship cùng ngày, smoke test xong tìm thấy gap thứ 3: admin có

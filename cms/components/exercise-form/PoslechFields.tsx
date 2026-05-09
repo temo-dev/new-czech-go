@@ -145,7 +145,7 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
                       type="text"
                       value={imgK}
                       onChange={e => setImg(e.target.value)}
-                      placeholder={`Asset ID ảnh ${k} (paste, hoặc dùng nút ✨ AI / 📁 Upload bên dưới)`}
+                      placeholder={`Storage key ảnh ${k} (vd. exercises/<id>/<asset>.jpg — paste, hoặc dùng ✨ AI / 📁 Upload)`}
                       style={imgInputStyle}
                     />
                     <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
@@ -195,7 +195,11 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
                               mime_type: 'image/jpeg',
                             }),
                           });
-                          setImg(result.assetId);
+                          // V30 hotfix — store storage_key (not assetId).
+                          // Flutter mediaUri queries /v1/media/file?key=<storage_key>;
+                          // assetId is the registry handle, storage_key is the
+                          // on-disk path the media route actually serves.
+                          setImg(result.storageKey);
                         }}
                         disabled={!editingId || otherUploadingBlocks}
                         existingAssetId={imgK || undefined}

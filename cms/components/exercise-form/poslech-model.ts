@@ -209,18 +209,25 @@ export function makeOptionImagePatcher(
 }
 
 /**
- * V29 — extract the asset_id from a successful upload response. The asset
- * upload endpoint returns `{ data: { asset: { id: string, ... } } }`.
- * Throws when the field is missing so callers don't silently leave imgK
- * empty after an "ok" response.
+ * V29 — extract the storage_key from a successful upload response. The
+ * asset upload endpoint returns
+ * `{ data: { asset: { id, storage_key, ... } } }`. Throws when storage_key
+ * is missing so callers don't silently leave imgK empty after an "ok"
+ * response.
+ *
+ * V30 hotfix — earlier wire stored `asset.id` here, but Flutter
+ * `mediaUri(imgK)` queries `/v1/media/file?key=<imgK>` and the server
+ * resolves the key as a storage_key (not an asset_id). Storing the id
+ * caused `option.imageAssetId` lookups to 404 and the learner UI to fall
+ * back to letter placeholders.
  */
 export function parseUploadResponse(json: unknown): string {
-  const data = (json as { data?: { asset?: { id?: unknown } } } | null)?.data;
-  const id = data?.asset?.id;
-  if (typeof id !== 'string' || id === '') {
-    throw new Error('Upload response missing asset.id');
+  const data = (json as { data?: { asset?: { storage_key?: unknown } } } | null)?.data;
+  const storageKey = data?.asset?.storage_key;
+  if (typeof storageKey !== 'string' || storageKey === '') {
+    throw new Error('Upload response missing asset.storage_key');
   }
-  return id;
+  return storageKey;
 }
 
 /**

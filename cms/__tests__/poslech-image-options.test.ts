@@ -343,26 +343,31 @@ describe('PoslechFields image_asset_id (V27)', () => {
   });
 
   describe('parseUploadResponse + uploadingKeyFor (V29 — manual upload)', () => {
-    it('extracts asset.id from a happy upload response', () => {
+    it('extracts asset.storage_key from a happy upload response (V30 hotfix)', () => {
+      // Backend register response shape: data.asset = {id, asset_kind,
+      // storage_key, mime_type}. Flutter mediaUri queries ?key=<storage_key>
+      // so we MUST store storage_key — not the asset.id — into imgK,
+      // otherwise /v1/media/file 404s and learners see letter placeholders.
       const json = {
         data: {
           asset: {
-            id: 'media/uploads/abc123.jpg',
+            id: 'asset-abc123',
             asset_kind: 'image',
+            storage_key: 'exercises/ex1/asset-abc123.jpg',
             mime_type: 'image/jpeg',
           },
         },
       };
-      expect(parseUploadResponse(json)).toBe('media/uploads/abc123.jpg');
+      expect(parseUploadResponse(json)).toBe('exercises/ex1/asset-abc123.jpg');
     });
 
     it('throws when data is missing', () => {
-      expect(() => parseUploadResponse({})).toThrow(/asset.id/);
+      expect(() => parseUploadResponse({})).toThrow(/storage_key/);
     });
 
-    it('throws when asset.id is missing or empty', () => {
-      expect(() => parseUploadResponse({ data: { asset: {} } })).toThrow(/asset.id/);
-      expect(() => parseUploadResponse({ data: { asset: { id: '' } } })).toThrow(/asset.id/);
+    it('throws when storage_key is missing or empty', () => {
+      expect(() => parseUploadResponse({ data: { asset: { id: 'x' } } })).toThrow(/storage_key/);
+      expect(() => parseUploadResponse({ data: { asset: { id: 'x', storage_key: '' } } })).toThrow(/storage_key/);
     });
 
     it('throws on null or non-object input', () => {
