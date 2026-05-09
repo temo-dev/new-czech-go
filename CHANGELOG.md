@@ -10,6 +10,56 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V31 — Poslech 1 Per-item Audio Gate — 2026-05-10
+
+V26 per-item audio handler silently skipped items whose
+`audio_source.segments` text was empty: `BuildExerciseItemTexts`
+filtered the slice down to whatever items actually had transcript
+input. When admins authored a partial set (only the last item filled
+in, for example), the loop generated one MP3 instead of five and
+Flutter's `itemsHavePerItemAudio` gate returned false (it requires
+*every* item to carry asset_id), so the screen rendered the legacy
+single top-level player. The user-visible symptom: "tạo audio chỉ
+tạo transcript cuối cùng".
+
+V31 reverses the silent failure into a loud one. The handler now
+gates the per-item branch on a complete authoring state and surfaces
+the offending question numbers so the admin can fix them.
+
+### Backend
+
+- `processing/exercise_audio.go` adds
+  `Poslech1MissingTranscripts(exercise) []int`. An item counts as
+  "missing" when it has neither an uploaded `AudioSource.AssetID` nor
+  a non-empty transcript. Returns nil for non-poslech_1 exercises so
+  callers can keep their existing scope guard.
+- `httpapi/server.go handleAdminGenerateAudio`: before the per-item
+  branch fires, it calls `Poslech1MissingTranscripts(exercise)` and
+  returns `400 validation_error` with the message
+  `"Câu N1, N2, ...: chưa nhập transcript hoặc upload audio. Hoàn
+  thiện trước khi tạo audio per-item."` when the slice is non-empty.
+  No mutation, no rollback needed — the request never starts the
+  generate loop. Uploaded items remain exempt.
+- `formatMissingTranscriptsMessage(missing)` helper formats the list
+  so the test (and admin) sees "Câu 1, 2, 3, 4" instead of
+  Go-default `[1 2 3 4]` slice formatting.
+
+### Tests
+
+Backend: 871 tests pass (was 865 → +6 V31). Phase tests cover:
+all-filled returns no missing; only-last-filled reports four offenders;
+uploaded items exempt; all-empty reports all five; non-poslech_1
+returns nil; integration via admin endpoint asserts 400 + message
+names every missing question + detail untouched. Build clean.
+
+### Out of scope
+
+- ❌ Auto-generate stub audio for empty items
+- ❌ CMS-side validation mirror (defer; backend gate is the floor)
+- ❌ poslech_2/3/4 (single-audio path keeps working as before)
+
+---
+
 ## V30 — Poslech 1 Image Wire Hotfix — 2026-05-10
 
 Smoke test V29 found Flutter showed letter placeholders (A/B/C/D) in

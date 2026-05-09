@@ -384,6 +384,94 @@ func TestBuildExerciseItemTexts_NonListening_Nil(t *testing.T) {
 	}
 }
 
+// V31 — Poslech1MissingTranscripts gate. Pre-V31, an exercise with a partial
+// transcript set quietly generated audio only for the items that had text
+// and silently fell back to legacy single-audio because the per-item gate
+// (`itemsHavePerItemAudio`) requires every item to carry asset_id.
+
+func TestPoslech1MissingTranscripts_AllFilled_NoneMissing(t *testing.T) {
+	exercise := contracts.Exercise{
+		ExerciseType: "poslech_1",
+		Detail: contracts.Poslech1Detail{
+			Items: []contracts.ListeningItem{
+				{QuestionNo: 1, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "a"}}}},
+				{QuestionNo: 2, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "b"}}}},
+				{QuestionNo: 3, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "c"}}}},
+				{QuestionNo: 4, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "d"}}}},
+				{QuestionNo: 5, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "e"}}}},
+			},
+		},
+	}
+	if got := Poslech1MissingTranscripts(exercise); len(got) != 0 {
+		t.Errorf("got missing %+v, want none", got)
+	}
+}
+
+func TestPoslech1MissingTranscripts_OnlyLastFilled_FourMissing(t *testing.T) {
+	exercise := contracts.Exercise{
+		ExerciseType: "poslech_1",
+		Detail: contracts.Poslech1Detail{
+			Items: []contracts.ListeningItem{
+				{QuestionNo: 1},
+				{QuestionNo: 2, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "  "}}}},
+				{QuestionNo: 3},
+				{QuestionNo: 4},
+				{QuestionNo: 5, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "last"}}}},
+			},
+		},
+	}
+	got := Poslech1MissingTranscripts(exercise)
+	want := []int{1, 2, 3, 4}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("missing[%d] = %d, want %d", i, got[i], want[i])
+		}
+	}
+}
+
+func TestPoslech1MissingTranscripts_UploadedItemsExempt(t *testing.T) {
+	exercise := contracts.Exercise{
+		ExerciseType: "poslech_1",
+		Detail: contracts.Poslech1Detail{
+			Items: []contracts.ListeningItem{
+				{QuestionNo: 1, AudioSource: contracts.ListeningAudioSource{AssetID: "uploaded-1"}},
+				{QuestionNo: 2, AudioSource: contracts.ListeningAudioSource{AssetID: "uploaded-2"}},
+				{QuestionNo: 3, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "c"}}}},
+				{QuestionNo: 4, AudioSource: contracts.ListeningAudioSource{AssetID: "uploaded-4"}},
+				{QuestionNo: 5, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "e"}}}},
+			},
+		},
+	}
+	if got := Poslech1MissingTranscripts(exercise); len(got) != 0 {
+		t.Errorf("uploaded items should not count as missing, got %+v", got)
+	}
+}
+
+func TestPoslech1MissingTranscripts_AllEmpty_ReportsAll(t *testing.T) {
+	exercise := contracts.Exercise{
+		ExerciseType: "poslech_1",
+		Detail: contracts.Poslech1Detail{
+			Items: []contracts.ListeningItem{
+				{QuestionNo: 1}, {QuestionNo: 2}, {QuestionNo: 3}, {QuestionNo: 4}, {QuestionNo: 5},
+			},
+		},
+	}
+	got := Poslech1MissingTranscripts(exercise)
+	if len(got) != 5 {
+		t.Errorf("got %d missing, want 5", len(got))
+	}
+}
+
+func TestPoslech1MissingTranscripts_NonPoslech1_Nil(t *testing.T) {
+	exercise := contracts.Exercise{ExerciseType: "poslech_2"}
+	if got := Poslech1MissingTranscripts(exercise); got != nil {
+		t.Errorf("non-poslech_1 should return nil, got %+v", got)
+	}
+}
+
 func TestPollyExerciseAudioGenerator_GenerateItemAudio_StorageKey(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LOCAL_ASSETS_DIR", dir)

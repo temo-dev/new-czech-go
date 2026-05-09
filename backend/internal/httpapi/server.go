@@ -1345,6 +1345,15 @@ func (s *Server) handleAdminGenerateAudio(w http.ResponseWriter, r *http.Request
 	//   - all items are uploaded (no synthesizable text)
 	if exercise.ExerciseType == "poslech_1" {
 		if itemGen, ok := s.audioGenerator.(processing.ItemAudioGenerator); ok {
+			// V31 — gate: every item must already have an upload OR a transcript.
+			// A partial set leaks into Flutter as a per-item/legacy mismatch
+			// (per-item gate needs ALL items to carry asset_id) so we reject
+			// loudly with the offending question numbers.
+			if missing := processing.Poslech1MissingTranscripts(exercise); len(missing) > 0 {
+				writeError(w, http.StatusBadRequest, "validation_error",
+					formatMissingTranscriptsMessage(missing), false)
+				return
+			}
 			items := processing.BuildExerciseItemTexts(exercise)
 			if len(items) > 0 {
 				if s.generatePoslech1ItemAudio(w, exerciseID, exercise, itemGen, items) {
@@ -1407,6 +1416,20 @@ func localExerciseAudioPath(storageKey string) string {
 		base = filepath.Join(os.TempDir(), "czech-go-system-assets")
 	}
 	return filepath.Join(base, storageKey)
+}
+
+// formatMissingTranscriptsMessage formats the V31 gate error so the admin
+// can see exactly which question numbers still need a transcript before
+// per-item audio generation runs.
+func formatMissingTranscriptsMessage(missing []int) string {
+	parts := make([]string, len(missing))
+	for i, q := range missing {
+		parts[i] = fmt.Sprintf("%d", q)
+	}
+	return fmt.Sprintf(
+		"Câu %s: chưa nhập transcript hoặc upload audio. Hoàn thiện trước khi tạo audio per-item.",
+		strings.Join(parts, ", "),
+	)
 }
 
 // generatePoslech1ItemAudio runs the V26 per-item generation path: synthesise

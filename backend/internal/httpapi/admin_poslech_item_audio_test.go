@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
@@ -195,6 +196,63 @@ func TestAdminGenerateAudio_Poslech1_LegacyFallback_NoItems(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400 (no synthesizable items)", resp.StatusCode)
+	}
+}
+
+// V31 — admin tries to generate per-item audio when only a subset of items
+// have transcripts. Pre-V31 the handler would silently generate just for the
+// items with text, leaving the others without asset_id and Flutter falling
+// back to legacy single-audio. V31 must reject loudly with question numbers.
+func TestAdminGenerateAudio_Poslech1_PartialTranscripts_Rejected(t *testing.T) {
+	t.Setenv("LOCAL_ASSETS_DIR", t.TempDir())
+	repo := store.NewMemoryStore()
+	created := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "poslech_1",
+		SkillKind:    "nghe",
+		ModuleID:     "mod-nghe",
+		Pool:         "course",
+		Status:       "draft",
+		Detail: contracts.Poslech1Detail{
+			Items: []contracts.ListeningItem{
+				{QuestionNo: 1},
+				{QuestionNo: 2},
+				{QuestionNo: 3},
+				{QuestionNo: 4},
+				{QuestionNo: 5, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "only this one"}}}},
+			},
+		},
+	})
+
+	s := NewServerForTest(repo, nil)
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+
+	resp := postGenerateAudio(t, srv, created.ID)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	errObj, _ := body["error"].(map[string]any)
+	msg, _ := errObj["message"].(string)
+	for _, q := range []string{"1", "2", "3", "4"} {
+		if !strings.Contains(msg, q) {
+			t.Errorf("error message should name missing item %s; got %q", q, msg)
+		}
+	}
+
+	// Detail must remain untouched — no leaked asset_id from the partial state.
+	updated, _ := repo.Exercise(created.ID)
+	detail := mustDecodePoslech1Detail(t, updated.Detail)
+	for i, item := range detail.Items {
+		if item.AudioSource.AssetID != "" {
+			t.Errorf("item %d AssetID = %q, want empty (rejected before persist)",
+				i, item.AudioSource.AssetID)
+		}
 	}
 }
 

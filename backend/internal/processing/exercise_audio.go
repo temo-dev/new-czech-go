@@ -43,6 +43,33 @@ func BuildExerciseItemTexts(exercise contracts.Exercise) []ItemText {
 	return out
 }
 
+// Poslech1MissingTranscripts returns the QuestionNo of every poslech_1 item
+// that is missing both an uploaded AssetID and a non-empty transcript. The
+// admin generate-audio handler uses this to gate the per-item path:
+// admins must either fill every item's transcript or upload audio for the
+// gaps before per-item generation can run, otherwise the result is a
+// partial set of asset_ids and Flutter silently falls back to legacy
+// single-audio (the per-item gate requires every item to carry asset_id).
+//
+// Returns nil for non-poslech_1 exercises.
+func Poslech1MissingTranscripts(exercise contracts.Exercise) []int {
+	if exercise.ExerciseType != "poslech_1" {
+		return nil
+	}
+	items := toListening1Detail(exercise.Detail)
+	var missing []int
+	for _, item := range items {
+		if item.AudioSource.AssetID != "" {
+			continue // uploaded — no transcript needed
+		}
+		if joinSegments(item.AudioSource.Segments) != "" {
+			continue
+		}
+		missing = append(missing, item.QuestionNo)
+	}
+	return missing
+}
+
 // BuildExerciseAudioText extracts a concatenated text string from a listening
 // exercise's detail so it can be sent to Polly TTS.
 // Returns "" when the exercise type is not listening or uses an uploaded asset.
