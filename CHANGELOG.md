@@ -20,8 +20,9 @@ resolves that key as a **storage_key** (not an asset_id). So
 `localExerciseAssetPath(assetId)` 404'd every request and the
 image grid fell through to `_LetterPlaceholder` via `errorBuilder`.
 
-Hotfix only touches the CMS wire. Backend + Flutter unchanged. No
-new spec — semantic clarification for V28/V29 callbacks.
+Hotfix touches CMS wire + adds a backend startup migration to heal
+data that was already saved with the wrong field. Flutter unchanged.
+No new spec — semantic clarification for V28/V29 callbacks.
 
 ### CMS
 
@@ -37,10 +38,31 @@ new spec — semantic clarification for V28/V29 callbacks.
   format (`exercises/<id>/<asset>.jpg`) so admins paste the right
   string when bypassing the AI / upload buttons.
 
+### Backend (heal migration)
+
+- `processing/heal_image_keys.go`:
+  - `HealImageKeysRepo` interface (subset of store ops both
+    MemoryStore + postgresExerciseStore satisfy).
+  - `HealPoslechImageKeys(repo)`: scans all exercises, for
+    `exercise_type == "poslech_1"` looks up
+    `Items[i].Options[k].ImageAssetID` against `exercise.Assets[*].ID`
+    and rewrites to that asset's `StorageKey`. Persists via
+    `UpdateExercise(id, Exercise{Detail: ...})`. Idempotent —
+    storage_keys do not collide with asset.ids on a second run
+    because asset.ids are short hex while storage_keys carry a
+    directory-shaped prefix.
+- `httpapi/server.go assembleServer`: calls
+  `processing.HealPoslechImageKeys(repo)` once at startup, after the
+  job-recovery sweep. Logs "v30 heal: rewrote image_asset_id on N
+  poslech_1 exercise(s)" when N > 0.
+
 ### Tests
 
-CMS: 290 tests pass (count unchanged; existing V29 tests adjusted
-to assert storage_key extraction). Lint clean.
+CMS: 290 tests pass (count unchanged; existing V29 tests adjusted to
+assert storage_key extraction). Backend: 865 tests pass (+6 V30 heal
+tests covering swap-asset-id-to-storage-key, idempotent reruns, no
+poslech_2 cross-pollution, no-Assets-no-change, and integration via
+fakeHealRepo). Lint + build clean.
 
 ### Audio note (not a bug)
 

@@ -191,6 +191,13 @@ func assembleServer(repo *store.MemoryStore, processor *processing.Processor, up
 	}
 	// Recover any jobs stuck in "running" from a previous server crash.
 	repo.MarkAllRunningJobsFailed("Server restarted while generation was running")
+	// V30 hotfix — pre-V30 saves stored asset.id into
+	// poslech_1 Items[i].Options[k].ImageAssetID instead of storage_key. The
+	// migration scans for that pattern and rewrites to the registered storage
+	// key so Flutter mediaUri resolves correctly. Idempotent.
+	if healed := processing.HealPoslechImageKeys(repo); healed > 0 {
+		log.Printf("v30 heal: rewrote image_asset_id on %d poslech_1 exercise(s)", healed)
+	}
 	s.routes()
 	return s.withRequestLog(s.withCORS(s.mux))
 }
