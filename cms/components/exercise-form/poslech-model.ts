@@ -207,3 +207,27 @@ export function makeOptionImagePatcher(
     onPatch({ [`img${optionKey}`]: assetId } as Partial<P12Item>);
   };
 }
+
+/**
+ * V29 — extract the asset_id from a successful upload response. The asset
+ * upload endpoint returns `{ data: { asset: { id: string, ... } } }`.
+ * Throws when the field is missing so callers don't silently leave imgK
+ * empty after an "ok" response.
+ */
+export function parseUploadResponse(json: unknown): string {
+  const data = (json as { data?: { asset?: { id?: unknown } } } | null)?.data;
+  const id = data?.asset?.id;
+  if (typeof id !== 'string' || id === '') {
+    throw new Error('Upload response missing asset.id');
+  }
+  return id;
+}
+
+/**
+ * V29 — uploading-key encodes which (item index, option key) cell is
+ * currently uploading. Used as a single-flight guard so admins can't
+ * double-fire while a request is in flight.
+ */
+export function uploadingKeyFor(itemIndex: number, optionKey: OptionKey): string {
+  return `${itemIndex}-${optionKey}`;
+}

@@ -4,6 +4,8 @@ import {
   buildPoslechDetail,
   countItemImages,
   makeOptionImagePatcher,
+  parseUploadResponse,
+  uploadingKeyFor,
   type P12State,
   type P12Item,
 } from '../components/exercise-form/poslech-model';
@@ -337,6 +339,42 @@ describe('PoslechFields image_asset_id (V27)', () => {
       expect(detail.items[0].options[0].image_asset_id).toBe('media/q1-a-ai.jpg');
       // Sibling options stay text-only because their imgK is still empty.
       expect(detail.items[0].options[1].image_asset_id).toBeUndefined();
+    });
+  });
+
+  describe('parseUploadResponse + uploadingKeyFor (V29 — manual upload)', () => {
+    it('extracts asset.id from a happy upload response', () => {
+      const json = {
+        data: {
+          asset: {
+            id: 'media/uploads/abc123.jpg',
+            asset_kind: 'image',
+            mime_type: 'image/jpeg',
+          },
+        },
+      };
+      expect(parseUploadResponse(json)).toBe('media/uploads/abc123.jpg');
+    });
+
+    it('throws when data is missing', () => {
+      expect(() => parseUploadResponse({})).toThrow(/asset.id/);
+    });
+
+    it('throws when asset.id is missing or empty', () => {
+      expect(() => parseUploadResponse({ data: { asset: {} } })).toThrow(/asset.id/);
+      expect(() => parseUploadResponse({ data: { asset: { id: '' } } })).toThrow(/asset.id/);
+    });
+
+    it('throws on null or non-object input', () => {
+      expect(() => parseUploadResponse(null)).toThrow();
+      expect(() => parseUploadResponse(undefined)).toThrow();
+    });
+
+    it('uploadingKeyFor encodes (item, option) deterministically', () => {
+      expect(uploadingKeyFor(0, 'A')).toBe('0-A');
+      expect(uploadingKeyFor(4, 'D')).toBe('4-D');
+      // Different cells must yield different keys.
+      expect(uploadingKeyFor(0, 'B')).not.toBe(uploadingKeyFor(0, 'A'));
     });
   });
 

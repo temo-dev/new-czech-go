@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnswerSelect } from './AnswerSelect';
 import { OptionRow } from './OptionRow';
 import AiImageButton from '../AiImageButton';
@@ -9,6 +9,8 @@ import {
   initPoslechState,
   buildPoslechDetail,
   makeOptionImagePatcher,
+  parseUploadResponse,
+  uploadingKeyFor,
   type OptionKey,
   type P12Item,
   type P5State,
@@ -36,6 +38,11 @@ const imgInputStyle: React.CSSProperties = { flex: 1, padding: '7px 10px', borde
 export function PoslechFields({ exerciseType, initialData, onChange, editingId, audioGenerating, audioGenMsg, onGenerateAudio }: Props) {
   const [state, setState] = useState<PoslechState>(() => initPoslechState(exerciseType, initialData));
   const [audioSource, setAudioSource] = useState<'text' | 'upload'>('text');
+  // V29 — manual image upload per (item, option). Single-flight: the key
+  // identifies which cell is currently uploading; null = idle.
+  const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<{ key: string; message: string } | null>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // Re-init when switching exercise or opening a different one in edit mode
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -43,6 +50,41 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
 
   function update(next: PoslechState) { setState(next); onChange(buildPoslechDetail(next, audioSource)); }
   function updateAudioSrc(src: 'text' | 'upload') { setAudioSource(src); onChange(buildPoslechDetail(state, src)); }
+
+  async function handleP12ImageUpload(
+    file: File,
+    itemIndex: number,
+    optionKey: OptionKey,
+    setImg: (assetId: string) => void,
+  ) {
+    if (!editingId) {
+      setUploadError({ key: uploadingKeyFor(itemIndex, optionKey), message: 'Lưu bài tập trước rồi upload ảnh.' });
+      return;
+    }
+    const key = uploadingKeyFor(itemIndex, optionKey);
+    setUploadingKey(key);
+    setUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.set('file', file);
+      formData.set('asset_kind', 'image');
+      const res = await adminFetch(`/api/admin/exercises/${editingId}/assets/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        const errMsg = (json?.error?.message as string | undefined) ?? 'Upload thất bại.';
+        throw new Error(errMsg);
+      }
+      const assetId = parseUploadResponse(json);
+      setImg(assetId);
+    } catch (err) {
+      setUploadError({ key, message: err instanceof Error ? err.message : 'Upload thất bại.' });
+    } finally {
+      setUploadingKey(null);
+    }
+  }
 
   // Explicit narrowing to avoid union-in-closure issues
   const p12  = (state.type === 'poslech_1' || state.type === 'poslech_2') ? state : null;
@@ -92,6 +134,10 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
               {(['A', 'B', 'C', 'D'] as const).map(k => {
                 const imgK = (item as Record<string, string>)[`img${k}`] ?? '';
                 const setImg = makeOptionImagePatcher(patch, k as OptionKey);
+                const cellKey = uploadingKeyFor(i, k as OptionKey);
+                const isUploading = uploadingKey === cellKey;
+                const cellError = uploadError?.key === cellKey ? uploadError.message : null;
+                const otherUploadingBlocks = uploadingKey !== null && uploadingKey !== cellKey;
                 return (
                   <div key={k} style={{ display: 'grid', gap: 4, gridTemplateColumns: '1fr' }}>
                     <OptionRow optionKey={k} label={(item as Record<string, string>)[`opt${k}`] ?? ''} onChange={v => patch({ [`opt${k}`]: v } as Partial<P12Item>)} />
@@ -99,29 +145,67 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
                       type="text"
                       value={imgK}
                       onChange={e => setImg(e.target.value)}
-                      placeholder={`Asset ID ảnh ${k} (tùy chọn — paste, hoặc dùng nút ✨ bên dưới)`}
+                      placeholder={`Asset ID ảnh ${k} (paste, hoặc dùng nút ✨ AI / 📁 Upload bên dưới)`}
                       style={imgInputStyle}
                     />
-                    <AiImageButton
-                      onAssetCreated={async (result) => {
-                        if (!editingId) return;
-                        // Register the freshly generated blob as an exercise asset so
-                        // the same /v1/media/file route the learner uses can serve it.
-                        await adminFetch(`/api/admin/exercises/${editingId}/assets`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            id: result.assetId,
-                            asset_kind: 'image',
-                            storage_key: result.storageKey,
-                            mime_type: 'image/jpeg',
-                          }),
-                        });
-                        setImg(result.assetId);
-                      }}
-                      disabled={!editingId}
-                      existingAssetId={imgK || undefined}
-                    />
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+                      <label style={{
+                        flex: 1,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        border: '1.5px solid var(--border-strong)',
+                        borderRadius: 8,
+                        padding: '7px 14px',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: (!editingId || otherUploadingBlocks) ? 'not-allowed' : 'pointer',
+                        background: 'var(--surface)',
+                        color: 'var(--ink-2)',
+                        opacity: (!editingId || otherUploadingBlocks) ? 0.5 : 1,
+                        lineHeight: 1,
+                      }}>
+                        {isUploading ? '⏳ Đang tải...' : imgK ? '🔄 Đổi ảnh' : '📁 Tải ảnh lên'}
+                        <input
+                          ref={el => { fileInputRefs.current[cellKey] = el; }}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          style={{ display: 'none' }}
+                          disabled={!editingId || otherUploadingBlocks || isUploading}
+                          onChange={e => {
+                            const f = e.target.files?.[0];
+                            if (f) void handleP12ImageUpload(f, i, k as OptionKey, setImg);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                      <AiImageButton
+                        onAssetCreated={async (result) => {
+                          if (!editingId) return;
+                          // Register the freshly generated blob as an exercise asset so
+                          // the same /v1/media/file route the learner uses can serve it.
+                          await adminFetch(`/api/admin/exercises/${editingId}/assets`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              id: result.assetId,
+                              asset_kind: 'image',
+                              storage_key: result.storageKey,
+                              mime_type: 'image/jpeg',
+                            }),
+                          });
+                          setImg(result.assetId);
+                        }}
+                        disabled={!editingId || otherUploadingBlocks}
+                        existingAssetId={imgK || undefined}
+                      />
+                    </div>
+                    {cellError && (
+                      <div style={{ fontSize: 11, color: 'var(--error)', marginTop: 2 }}>
+                        {cellError}
+                      </div>
+                    )}
                   </div>
                 );
               })}
