@@ -13,6 +13,36 @@ import (
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
 
+// ItemText pairs a listening item's question_no with its synthesizable text.
+// V26 — used by per-item audio generation for poslech_1.
+type ItemText struct {
+	ItemNo int
+	Text   string
+}
+
+// BuildExerciseItemTexts returns per-item synthesis input for poslech_1.
+// Items with an uploaded AssetID or no text segments are skipped — the caller
+// should not attempt TTS for those. Returns nil for any other exercise type
+// (V26 scope = poslech_1 only; poslech_2/3/4 still use single-audio path).
+func BuildExerciseItemTexts(exercise contracts.Exercise) []ItemText {
+	if exercise.ExerciseType != "poslech_1" {
+		return nil
+	}
+	items := toListening1Detail(exercise.Detail)
+	var out []ItemText
+	for _, item := range items {
+		if item.AudioSource.AssetID != "" {
+			continue
+		}
+		text := joinSegments(item.AudioSource.Segments)
+		if text == "" {
+			continue
+		}
+		out = append(out, ItemText{ItemNo: item.QuestionNo, Text: text})
+	}
+	return out
+}
+
 // BuildExerciseAudioText extracts a concatenated text string from a listening
 // exercise's detail so it can be sent to Polly TTS.
 // Returns "" when the exercise type is not listening or uses an uploaded asset.
@@ -160,6 +190,15 @@ type SentenceExerciseAudioGenerator interface {
 	GenerateSentenceAudio(exerciseID string, sentenceIdx int, text string) (*contracts.ExerciseAudio, error)
 }
 
+// ItemAudioGenerator extends ExerciseAudioGenerator with V26 per-item poslech_1
+// audio. Each call writes one MP3 (or WAV in dev) keyed by (exercise_id,
+// item_no). The admin generate-audio endpoint uses a type assertion against
+// this interface to fork the per-item branch for poslech_1.
+type ItemAudioGenerator interface {
+	ExerciseAudioGenerator
+	GenerateItemAudio(exerciseID string, itemNo int, text string) (*contracts.ExerciseAudio, error)
+}
+
 // HasMultipleSpeakers returns true when the exercise has segments with ≥2 distinct
 // speaker labels, indicating dialog (2-voice) TTS should be used.
 func HasMultipleSpeakers(exercise contracts.Exercise) bool {
@@ -259,6 +298,26 @@ func (DevExerciseAudioGenerator) GenerateSentenceAudio(exerciseID string, senten
 	}, nil
 }
 
+// GenerateItemAudio for dev: writes a stub silent WAV per (exercise, item).
+// V26 — used by poslech_1 per-item audio path.
+func (DevExerciseAudioGenerator) GenerateItemAudio(exerciseID string, itemNo int, _ string) (*contracts.ExerciseAudio, error) {
+	storageKey := fmt.Sprintf("exercise-audio/%s/item-%d.wav", exerciseID, itemNo)
+	dst := localExerciseAudioPath(storageKey)
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return nil, fmt.Errorf("dev item audio dir: %w", err)
+	}
+	if err := os.WriteFile(dst, devSilentWAV(), 0o644); err != nil {
+		return nil, fmt.Errorf("dev item audio write: %w", err)
+	}
+	return &contracts.ExerciseAudio{
+		ExerciseID:  exerciseID,
+		StorageKey:  storageKey,
+		MimeType:    "audio/wav",
+		SourceType:  "dev",
+		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
+	}, nil
+}
+
 // devSilentWAV returns a minimal valid 44-byte WAV file (0 audio samples).
 func devSilentWAV() []byte {
 	buf := make([]byte, 44)
@@ -322,6 +381,40 @@ func (g *PollyExerciseAudioGenerator) GenerateAudio(exerciseID, text string) (*c
 		return nil, fmt.Errorf("write exercise audio: %w", err)
 	}
 
+	return &contracts.ExerciseAudio{
+		ExerciseID:  exerciseID,
+		StorageKey:  storageKey,
+		MimeType:    "audio/mpeg",
+		SourceType:  "polly",
+		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
+	}, nil
+}
+
+// GenerateItemAudio for Polly: synthesizes one MP3 per poslech_1 item.
+// Storage key is `exercise-audio/<exerciseID>/item-<n>.mp3` so each item is
+// addressable independently of the merged whole-exercise audio file.
+// V26 — mirrors GenerateSentenceAudio (V18 dictation pattern).
+func (g *PollyExerciseAudioGenerator) GenerateItemAudio(exerciseID string, itemNo int, text string) (*contracts.ExerciseAudio, error) {
+	if strings.TrimSpace(text) == "" {
+		return nil, fmt.Errorf("exercise %s item %d: no text to synthesize", exerciseID, itemNo)
+	}
+	ttsResult, err := g.tts.Generate(fmt.Sprintf("%s-item-%d", exerciseID, itemNo), text)
+	if err != nil {
+		return nil, fmt.Errorf("polly item audio: %w", err)
+	}
+	storageKey := fmt.Sprintf("exercise-audio/%s/item-%d.mp3", exerciseID, itemNo)
+	srcPath := localReviewAudioPath(ttsResult.StorageKey)
+	dstPath := localExerciseAudioPath(storageKey)
+	if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
+		return nil, fmt.Errorf("prepare item audio dir: %w", err)
+	}
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		return nil, fmt.Errorf("read polly output: %w", err)
+	}
+	if err := os.WriteFile(dstPath, data, 0o644); err != nil {
+		return nil, fmt.Errorf("write item audio: %w", err)
+	}
 	return &contracts.ExerciseAudio{
 		ExerciseID:  exerciseID,
 		StorageKey:  storageKey,
