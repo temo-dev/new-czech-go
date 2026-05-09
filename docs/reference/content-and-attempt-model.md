@@ -100,7 +100,11 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026).
 - `psani_2_email` — Viết email theo 5 ảnh, ≥35 từ (12 điểm)
 
 **Listening (nghe) — V3:**
-- `poslech_1` — 5 đoạn ngắn → chọn A-D (5 điểm)
+- `poslech_1` — 5 đoạn ngắn → chọn A-D (5 điểm). **V26**: audio
+  per-item — admin generate-audio sinh 1 file MP3/đoạn, lưu vào
+  `detail.items[i].audio_source.asset_id`. Flutter render mini-player
+  riêng từng câu khi tất cả items đều có asset_id; fallback single
+  audio (`/v1/exercises/:id/audio`) cho seed cũ chưa upgrade.
 - `poslech_2` — 5 đoạn ngắn → chọn A-D (5 điểm)
 - `poslech_3` — 5 đoạn → match A-G, 2 dư (5 điểm)
 - `poslech_4` — 5 dialog → chọn ảnh A-F, 1 dư (5 điểm)

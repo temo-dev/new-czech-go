@@ -1,7 +1,7 @@
 # Poslech 1 Per-item Audio (V26) — Spec
 
 **Slice:** V26 — poslech_1 per-item audio generation + render
-**Status:** Draft — chờ human approve trước khi sang plan
+**Status:** Shipped 2026-05-09
 **Owner:** TBD
 **Last updated:** 2026-05-09
 

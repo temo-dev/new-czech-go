@@ -10,6 +10,115 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V26 — Poslech 1 Per-item Audio — 2026-05-09
+
+V21.2 ship được 30 ngày, learner feedback từ MobAI test cho thấy
+poslech_1 phát 1 file MP3 gộp 5 câu liên tiếp khiến học viên không
+tua được riêng từng câu — phải scrub timeline thủ công, lệch UX so
+với đề thi A2 thật vốn phát từng đoạn riêng có khoảng nghỉ. V26 bỏ
+mô hình "1 audio = cả exercise" cho poslech_1 và chuyển sang
+"1 audio = 1 ListeningItem"; mỗi câu có mini-player riêng trên
+Flutter, pause-others coordinator đảm bảo chỉ 1 câu chạy cùng lúc.
+Backward compat: seed cũ vẫn play single audio cho đến khi admin
+click Generate audio để upgrade.
+
+Spec: `docs/specs/poslech-per-item-audio.md`. Plan + todo:
+`tasks/v26-poslech-per-item-audio-{plan,todo}.md`. Idea:
+`docs/ideas/poslech-per-item-audio.md`.
+
+Scope là poslech_1 only. poslech_2/3/4 (cùng schema gia đình) giữ
+single-audio path; mở rộng sang slice sau nếu cần.
+
+### Backend (Phase A + B)
+
+- **`processing.BuildExerciseItemTexts(exercise) []ItemText`**
+  (`exercise_audio.go`): trả slice per-item text cho poslech_1,
+  skip items đã upload (`AssetID != ""`) và items không có text.
+  `nil` cho non-poslech_1 — scope guard tránh poslech_2 vô tình
+  lọt qua đường mới.
+- **`PollyExerciseAudioGenerator.GenerateItemAudio(eid, n, text)`**:
+  mirror `GenerateSentenceAudio` (V18 dictation pattern). Storage
+  key `exercise-audio/<eid>/item-<n>.mp3`. Empty text → error.
+- **`DevExerciseAudioGenerator.GenerateItemAudio`**: writes silent
+  WAV stub cho dev/test. Cùng namespace
+  `exercise-audio/<eid>/item-<n>.wav`.
+- **`ItemAudioGenerator` interface**: extends
+  `ExerciseAudioGenerator`, both Dev + Polly satisfy. Admin endpoint
+  type-asserts để fork branch.
+- **`handleAdminGenerateAudio` poslech_1 fast-path**
+  (`server.go:1322` + `generatePoslech1ItemAudio` helper): khi
+  `audioGenerator` thoả `ItemAudioGenerator` và
+  `BuildExerciseItemTexts` non-empty, loop sequential generate, mutate
+  `Detail.Items[i].AudioSource.AssetID = result.StorageKey`, gọi
+  `repo.UpdateExercise({Detail: ...})` để persist. Last item's
+  audio cũng được `SetExerciseAudio` để legacy `/v1/exercises/:id/audio`
+  vẫn answer hợp lý cho client cũ chưa nâng cấp.
+- **Rollback**: collect `written` storage keys từng vòng; nếu item
+  thứ N fail, `os.Remove` tất cả file đã write trước đó (best-effort,
+  IsNotExist không log fatal) + skip `UpdateExercise` → exercise
+  unchanged. Admin retry không tạo orphan asset_id.
+- **Response shape**: giữ `data.{storage_key, mime_type, source_type,
+  generated_at}` cho compat (= last item's audio); thêm
+  `meta.item_count` (= số file đã generate).
+- **Fallback paths**: poslech_2/3/4/5/6, exercise legacy không có
+  text segments, hoặc audioGenerator chỉ là single-audio interface
+  → vẫn dùng nhánh dialog/single-voice gốc.
+
+### Flutter (Phase C)
+
+- **`PoslechItemView.audioAssetId`**: hydrate từ
+  `audio_source.asset_id` JSON khi parse `ExerciseDetail`.
+- **`itemsHavePerItemAudio(detail)` helper** (exported via
+  `@visibleForTesting`): true iff exercise_type là poslech_1, có
+  items, và mỗi item có `audioAssetId.isNotEmpty`. Dùng cho cả
+  screen logic lẫn unit test để có 1 quy tắc duy nhất.
+- **`ListeningExerciseScreen` refactor**: top-level
+  `_LegacyAudioPlayerBar` chỉ render khi `itemsHavePerItemAudio`
+  false; per-item branch render `_ItemAudioPlayerBar` inline phía
+  trên question label của mỗi item.
+- **`_ItemAudioPlayerBar`**: lazy `setAudioSource` (chỉ khi user tap
+  play đầu tiên) → mở screen không bùng 5 network call. Lifecycle
+  cleanup `_player.dispose()` + cancel stream subscription.
+- **`_PlaybackCoordinator`** (`ChangeNotifier`): each player owns
+  `playerId = item.questionNo`. `claim`/`release` đẩy sự kiện;
+  player khác listen và pause khi active != my id. Đảm bảo "chỉ 1
+  câu chạy cùng lúc".
+- **`_AudioBarShell`**: shared visual (headphones icon + status
+  text + play/retry button) cho cả 2 bar variants — single style
+  source.
+
+### Docs
+
+- `docs/ideas/poslech-per-item-audio.md` — one-pager idea.
+- `docs/specs/poslech-per-item-audio.md` — Status: Draft → Shipped.
+- `tasks/v26-poslech-per-item-audio-plan.md` — 4 phase A-D với
+  dependency graph.
+- `tasks/v26-poslech-per-item-audio-todo.md` — RED/GREEN checklist
+  từng task.
+- `docs/reference/content-and-attempt-model.md` § Listening: ghi
+  rõ poslech_1 V26 audio model + fallback semantics.
+- `SPEC.md` digest: row V26.
+
+### Tests
+
+Backend: 859 tests pass. Phase A added 9 (per-item text extraction
+× 5, item audio gen × 3, interface satisfaction × 1). Phase B added
+3 (happy 5-asset, rollback at item 3, all-uploaded fallback to 400).
+Flutter: 373 tests pass. Phase C added 7 (PoslechItemView hydration
+× 3, itemsHavePerItemAudio truth-table × 4 covering scope guard,
+all-have, mixed, empty).
+
+### Out of scope
+
+- ❌ poslech_2/3/4 per-item audio
+- ❌ Vocab V11 per-item TTS
+- ❌ Image A-D per choice (slice riêng đã review tách biệt)
+- ❌ CMS UI thay đổi — admin click "Generate audio" như cũ, backend
+  tự loop 5 lần
+- ❌ Migration regenerate seed cũ — admin tự click khi muốn upgrade
+
+---
+
 ## V25 — IAP Wire Real — 2026-05-08
 
 V17 shipped backend `/v1/iap/apple/verify` + `/webhook` + `pro_purchases`
