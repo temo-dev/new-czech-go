@@ -1,7 +1,7 @@
 # Poslech 1 Image Upload Button (V29) — Spec
 
 **Slice:** V29 — manual file upload button per A-D option in PoslechFields
-**Status:** Draft — chờ human approve trước khi sang plan
+**Status:** Shipped 2026-05-10
 **Owner:** TBD
 **Last updated:** 2026-05-10
 

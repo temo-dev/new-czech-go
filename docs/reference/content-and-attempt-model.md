@@ -114,7 +114,11 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026).
   option, click "✨ Tạo bằng AI" → `/api/admin/ai/generate-image`
   (Replicate Flux Schnell ~3-5s) → preview → confirm → asset_id
   populated tự động. Wire path không đổi: vẫn `image_asset_id` dùng
-  V27 spec. Manual paste vẫn hoạt động.
+  V27 spec. Manual paste vẫn hoạt động. **V29**: manual upload —
+  "📁 Tải ảnh lên" button per option mở native file picker; mirror
+  cteni_1 upload pattern (`POST /api/admin/exercises/:id/assets/upload`
+  multipart). Per option giờ có 3 paths: paste text, AI generate,
+  upload local.
 - `poslech_2` — 5 đoạn ngắn → chọn A-D (5 điểm)
 - `poslech_3` — 5 đoạn → match A-G, 2 dư (5 điểm)
 - `poslech_4` — 5 dialog → chọn ảnh A-F, 1 dư (5 điểm)

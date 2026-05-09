@@ -10,6 +10,82 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V29 — Poslech 1 Image Upload Button — 2026-05-10
+
+V28 ship cùng ngày, smoke test xong tìm thấy gap thứ 3: admin có
+ảnh có sẵn trên máy local (vd. ảnh chụp đề thi A2 thật, stock
+photo) không có UX upload trực tiếp trong PoslechFields — phải đi
+qua route khác rồi paste asset_id. Cteni_1 đã có "📁 Tải ảnh lên"
+button gọi `/api/admin/exercises/:id/assets/upload` (FormData).
+V29 wire pattern này vào PoslechFields per A-D option.
+
+Spec: `docs/specs/poslech-1-image-upload-button.md`. Plan + todo:
+`tasks/v29-poslech-1-image-upload-button-{plan,todo}.md`. Idea:
+`docs/ideas/poslech-1-image-upload-button.md`.
+
+CMS-only slice. Backend (upload endpoint đã có V11+) + Flutter
+unchanged.
+
+### CMS (Phase A)
+
+- **`poslech-model.ts`**:
+  - `parseUploadResponse(json)`: extract `data.asset.id` từ upload
+    response; throw on missing field tránh "ok response → asset_id
+    rỗng" silent failure.
+  - `uploadingKeyFor(itemIndex, optionKey)`: encode active cell vào
+    string `${i}-${k}`. Single-state guard concurrent upload.
+- **`PoslechFields.tsx`**:
+  - `handleP12ImageUpload(file, itemIndex, optionKey, setImg)` async
+    handler: FormData POST → parseUploadResponse → setImg via V28
+    `makeOptionImagePatcher`. Try/catch error caught into
+    `uploadError` state với cellKey + message.
+  - Hidden `<input type="file">` + visible `<label>` button per
+    option. Label: "📁 Tải ảnh lên" / "🔄 Đổi ảnh" / "⏳ Đang tải...".
+  - `accept="image/jpeg,image/png,image/webp"` match cteni_1.
+  - File picker disabled khi (a) `editingId` null hoặc (b) other cell
+    uploading hoặc (c) this cell uploading.
+  - AiImageButton (V28) cũng disabled khi other cell upload — tránh
+    state race.
+  - Inline error message dưới row option khi cellKey match.
+
+Per option giờ có 3 entry points cho asset_id:
+1. Paste text (V27)
+2. ✨ AI tạo (V28)
+3. 📁 Upload local (V29)
+
+### Backend + Flutter
+
+Không đổi. Endpoint `/api/admin/exercises/:id/assets/upload` đã ship
+multipart support qua V11+; Flutter consume `image_asset_id` không
+đổi semantics.
+
+### Docs
+
+- `docs/ideas/poslech-1-image-upload-button.md` — idea.
+- `docs/specs/poslech-1-image-upload-button.md` — Status: Draft → Shipped.
+- `tasks/v29-poslech-1-image-upload-button-{plan,todo}.md`.
+- `docs/reference/content-and-attempt-model.md` § listening: thêm
+  ghi chú V29.
+- `SPEC.md` digest: row V29.
+
+### Tests
+
+CMS: 290 tests pass (was 285 → +5 V29). Phase A added 5 tests
+(parseUploadResponse happy + missing data + missing/empty
+asset.id + null/undefined input + uploadingKeyFor encoding).
+Lint + build clean. Backend (859) + Flutter (373) unchanged.
+
+### Out of scope
+
+- ❌ poslech_2/3/4
+- ❌ Backend endpoint changes
+- ❌ Flutter changes
+- ❌ Drag-drop / multi-file
+- ❌ CMS-side image preview / crop
+- ❌ Concurrent upload (single-flight by design)
+
+---
+
 ## V28 — Poslech 1 AI Image Generate — 2026-05-10
 
 V27 ship 1 ngày, smoke test phát hiện UX gap: admin phải tự upload
