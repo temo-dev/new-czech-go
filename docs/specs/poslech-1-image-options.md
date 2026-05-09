@@ -1,7 +1,7 @@
 # Poslech 1 Image Options A-D (V27) — Spec
 
 **Slice:** V27 — poslech_1 image_asset_id per option in CMS authoring
-**Status:** Draft — chờ human approve trước khi sang plan
+**Status:** Shipped 2026-05-09
 **Owner:** TBD
 **Last updated:** 2026-05-09
 

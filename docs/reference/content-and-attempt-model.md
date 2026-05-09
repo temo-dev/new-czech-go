@@ -104,7 +104,12 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026).
   per-item — admin generate-audio sinh 1 file MP3/đoạn, lưu vào
   `detail.items[i].audio_source.asset_id`. Flutter render mini-player
   riêng từng câu khi tất cả items đều có asset_id; fallback single
-  audio (`/v1/exercises/:id/audio`) cho seed cũ chưa upgrade.
+  audio (`/v1/exercises/:id/audio`) cho seed cũ chưa upgrade. **V27**:
+  image options — admin có thể nhập `image_asset_id` per option A-D
+  trong CMS; wire field `detail.items[i].options[k].image_asset_id`
+  (V11 schema, omitempty). Flutter `MultipleChoiceWidget` switch sang
+  2×2 image grid khi cả 4 option có asset_id. Validation publish-time:
+  all-or-none per item (4 ảnh hoặc 0 ảnh, không cho mixed).
 - `poslech_2` — 5 đoạn ngắn → chọn A-D (5 điểm)
 - `poslech_3` — 5 đoạn → match A-G, 2 dư (5 điểm)
 - `poslech_4` — 5 dialog → chọn ảnh A-F, 1 dư (5 điểm)

@@ -10,6 +10,89 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V27 — Poslech 1 Image Options A-D — 2026-05-09
+
+V26 ship được 1 ngày, dispatch review tìm thấy poslech_1 thiếu khả
+năng authoring image_asset_id per A-D option mặc dù backend (V11
+`MultipleChoiceOption.ImageAssetID` + `omitempty`) và Flutter
+(`MultipleChoiceWidget._allHaveImages` đã switch 2×2 image grid khi
+đủ 4 image) đã sẵn sàng. CMS form `PoslechFields.tsx` chỉ track
+`{optA..D}` text, không emit `image_asset_id`. V27 wire CMS field +
+validation, không đụng backend hay Flutter.
+
+Spec: `docs/specs/poslech-1-image-options.md`. Plan + todo:
+`tasks/v27-poslech-1-image-options-{plan,todo}.md`. Idea:
+`docs/ideas/poslech-1-image-options.md`.
+
+Scope là poslech_1 only. poslech_2 (cùng schema) defer slice sau.
+
+### CMS (Phase A + B)
+
+- **`cms/components/exercise-form/poslech-model.ts`** mới: extract
+  pure types + `initPoslechState` + `buildPoslechDetail` +
+  `countItemImages` từ `PoslechFields.tsx` (mirrors `cteni-model.ts`
+  pattern). Tests có thể drive helpers trực tiếp không cần React
+  Testing Library. `PoslechFields.tsx` import từ module mới, không
+  còn inline duplicate.
+- **`P12Item` mở rộng**: thêm `imgA, imgB, imgC, imgD: string` cho
+  poslech_1/2. Empty string = không ảnh.
+- **`initPoslechState` (poslech_1/2)**: hydrate `imgK` từ
+  `detail.items[i].options[k].image_asset_id`, default empty.
+- **`buildPoslechDetail` (poslech_1/2)**: emit
+  `options[k] = {key, text}` khi `imgK` empty (V26-compatible),
+  hoặc `{key, text, image_asset_id}` khi set. Round-trip clean.
+- **PoslechFields UI**: cho poslech_1/2 branch, dưới mỗi `OptionRow`
+  text input thêm 1 `<input>` cho `image_asset_id` per option.
+  Placeholder: "Asset ID ảnh K (tùy chọn — bỏ trống nếu chỉ dùng
+  text)". Admin paste asset_id từ existing uploader; UI integration
+  upload defer.
+- **`validation.ts` poslech_1 all-or-none rule**: published poslech_1
+  per item phải có 0/4 hoặc 4/4 image_asset_id. 1-3/4 fail với
+  message "Câu N: hoặc tất cả 4 đáp án có ảnh, hoặc không đáp án nào
+  có ảnh (hiện có X/4 ảnh)." Drafts skip (status='draft').
+  poslech_2 không gate (dù P12State shared, V27 chỉ enforce
+  poslech_1).
+
+### Backend + Flutter
+
+Không đổi. `MultipleChoiceOption.ImageAssetID` đã có V11 với
+`omitempty` — wire shape backward-compat tự nhiên.
+`MultipleChoiceWidget._allHaveImages` đã switch image grid khi
+`mediaUri != null && options.every(imageAssetId != "")`. Per-item
+audio (V26) + image options (V27) độc lập cùng tồn tại.
+
+### Docs
+
+- `docs/ideas/poslech-1-image-options.md` — one-pager idea.
+- `docs/specs/poslech-1-image-options.md` — Status: Draft → Shipped.
+- `tasks/v27-poslech-1-image-options-plan.md` — 3 phase A-C.
+- `tasks/v27-poslech-1-image-options-todo.md` — RED/GREEN checklist.
+- `docs/reference/content-and-attempt-model.md` § Listening: thêm
+  ghi chú V27 image options + all-or-none rule.
+- `SPEC.md` digest: row V27.
+
+### Tests
+
+CMS: 282 tests pass (was 277 → +15 V27). Phase A added 10 (state
+hydration, buildDetail emit/omit, round-trip, countItemImages
+truth-table, poslech_2 cross-pollution). Phase B added 5 (mixed
+rejected, 0/4 pass, 4/4 pass, drafts skip, multi-offender). Lint
+clean. Build clean.
+
+### Out of scope
+
+- ❌ poslech_2/3/4 image options (poslech_4 đã có image qua MatchOption
+  asset_id, khác design)
+- ❌ Backend changes (V11 đủ)
+- ❌ Flutter changes (MultipleChoiceWidget đủ)
+- ❌ File upload UX trong CMS — admin paste asset_id qua existing
+  `/api/admin/exercises/:id/assets/upload` flow, không integrate inline
+- ❌ Seed image data — admin tự authoring qua CMS
+- ❌ V22 content health rule mixed state
+- ❌ Migration regenerate seed cũ
+
+---
+
 ## V26 — Poslech 1 Per-item Audio — 2026-05-09
 
 V21.2 ship được 30 ngày, learner feedback từ MobAI test cho thấy
