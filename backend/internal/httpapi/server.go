@@ -1331,6 +1331,21 @@ func (s *Server) handleAdminGenerateAudio(w http.ResponseWriter, r *http.Request
 		writeNotFound(w)
 		return
 	}
+	// V26 — poslech_1 per-item branch: each ListeningItem gets its own MP3 so
+	// the learner UI can render a mini-player per question. Falls through to
+	// the single-audio path when:
+	//   - audio generator does not implement ItemAudioGenerator (older wires)
+	//   - all items are uploaded (no synthesizable text)
+	if exercise.ExerciseType == "poslech_1" {
+		if itemGen, ok := s.audioGenerator.(processing.ItemAudioGenerator); ok {
+			items := processing.BuildExerciseItemTexts(exercise)
+			if len(items) > 0 {
+				if s.generatePoslech1ItemAudio(w, exerciseID, exercise, itemGen, items) {
+					return
+				}
+			}
+		}
+	}
 	// Use 2-voice dialog generation when:
 	// - exercise is poslech_4 (per-item dialogs), OR
 	// - any poslech_* has segments with ≥2 distinct speaker labels (e.g. [Muž]/[Žena]).
@@ -1385,6 +1400,123 @@ func localExerciseAudioPath(storageKey string) string {
 		base = filepath.Join(os.TempDir(), "czech-go-system-assets")
 	}
 	return filepath.Join(base, storageKey)
+}
+
+// generatePoslech1ItemAudio runs the V26 per-item generation path: synthesise
+// each item's audio sequentially, mutate Detail.Items[i].AudioSource.AssetID,
+// then UpdateExercise. On any per-item failure all previously-written files
+// are removed and the exercise is left untouched.
+//
+// Returns true when the response has been written (success or rollback'd
+// failure). Returns false when the caller should fall through to the legacy
+// single-audio path (no items synthesisable, etc).
+func (s *Server) generatePoslech1ItemAudio(
+	w http.ResponseWriter,
+	exerciseID string,
+	exercise contracts.Exercise,
+	gen processing.ItemAudioGenerator,
+	items []processing.ItemText,
+) bool {
+	// Decode current detail so we can mutate Items[i].AudioSource.AssetID.
+	detail, ok := decodePoslech1Detail(exercise.Detail)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "internal_error", "Could not decode exercise detail.", true)
+		return true
+	}
+
+	written := make([]string, 0, len(items))
+	rollback := func() {
+		for _, key := range written {
+			if err := os.Remove(localExerciseAudioPath(key)); err != nil && !os.IsNotExist(err) {
+				log.Printf("rollback remove %s (non-fatal): %v", key, err)
+			}
+		}
+	}
+
+	var lastAudio *contracts.ExerciseAudio
+	for _, item := range items {
+		a, err := gen.GenerateItemAudio(exerciseID, item.ItemNo, item.Text)
+		if err != nil {
+			log.Printf("generate-audio exercise %s item %d: %v", exerciseID, item.ItemNo, err)
+			rollback()
+			writeError(w, http.StatusInternalServerError, "internal_error", "Item audio generation failed.", true)
+			return true
+		}
+		written = append(written, a.StorageKey)
+		lastAudio = a
+		for i := range detail.Items {
+			if detail.Items[i].QuestionNo == item.ItemNo {
+				detail.Items[i].AudioSource.AssetID = a.StorageKey
+				break
+			}
+		}
+	}
+
+	if _, ok := s.repo.UpdateExercise(exerciseID, contracts.Exercise{Detail: detail}); !ok {
+		rollback()
+		writeError(w, http.StatusInternalServerError, "internal_error", "Could not persist updated detail.", true)
+		return true
+	}
+
+	// SetExerciseAudio for backward compat — the legacy /v1/exercises/:id/audio
+	// route still answers with a sane file (last item) when the Flutter client
+	// happens to fall back to single-audio mode (e.g. older builds).
+	if lastAudio != nil {
+		s.repo.SetExerciseAudio(exerciseID, *lastAudio)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"storage_key":  storageKeyOf(lastAudio),
+			"mime_type":    mimeTypeOf(lastAudio),
+			"source_type":  sourceTypeOf(lastAudio),
+			"generated_at": generatedAtOf(lastAudio),
+		},
+		"meta": map[string]any{
+			"item_count": len(items),
+		},
+	})
+	return true
+}
+
+func decodePoslech1Detail(v any) (contracts.Poslech1Detail, bool) {
+	if v == nil {
+		return contracts.Poslech1Detail{}, false
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return contracts.Poslech1Detail{}, false
+	}
+	var d contracts.Poslech1Detail
+	if err := json.Unmarshal(b, &d); err != nil {
+		return contracts.Poslech1Detail{}, false
+	}
+	return d, true
+}
+
+func storageKeyOf(a *contracts.ExerciseAudio) string {
+	if a == nil {
+		return ""
+	}
+	return a.StorageKey
+}
+func mimeTypeOf(a *contracts.ExerciseAudio) string {
+	if a == nil {
+		return ""
+	}
+	return a.MimeType
+}
+func sourceTypeOf(a *contracts.ExerciseAudio) string {
+	if a == nil {
+		return ""
+	}
+	return a.SourceType
+}
+func generatedAtOf(a *contracts.ExerciseAudio) string {
+	if a == nil {
+		return ""
+	}
+	return a.GeneratedAt
 }
 
 func (s *Server) handleSubmitText(w http.ResponseWriter, r *http.Request, user contracts.User, attemptID string) {
@@ -2089,6 +2221,7 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 			Status                string          `json:"status"`
 			ModuleID              string          `json:"module_id"`
 			SkillKind             string          `json:"skill_kind"`
+			Pool                  string          `json:"pool"`
 			Detail                json.RawMessage `json:"detail"`
 			Questions             []string        `json:"questions"`
 			CreatedByLLM          bool            `json:"created_by_llm"`
@@ -2132,6 +2265,16 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 		}
 		exercise.ModuleID = req.ModuleID
 		exercise.SkillKind = req.SkillKind
+		pool := strings.TrimSpace(req.Pool)
+		switch pool {
+		case "course", "exam":
+		default:
+			pool = "course"
+		}
+		exercise.Pool = pool
+		if pool == "exam" {
+			exercise.ModuleID = ""
+		}
 		if err := s.validateDictationPublish("", exercise); err != nil {
 			writeError(w, http.StatusBadRequest, "validation_error", err.Error(), false)
 			return
