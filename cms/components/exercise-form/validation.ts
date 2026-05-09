@@ -17,10 +17,30 @@ export function validateExercise(exerciseType: ExerciseType, payload: AnyPayload
 
   // Poslech 1/2: need 5 items with text + correct_answers
   if (exerciseType === 'poslech_1' || exerciseType === 'poslech_2') {
-    const items = (detail.items ?? []) as unknown[];
+    const items = (detail.items ?? []) as Array<Record<string, unknown>>;
     if (items.length < 5) errors.push(`Poslech 1/2 cần đúng 5 đoạn nghe (hiện có ${items.length}).`);
     const ca = detail.correct_answers as Record<string, string> | undefined;
     if (!ca || Object.keys(ca).length < 5) errors.push('Cần nhập đáp án cho tất cả 5 câu.');
+
+    // V27 — poslech_1 image_asset_id all-or-none per item. Drafts can hold
+    // partial state while admin is uploading; published exercises must be
+    // 0/4 or 4/4 because Flutter only switches to image grid when ALL four
+    // options carry an asset_id (mixed state silently falls back to text).
+    const isPublished = String(payload.status ?? '') === 'published';
+    if (exerciseType === 'poslech_1' && isPublished) {
+      items.forEach((rawItem, i) => {
+        const opts = (rawItem?.options ?? []) as Array<Record<string, unknown>>;
+        const withImage = opts.filter((o) => {
+          const v = String(o.image_asset_id ?? '').trim();
+          return v !== '';
+        }).length;
+        if (withImage !== 0 && withImage !== 4) {
+          errors.push(
+            `Câu ${i + 1}: hoặc tất cả 4 đáp án có ảnh, hoặc không đáp án nào có ảnh (hiện có ${withImage}/4 ảnh).`,
+          );
+        }
+      });
+    }
   }
 
   // Poslech 3: need 5 items + options A-G + answers

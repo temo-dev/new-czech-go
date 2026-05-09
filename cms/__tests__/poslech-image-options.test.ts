@@ -6,6 +6,7 @@ import {
   type P12State,
   type P12Item,
 } from '../components/exercise-form/poslech-model';
+import { validateExercise } from '../components/exercise-form/validation';
 
 const optsAtoD = (
   withImage: boolean,
@@ -184,6 +185,93 @@ describe('PoslechFields image_asset_id (V27)', () => {
 
     it('treats whitespace-only as empty', () => {
       expect(countItemImages(makeItem(['  ', '', '', '']))).toBe(0);
+    });
+  });
+
+  describe('validation all-or-none image rule (V27)', () => {
+    function poslech1Payload(opts: {
+      imagesPerItem: number[]; // length 5 — count of image_asset_id per item
+      status: 'draft' | 'published';
+    }) {
+      const items = opts.imagesPerItem.map((cnt, i) => {
+        const options = ['A', 'B', 'C', 'D'].map((k, ki) => {
+          const base: { key: string; text: string; image_asset_id?: string } = {
+            key: k,
+            text: `Option ${k}`,
+          };
+          if (ki < cnt) {
+            base.image_asset_id = `media/q${i + 1}-${k.toLowerCase()}.jpg`;
+          }
+          return base;
+        });
+        return {
+          question_no: i + 1,
+          question: `Q${i + 1}`,
+          audio_source: { segments: [{ text: `seg ${i + 1}` }] },
+          options,
+        };
+      });
+      return {
+        title: 'Poslech 1 Image',
+        module_id: 'mod-nghe',
+        status: opts.status,
+        detail: {
+          items,
+          correct_answers: { '1': 'A', '2': 'A', '3': 'A', '4': 'A', '5': 'A' },
+        },
+      };
+    }
+
+    it('rejects published exercise with mixed (2/4) images on any item', () => {
+      const payload = poslech1Payload({
+        imagesPerItem: [4, 4, 2, 4, 4],
+        status: 'published',
+      });
+      const errors = validateExercise('poslech_1', payload);
+      const hit = errors.find((e) => e.includes('Câu 3') && e.includes('ảnh'));
+      expect(hit, `expected error mentioning Câu 3 ảnh, got: ${errors.join(' | ')}`).toBeTruthy();
+    });
+
+    it('accepts published exercise with all-empty (0/4) on every item', () => {
+      const payload = poslech1Payload({
+        imagesPerItem: [0, 0, 0, 0, 0],
+        status: 'published',
+      });
+      const errors = validateExercise('poslech_1', payload);
+      const imgErrors = errors.filter((e) => e.includes('ảnh'));
+      expect(imgErrors).toEqual([]);
+    });
+
+    it('accepts published exercise with all-set (4/4) on every item', () => {
+      const payload = poslech1Payload({
+        imagesPerItem: [4, 4, 4, 4, 4],
+        status: 'published',
+      });
+      const errors = validateExercise('poslech_1', payload);
+      const imgErrors = errors.filter((e) => e.includes('ảnh'));
+      expect(imgErrors).toEqual([]);
+    });
+
+    it('drafts skip the all-or-none rule (admin can save WIP with 1/4)', () => {
+      const payload = poslech1Payload({
+        imagesPerItem: [1, 4, 4, 4, 4],
+        status: 'draft',
+      });
+      const errors = validateExercise('poslech_1', payload);
+      const imgErrors = errors.filter((e) => e.includes('ảnh'));
+      expect(imgErrors).toEqual([]);
+    });
+
+    it('reports all offending items, not just the first one', () => {
+      const payload = poslech1Payload({
+        imagesPerItem: [4, 2, 4, 1, 4],
+        status: 'published',
+      });
+      const errors = validateExercise('poslech_1', payload);
+      const offenders = errors.filter((e) => e.includes('ảnh'));
+      expect(offenders.length).toBeGreaterThanOrEqual(2);
+      expect(offenders.some((e) => e.includes('Câu 2'))).toBe(true);
+      expect(offenders.some((e) => e.includes('Câu 4'))).toBe(true);
     });
   });
 
