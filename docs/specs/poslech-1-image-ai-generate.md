@@ -1,7 +1,7 @@
 # Poslech 1 AI Image Generate per option (V28) — Spec
 
 **Slice:** V28 — Wire AiImageButton into PoslechFields per option for poslech_1
-**Status:** Draft — chờ human approve trước khi sang plan
+**Status:** Shipped 2026-05-10
 **Owner:** TBD
 **Last updated:** 2026-05-10
 

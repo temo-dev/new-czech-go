@@ -109,7 +109,12 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026).
   trong CMS; wire field `detail.items[i].options[k].image_asset_id`
   (V11 schema, omitempty). Flutter `MultipleChoiceWidget` switch sang
   2×2 image grid khi cả 4 option có asset_id. Validation publish-time:
-  all-or-none per item (4 ảnh hoặc 0 ảnh, không cho mixed).
+  all-or-none per item (4 ảnh hoặc 0 ảnh, không cho mixed). **V28**:
+  AI image generate — `<AiImageButton>` wire vào PoslechFields per
+  option, click "✨ Tạo bằng AI" → `/api/admin/ai/generate-image`
+  (Replicate Flux Schnell ~3-5s) → preview → confirm → asset_id
+  populated tự động. Wire path không đổi: vẫn `image_asset_id` dùng
+  V27 spec. Manual paste vẫn hoạt động.
 - `poslech_2` — 5 đoạn ngắn → chọn A-D (5 điểm)
 - `poslech_3` — 5 đoạn → match A-G, 2 dư (5 điểm)
 - `poslech_4` — 5 dialog → chọn ảnh A-F, 1 dư (5 điểm)

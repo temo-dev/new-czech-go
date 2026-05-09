@@ -10,6 +10,82 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V28 — Poslech 1 AI Image Generate — 2026-05-10
+
+V27 ship 1 ngày, smoke test phát hiện UX gap: admin phải tự upload
+4 ảnh × 5 câu = 20 lần upload thủ công ngoài CMS rồi paste asset_id
+vào PoslechFields. Không scalable. `<AiImageButton>` đã tồn tại +
+tích hợp 4 nơi khác trong CMS (exercise-form context image,
+CteniFields per item cteni_1, course/mock-test banner). V28 wire
+component thứ 5: per A-D option của poslech_1.
+
+Spec: `docs/specs/poslech-1-image-ai-generate.md`. Plan + todo:
+`tasks/v28-poslech-1-image-ai-generate-{plan,todo}.md`. Idea:
+`docs/ideas/poslech-1-image-ai-generate.md`.
+
+CMS-only slice. Backend (`/api/admin/ai/generate-image` Replicate
+Flux Schnell endpoint) + Flutter unchanged.
+
+### CMS (Phase A)
+
+- **`poslech-model.ts`**: thêm `OptionKey` type alias +
+  `makeOptionImagePatcher(onPatch, optionKey)` factory. Returns
+  setter `(assetId) => onPatch({ [imgK]: assetId })`. Extracted để
+  test wire không cần React Testing Library.
+- **`PoslechFields.tsx`** (P12 branch): per option K ∈ {A,B,C,D}
+  render thêm `<AiImageButton>` cạnh OptionRow + img text input.
+  Callback flow:
+  1. `onAssetCreated(result)` fired (AiImageButton state machine
+     `idle → open → generating → preview → confirm`)
+  2. Register asset: `POST /api/admin/exercises/{editingId}/assets`
+     với `{id, asset_kind: 'image', storage_key, mime_type}` —
+     mirror CteniFields cteni_1 pattern.
+  3. `setImg(result.assetId)` qua `makeOptionImagePatcher` →
+     state.items[i].imgK update → buildPoslechDetail re-emit
+     `image_asset_id` qua V27 wire shape.
+- Disabled khi `editingId == null` (chưa save bài). Title prop
+  hiện hint "Lưu bài tập trước để tạo ảnh AI".
+- `existingAssetId={imgK || undefined}` flip label "Tạo lại bằng AI"
+  thay vì "Tạo bằng AI" khi option đã có ảnh — UX consistency với
+  4 wire site khác.
+- Manual paste vẫn hoạt động (V27 path) — admin có thể paste
+  asset_id thủ công nếu muốn dùng ảnh upload bằng đường khác.
+
+### Backend + Flutter
+
+Không đổi. `/api/admin/ai/generate-image` đã ship qua
+`ai-image-generation` slice (V11+); rate limit 5 req/min/admin,
+Replicate Flux Schnell, timeout 30s. Wire shape `image_asset_id`
+giữ V27 spec. `MultipleChoiceWidget` switch image grid như cũ.
+
+### Docs
+
+- `docs/ideas/poslech-1-image-ai-generate.md` — idea.
+- `docs/specs/poslech-1-image-ai-generate.md` — Status: Draft → Shipped.
+- `tasks/v28-poslech-1-image-ai-generate-{plan,todo}.md`.
+- `docs/reference/content-and-attempt-model.md` § listening: thêm
+  ghi chú V28 AI generate.
+- `SPEC.md` digest: row V28.
+
+### Tests
+
+CMS: 285 tests pass (was 282 → +3 V28). Phase A added 3 tests
+(makeOptionImagePatcher targets correct imgK; A/B/C/D isolated;
+end-to-end through buildPoslechDetail emits image_asset_id on
+patched option only). Lint + build clean. Backend (859) + Flutter
+(373) unchanged.
+
+### Out of scope
+
+- ❌ poslech_2/3/4 AI generate
+- ❌ Backend endpoint changes
+- ❌ Flutter changes
+- ❌ Bulk generate (1 prompt → 4 variations)
+- ❌ Prompt template auto-fill from option text
+- ❌ Rate limit improvements
+
+---
+
 ## V27 — Poslech 1 Image Options A-D — 2026-05-09
 
 V26 ship được 1 ngày, dispatch review tìm thấy poslech_1 thiếu khả
