@@ -186,3 +186,24 @@ export function buildPoslechDetail(
 export function countItemImages(item: P12Item): number {
   return [item.imgA, item.imgB, item.imgC, item.imgD].filter((x) => x && x.trim() !== '').length;
 }
+
+export type OptionKey = 'A' | 'B' | 'C' | 'D';
+
+/**
+ * V28 — factory for the AiImageButton onAssetCreated callback per option.
+ * Returns a setter that knows which option key to update on the parent
+ * patch function. Extracted so tests can drive the wire without rendering
+ * AiImageButton (no React Testing Library in this project).
+ *
+ * Usage:
+ *   const patcher = makeOptionImagePatcher(patch, 'A');
+ *   <AiImageButton onAssetCreated={(r) => patcher(r.assetId)} />
+ */
+export function makeOptionImagePatcher(
+  onPatch: (partial: Partial<P12Item>) => void,
+  optionKey: OptionKey,
+): (assetId: string) => void {
+  return (assetId) => {
+    onPatch({ [`img${optionKey}`]: assetId } as Partial<P12Item>);
+  };
+}

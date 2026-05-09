@@ -3,9 +3,13 @@
 import { useEffect, useState } from 'react';
 import { AnswerSelect } from './AnswerSelect';
 import { OptionRow } from './OptionRow';
+import AiImageButton from '../AiImageButton';
+import { adminFetch } from '../../lib/api';
 import {
   initPoslechState,
   buildPoslechDetail,
+  makeOptionImagePatcher,
+  type OptionKey,
   type P12Item,
   type P5State,
   type PoslechState,
@@ -84,19 +88,43 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
               </label>
             )}
             <div style={{ display: 'grid', gap: 8 }}>
-              <span style={labelStyle}>Lựa chọn A-D (V27: thêm Asset ID ảnh nếu muốn ảnh thay text)</span>
-              {(['A', 'B', 'C', 'D'] as const).map(k => (
-                <div key={k} style={{ display: 'grid', gap: 4 }}>
-                  <OptionRow optionKey={k} label={(item as Record<string, string>)[`opt${k}`] ?? ''} onChange={v => patch({ [`opt${k}`]: v } as Partial<P12Item>)} />
-                  <input
-                    type="text"
-                    value={(item as Record<string, string>)[`img${k}`] ?? ''}
-                    onChange={e => patch({ [`img${k}`]: e.target.value } as Partial<P12Item>)}
-                    placeholder={`Asset ID ảnh ${k} (tùy chọn — bỏ trống nếu chỉ dùng text)`}
-                    style={imgInputStyle}
-                  />
-                </div>
-              ))}
+              <span style={labelStyle}>Lựa chọn A-D (V27: paste asset_id, V28: ✨ AI tạo)</span>
+              {(['A', 'B', 'C', 'D'] as const).map(k => {
+                const imgK = (item as Record<string, string>)[`img${k}`] ?? '';
+                const setImg = makeOptionImagePatcher(patch, k as OptionKey);
+                return (
+                  <div key={k} style={{ display: 'grid', gap: 4, gridTemplateColumns: '1fr' }}>
+                    <OptionRow optionKey={k} label={(item as Record<string, string>)[`opt${k}`] ?? ''} onChange={v => patch({ [`opt${k}`]: v } as Partial<P12Item>)} />
+                    <input
+                      type="text"
+                      value={imgK}
+                      onChange={e => setImg(e.target.value)}
+                      placeholder={`Asset ID ảnh ${k} (tùy chọn — paste, hoặc dùng nút ✨ bên dưới)`}
+                      style={imgInputStyle}
+                    />
+                    <AiImageButton
+                      onAssetCreated={async (result) => {
+                        if (!editingId) return;
+                        // Register the freshly generated blob as an exercise asset so
+                        // the same /v1/media/file route the learner uses can serve it.
+                        await adminFetch(`/api/admin/exercises/${editingId}/assets`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            id: result.assetId,
+                            asset_kind: 'image',
+                            storage_key: result.storageKey,
+                            mime_type: 'image/jpeg',
+                          }),
+                        });
+                        setImg(result.assetId);
+                      }}
+                      disabled={!editingId}
+                      existingAssetId={imgK || undefined}
+                    />
+                  </div>
+                );
+              })}
             </div>
             <AnswerSelect label="Đáp án đúng:" options={opts} value={item.answer} onChange={v => patch({ answer: v })} />
           </div>

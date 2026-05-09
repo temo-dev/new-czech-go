@@ -3,6 +3,7 @@ import {
   initPoslechState,
   buildPoslechDetail,
   countItemImages,
+  makeOptionImagePatcher,
   type P12State,
   type P12Item,
 } from '../components/exercise-form/poslech-model';
@@ -272,6 +273,70 @@ describe('PoslechFields image_asset_id (V27)', () => {
       expect(offenders.length).toBeGreaterThanOrEqual(2);
       expect(offenders.some((e) => e.includes('Câu 2'))).toBe(true);
       expect(offenders.some((e) => e.includes('Câu 4'))).toBe(true);
+    });
+  });
+
+  describe('makeOptionImagePatcher (V28 — AI image wire)', () => {
+    it('returns a setter that patches the matching imgK field', () => {
+      let captured: Partial<P12Item> | null = null;
+      const patch = (partial: Partial<P12Item>) => {
+        captured = partial;
+      };
+      const patcher = makeOptionImagePatcher(patch, 'B');
+      patcher('media/ai-generated-asset-xyz');
+      expect(captured).toEqual({ imgB: 'media/ai-generated-asset-xyz' });
+    });
+
+    it('isolates A / B / C / D — calling A does not patch others', () => {
+      const captured: Partial<P12Item>[] = [];
+      const patch = (partial: Partial<P12Item>) => {
+        captured.push(partial);
+      };
+      makeOptionImagePatcher(patch, 'A')('asset-A');
+      makeOptionImagePatcher(patch, 'C')('asset-C');
+      expect(captured).toEqual([{ imgA: 'asset-A' }, { imgC: 'asset-C' }]);
+      // None of the patches should mention sibling keys.
+      for (const p of captured) {
+        expect(Object.keys(p)).toHaveLength(1);
+      }
+    });
+
+    it('feeds buildPoslechDetail to emit image_asset_id through V27 wire', () => {
+      // Simulate the full flow: AiImageButton fires onAssetCreated → patcher
+      // → state update → buildPoslechDetail → wire shape.
+      const baseItem: P12Item = {
+        question: 'Q1',
+        text: 'seg',
+        optA: 'a', optB: 'b', optC: 'c', optD: 'd',
+        imgA: '', imgB: '', imgC: '', imgD: '',
+        answer: 'A',
+      };
+      const filler: P12Item = {
+        question: '', text: '',
+        optA: '', optB: '', optC: '', optD: '',
+        imgA: '', imgB: '', imgC: '', imgD: '',
+        answer: '',
+      };
+      const items = [baseItem, filler, filler, filler, filler];
+      let state: P12State = { type: 'poslech_1', items };
+
+      const patch = (partial: Partial<P12Item>) => {
+        state = {
+          ...state,
+          items: state.items.map((it, i) =>
+            i === 0 ? { ...it, ...partial } : it,
+          ),
+        };
+      };
+      makeOptionImagePatcher(patch, 'A')('media/q1-a-ai.jpg');
+
+      expect(state.items[0].imgA).toBe('media/q1-a-ai.jpg');
+      const detail = buildPoslechDetail(state, 'text') as {
+        items: Array<{ options: Array<Record<string, unknown>> }>;
+      };
+      expect(detail.items[0].options[0].image_asset_id).toBe('media/q1-a-ai.jpg');
+      // Sibling options stay text-only because their imgK is still empty.
+      expect(detail.items[0].options[1].image_asset_id).toBeUndefined();
     });
   });
 
