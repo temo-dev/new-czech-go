@@ -254,7 +254,7 @@ func seedExercises() []contracts.Exercise {
 			ExerciseType: "poslech_1",
 			Title:        "Poslech 1 — Seed",
 			ShortInstruction:   "Nghe và chọn đáp án đúng.",
-			LearnerInstruction: "Nghe đoạn hội thoại và chọn A, B hoặc C.",
+			LearnerInstruction: "Nghe 5 đoạn hội thoại ngắn và chọn đáp án A-D đúng.",
 			Status:             "published",
 			SequenceNo:         1,
 			Detail: contracts.Poslech1Detail{
@@ -269,10 +269,63 @@ func seedExercises() []contracts.Exercise {
 							{Key: "A", Text: "V praci"},
 							{Key: "B", Text: "Doma"},
 							{Key: "C", Text: "V obchode"},
+							{Key: "D", Text: "U lekare"},
+						},
+					},
+					{
+						QuestionNo: 2,
+						Question:   "Kolik je hodin?",
+						AudioSource: contracts.ListeningAudioSource{
+							Segments: []contracts.AudioSegment{{Text: "Je devet hodin."}},
+						},
+						Options: []contracts.MultipleChoiceOption{
+							{Key: "A", Text: "Sedm hodin"},
+							{Key: "B", Text: "Osm hodin"},
+							{Key: "C", Text: "Devet hodin"},
+							{Key: "D", Text: "Deset hodin"},
+						},
+					},
+					{
+						QuestionNo: 3,
+						Question:   "Co dela Pavel?",
+						AudioSource: contracts.ListeningAudioSource{
+							Segments: []contracts.AudioSegment{{Text: "Pavel cte knihu."}},
+						},
+						Options: []contracts.MultipleChoiceOption{
+							{Key: "A", Text: "Pise dopis"},
+							{Key: "B", Text: "Cte knihu"},
+							{Key: "C", Text: "Vari obed"},
+							{Key: "D", Text: "Sleduje televizi"},
+						},
+					},
+					{
+						QuestionNo: 4,
+						Question:   "Kam jde Eva?",
+						AudioSource: contracts.ListeningAudioSource{
+							Segments: []contracts.AudioSegment{{Text: "Eva jde na nadrazi."}},
+						},
+						Options: []contracts.MultipleChoiceOption{
+							{Key: "A", Text: "Do skoly"},
+							{Key: "B", Text: "Na poste"},
+							{Key: "C", Text: "Na nadrazi"},
+							{Key: "D", Text: "Do parku"},
+						},
+					},
+					{
+						QuestionNo: 5,
+						Question:   "Co rad pije Petr?",
+						AudioSource: contracts.ListeningAudioSource{
+							Segments: []contracts.AudioSegment{{Text: "Petr ma rad cernou kavu."}},
+						},
+						Options: []contracts.MultipleChoiceOption{
+							{Key: "A", Text: "Caj"},
+							{Key: "B", Text: "Mléko"},
+							{Key: "C", Text: "Vodu"},
+							{Key: "D", Text: "Cernou kavu"},
 						},
 					},
 				},
-				CorrectAnswers: map[string]string{"1": "B"},
+				CorrectAnswers: map[string]string{"1": "B", "2": "C", "3": "B", "4": "C", "5": "D"},
 			},
 		},
 		{
