@@ -18,6 +18,10 @@ import '../widgets/objective_result_card.dart';
 /// Screen for all poslech_* exercise types.
 ///
 /// Flow: show audio player → learner answers → submit answers (sync) → result.
+///
+/// V26 — when every poslech_1 item has its own `audio_source.asset_id`, the
+/// screen renders one mini-player per question card instead of a single
+/// top-level player. Falls back to the merged-audio path for legacy seeds.
 class ListeningExerciseScreen extends StatefulWidget {
   const ListeningExerciseScreen({
     super.key,
@@ -41,7 +45,12 @@ class ListeningExerciseScreen extends StatefulWidget {
 }
 
 class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
-  final AudioPlayer _player = AudioPlayer();
+  // Legacy single-audio player. Only initialised when [_usePerItemAudio] is
+  // false (older seeds without per-item asset_ids).
+  final AudioPlayer _legacyPlayer = AudioPlayer();
+  // V26 — coordinates "only one item plays at a time" across mini-players.
+  final _PlaybackCoordinator _coordinator = _PlaybackCoordinator();
+
   final Map<String, String> _answers = {};
 
   bool _audioLoading = true;
@@ -50,25 +59,33 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
   String? _submitError;
   AttemptResult? _result;
 
+  bool get _usePerItemAudio => itemsHavePerItemAudio(widget.detail);
+
   @override
   void initState() {
     super.initState();
-    _loadAudio();
+    if (_usePerItemAudio) {
+      // Per-item players each load on first tap; nothing to do here.
+      _audioLoading = false;
+    } else {
+      _loadLegacyAudio();
+    }
   }
 
   @override
   void dispose() {
-    _player.dispose();
+    _legacyPlayer.dispose();
+    _coordinator.dispose();
     super.dispose();
   }
 
-  Future<void> _loadAudio() async {
+  Future<void> _loadLegacyAudio() async {
     setState(() {
       _audioLoading = true;
       _audioError = false;
     });
     try {
-      await _player.setAudioSource(
+      await _legacyPlayer.setAudioSource(
         AudioSource.uri(
           widget.client.exerciseAudioUri(widget.detail.id),
           headers: widget.client.authHeaders,
@@ -185,14 +202,16 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
               const SizedBox(height: AppSpacing.x4),
             ],
 
-            // Audio player
-            _AudioPlayerBar(
-              player: _player,
-              loading: _audioLoading,
-              error: _audioError,
-              onRetry: _loadAudio,
-            ),
-            const SizedBox(height: AppSpacing.x4),
+            // Top-level audio player — only in legacy single-audio mode.
+            if (!_usePerItemAudio) ...[
+              _LegacyAudioPlayerBar(
+                player: _legacyPlayer,
+                loading: _audioLoading,
+                error: _audioError,
+                onRetry: _loadLegacyAudio,
+              ),
+              const SizedBox(height: AppSpacing.x4),
+            ],
 
             // Answer UI
             if (d.isPoslech6)
@@ -259,7 +278,7 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
   List<Widget> _buildItemAnswers(ExerciseDetail d) {
     final items = d.poslechItems;
     if (items.isEmpty) {
-      // Fallback: 5 generic A-D questions
+      // Fallback: 5 generic A-D questions (no per-item audio).
       return List.generate(5, (i) {
         final qno = i + 1;
         return Padding(
@@ -282,6 +301,15 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_usePerItemAudio) ...[
+              _ItemAudioPlayerBar(
+                audioUri: widget.client.mediaUri(item.audioAssetId),
+                authHeaders: widget.client.authHeaders,
+                coordinator: _coordinator,
+                playerId: item.questionNo,
+              ),
+              const SizedBox(height: AppSpacing.x2),
+            ],
             if (item.question.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.x2),
@@ -314,8 +342,36 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
   ];
 }
 
-class _AudioPlayerBar extends StatefulWidget {
-  const _AudioPlayerBar({
+/// V26 — true when the exercise has poslech items and every item carries an
+/// `audio_source.asset_id`. The screen uses this flag to switch between the
+/// per-item player layout and the legacy single-audio player.
+@visibleForTesting
+bool itemsHavePerItemAudio(ExerciseDetail detail) {
+  if (detail.exerciseType != 'poslech_1') return false;
+  if (detail.poslechItems.isEmpty) return false;
+  return detail.poslechItems.every((it) => it.audioAssetId.isNotEmpty);
+}
+
+/// Tiny notifier that lets per-item players pause each other so two questions
+/// don't play at the same time. Player 0 = nothing playing.
+class _PlaybackCoordinator extends ChangeNotifier {
+  int _active = 0;
+  int get active => _active;
+  void claim(int id) {
+    if (_active == id) return;
+    _active = id;
+    notifyListeners();
+  }
+
+  void release(int id) {
+    if (_active != id) return;
+    _active = 0;
+    notifyListeners();
+  }
+}
+
+class _LegacyAudioPlayerBar extends StatefulWidget {
+  const _LegacyAudioPlayerBar({
     required this.player,
     required this.loading,
     required this.error,
@@ -327,10 +383,10 @@ class _AudioPlayerBar extends StatefulWidget {
   final VoidCallback? onRetry;
 
   @override
-  State<_AudioPlayerBar> createState() => _AudioPlayerBarState();
+  State<_LegacyAudioPlayerBar> createState() => _LegacyAudioPlayerBarState();
 }
 
-class _AudioPlayerBarState extends State<_AudioPlayerBar> {
+class _LegacyAudioPlayerBarState extends State<_LegacyAudioPlayerBar> {
   bool _playing = false;
   StreamSubscription<PlayerState>? _sub;
 
@@ -350,6 +406,141 @@ class _AudioPlayerBarState extends State<_AudioPlayerBar> {
 
   @override
   Widget build(BuildContext context) {
+    return _AudioBarShell(
+      loading: widget.loading,
+      error: widget.error,
+      playing: _playing,
+      onRetry: widget.onRetry,
+      onTogglePlay: () async {
+        if (_playing) {
+          await widget.player.pause();
+        } else {
+          await widget.player.seek(Duration.zero);
+          await widget.player.play();
+        }
+      },
+    );
+  }
+}
+
+/// V26 — per-item audio bar. Lazy-loads its source on first play, registers
+/// with the [_PlaybackCoordinator] so other items pause when this one starts.
+class _ItemAudioPlayerBar extends StatefulWidget {
+  const _ItemAudioPlayerBar({
+    required this.audioUri,
+    required this.authHeaders,
+    required this.coordinator,
+    required this.playerId,
+  });
+  final Uri audioUri;
+  final Map<String, String> authHeaders;
+  final _PlaybackCoordinator coordinator;
+  final int playerId;
+
+  @override
+  State<_ItemAudioPlayerBar> createState() => _ItemAudioPlayerBarState();
+}
+
+class _ItemAudioPlayerBarState extends State<_ItemAudioPlayerBar> {
+  AudioPlayer? _player;
+  bool _loading = false;
+  bool _error = false;
+  bool _playing = false;
+  bool _sourceLoaded = false;
+  StreamSubscription<PlayerState>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.coordinator.addListener(_onCoordinatorChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.coordinator.removeListener(_onCoordinatorChanged);
+    _sub?.cancel();
+    _player?.dispose();
+    super.dispose();
+  }
+
+  void _onCoordinatorChanged() {
+    if (widget.coordinator.active != widget.playerId && _playing) {
+      _player?.pause();
+    }
+  }
+
+  Future<void> _ensurePlayer() async {
+    if (_sourceLoaded) return;
+    _loading = true;
+    setState(() {});
+    _player ??= AudioPlayer();
+    _sub ??= _player!.playerStateStream.listen((s) {
+      if (!mounted) return;
+      setState(() => _playing = s.playing);
+      if (s.processingState == ProcessingState.completed) {
+        widget.coordinator.release(widget.playerId);
+      }
+    });
+    try {
+      await _player!.setAudioSource(
+        AudioSource.uri(widget.audioUri, headers: widget.authHeaders),
+      );
+      _sourceLoaded = true;
+      _error = false;
+    } catch (_) {
+      _error = true;
+    } finally {
+      _loading = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _toggle() async {
+    await _ensurePlayer();
+    if (_error || _player == null) return;
+    if (_playing) {
+      await _player!.pause();
+      widget.coordinator.release(widget.playerId);
+    } else {
+      widget.coordinator.claim(widget.playerId);
+      await _player!.seek(Duration.zero);
+      await _player!.play();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _AudioBarShell(
+      loading: _loading,
+      error: _error,
+      playing: _playing,
+      onRetry: () {
+        _sourceLoaded = false;
+        _ensurePlayer();
+      },
+      onTogglePlay: _toggle,
+    );
+  }
+}
+
+/// Shared visual shell for both legacy and per-item audio bars. Centralises
+/// the headphones row + play/pause icon so we only style this in one place.
+class _AudioBarShell extends StatelessWidget {
+  const _AudioBarShell({
+    required this.loading,
+    required this.error,
+    required this.playing,
+    required this.onTogglePlay,
+    this.onRetry,
+  });
+  final bool loading;
+  final bool error;
+  final bool playing;
+  final Future<void> Function() onTogglePlay;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.x3),
       decoration: BoxDecoration(
@@ -362,47 +553,40 @@ class _AudioPlayerBarState extends State<_AudioPlayerBar> {
           Icon(Icons.headphones_rounded, color: AppColors.secondary, size: 20),
           const SizedBox(width: 10),
           Expanded(
-            child:
-                widget.error
-                    ? Text(
-                      AppLocalizations.of(context).audioError,
-                      style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.error,
-                      ),
-                    )
-                    : widget.loading
-                    ? Text(
-                      AppLocalizations.of(context).audioLoading,
-                      style: AppTypography.bodySmall,
-                    )
-                    : Text(
-                      AppLocalizations.of(context).audioHint,
-                      style: AppTypography.bodySmall,
+            child: error
+                ? Text(
+                    AppLocalizations.of(context).audioError,
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.error,
                     ),
+                  )
+                : loading
+                    ? Text(
+                        AppLocalizations.of(context).audioLoading,
+                        style: AppTypography.bodySmall,
+                      )
+                    : Text(
+                        AppLocalizations.of(context).audioHint,
+                        style: AppTypography.bodySmall,
+                      ),
           ),
-          if (widget.error && widget.onRetry != null)
+          if (error && onRetry != null)
             IconButton(
               icon: const Icon(Icons.refresh_rounded),
               color: AppColors.secondary,
               tooltip: 'Thử lại',
-              onPressed: widget.onRetry,
+              onPressed: onRetry,
             ),
-          if (!widget.error && !widget.loading) ...[
+          if (!error && !loading)
             IconButton(
               icon: Icon(
-                _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
               ),
               color: AppColors.secondary,
-              onPressed: () async {
-                if (_playing) {
-                  await widget.player.pause();
-                } else {
-                  await widget.player.seek(Duration.zero);
-                  await widget.player.play();
-                }
+              onPressed: () {
+                onTogglePlay();
               },
             ),
-          ],
         ],
       ),
     );

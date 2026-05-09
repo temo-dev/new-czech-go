@@ -1197,12 +1197,22 @@ class PoslechItemView {
     required this.questionNo,
     this.question = '',
     this.options = const [],
+    this.audioAssetId = '',
   });
   final int questionNo;
   final String question;
   final List<PoslechOptionView> options;
+  // V26 — populated from detail.items[i].audio_source.asset_id when the
+  // exercise has been generated with per-item audio. Empty for legacy
+  // exercises that still use the merged whole-exercise audio file.
+  final String audioAssetId;
 
   factory PoslechItemView.fromJson(Map<String, dynamic> json) {
+    final audioSource = json['audio_source'];
+    String audioAssetId = '';
+    if (audioSource is Map<String, dynamic>) {
+      audioAssetId = audioSource['asset_id'] as String? ?? '';
+    }
     return PoslechItemView(
       questionNo: (json['question_no'] as num?)?.toInt() ?? 0,
       question: json['question'] as String? ?? '',
@@ -1210,6 +1220,7 @@ class PoslechItemView {
           (json['options'] as List<dynamic>? ?? const [])
               .map((e) => PoslechOptionView.fromJson(e as Map<String, dynamic>))
               .toList(),
+      audioAssetId: audioAssetId,
     );
   }
 }
