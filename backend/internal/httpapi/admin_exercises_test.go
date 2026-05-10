@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -100,6 +101,85 @@ func TestAdminExercises_ForbiddenWithoutAdminToken(t *testing.T) {
 	resp, _ := adminExercisesGet(t, server, "", "dev-learner-token")
 	if resp.StatusCode != http.StatusForbidden {
 		t.Errorf("want 403, got %d", resp.StatusCode)
+	}
+}
+
+// V21.3 hotfix — POST handler previously omitted Pool from its anon
+// decode struct, so every CMS-created exercise silently landed with
+// pool="course" (postgres insert default at insertExercise:173-175).
+// Regression: POST round-trip must preserve pool="exam" and clear
+// module_id when pool is exam (per AGENTS.md "Exercise pools").
+func TestAdminExercises_CreatePreservesExamPool(t *testing.T) {
+	server, _ := newAdminExercisesEnv(t)
+
+	body := map[string]any{
+		"title":         "Mock test item 1",
+		"exercise_type": "uloha_1_topic_answers",
+		"skill_kind":    "noi",
+		"pool":          "exam",
+		"module_id":     "",
+		"status":        "draft",
+		"questions":     []string{"Q1", "Q2"},
+	}
+	raw, _ := json.Marshal(body)
+	req, _ := http.NewRequest(http.MethodPost, server.URL+"/v1/admin/exercises", bytes.NewReader(raw))
+	req.Header.Set("Authorization", "Bearer dev-admin-token")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("want 201, got %d", resp.StatusCode)
+	}
+	var created struct {
+		Data contracts.Exercise `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if created.Data.Pool != "exam" {
+		t.Errorf("pool not preserved: want exam, got %q", created.Data.Pool)
+	}
+	if created.Data.ModuleID != "" {
+		t.Errorf("exam pool must clear module_id, got %q", created.Data.ModuleID)
+	}
+}
+
+func TestAdminExercises_CreateDefaultsPoolToCourse(t *testing.T) {
+	server, _ := newAdminExercisesEnv(t)
+
+	body := map[string]any{
+		"title":         "Course item",
+		"exercise_type": "uloha_1_topic_answers",
+		"skill_kind":    "noi",
+		"module_id":     "mod_1",
+		"questions":     []string{"Q1"},
+	}
+	raw, _ := json.Marshal(body)
+	req, _ := http.NewRequest(http.MethodPost, server.URL+"/v1/admin/exercises", bytes.NewReader(raw))
+	req.Header.Set("Authorization", "Bearer dev-admin-token")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("want 201, got %d", resp.StatusCode)
+	}
+	var created struct {
+		Data contracts.Exercise `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if created.Data.Pool != "course" {
+		t.Errorf("missing pool should default to course, got %q", created.Data.Pool)
+	}
+	if created.Data.ModuleID != "mod_1" {
+		t.Errorf("course pool keeps module_id, got %q", created.Data.ModuleID)
 	}
 }
 

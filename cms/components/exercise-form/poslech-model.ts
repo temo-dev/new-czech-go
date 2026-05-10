@@ -15,6 +15,10 @@ export type PoslechType =
 export type P12Item = {
   question: string;
   text: string;
+  // V32 — hidden form state for per-item Polly output. The learner app reads
+  // detail.items[i].audio_source.asset_id to decide whether to render the
+  // mini-player for each poslech_1 item.
+  audioAssetId: string;
   optA: string;
   optB: string;
   optC: string;
@@ -27,9 +31,14 @@ export type P12Item = {
   answer: string;
 };
 
-export type MatchItem = { text: string; answer: string };
+export type MatchItem = {
+  questionNo: number;
+  question: string;
+  text: string;
+  answer: string;
+};
 export type SharedOption = { key: string; label: string };
-export type FillSlot = { answer: string };
+export type FillSlot = { questionNo: number; prompt: string; answer: string };
 
 export type P12State = { type: 'poslech_1' | 'poslech_2'; items: P12Item[] };
 export type MatchState = {
@@ -46,6 +55,11 @@ export const OPTION_KEYS_4 = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 type RawOption = { key: string; text?: string; image_asset_id?: string };
 
+function readQuestionNo(raw: Record<string, unknown> | undefined, fallback: number): number {
+  const n = Number(raw?.question_no);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
 export function initPoslechState(
   exerciseType: PoslechType,
   detail: Record<string, unknown>,
@@ -56,8 +70,8 @@ export function initPoslechState(
     const rawItems = (detail.items ?? []) as Array<Record<string, unknown>>;
     const items: P12Item[] = Array.from({ length: ITEM_COUNT }, (_, i) => {
       const raw = rawItems[i] as Record<string, unknown> | undefined;
-      const segs = ((raw?.audio_source as Record<string, unknown>)?.segments ??
-        []) as Array<{ speaker?: string; text: string }>;
+      const audio = (raw?.audio_source as Record<string, unknown>) ?? {};
+      const segs = (audio.segments ?? []) as Array<{ speaker?: string; text: string }>;
       const opts = (raw?.options ?? []) as RawOption[];
       const text = segs
         .map((s) => (s.speaker ? `[${s.speaker}]: ${s.text}` : s.text))
@@ -68,6 +82,7 @@ export function initPoslechState(
       return {
         question: String(raw?.question ?? ''),
         text,
+        audioAssetId: String(audio.asset_id ?? ''),
         optA: get('A'),
         optB: get('B'),
         optC: get('C'),
@@ -92,21 +107,37 @@ export function initPoslechState(
     });
     const items: MatchItem[] = Array.from({ length: ITEM_COUNT }, (_, i) => {
       const raw = rawItems[i] as Record<string, unknown> | undefined;
+      const questionNo = readQuestionNo(raw, i + 1);
       const segs = ((raw?.audio_source as Record<string, unknown>)?.segments ??
         []) as Array<{ speaker?: string; text: string }>;
       const text = segs
         .map((s) => (s.speaker ? `[${s.speaker}]: ${s.text}` : s.text))
         .join('\n');
-      return { text, answer: ca[String(i + 1)] ?? '' };
+      return {
+        questionNo,
+        question: String(raw?.question ?? ''),
+        text,
+        answer: ca[String(questionNo)] ?? ca[String(i + 1)] ?? '',
+      };
     });
     return { type: exerciseType, items, options };
   }
 
   const segs = ((detail.audio_source as Record<string, unknown>)?.segments ??
     []) as Array<{ text: string }>;
-  const slots: FillSlot[] = Array.from({ length: ITEM_COUNT }, (_, i) => ({
-    answer: ca[String(i + 1)] ?? '',
-  }));
+  const rawQs = (detail.questions ?? []) as Array<Record<string, unknown>>;
+  const slots: FillSlot[] = Array.from({ length: ITEM_COUNT }, (_, i) => {
+    const fallbackNo = 21 + i;
+    const raw =
+      rawQs.find((q) => Number(q.question_no) === fallbackNo) ?? rawQs[i];
+    const legacyNo = readQuestionNo(raw, i + 1);
+    return {
+      questionNo: fallbackNo,
+      prompt: String(raw?.prompt ?? ''),
+      answer:
+        ca[String(fallbackNo)] ?? ca[String(legacyNo)] ?? ca[String(i + 1)] ?? '',
+    };
+  });
   return {
     type: 'poslech_5',
     voiceText: segs.map((s) => s.text).join('\n'),
@@ -143,7 +174,11 @@ export function buildPoslechDetail(
       return {
         question_no: i + 1,
         question: item.question,
-        audio_source: { type: audioSource, segments: seg(item.text) },
+        audio_source: {
+          type: audioSource,
+          ...(item.audioAssetId ? { asset_id: item.audioAssetId } : {}),
+          segments: seg(item.text),
+        },
         options: [buildOpt('A'), buildOpt('B'), buildOpt('C'), buildOpt('D')],
       };
     });
@@ -153,9 +188,13 @@ export function buildPoslechDetail(
   if (state.type === 'poslech_3' || state.type === 'poslech_4') {
     const correct: Record<string, string> = {};
     const items = state.items.map((item, i) => {
-      if (item.answer) correct[String(i + 1)] = item.answer;
+      const questionNo = item.questionNo > 0 ? item.questionNo : i + 1;
+      if (item.answer) correct[String(questionNo)] = item.answer;
       return {
-        question_no: i + 1,
+        question_no: questionNo,
+        ...(state.type === 'poslech_3' && item.question.trim()
+          ? { question: item.question }
+          : {}),
         audio_source: { type: audioSource, segments: seg(item.text) },
       };
     });
@@ -169,11 +208,15 @@ export function buildPoslechDetail(
   const s5 = state as P5State;
   const correct: Record<string, string> = {};
   s5.slots.forEach((slot, i) => {
-    if (slot.answer) correct[String(i + 1)] = slot.answer;
+    const questionNo = slot.questionNo > 0 ? slot.questionNo : 21 + i;
+    if (slot.answer) correct[String(questionNo)] = slot.answer;
   });
   return {
     audio_source: { type: audioSource, segments: seg(s5.voiceText) },
-    questions: s5.slots.map((_, i) => ({ question_no: i + 1, prompt: '' })),
+    questions: s5.slots.map((slot, i) => ({
+      question_no: slot.questionNo > 0 ? slot.questionNo : 21 + i,
+      prompt: slot.prompt,
+    })),
     correct_answers: correct,
   };
 }
@@ -188,6 +231,7 @@ export function countItemImages(item: P12Item): number {
 }
 
 export type OptionKey = 'A' | 'B' | 'C' | 'D';
+export type SharedImageOptionKey = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
 /**
  * V28 — factory for the AiImageButton onAssetCreated callback per option.
@@ -205,6 +249,45 @@ export function makeOptionImagePatcher(
 ): (assetId: string) => void {
   return (assetId) => {
     onPatch({ [`img${optionKey}`]: assetId } as Partial<P12Item>);
+  };
+}
+
+/**
+ * POSLECH 4 stores the six shared image choices as `options[].asset_id`.
+ * This mirrors makeOptionImagePatcher for the shared A-F option pool so the
+ * upload and AI callbacks can update exactly one option.
+ */
+export function makeSharedOptionImagePatcher(
+  onPatch: (optionKey: SharedImageOptionKey, assetId: string) => void,
+  optionKey: SharedImageOptionKey,
+): (assetId: string) => void {
+  return (assetId) => onPatch(optionKey, assetId);
+}
+
+/**
+ * V32 — generate-audio needs to synthesize fresh files from the current
+ * transcript text. Normal CMS saves preserve audio_source.asset_id, but the
+ * pre-generate PATCH intentionally clears item asset ids so the backend does
+ * not treat already-generated files as uploaded audio and skip regeneration.
+ */
+export function stripPoslechItemAudioAssetIds(
+  detail: Record<string, unknown>,
+): Record<string, unknown> {
+  const items = detail.items;
+  if (!Array.isArray(items)) return detail;
+  return {
+    ...detail,
+    items: items.map((raw) => {
+      if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+      const item = raw as Record<string, unknown>;
+      const audio = item.audio_source;
+      if (audio == null || typeof audio !== 'object' || Array.isArray(audio)) return item;
+      const { asset_id: _assetId, ...restAudio } = audio as Record<string, unknown>;
+      return {
+        ...item,
+        audio_source: restAudio,
+      };
+    }),
   };
 }
 
@@ -237,4 +320,8 @@ export function parseUploadResponse(json: unknown): string {
  */
 export function uploadingKeyFor(itemIndex: number, optionKey: OptionKey): string {
   return `${itemIndex}-${optionKey}`;
+}
+
+export function sharedUploadingKeyFor(optionKey: SharedImageOptionKey): string {
+  return `shared-${optionKey}`;
 }

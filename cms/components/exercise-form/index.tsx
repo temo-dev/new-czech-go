@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useS } from '../../lib/i18n';
 import { adminFetch } from '../../lib/api';
 import { PoslechFields } from './PoslechFields';
+import { stripPoslechItemAudioAssetIds } from './poslech-model';
 import { CteniFields } from './CteniFields';
 import { AnoNeFields } from './AnoNeFields';
 import { DictationFields } from './DictationFields';
@@ -474,16 +475,37 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
     setAudioGenerating(true);
     setAudioGenMsg(null);
     try {
+      const updatePayload = buildUpdatePayload(form) as Record<string, unknown>;
+      const detail =
+        (updatePayload.detail as Record<string, unknown> | undefined) ?? {};
+      const payloadForGenerate =
+        form.exerciseType === 'poslech_1'
+          ? {
+              ...updatePayload,
+              detail: stripPoslechItemAudioAssetIds(detail),
+            }
+          : updatePayload;
       const saveRes = await adminFetch(`${adminApi}/${editingId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildUpdatePayload(form)),
+        body: JSON.stringify(payloadForGenerate),
       });
       if (!saveRes.ok) throw new Error('Lưu thất bại trước khi tạo audio.');
       const res = await adminFetch(`${adminApi}/${editingId}/generate-audio`, { method: 'POST' });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error?.message ?? 'Failed');
-      setAudioGenMsg('Đã tạo audio.');
+      const refreshed = await adminFetch(`${adminApi}/${editingId}`);
+      const refreshedJson = await refreshed.json();
+      if (!refreshed.ok) {
+        throw new Error('Đã tạo audio nhưng không tải lại được bài tập.');
+      }
+      if (refreshedJson.data) {
+        setForm(formStateFromExercise(refreshedJson.data as Exercise));
+      }
+      const itemCount = Number(
+        (j.meta as Record<string, unknown> | undefined)?.item_count ?? 0,
+      );
+      setAudioGenMsg(itemCount > 0 ? `Đã tạo ${itemCount} audio.` : 'Đã tạo audio.');
     } catch (e) {
       setAudioGenMsg(e instanceof Error ? e.message : 'Error');
     } finally {

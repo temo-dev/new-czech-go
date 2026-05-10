@@ -121,8 +121,14 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026).
   upload local.
 - `poslech_2` — 5 đoạn ngắn → chọn A-D (5 điểm)
 - `poslech_3` — 5 đoạn → match A-G, 2 dư (5 điểm)
-- `poslech_4` — 5 dialog → chọn ảnh A-F, 1 dư (5 điểm)
-- `poslech_5` — Nghe voicemail → điền thông tin, 5 ô (5 điểm)
+- `poslech_4` — 5 dialog → chọn ảnh A-F, 1 dư (5 điểm).
+  Options dùng `detail.options[].asset_id` làm storage key ảnh. **V35**:
+  CMS hỗ trợ đủ 3 paths per option A-F: paste storage key, upload ảnh,
+  hoặc AI generate; Flutter image grid resolve `asset_id` như image
+  storage key cho POSLECH 4.
+- `poslech_5` — Nghe voicemail → điền thông tin theo 5 câu hỏi
+  `question_no=21..25`; mỗi câu phải có `prompt` hiển thị cho learner
+  và một đáp án trong `correct_answers` (5 điểm)
 - `poslech_6` — Nghe văn bản (TTS) → Ano/Ne, 1–5 câu (admin nhập điểm) — V13
 
 **Reading (doc) — V4:**

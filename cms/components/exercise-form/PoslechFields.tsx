@@ -9,13 +9,16 @@ import {
   initPoslechState,
   buildPoslechDetail,
   makeOptionImagePatcher,
+  makeSharedOptionImagePatcher,
   parseUploadResponse,
+  sharedUploadingKeyFor,
   uploadingKeyFor,
   type OptionKey,
   type P12Item,
   type P5State,
   type PoslechState,
   type PoslechType,
+  type SharedImageOptionKey,
 } from './poslech-model';
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -51,17 +54,15 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
   function update(next: PoslechState) { setState(next); onChange(buildPoslechDetail(next, audioSource)); }
   function updateAudioSrc(src: 'text' | 'upload') { setAudioSource(src); onChange(buildPoslechDetail(state, src)); }
 
-  async function handleP12ImageUpload(
+  async function handleOptionImageUpload(
     file: File,
-    itemIndex: number,
-    optionKey: OptionKey,
+    key: string,
     setImg: (assetId: string) => void,
   ) {
     if (!editingId) {
-      setUploadError({ key: uploadingKeyFor(itemIndex, optionKey), message: 'Lưu bài tập trước rồi upload ảnh.' });
+      setUploadError({ key, message: 'Lưu bài tập trước rồi upload ảnh.' });
       return;
     }
-    const key = uploadingKeyFor(itemIndex, optionKey);
     setUploadingKey(key);
     setUploadError(null);
     try {
@@ -84,6 +85,27 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
     } finally {
       setUploadingKey(null);
     }
+  }
+
+  async function registerGeneratedImage(
+    result: { assetId: string; storageKey: string },
+    setImg: (assetId: string) => void,
+  ) {
+    if (!editingId) return;
+    // Register the freshly generated blob as an exercise asset so the same
+    // /v1/media/file route the learner uses can serve it.
+    await adminFetch(`/api/admin/exercises/${editingId}/assets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: result.assetId,
+        asset_kind: 'image',
+        storage_key: result.storageKey,
+        mime_type: 'image/jpeg',
+      }),
+    });
+    // Store storage_key, not registry id. Flutter mediaUri resolves ?key=...
+    setImg(result.storageKey);
   }
 
   // Explicit narrowing to avoid union-in-closure issues
@@ -175,32 +197,13 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
                           disabled={!editingId || otherUploadingBlocks || isUploading}
                           onChange={e => {
                             const f = e.target.files?.[0];
-                            if (f) void handleP12ImageUpload(f, i, k as OptionKey, setImg);
+                            if (f) void handleOptionImageUpload(f, cellKey, setImg);
                             e.target.value = '';
                           }}
                         />
                       </label>
                       <AiImageButton
-                        onAssetCreated={async (result) => {
-                          if (!editingId) return;
-                          // Register the freshly generated blob as an exercise asset so
-                          // the same /v1/media/file route the learner uses can serve it.
-                          await adminFetch(`/api/admin/exercises/${editingId}/assets`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              id: result.assetId,
-                              asset_kind: 'image',
-                              storage_key: result.storageKey,
-                              mime_type: 'image/jpeg',
-                            }),
-                          });
-                          // V30 hotfix — store storage_key (not assetId).
-                          // Flutter mediaUri queries /v1/media/file?key=<storage_key>;
-                          // assetId is the registry handle, storage_key is the
-                          // on-disk path the media route actually serves.
-                          setImg(result.storageKey);
-                        }}
+                        onAssetCreated={(result) => registerGeneratedImage(result, setImg)}
                         disabled={!editingId || otherUploadingBlocks}
                         existingAssetId={imgK || undefined}
                       />
@@ -223,49 +226,141 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
       {match && (
         <>
           <div style={{ display: 'grid', gap: 6 }}>
-            <span style={labelStyle}>{match.type === 'poslech_4' ? 'Options A-F (Asset ID ảnh)' : 'Options A-G (nội dung)'}</span>
-            {match.options.map((opt, oi) => (
-              <OptionRow
-                key={opt.key}
-                optionKey={opt.key}
-                label={opt.label}
-                placeholder={match.type === 'poslech_4' ? `Asset ID ảnh ${opt.key}` : `Nội dung ${opt.key}`}
-                onChange={v => {
-                  const next = [...match.options];
-                  next[oi] = { ...next[oi], label: v };
-                  update({ ...match, options: next });
-                }}
-              />
-            ))}
-          </div>
-          {match.items.map((item, i) => (
-            <div key={i} style={sectionStyle}>
-              <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Câu {i + 1}</span>
-              {audioSource === 'text' && (
-                <label style={{ display: 'grid', gap: 4 }}>
-                  <span style={labelStyle}>Transcript</span>
-                  <textarea rows={3} value={item.text}
-                    onChange={e => {
-                      const next = [...match.items];
-                      next[i] = { ...next[i], text: e.target.value };
-                      update({ ...match, items: next });
+            <span style={labelStyle}>
+              {match.type === 'poslech_4' ? 'Options A-F (ảnh)' : 'Options A-G (nội dung)'}
+            </span>
+            {match.options.map((opt, oi) => {
+              const optionKey = opt.key as SharedImageOptionKey;
+              const patchSharedImage = makeSharedOptionImagePatcher((key, assetId) => {
+                const next = [...match.options];
+                const targetIndex = next.findIndex((o) => o.key === key);
+                if (targetIndex < 0) return;
+                next[targetIndex] = { ...next[targetIndex], label: assetId };
+                update({ ...match, options: next });
+              }, optionKey);
+
+              if (match.type !== 'poslech_4') {
+                return (
+                  <OptionRow
+                    key={opt.key}
+                    optionKey={opt.key}
+                    label={opt.label}
+                    placeholder={`Nội dung ${opt.key}`}
+                    onChange={v => {
+                      const next = [...match.options];
+                      next[oi] = { ...next[oi], label: v };
+                      update({ ...match, options: next });
                     }}
-                    placeholder="Nội dung đoạn nghe..." style={txStyle}
                   />
-                </label>
-              )}
-              <AnswerSelect
-                label="Đáp án đúng:"
-                options={match.options.map(o => ({ key: o.key, label: o.label }))}
-                value={item.answer}
-                onChange={v => {
-                  const next = [...match.items];
-                  next[i] = { ...next[i], answer: v };
-                  update({ ...match, items: next });
-                }}
-              />
-            </div>
-          ))}
+                );
+              }
+
+              const cellKey = sharedUploadingKeyFor(optionKey);
+              const isUploading = uploadingKey === cellKey;
+              const cellError = uploadError?.key === cellKey ? uploadError.message : null;
+              const otherUploadingBlocks = uploadingKey !== null && uploadingKey !== cellKey;
+              return (
+                <div key={opt.key} style={{ display: 'grid', gap: 4 }}>
+                  <OptionRow
+                    optionKey={opt.key}
+                    label={opt.label}
+                    placeholder={`Storage key ảnh ${opt.key} (paste, upload hoặc AI tạo)`}
+                    onChange={patchSharedImage}
+                  />
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'stretch', paddingLeft: 34 }}>
+                    <label style={{
+                      flex: 1,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      border: '1.5px solid var(--border-strong)',
+                      borderRadius: 8,
+                      padding: '7px 14px',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: (!editingId || otherUploadingBlocks) ? 'not-allowed' : 'pointer',
+                      background: 'var(--surface)',
+                      color: 'var(--ink-2)',
+                      opacity: (!editingId || otherUploadingBlocks) ? 0.5 : 1,
+                      lineHeight: 1,
+                    }}>
+                      {isUploading ? '⏳ Đang tải...' : opt.label ? '🔄 Đổi ảnh' : '📁 Tải ảnh lên'}
+                      <input
+                        ref={el => { fileInputRefs.current[cellKey] = el; }}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        style={{ display: 'none' }}
+                        disabled={!editingId || otherUploadingBlocks || isUploading}
+                        onChange={e => {
+                          const f = e.target.files?.[0];
+                          if (f) void handleOptionImageUpload(f, cellKey, patchSharedImage);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    <AiImageButton
+                      onAssetCreated={(result) => registerGeneratedImage(result, patchSharedImage)}
+                      disabled={!editingId || otherUploadingBlocks}
+                      existingAssetId={opt.label || undefined}
+                    />
+                  </div>
+                  {cellError && (
+                    <div style={{ fontSize: 11, color: 'var(--error)', marginTop: 2, paddingLeft: 34 }}>
+                      {cellError}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {match.items.map((item, i) => {
+            const displayNo = item.questionNo > 0 ? item.questionNo : i + 1;
+            return (
+              <div key={i} style={sectionStyle}>
+                <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Câu {displayNo}</span>
+                {match.type === 'poslech_3' && (
+                  <label style={{ display: 'grid', gap: 4 }}>
+                    <span style={labelStyle}>Tên câu hỏi (hiển thị cho học viên)</span>
+                    <input
+                      type="text"
+                      value={item.question}
+                      onChange={e => {
+                        const next = [...match.items];
+                        next[i] = { ...next[i], question: e.target.value };
+                        update({ ...match, items: next });
+                      }}
+                      placeholder="Ví dụ: Leila"
+                      style={{ padding: '8px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }}
+                    />
+                  </label>
+                )}
+                {audioSource === 'text' && (
+                  <label style={{ display: 'grid', gap: 4 }}>
+                    <span style={labelStyle}>Transcript</span>
+                    <textarea rows={3} value={item.text}
+                      onChange={e => {
+                        const next = [...match.items];
+                        next[i] = { ...next[i], text: e.target.value };
+                        update({ ...match, items: next });
+                      }}
+                      placeholder="Nội dung đoạn nghe..." style={txStyle}
+                    />
+                  </label>
+                )}
+                <AnswerSelect
+                  label="Đáp án đúng:"
+                  options={match.options.map(o => ({ key: o.key, label: o.label }))}
+                  value={item.answer}
+                  onChange={v => {
+                    const next = [...match.items];
+                    next[i] = { ...next[i], answer: v };
+                    update({ ...match, items: next });
+                  }}
+                />
+              </div>
+            );
+          })}
         </>
       )}
 
@@ -283,19 +378,33 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
             </label>
           )}
           <div style={{ display: 'grid', gap: 8 }}>
-            <span style={labelStyle}>Đáp án điền vào (5 ô)</span>
+            <span style={labelStyle}>Câu hỏi + đáp án điền vào (5 câu)</span>
             {(p5 as P5State).slots.map((slot, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 13, color: 'var(--ink-3)', width: 52, flexShrink: 0 }}>Câu {i + 1}:</span>
-                <input type="text" value={slot.answer}
+              <div key={i} style={sectionStyle}>
+                <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>
+                  Câu {slot.questionNo > 0 ? slot.questionNo : 21 + i}
+                </span>
+                <input type="text" value={slot.prompt}
                   onChange={e => {
                     const next = [...(p5 as P5State).slots];
-                    next[i] = { answer: e.target.value };
+                    next[i] = { ...next[i], prompt: e.target.value };
                     update({ ...p5, slots: next });
                   }}
-                  placeholder="Đáp án đúng..."
-                  style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }}
+                  placeholder="Ví dụ: KDO dal Evě lístky?"
+                  style={{ padding: '7px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }}
                 />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, color: 'var(--ink-3)', flexShrink: 0 }}>Đáp án:</span>
+                  <input type="text" value={slot.answer}
+                    onChange={e => {
+                      const next = [...(p5 as P5State).slots];
+                      next[i] = { ...next[i], answer: e.target.value };
+                      update({ ...p5, slots: next });
+                    }}
+                    placeholder="Đáp án đúng..."
+                    style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }}
+                  />
+                </div>
               </div>
             ))}
           </div>

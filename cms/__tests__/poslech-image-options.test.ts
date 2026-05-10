@@ -4,10 +4,15 @@ import {
   buildPoslechDetail,
   countItemImages,
   makeOptionImagePatcher,
+  makeSharedOptionImagePatcher,
   parseUploadResponse,
+  sharedUploadingKeyFor,
+  stripPoslechItemAudioAssetIds,
   uploadingKeyFor,
+  type MatchState,
   type P12State,
   type P12Item,
+  type P5State,
 } from '../components/exercise-form/poslech-model';
 import { validateExercise } from '../components/exercise-form/validation';
 
@@ -28,6 +33,193 @@ const optsAtoD = (
 };
 
 describe('PoslechFields image_asset_id (V27)', () => {
+  describe('poslech_3 question names', () => {
+    it('round-trips learner-facing item names', () => {
+      const detailIn = {
+        items: [
+          {
+            question_no: 11,
+            question: 'Leila',
+            audio_source: {
+              segments: [{ text: 'Jmenuji se Leila. Baví mě plavání.' }],
+            },
+          },
+        ],
+        options: [
+          { key: 'A', label: 'běh' },
+          { key: 'B', label: 'vaření' },
+          { key: 'C', label: 'kreslení' },
+          { key: 'D', label: 'sledování televize' },
+          { key: 'E', label: 'čtení' },
+          { key: 'F', label: 'plavání' },
+          { key: 'G', label: 'fotografování' },
+        ],
+        correct_answers: { '11': 'F' },
+      };
+      const state = initPoslechState('poslech_3', detailIn) as MatchState;
+      expect(state.items[0].questionNo).toBe(11);
+      expect(state.items[0].question).toBe('Leila');
+      expect(state.items[0].answer).toBe('F');
+
+      const detailOut = buildPoslechDetail(state, 'text') as {
+        items: Array<{ question_no: number; question?: string }>;
+        correct_answers: Record<string, string>;
+      };
+      expect(detailOut.items[0].question_no).toBe(11);
+      expect(detailOut.items[0].question).toBe('Leila');
+      expect(detailOut.correct_answers['11']).toBe('F');
+    });
+  });
+
+  describe('poslech_5 fill questions', () => {
+    it('round-trips learner-facing prompts and exam question numbers', () => {
+      const detailIn = {
+        audio_source: {
+          segments: [{ text: 'Ahoj Lído, tady Eva. Dostala jsem lístky.' }],
+        },
+        questions: [
+          { question_no: 21, prompt: 'KDO dal Evě lístky?' },
+          { question_no: 22, prompt: 'KOLIKÁTÉHO bude balet?' },
+          { question_no: 23, prompt: 'KTERÝ DEN bude balet?' },
+          { question_no: 24, prompt: 'JAK se jmenuje restaurace?' },
+          { question_no: 25, prompt: 'TELEFON Evy?' },
+        ],
+        correct_answers: {
+          '21': 'sestra Ivana',
+          '22': '23',
+          '23': 'úterý',
+          '24': 'Klášterní',
+          '25': '773 932 504',
+        },
+      };
+
+      const state = initPoslechState('poslech_5', detailIn) as P5State;
+      expect(state.slots[0]).toEqual({
+        questionNo: 21,
+        prompt: 'KDO dal Evě lístky?',
+        answer: 'sestra Ivana',
+      });
+      expect(state.slots[4].questionNo).toBe(25);
+      expect(state.slots[4].prompt).toBe('TELEFON Evy?');
+      expect(state.slots[4].answer).toBe('773 932 504');
+
+      const detailOut = buildPoslechDetail(state, 'text') as {
+        questions: Array<{ question_no: number; prompt: string }>;
+        correct_answers: Record<string, string>;
+      };
+      expect(detailOut.questions.map((q) => q.question_no)).toEqual([
+        21, 22, 23, 24, 25,
+      ]);
+      expect(detailOut.questions[0].prompt).toBe('KDO dal Evě lístky?');
+      expect(detailOut.correct_answers['21']).toBe('sestra Ivana');
+      expect(detailOut.correct_answers['25']).toBe('773 932 504');
+    });
+
+    it('uses 21-25 for new poslech_5 slots instead of blank 1-5 prompts', () => {
+      const state = initPoslechState('poslech_5', {}) as P5State;
+      expect(state.slots.map((slot) => slot.questionNo)).toEqual([
+        21, 22, 23, 24, 25,
+      ]);
+
+      const next: P5State = {
+        ...state,
+        voiceText: 'Ahoj, tady Eva.',
+        slots: state.slots.map((slot, i) =>
+          i === 0
+            ? { ...slot, prompt: 'KDO volá?', answer: 'Eva' }
+            : slot,
+        ),
+      };
+      const detailOut = buildPoslechDetail(next, 'text') as {
+        questions: Array<{ question_no: number; prompt: string }>;
+        correct_answers: Record<string, string>;
+      };
+      expect(detailOut.questions[0]).toEqual({
+        question_no: 21,
+        prompt: 'KDO volá?',
+      });
+      expect(detailOut.correct_answers).toEqual({ '21': 'Eva' });
+    });
+
+    it('normalizes legacy 1-5 slots to 21-25 while preserving answers', () => {
+      const state = initPoslechState('poslech_5', {
+        questions: [
+          { question_no: 1, prompt: 'KDO volá?' },
+          { question_no: 2, prompt: 'KAM jde?' },
+          { question_no: 3, prompt: 'KDY?' },
+          { question_no: 4, prompt: 'KDE?' },
+          { question_no: 5, prompt: 'TELEFON?' },
+        ],
+        correct_answers: {
+          '1': 'Eva',
+          '2': 'balet',
+          '3': 'úterý',
+          '4': 'Klášterní',
+          '5': '773',
+        },
+      }) as P5State;
+
+      expect(state.slots.map((slot) => slot.questionNo)).toEqual([
+        21, 22, 23, 24, 25,
+      ]);
+      expect(state.slots[0].prompt).toBe('KDO volá?');
+      expect(state.slots[0].answer).toBe('Eva');
+
+      const detailOut = buildPoslechDetail(state, 'text') as {
+        questions: Array<{ question_no: number; prompt: string }>;
+        correct_answers: Record<string, string>;
+      };
+      expect(detailOut.questions[0]).toEqual({
+        question_no: 21,
+        prompt: 'KDO volá?',
+      });
+      expect(detailOut.correct_answers['21']).toBe('Eva');
+      expect(detailOut.correct_answers['1']).toBeUndefined();
+    });
+
+    it('validation rejects published-shaped payloads with blank prompts', () => {
+      const errors = validateExercise('poslech_5', {
+        title: 'Poslech 5',
+        module_id: 'mod-nghe',
+        detail: {
+          questions: Array.from({ length: 5 }, (_, i) => ({
+            question_no: 21 + i,
+            prompt: i === 2 ? '' : `Otázka ${21 + i}?`,
+          })),
+          correct_answers: {
+            '21': 'a',
+            '22': 'b',
+            '23': 'c',
+            '24': 'd',
+            '25': 'e',
+          },
+        },
+      });
+      expect(errors.some((e) => e.includes('câu 23'))).toBe(true);
+    });
+
+    it('validation accepts five prompted poslech_5 fill slots', () => {
+      const errors = validateExercise('poslech_5', {
+        title: 'Poslech 5',
+        module_id: 'mod-nghe',
+        detail: {
+          questions: Array.from({ length: 5 }, (_, i) => ({
+            question_no: 21 + i,
+            prompt: `Otázka ${21 + i}?`,
+          })),
+          correct_answers: {
+            '21': 'a',
+            '22': 'b',
+            '23': 'c',
+            '24': 'd',
+            '25': 'e',
+          },
+        },
+      });
+      expect(errors).toEqual([]);
+    });
+  });
+
   describe('initPoslechState (poslech_1) reads image_asset_id', () => {
     it('hydrates imgA-D when options have image_asset_id', () => {
       const detail = {
@@ -72,6 +264,7 @@ describe('PoslechFields image_asset_id (V27)', () => {
       const item: P12Item = {
         question: 'Q1',
         text: 'Pani Novakova je doma.',
+        audioAssetId: '',
         optA: 'V praci',
         optB: 'Doma',
         optC: 'V obchode',
@@ -88,6 +281,7 @@ describe('PoslechFields image_asset_id (V27)', () => {
           : {
               question: '',
               text: '',
+              audioAssetId: '',
               optA: '',
               optB: '',
               optC: '',
@@ -155,6 +349,63 @@ describe('PoslechFields image_asset_id (V27)', () => {
       expect(out[0].image_asset_id).toBe('media/items/q1-a.jpg');
       expect(out[3].image_asset_id).toBe('media/items/q1-d.jpg');
     });
+
+    it('round-trips per-item audio asset_id after Polly generation', () => {
+      const detailIn = {
+        items: [
+          {
+            question_no: 1,
+            question: 'Kde je pani Novakova?',
+            audio_source: {
+              asset_id: 'exercise-audio/ex-1/item-1.mp3',
+              segments: [{ text: 'Pani Novakova je doma.' }],
+            },
+            options: optsAtoD(false),
+          },
+        ],
+        correct_answers: { '1': 'B' },
+      };
+      const state = initPoslechState('poslech_1', detailIn) as P12State;
+      expect(state.items[0].audioAssetId).toBe(
+        'exercise-audio/ex-1/item-1.mp3',
+      );
+
+      const detailOut = buildPoslechDetail(state, 'text') as {
+        items: Array<{ audio_source: Record<string, unknown> }>;
+      };
+      expect(detailOut.items[0].audio_source.asset_id).toBe(
+        'exercise-audio/ex-1/item-1.mp3',
+      );
+      expect(detailOut.items[0].audio_source.segments).toEqual([
+        { text: 'Pani Novakova je doma.' },
+      ]);
+    });
+
+    it('strips audio asset ids only for the pre-generate save payload', () => {
+      const detailIn = {
+        items: [
+          {
+            question_no: 1,
+            audio_source: {
+              type: 'text',
+              asset_id: 'exercise-audio/ex-1/item-1.mp3',
+              segments: [{ text: 'Pani Novakova je doma.' }],
+            },
+          },
+        ],
+        correct_answers: { '1': 'B' },
+      };
+      const stripped = stripPoslechItemAudioAssetIds(detailIn);
+      const audio = (
+        stripped.items as Array<{ audio_source: Record<string, unknown> }>
+      )[0].audio_source;
+      expect(audio.asset_id).toBeUndefined();
+      expect(audio.type).toBe('text');
+      expect(audio.segments).toEqual([{ text: 'Pani Novakova je doma.' }]);
+      expect(detailIn.items[0].audio_source.asset_id).toBe(
+        'exercise-audio/ex-1/item-1.mp3',
+      );
+    });
   });
 
   describe('countItemImages helper', () => {
@@ -162,6 +413,7 @@ describe('PoslechFields image_asset_id (V27)', () => {
       return {
         question: '',
         text: '',
+        audioAssetId: '',
         optA: '',
         optB: '',
         optC: '',
@@ -309,12 +561,14 @@ describe('PoslechFields image_asset_id (V27)', () => {
       const baseItem: P12Item = {
         question: 'Q1',
         text: 'seg',
+        audioAssetId: '',
         optA: 'a', optB: 'b', optC: 'c', optD: 'd',
         imgA: '', imgB: '', imgC: '', imgD: '',
         answer: 'A',
       };
       const filler: P12Item = {
         question: '', text: '',
+        audioAssetId: '',
         optA: '', optB: '', optC: '', optD: '',
         imgA: '', imgB: '', imgC: '', imgD: '',
         answer: '',
@@ -339,6 +593,59 @@ describe('PoslechFields image_asset_id (V27)', () => {
       expect(detail.items[0].options[0].image_asset_id).toBe('media/q1-a-ai.jpg');
       // Sibling options stay text-only because their imgK is still empty.
       expect(detail.items[0].options[1].image_asset_id).toBeUndefined();
+    });
+  });
+
+  describe('poslech_4 shared image options', () => {
+    it('round-trips A-F image asset ids through the poslech_4 wire', () => {
+      const detailIn = {
+        items: [
+          {
+            question_no: 16,
+            audio_source: {
+              segments: [{ speaker: 'A', text: 'Máte tyhle boty?' }],
+            },
+          },
+        ],
+        options: [
+          { key: 'A', asset_id: 'media/poslech4/a.jpg' },
+          { key: 'B', asset_id: 'media/poslech4/b.jpg' },
+          { key: 'C', asset_id: 'media/poslech4/c.jpg' },
+          { key: 'D', asset_id: 'media/poslech4/d.jpg' },
+          { key: 'E', asset_id: 'media/poslech4/e.jpg' },
+          { key: 'F', asset_id: 'media/poslech4/f.jpg' },
+        ],
+        correct_answers: { '16': 'A' },
+      };
+
+      const state = initPoslechState('poslech_4', detailIn) as MatchState;
+      expect(state.options.map((o) => o.label)).toEqual([
+        'media/poslech4/a.jpg',
+        'media/poslech4/b.jpg',
+        'media/poslech4/c.jpg',
+        'media/poslech4/d.jpg',
+        'media/poslech4/e.jpg',
+        'media/poslech4/f.jpg',
+      ]);
+
+      const detailOut = buildPoslechDetail(state, 'text') as {
+        options: Array<{ key: string; asset_id: string }>;
+      };
+      expect(detailOut.options).toEqual(detailIn.options);
+    });
+
+    it('patches only the selected shared option for upload or AI generation', () => {
+      const captured: Array<{ optionKey: string; assetId: string }> = [];
+      const patcher = makeSharedOptionImagePatcher((optionKey, assetId) => {
+        captured.push({ optionKey, assetId });
+      }, 'F');
+
+      patcher('media/poslech4/f-generated.jpg');
+
+      expect(captured).toEqual([
+        { optionKey: 'F', assetId: 'media/poslech4/f-generated.jpg' },
+      ]);
+      expect(sharedUploadingKeyFor('F')).toBe('shared-F');
     });
   });
 

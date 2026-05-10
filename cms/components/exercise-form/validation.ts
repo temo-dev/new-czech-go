@@ -61,8 +61,17 @@ export function validateExercise(exerciseType: ExerciseType, payload: AnyPayload
 
   // Poslech 5: voicemail + 5 fill slots
   if (exerciseType === 'poslech_5') {
+    const questions = (detail.questions ?? []) as Array<Record<string, unknown>>;
+    if (questions.length < 5) errors.push(`Poslech 5 cần 5 câu hỏi điền vào (hiện có ${questions.length}).`);
+    questions.slice(0, 5).forEach((q, i) => {
+      if (!String(q.prompt ?? '').trim()) {
+        errors.push(`Poslech 5 câu ${21 + i}: thiếu câu hỏi hiển thị cho học viên.`);
+      }
+    });
     const ca = detail.correct_answers as Record<string, string> | undefined;
-    if (!ca || Object.values(ca).every(v => !v)) errors.push('Cần nhập ít nhất 1 đáp án điền vào.');
+    if (!ca || Object.values(ca).filter(v => String(v ?? '').trim()).length < 5) {
+      errors.push('Poslech 5 cần nhập đáp án cho đủ 5 câu.');
+    }
   }
 
   // Cteni 1: need 5 items + 8 options + answers

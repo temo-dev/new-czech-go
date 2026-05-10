@@ -127,6 +127,30 @@ void main() {
     expect(detail.expectedReasoningAxes, ['price', 'location', 'space']);
   });
 
+  test(
+    'PoslechOptionView uses asset_id as image storage key for POSLECH 4',
+    () {
+      final option = PoslechOptionView.fromJson({
+        'key': 'A',
+        'asset_id': 'media/poslech4/a.jpg',
+      });
+
+      expect(option.assetId, 'media/poslech4/a.jpg');
+      expect(option.imageAssetId, isEmpty);
+      expect(option.imageStorageKey, 'media/poslech4/a.jpg');
+    },
+  );
+
+  test('PoslechOptionView prefers image_asset_id when present', () {
+    final option = PoslechOptionView.fromJson({
+      'key': 'A',
+      'asset_id': 'media/poslech4/a.jpg',
+      'image_asset_id': 'media/poslech1/a.jpg',
+    });
+
+    expect(option.imageStorageKey, 'media/poslech1/a.jpg');
+  });
+
   test('AttemptResult parses transcript provenance fields', () {
     final attempt = AttemptResult.fromJson({
       'id': 'attempt-1',
@@ -190,7 +214,10 @@ void main() {
     expect(feedback.criteriaResults, hasLength(2));
     expect(feedback.criteriaResults.first.criterionKey, 'answered_question');
     expect(feedback.criteriaResults.first.met, isTrue);
-    expect(feedback.criteriaResults.last.criterionKey, 'gave_supporting_detail');
+    expect(
+      feedback.criteriaResults.last.criterionKey,
+      'gave_supporting_detail',
+    );
     expect(feedback.criteriaResults.last.met, isFalse);
     expect(feedback.criteriaResults.last.comment, 'Can them vi du cu the');
   });
@@ -257,10 +284,30 @@ void main() {
       'estimated_duration_minutes': 12,
       'status': 'published',
       'sections': [
-        {'sequence_no': 1, 'exercise_id': 'ex-1', 'exercise_type': 'uloha_1_topic_answers', 'max_points': 8},
-        {'sequence_no': 2, 'exercise_id': 'ex-2', 'exercise_type': 'uloha_2_dialogue_questions', 'max_points': 12},
-        {'sequence_no': 3, 'exercise_id': 'ex-3', 'exercise_type': 'uloha_3_story_narration', 'max_points': 10},
-        {'sequence_no': 4, 'exercise_id': 'ex-4', 'exercise_type': 'uloha_4_choice_reasoning', 'max_points': 7},
+        {
+          'sequence_no': 1,
+          'exercise_id': 'ex-1',
+          'exercise_type': 'uloha_1_topic_answers',
+          'max_points': 8,
+        },
+        {
+          'sequence_no': 2,
+          'exercise_id': 'ex-2',
+          'exercise_type': 'uloha_2_dialogue_questions',
+          'max_points': 12,
+        },
+        {
+          'sequence_no': 3,
+          'exercise_id': 'ex-3',
+          'exercise_type': 'uloha_3_story_narration',
+          'max_points': 10,
+        },
+        {
+          'sequence_no': 4,
+          'exercise_id': 'ex-4',
+          'exercise_type': 'uloha_4_choice_reasoning',
+          'max_points': 7,
+        },
       ],
     });
 
@@ -435,17 +482,23 @@ void main() {
 
   test('SkillSummary isImplemented includes tu_vung and ngu_phap', () {
     final tuVung = SkillSummary(
-      moduleId: 'mod-1', skillKind: 'tu_vung', exerciseCount: 3,
+      moduleId: 'mod-1',
+      skillKind: 'tu_vung',
+      exerciseCount: 3,
     );
     expect(tuVung.isImplemented, isTrue);
 
     final nguPhap = SkillSummary(
-      moduleId: 'mod-1', skillKind: 'ngu_phap', exerciseCount: 2,
+      moduleId: 'mod-1',
+      skillKind: 'ngu_phap',
+      exerciseCount: 2,
     );
     expect(nguPhap.isImplemented, isTrue);
 
     final tuVung2 = SkillSummary(
-      moduleId: 'mod-1', skillKind: 'tu_vung', exerciseCount: 1,
+      moduleId: 'mod-1',
+      skillKind: 'tu_vung',
+      exerciseCount: 1,
     );
     expect(tuVung2.isImplemented, isTrue);
   });
@@ -488,22 +541,29 @@ void main() {
     expect(detail.isChoiceWord, isFalse);
   });
 
-  test('ExerciseDetail fromJson does not crash for psani_1_formular with string questions', () {
-    // psani_1 detail['questions'] contains strings (form questions).
-    // poslechQuestions parser must not cast them as Maps.
-    final detail = ExerciseDetail.fromJson(<String, dynamic>{
-      'id': 'psani1-test',
-      'title': 'Formulář',
-      'exercise_type': 'psani_1_formular',
-      'detail': <String, dynamic>{
-        'questions': ['Jak jste se dozvěděl/a?', 'Proč nakupujete?', 'Co vám chybí?'],
-        'min_words': 10,
-      },
-    });
-    expect(detail.isPsani1, isTrue);
-    expect(detail.writingQuestions.length, 3);
-    expect(detail.poslechQuestions, isEmpty);
-  });
+  test(
+    'ExerciseDetail fromJson does not crash for psani_1_formular with string questions',
+    () {
+      // psani_1 detail['questions'] contains strings (form questions).
+      // poslechQuestions parser must not cast them as Maps.
+      final detail = ExerciseDetail.fromJson(<String, dynamic>{
+        'id': 'psani1-test',
+        'title': 'Formulář',
+        'exercise_type': 'psani_1_formular',
+        'detail': <String, dynamic>{
+          'questions': [
+            'Jak jste se dozvěděl/a?',
+            'Proč nakupujete?',
+            'Co vám chybí?',
+          ],
+          'min_words': 10,
+        },
+      });
+      expect(detail.isPsani1, isTrue);
+      expect(detail.writingQuestions.length, 3);
+      expect(detail.poslechQuestions, isEmpty);
+    },
+  );
 
   test('ExerciseDetail writingMinWords defaults correctly per type', () {
     ExerciseDetail makeWriting(String type, {int? minWords}) {
@@ -589,7 +649,11 @@ void main() {
         {'kind': 'unchanged', 'source_text': 'Já ', 'target_text': 'Já '},
         {'kind': 'deleted', 'source_text': 'jít', 'target_text': ''},
         {'kind': 'inserted', 'source_text': '', 'target_text': 'jdu'},
-        {'kind': 'unchanged', 'source_text': ' do školy.', 'target_text': ' do školy.'},
+        {
+          'kind': 'unchanged',
+          'source_text': ' do školy.',
+          'target_text': ' do školy.',
+        },
       ],
       'repair_provider': 'writing_scorer_v1',
       'generated_at': '2026-04-29T00:00:00Z',
@@ -602,17 +666,20 @@ void main() {
     expect(artifact.diffChunks[2].targetText, 'jdu');
   });
 
-  test('AttemptReviewArtifactView.diffChunks defaults to empty list when absent', () {
-    final artifact = AttemptReviewArtifactView.fromJson({
-      'status': 'ready',
-      'source_transcript_text': 'text',
-      'corrected_transcript_text': 'text',
-      'model_answer_text': '',
-      'repair_provider': 'writing_scorer_v1',
-      'generated_at': '2026-04-29T00:00:00Z',
-    });
-    expect(artifact.diffChunks, isEmpty);
-  });
+  test(
+    'AttemptReviewArtifactView.diffChunks defaults to empty list when absent',
+    () {
+      final artifact = AttemptReviewArtifactView.fromJson({
+        'status': 'ready',
+        'source_transcript_text': 'text',
+        'corrected_transcript_text': 'text',
+        'model_answer_text': '',
+        'repair_provider': 'writing_scorer_v1',
+        'generated_at': '2026-04-29T00:00:00Z',
+      });
+      expect(artifact.diffChunks, isEmpty);
+    },
+  );
 
   // ── V7 Sprint MockTest model tests ─────────────────────────────────────────
 
@@ -625,8 +692,18 @@ void main() {
       'status': 'published',
       'pass_threshold_percent': 80,
       'sections': [
-        {'sequence_no': 1, 'exercise_id': 'ex-1', 'exercise_type': 'uloha_1_topic_answers', 'max_points': 8},
-        {'sequence_no': 2, 'exercise_id': 'ex-2', 'exercise_type': 'poslech_2', 'max_points': 5},
+        {
+          'sequence_no': 1,
+          'exercise_id': 'ex-1',
+          'exercise_type': 'uloha_1_topic_answers',
+          'max_points': 8,
+        },
+        {
+          'sequence_no': 2,
+          'exercise_id': 'ex-2',
+          'exercise_type': 'poslech_2',
+          'max_points': 5,
+        },
       ],
     });
     expect(mt.passThresholdPercent, equals(80));
@@ -662,16 +739,19 @@ void main() {
     expect(session.passed, isFalse);
   });
 
-  test('MockExamSessionView.passThresholdPercent defaults to 60 when absent', () {
-    final session = MockExamSessionView.fromJson({
-      'id': 'ses-2',
-      'status': 'completed',
-      'overall_score': 24,
-      'passed': true,
-      'sections': [],
-    });
-    expect(session.passThresholdPercent, equals(60));
-  });
+  test(
+    'MockExamSessionView.passThresholdPercent defaults to 60 when absent',
+    () {
+      final session = MockExamSessionView.fromJson({
+        'id': 'ses-2',
+        'status': 'completed',
+        'overall_score': 24,
+        'passed': true,
+        'sections': [],
+      });
+      expect(session.passThresholdPercent, equals(60));
+    },
+  );
 
   test('MockTest._skillKind covers all exercise type prefixes', () {
     // Verify the model recognises sprint-specific types via passThresholdPercent field
@@ -683,10 +763,30 @@ void main() {
       'status': 'published',
       'pass_threshold_percent': 75,
       'sections': [
-        {'sequence_no': 1, 'exercise_id': 'ex-u1', 'exercise_type': 'uloha_1_topic_answers', 'max_points': 8},
-        {'sequence_no': 2, 'exercise_id': 'ex-p2', 'exercise_type': 'poslech_2',              'max_points': 5},
-        {'sequence_no': 3, 'exercise_id': 'ex-c1', 'exercise_type': 'cteni_1',                'max_points': 5},
-        {'sequence_no': 4, 'exercise_id': 'ex-w1', 'exercise_type': 'psani_1_formular',       'max_points': 8},
+        {
+          'sequence_no': 1,
+          'exercise_id': 'ex-u1',
+          'exercise_type': 'uloha_1_topic_answers',
+          'max_points': 8,
+        },
+        {
+          'sequence_no': 2,
+          'exercise_id': 'ex-p2',
+          'exercise_type': 'poslech_2',
+          'max_points': 5,
+        },
+        {
+          'sequence_no': 3,
+          'exercise_id': 'ex-c1',
+          'exercise_type': 'cteni_1',
+          'max_points': 5,
+        },
+        {
+          'sequence_no': 4,
+          'exercise_id': 'ex-w1',
+          'exercise_type': 'psani_1_formular',
+          'max_points': 8,
+        },
       ],
     });
     expect(sprint.passThresholdPercent, equals(75));

@@ -103,24 +103,23 @@ class LevelProgressResponse {
 
   factory LevelProgressResponse.fromJson(Map<String, dynamic> json) {
     final unlockedRaw = (json['unlocked_levels'] as List?) ?? const [];
-    final unlocked = unlockedRaw
-        .whereType<String>()
-        .map(parseLevel)
-        .toSet();
+    final unlocked = unlockedRaw.whereType<String>().map(parseLevel).toSet();
     final masteryRaw =
         (json['skill_mastery'] as Map?)?.cast<String, dynamic>() ?? const {};
     final mastery = masteryRaw.map<String, SkillMasteryInfo>(
-      (k, v) => MapEntry(k, SkillMasteryInfo.fromJson(
-        (v as Map).cast<String, dynamic>(),
-      )),
+      (k, v) => MapEntry(
+        k,
+        SkillMasteryInfo.fromJson((v as Map).cast<String, dynamic>()),
+      ),
     );
     final currentLevel = parseLevel(json['current_level'] as String?);
     // next_level may be null at the top of the ladder; fall back to the
     // computed ladder so the client always has something to render.
     final nextRaw = json['next_level'] as String?;
-    final next = (nextRaw == null || nextRaw.isEmpty)
-        ? nextCefrLevel(currentLevel)
-        : parseLevel(nextRaw);
+    final next =
+        (nextRaw == null || nextRaw.isEmpty)
+            ? nextCefrLevel(currentLevel)
+            : parseLevel(nextRaw);
     return LevelProgressResponse(
       userID: json['user_id'] as String? ?? '',
       currentLevel: currentLevel,
@@ -1180,6 +1179,8 @@ class PoslechOptionView {
   assetId; // existing ImageOption asset (e.g. uploaded image for послech options)
   final String
   imageAssetId; // V11: MultipleChoiceOption.image_asset_id (vocabulary image)
+  String get imageStorageKey =>
+      imageAssetId.isNotEmpty ? imageAssetId : assetId;
 
   factory PoslechOptionView.fromJson(Map<String, dynamic> json) {
     return PoslechOptionView(
@@ -1241,10 +1242,11 @@ class FillQuestionView {
     return FillQuestionView(
       questionNo: (json['question_no'] as num?)?.toInt() ?? 0,
       prompt: json['prompt'] as String? ?? '',
-      options: (json['options'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(PoslechOptionView.fromJson)
-          .toList(),
+      options:
+          (json['options'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(PoslechOptionView.fromJson)
+              .toList(),
     );
   }
 }

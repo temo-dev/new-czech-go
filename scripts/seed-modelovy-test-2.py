@@ -298,11 +298,11 @@ def ex_poslech3(pool, skill_id=None, module_id=None):
         **({"skill_id": skill_id, "module_id": module_id} if skill_id else {}),
         "detail": {
             "items": [
-                {"question_no": 11, "audio_source": {"segments": [{"text": "Jmenuji se Leila. Teď mě nejvíc baví plavání. Chodím do bazénu třikrát týdně."}]}},
-                {"question_no": 12, "audio_source": {"segments": [{"text": "Já jsem Dzamila. Ráda vařím různá jídla z celého světa. Mám doma hodně kuchařských knih."}]}},
-                {"question_no": 13, "audio_source": {"segments": [{"text": "Jmenuji se Ivona. Mám ráda přírodu a fotografuji ji. Mám doma tisíce fotografií."}]}},
-                {"question_no": 14, "audio_source": {"segments": [{"text": "Já jsem Hindi. Hodně čtu. Mám ráda romány a detektivky. Jsem členem knihovny."}]}},
-                {"question_no": 15, "audio_source": {"segments": [{"text": "Jmenuji se Nada. Každé ráno běhám v parku. Letos jsem běžela svůj první půlmaraton."}]}}
+                {"question_no": 11, "question": "Leila", "audio_source": {"segments": [{"text": "Jmenuji se Leila. Teď mě nejvíc baví plavání. Chodím do bazénu třikrát týdně."}]}},
+                {"question_no": 12, "question": "Džamila", "audio_source": {"segments": [{"text": "Já jsem Džamila. Ráda vařím různá jídla z celého světa. Mám doma hodně kuchařských knih."}]}},
+                {"question_no": 13, "question": "Ivona", "audio_source": {"segments": [{"text": "Jmenuji se Ivona. Mám ráda přírodu a fotografuji ji. Mám doma tisíce fotografií."}]}},
+                {"question_no": 14, "question": "Hindi", "audio_source": {"segments": [{"text": "Já jsem Hindi. Hodně čtu. Mám ráda romány a detektivky. Jsem členem knihovny."}]}},
+                {"question_no": 15, "question": "Naďa", "audio_source": {"segments": [{"text": "Jmenuji se Naďa. Každé ráno běhám v parku. Letos jsem běžela svůj první půlmaraton."}]}}
             ],
             "options": [
                 {"key": "A", "label": "běh"},

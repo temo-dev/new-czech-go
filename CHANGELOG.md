@@ -10,6 +10,121 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V35 — Poslech 4 Image Authoring Controls Hotfix — 2026-05-10
+
+POSLECH 4 already stores the shared A-F picture choices as
+`detail.options[].asset_id`, but the CMS edit form only exposed plain text
+inputs. Admins had to paste storage keys by hand and could not use the
+same upload / AI-generate flow that POSLECH 1 image options already had.
+
+### CMS + Flutter
+
+- `PoslechFields.tsx` now shows upload and AI-generate controls under each
+  POSLECH 4 option A-F, reusing the existing exercise asset upload and AI
+  image registration paths. The stored value remains the storage key in
+  `options[].asset_id`.
+- `poslech-model.ts` adds shared A-F image patch helpers so upload / AI
+  callbacks update exactly one option.
+- Flutter `PoslechOptionView.imageStorageKey` treats POSLECH 4
+  `asset_id` as an image storage key, while preserving `image_asset_id` as
+  the preferred source for POSLECH 1 / V11-style options. The shared
+  `MultipleChoiceWidget` now uses that resolved storage key for image grids.
+
+### Tests
+
+CMS: targeted `poslech-image-options.test.ts`, full Vitest
+(300 tests), lint, and production build pass. Flutter: targeted
+`models_test.dart`, full `flutter test` (375 tests), and targeted Dart
+analyze for touched files pass. Full `flutter analyze` still reports the
+pre-existing 10 warning/info items in unrelated files.
+
+---
+
+## V34 — Poslech 5 Fill-question Prompts Hotfix — 2026-05-10
+
+POSLECH 5 should match the model test sheet: the voicemail is followed by
+five learner-visible fill questions (`21..25`) such as "KDO dal Evě
+lístky?" and "TELEFON Evy?". CMS authoring previously only stored the
+answer slots and rebuilt `detail.questions` with blank prompts, so an edit
+could erase those questions even when seed/API content contained them.
+
+### CMS + contract
+
+- `poslech-model.ts` extends `poslech_5` slots with `questionNo` +
+  `prompt`, hydrates from `detail.questions`, defaults new slots to
+  exam numbering `21..25`, and re-emits prompts plus matching
+  `correct_answers` keys on save.
+- `PoslechFields.tsx` adds the missing POSLECH 5 question input above
+  each answer field.
+- CMS validation now requires five prompted POSLECH 5 fill questions and
+  five answers, preventing blank prompts from being published again.
+- `docs/reference/content-and-attempt-model.md` records the stable
+  `poslech_5` prompt/question-number contract.
+
+### Tests
+
+CMS: targeted `poslech-image-options.test.ts`, full Vitest
+(298 tests), lint, and production build pass.
+
+---
+
+## V33 — Poslech 3 Question Names Hotfix — 2026-05-10
+
+POSLECH 3 mock-test content should show learner-facing names for each
+matching row (Leila, Džamila, Ivona, Hindi, Naďa). Flutter already
+renders `detail.items[i].question` when present, but CMS authoring for
+`poslech_3` did not hydrate or re-emit that field, and the Modelový test
+2 seed did not populate it.
+
+### CMS + seed
+
+- `poslech-model.ts` extends the `poslech_3` match item state with
+  `questionNo` + `question`, preserving exam numbering (`11..15`) and
+  `correct_answers` keys on round-trip saves.
+- `PoslechFields.tsx` adds a POSLECH 3-only "Tên câu hỏi" field and
+  displays the preserved question number in the admin form.
+- `scripts/seed-modelovy-test-2.py` populates the five POSLECH 3 names
+  and aligns the Džamila / Naďa transcript spelling with the learner
+  reference.
+
+### Tests
+
+CMS: targeted `poslech-image-options.test.ts`, full Vitest
+(293 tests), lint, and production build pass.
+
+---
+
+## V32 — Poslech 1 CMS Audio Asset Preservation — 2026-05-10
+
+V31 fixed the backend side of the "only the last transcript plays"
+failure by rejecting partial transcript sets. This follow-up fixes the
+CMS state path that could still erase the per-item audio keys after a
+successful generate: `PoslechFields` hydrated transcript/image fields,
+but not `audio_source.asset_id`, so a later save rebuilt detail without
+the five `item-N` storage keys. Flutter then saw an incomplete per-item
+shape and fell back to the legacy top-level audio player.
+
+### CMS
+
+- `poslech-model.ts` extends `P12Item` with hidden `audioAssetId`,
+  hydrates it from `detail.items[i].audio_source.asset_id`, and emits it
+  back on normal saves.
+- `stripPoslechItemAudioAssetIds(detail)` clears item `asset_id` only for
+  the pre-generate PATCH, keeping regeneration behavior explicit while
+  preserving normal save semantics.
+- `ExerciseSlideOver.handleGenerateAudio()` now reloads the updated
+  exercise after `POST /generate-audio` and resets form state from the
+  backend response, so the CMS immediately holds the fresh five
+  per-item audio keys.
+
+### Tests
+
+CMS: lint, full Vitest (292 tests), and production build pass. Targeted
+backend Poslech audio tests and Flutter `poslech_item_audio_test.dart`
+also pass.
+
+---
+
 ## V31 — Poslech 1 Per-item Audio Gate — 2026-05-10
 
 V26 per-item audio handler silently skipped items whose

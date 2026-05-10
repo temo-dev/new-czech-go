@@ -283,6 +283,7 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
               'CO DĚLÁTE ODPOLEDNE?',
             ]
             : d.emailTopics;
+    final images = d.storyImageAssets;
     final words = _wordCount(_emailController.text);
     final enough = words >= d.writingMinWords;
     return [
@@ -304,37 +305,12 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
       ),
       const SizedBox(height: 8),
       ...topics.asMap().entries.map(
-        (e) => Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Row(
-            children: [
-              Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: AppColors.secondary,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    '${e.key + 1}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                e.value,
-                style: AppTypography.bodySmall.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
+        (e) => _Psani2TopicRow(
+          index: e.key,
+          topic: e.value,
+          asset: e.key < images.length ? images[e.key] : null,
+          exerciseId: d.id,
+          client: widget.client,
         ),
       ),
       const SizedBox(height: AppSpacing.x4),
@@ -362,6 +338,88 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
             ),
       ),
     ];
+  }
+}
+
+class _Psani2TopicRow extends StatelessWidget {
+  const _Psani2TopicRow({
+    required this.index,
+    required this.topic,
+    required this.asset,
+    required this.exerciseId,
+    required this.client,
+  });
+
+  final int index;
+  final String topic;
+  final PromptAssetView? asset;
+  final String exerciseId;
+  final ApiClient client;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.x3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (asset != null) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: 72,
+                height: 54,
+                child: Image.network(
+                  client.exerciseAssetUri(exerciseId, asset!.id).toString(),
+                  headers: client.authHeaders,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: const Color(0xFFF5F0EA),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.broken_image_outlined,
+                      size: 18,
+                      color: Colors.black26,
+                    ),
+                  ),
+                  loadingBuilder: (_, child, progress) => progress == null
+                      ? child
+                      : Container(color: const Color(0xFFF5F0EA)),
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.x3),
+          ],
+          Container(
+            width: 22,
+            height: 22,
+            decoration: const BoxDecoration(
+              color: AppColors.secondary,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                '${index + 1}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              topic,
+              style: AppTypography.bodySmall.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
