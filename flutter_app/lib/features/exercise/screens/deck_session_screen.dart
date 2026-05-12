@@ -358,6 +358,9 @@ class _CardArea extends StatelessWidget {
           imageUrl: detail.flashcardImageAssetId.isNotEmpty
               ? client.mediaUri(detail.flashcardImageAssetId).toString()
               : null,
+          audioUrl: detail.flashcardAudioStorageKey.isNotEmpty
+              ? client.mediaUri(detail.flashcardAudioStorageKey).toString()
+              : null,
           authHeaders: client.authHeaders,
           submitting: false,
           onChoice: onQuizcardChoice,

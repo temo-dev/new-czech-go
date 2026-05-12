@@ -403,11 +403,18 @@ func (s *Server) handlePublishGenJob(w http.ResponseWriter, jobID string) {
 		exercise.SourceID = job.SourceID
 		exercise.GenerationJobID = job.ID
 
-		// Inject vocabulary item image into quizcard detail when available.
+		// Inject vocabulary item image + audio (V37) into quizcard detail
+		// when available. Image lookup remains the V11 contract; audio is
+		// best-effort — admin may not have generated Polly TTS yet.
 		if ex.ExerciseType == "quizcard_basic" {
-			if item, ok := vocabItemsByTerm[ex.FrontText]; ok && item.ImageAssetID != "" {
+			if item, ok := vocabItemsByTerm[ex.FrontText]; ok {
 				if detail, ok := exercise.Detail.(contracts.QuizcardBasicDetail); ok {
-					detail.ImageAssetID = item.ImageAssetID
+					if item.ImageAssetID != "" {
+						detail.ImageAssetID = item.ImageAssetID
+					}
+					if item.AudioStorageKey != "" {
+						detail.AudioStorageKey = item.AudioStorageKey
+					}
 					exercise.Detail = detail
 				}
 			}

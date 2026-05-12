@@ -221,6 +221,9 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
                   exampleTranslation: d.flashcardExampleTranslation.isNotEmpty ? d.flashcardExampleTranslation : null,
                   // Priority: admin-uploaded context_image > vocab-injected flashcardImageAssetId
                   imageUrl: _quizcardImageUrl(d),
+                  audioUrl: d.flashcardAudioStorageKey.isNotEmpty
+                      ? widget.client.mediaUri(d.flashcardAudioStorageKey).toString()
+                      : null,
                   authHeaders: widget.client.authHeaders,
                   submitting: _submitting,
                   onChoice: _submitQuizcard,

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
@@ -9,7 +10,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 
 /// Flashcard with flip animation.
-/// Front: optional image + Czech term. Back: Vietnamese definition + optional example.
+/// Front: optional image + Czech term + V37 optional Polly TTS mic. Back: Vietnamese definition + optional example.
 /// After flip: [Đã biết ✓] and [Ôn lại ↺] buttons.
 class QuizcardWidget extends StatefulWidget {
   const QuizcardWidget({
@@ -19,6 +20,7 @@ class QuizcardWidget extends StatefulWidget {
     this.example,
     this.exampleTranslation,
     this.imageUrl,
+    this.audioUrl,
     this.authHeaders,
     required this.submitting,
     required this.onChoice,
@@ -30,6 +32,9 @@ class QuizcardWidget extends StatefulWidget {
   final String? exampleTranslation;
   /// Storage key URL for the flashcard image. Null = no image.
   final String? imageUrl;
+  /// V37: signed URL for the Polly Czech audio of `front`. Null = no audio
+  /// (admin has not generated TTS for this vocab item yet).
+  final String? audioUrl;
   final Map<String, String>? authHeaders;
   final bool submitting;
   final void Function(String choice) onChoice; // "known" | "review"
@@ -88,7 +93,7 @@ class _QuizcardWidgetState extends State<QuizcardWidget> with SingleTickerProvid
                 transform: Matrix4.identity()
                   ..setEntry(3, 2, 0.001)
                   ..rotateY(angle),
-                child: isFront ? _FrontFace(text: widget.front, hint: l.vocabFlip, imageUrl: widget.imageUrl, authHeaders: widget.authHeaders) : _BackFace(
+                child: isFront ? _FrontFace(text: widget.front, hint: l.vocabFlip, imageUrl: widget.imageUrl, audioUrl: widget.audioUrl, authHeaders: widget.authHeaders) : _BackFace(
                   back: widget.back,
                   example: widget.example,
                   exampleTranslation: widget.exampleTranslation,
@@ -139,22 +144,57 @@ class _QuizcardWidgetState extends State<QuizcardWidget> with SingleTickerProvid
   }
 }
 
-class _FrontFace extends StatelessWidget {
+class _FrontFace extends StatefulWidget {
   const _FrontFace({
     required this.text,
     required this.hint,
     this.imageUrl,
+    this.audioUrl,
     this.authHeaders,
   });
   final String text;
   final String hint;
   final String? imageUrl;
+  final String? audioUrl;
   final Map<String, String>? authHeaders;
 
   @override
+  State<_FrontFace> createState() => _FrontFaceState();
+}
+
+class _FrontFaceState extends State<_FrontFace> {
+  AudioPlayer? _player;
+  bool _playing = false;
+
+  bool get _hasAudio => widget.audioUrl != null && widget.audioUrl!.isNotEmpty;
+
+  Future<void> _play() async {
+    if (!_hasAudio || _playing) return;
+    final p = _player ??= AudioPlayer();
+    setState(() => _playing = true);
+    try {
+      await p.setAudioSource(AudioSource.uri(
+        Uri.parse(widget.audioUrl!),
+        headers: widget.authHeaders ?? const {},
+      ));
+      await p.play();
+    } catch (_) {
+      // swallow — UI shows the static mic icon either way.
+    } finally {
+      if (mounted) setState(() => _playing = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _player?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
-    return Container(
+    final hasImage = widget.imageUrl != null && widget.imageUrl!.isNotEmpty;
+    final card = Container(
       width: double.infinity,
       constraints: BoxConstraints(minHeight: hasImage ? 280 : 220),
       decoration: BoxDecoration(
@@ -170,15 +210,15 @@ class _FrontFace extends StatelessWidget {
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
               child: Image.network(
-                imageUrl!,
-                headers: authHeaders ?? const {},
+                widget.imageUrl!,
+                headers: widget.authHeaders ?? const {},
                 width: double.infinity,
                 height: 160,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 loadingBuilder: (_, child, progress) => progress == null
                     ? child
-                    : Container(height: 160, color: Color(0xFFF5F0EA),
+                    : Container(height: 160, color: const Color(0xFFF5F0EA),
                         child: const Center(child: CircularProgressIndicator(strokeWidth: 2))),
               ),
             ),
@@ -188,7 +228,7 @@ class _FrontFace extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(text, style: AppTypography.titleLarge.copyWith(fontSize: 32, fontWeight: FontWeight.w700), textAlign: TextAlign.center),
+                Text(widget.text, style: AppTypography.titleLarge.copyWith(fontSize: 32, fontWeight: FontWeight.w700), textAlign: TextAlign.center),
                 const SizedBox(height: AppSpacing.x3),
                 const Icon(Icons.touch_app_outlined, size: 20, color: Color(0xFFBCB2A6)),
               ],
@@ -196,6 +236,33 @@ class _FrontFace extends StatelessWidget {
           ),
         ],
       ),
+    );
+    if (!_hasAudio) return card;
+    return Stack(
+      children: [
+        card,
+        Positioned(
+          top: 8,
+          right: 8,
+          child: Material(
+            color: AppColors.interviewContainer,
+            shape: const CircleBorder(),
+            child: InkWell(
+              key: const Key('quizcard_audio_button'),
+              customBorder: const CircleBorder(),
+              onTap: _play,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Icon(
+                  _playing ? Icons.graphic_eq : Icons.volume_up_outlined,
+                  size: 20,
+                  color: AppColors.interview,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

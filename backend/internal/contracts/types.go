@@ -843,7 +843,10 @@ type QuizcardBasicDetail struct {
 	ExampleTranslation string            `json:"example_translation,omitempty"`
 	Explanation        string            `json:"explanation,omitempty"`
 	ImageAssetID       string            `json:"image_asset_id,omitempty"` // storage key for flashcard image
-	CorrectAnswers     map[string]string `json:"correct_answers"`          // always {"1":"known"}
+	// V37: injected at publish time from vocabulary_items.audio_storage_key.
+	// Empty when the admin has not generated audio for this term yet.
+	AudioStorageKey string            `json:"audio_storage_key,omitempty"`
+	CorrectAnswers  map[string]string `json:"correct_answers"` // always {"1":"known"}
 }
 
 // MatchingPair is one left→right pair in a matching exercise.
