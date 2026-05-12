@@ -8,6 +8,7 @@ mega-file, frozen). V19+ slices each have their own plan/todo pair.
 
 | Slice | Plan | Todo | Spec | Status |
 |---|---|---|---|---|
+| V39 Exam Flat-Sort Player | [v39-exam-flat-sort-player-plan.md](v39-exam-flat-sort-player-plan.md) | [v39-exam-flat-sort-player-todo.md](v39-exam-flat-sort-player-todo.md) | [docs/specs/v39-exam-flat-sort-player.md](../docs/specs/v39-exam-flat-sort-player.md) | 🟡 planned 2026-05-12 |
 | V37 Vocab Item Per-item Polly TTS | [v37-vocab-item-polly-tts-plan.md](v37-vocab-item-polly-tts-plan.md) | [v37-vocab-item-polly-tts-todo.md](v37-vocab-item-polly-tts-todo.md) | [docs/specs/v37-vocab-item-polly-tts.md](../docs/specs/v37-vocab-item-polly-tts.md) | ✅ shipped |
 | V36 Interview-in-Mock-Exam | [v36-interview-in-mock-exam-plan.md](v36-interview-in-mock-exam-plan.md) | [v36-interview-in-mock-exam-todo.md](v36-interview-in-mock-exam-todo.md) | [docs/specs/v36-interview-in-mock-exam.md](../docs/specs/v36-interview-in-mock-exam.md) | ✅ implemented — Phase E smoke pending |
 | V25 IAP Wire Real | [v25-iap-wire-real-plan.md](v25-iap-wire-real-plan.md) | [v25-iap-wire-real-todo.md](v25-iap-wire-real-todo.md) | [docs/specs/iap-wire-real.md](../docs/specs/iap-wire-real.md) | ✅ implemented (Phase A-G + H1; H2 App Store Connect + H3 TestFlight remain operator-side) |
