@@ -328,6 +328,7 @@ class MockExamSection {
     required this.attemptId,
     required this.sectionScore,
     required this.status,
+    this.displayOrder = 0,
   });
 
   final int sequenceNo;
@@ -339,12 +340,23 @@ class MockExamSection {
   final int sectionScore;
   final String status;
 
+  /// V39 — server-computed flat-sort cursor (1..N), ranked by
+  /// `(max_points ASC, sequence_no ASC)`. Falls back to `sequenceNo` when
+  /// the server hasn't backfilled (pre-V39 wire).
+  final int displayOrder;
+
   bool get isPending => status == 'pending';
   bool get isCompleted => status == 'completed';
 
+  /// V39 — section was actively skipped by the learner via /skip.
+  bool get isSkipped => status == 'skipped';
+
   factory MockExamSection.fromJson(Map<String, dynamic> json) {
+    final dispRaw = json['display_order'];
+    final seq = (json['sequence_no'] as num).toInt();
+    final disp = dispRaw is num ? dispRaw.toInt() : 0;
     return MockExamSection(
-      sequenceNo: (json['sequence_no'] as num).toInt(),
+      sequenceNo: seq,
       skillKind: json['skill_kind'] as String? ?? '',
       exerciseId: json['exercise_id'] as String? ?? '',
       exerciseType: json['exercise_type'] as String? ?? '',
@@ -352,6 +364,9 @@ class MockExamSection {
       attemptId: json['attempt_id'] as String? ?? '',
       sectionScore: (json['section_score'] as num?)?.toInt() ?? 0,
       status: json['status'] as String? ?? 'pending',
+      // Fallback to sequenceNo so pre-V39 sessions keep their original
+      // ordering when sorted by displayOrder.
+      displayOrder: disp > 0 ? disp : seq,
     );
   }
 }
@@ -367,6 +382,9 @@ class MockExamSessionView {
     required this.overallReadinessLevel,
     required this.overallSummary,
     required this.sections,
+    this.startedAt,
+    this.durationSec = 0,
+    this.expiresAt,
   });
 
   final String id;
@@ -378,6 +396,23 @@ class MockExamSessionView {
   final String overallReadinessLevel;
   final String overallSummary;
   final List<MockExamSection> sections;
+
+  /// V39 — server-anchored timer fields. Pre-V39 sessions have
+  /// `durationSec == 0` and `startedAt/expiresAt == null`.
+  final DateTime? startedAt;
+  final int durationSec;
+  final DateTime? expiresAt;
+
+  /// True when the session carries a V39 server-anchored timer.
+  bool get hasTimer => durationSec > 0 && expiresAt != null;
+
+  /// Remaining time computed against [now]. Returns [Duration.zero] when
+  /// the timer has run out or no timer is set.
+  Duration remainingAt(DateTime now) {
+    if (!hasTimer) return Duration.zero;
+    final diff = expiresAt!.difference(now);
+    return diff.isNegative ? Duration.zero : diff;
+  }
 
   bool get isCompleted => status == 'completed';
 
@@ -399,6 +434,11 @@ class MockExamSessionView {
 
   factory MockExamSessionView.fromJson(Map<String, dynamic> json) {
     final raw = json['sections'] as List<dynamic>? ?? const [];
+    DateTime? parseTime(dynamic v) {
+      if (v is String && v.isNotEmpty) return DateTime.tryParse(v);
+      return null;
+    }
+
     return MockExamSessionView(
       id: json['id'] as String? ?? '',
       status: json['status'] as String? ?? 'created',
@@ -413,6 +453,9 @@ class MockExamSessionView {
           raw
               .map((e) => MockExamSection.fromJson(e as Map<String, dynamic>))
               .toList(),
+      startedAt: parseTime(json['started_at']),
+      durationSec: (json['duration_sec'] as num?)?.toInt() ?? 0,
+      expiresAt: parseTime(json['expires_at']),
     );
   }
 }

@@ -56,19 +56,21 @@
 
 ## Window 2 — Flutter player scaffold (S4)
 
-### S4 — Player screen scaffold rewrite
-- [ ] **S4.1** `models/exam_section_state.dart` — `SectionState` enum + `fromWire`
-- [ ] **S4.2** `controllers/exam_session_controller.dart` — pointer + timer stream + server refresh
-- [ ] **S4.3** Controller: 30 s polling + on-resume refresh via `WidgetsBindingObserver`
-- [ ] **S4.4** `widgets/exam_app_bar.dart` — timer tabular figures + progress + sheet btn + ⋮
-- [ ] **S4.5** `widgets/question_status_chip.dart` — 64 pt cell, 3 + current states, icon-paired
-- [ ] **S4.6** `screens/mock_exam_player_screen.dart` — orchestrates controller + body
-- [ ] **S4.7** Re-use existing skill-dispatch (`getExercise` → per-type screens)
-- [ ] **S4.8** `mock_test_intro_screen.dart` — swap to `MockExamPlayerScreen` in `pushReplacement`
-- [ ] **S4.9** Delete `screens/mock_exam_screen.dart`
-- [ ] **S4.10** Delete `test/mock_exam_screen_test.dart`
-- [ ] **S4.11** New `test/mock_exam_player_test.dart` — boot, timer ticks, app-bar renders
-- [ ] **S4.12** `flutter analyze && flutter test` green
+### S4 — Player screen scaffold rewrite  🟢 partial (foundation landed 2026-05-12)
+- [x] **S4.1** `models/exam_section_state.dart` — `SectionState` enum (done / skipped / current / empty) + `sectionStateFor` mapper
+- [x] **S4.2** `controllers/exam_session_controller.dart` — pointer + 1-s ticker + `skipCurrent`/`advanceAfterAttempt`/`jumpTo`/`refresh` + injectable clock for tests
+- [ ] **S4.3** 30 s polling + on-resume `WidgetsBindingObserver` (deferred — added when intro swaps to new player in S5/S6)
+- [x] **S4.4** `widgets/exam_app_bar.dart` — timer tabular figures, error color <5 min, progress bar, sheet btn, ⋮ Nộp bài ngay
+- [x] **S4.5** `widgets/question_status_chip.dart` — 64 pt cell, 4 states icon-paired (color-not-only)
+- [ ] **S4.6** `screens/mock_exam_player_screen.dart` — **deferred to S5/S6** so the player ships with feature parity (skip UI + sheet)
+- [x] **S4.7** Existing `mock_exam_skill_dispatch.dart` re-used unchanged — controller delegates body to current per-type screens
+- [ ] **S4.8** `mock_test_intro_screen.dart` swap — deferred (depends on S4.6)
+- [ ] **S4.9** Delete `screens/mock_exam_screen.dart` — deferred until S5/S6 reach parity
+- [ ] **S4.10** Delete `test/mock_exam_screen_test.dart` — deferred
+- [x] **S4.11** Dart model V39 updates — `MockExamSection.displayOrder`/`isSkipped`, `MockExamSessionView.startedAt`/`durationSec`/`expiresAt` + `hasTimer`/`remainingAt(now)` helpers; `MockExamSection.fromJson` falls back `displayOrder=sequenceNo` for pre-V39 sessions
+- [x] **S4.12** 19 new tests (5 section state + 5 controller + 5 chip + 4 app bar); `flutter analyze` clean; `flutter test` 416 green (was 397 → +19)
+
+**Scope cut note**: S4 plan called for the full 942-line `mock_exam_screen.dart` rewrite + delete + intro swap in one slice. Doing that in isolation produces a regressed player (no skip UI, no sheet) and breaks production flow until S5/S6 catch up. Instead, S4 ships the foundation modules (model, controller, app bar, chip) with full test coverage; S5/S6 absorb the screen rewrite + intro swap + delete once skip + sheet land. Old `mock_exam_screen.dart` stays live in the meantime. No new slice added — net work moves into S5/S6.
 
 ---
 
