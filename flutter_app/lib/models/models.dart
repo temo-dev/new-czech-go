@@ -113,13 +113,11 @@ class LevelProgressResponse {
       ),
     );
     final currentLevel = parseLevel(json['current_level'] as String?);
-    // next_level may be null at the top of the ladder; fall back to the
-    // computed ladder so the client always has something to render.
+    // S1: server is the single source of truth for the next level — absent
+    // or empty means "no further rung" and the client renders accordingly.
     final nextRaw = json['next_level'] as String?;
     final next =
-        (nextRaw == null || nextRaw.isEmpty)
-            ? nextCefrLevel(currentLevel)
-            : parseLevel(nextRaw);
+        (nextRaw == null || nextRaw.isEmpty) ? null : parseLevel(nextRaw);
     return LevelProgressResponse(
       userID: json['user_id'] as String? ?? '',
       currentLevel: currentLevel,

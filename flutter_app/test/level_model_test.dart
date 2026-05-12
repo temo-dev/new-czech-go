@@ -89,10 +89,32 @@ void main() {
       expect(progress.userID, '');
       expect(progress.currentLevel, CefrLevel.a0);
       expect(progress.unlockedLevels, isEmpty);
-      expect(progress.nextLevel, CefrLevel.a1);
+      // S1: server is the single source of truth; an absent/empty
+      // next_level means "top of the ladder" — no client-side compute.
+      expect(progress.nextLevel, isNull);
       expect(progress.skillMastery, isEmpty);
       expect(progress.allSkillsPass, isFalse);
       expect(progress.promotionUnlocked, isFalse);
+    });
+
+    test('trusts server next_level even when current level would imply a different next (S1)', () {
+      // current a0 ladder would compute a1; server overrides to b1 → trust server.
+      final progress = LevelProgressResponse.fromJson({
+        'current_level': 'a0',
+        'next_level': 'b1',
+      });
+      expect(progress.currentLevel, CefrLevel.a0);
+      expect(progress.nextLevel, CefrLevel.b1);
+    });
+
+    test('returns null nextLevel when server omits the field (S1)', () {
+      // Server explicitly returns no next_level (learner at the top, or
+      // promotion gated). Client must not synthesise one from the ladder.
+      final progress = LevelProgressResponse.fromJson({
+        'current_level': 'a2',
+        'next_level': null,
+      });
+      expect(progress.nextLevel, isNull);
     });
   });
 
