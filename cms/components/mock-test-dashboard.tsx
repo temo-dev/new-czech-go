@@ -18,7 +18,12 @@ import {
   findPromotionConflict,
   gatingBadge,
   matchesKindFilter,
+  resequence,
   type MockTestKind,
+  type SkillKind,
+  SKILL_GROUPS,
+  EXERCISE_TYPE_LABEL,
+  DEFAULT_MAX_POINTS,
 } from './mock-test-dashboard-utils';
 
 type Exercise = {
@@ -30,7 +35,7 @@ type Exercise = {
 
 type MockTestSection = {
   sequence_no: number;
-  skill_kind: string; // noi | nghe | doc | viet
+  skill_kind: string; // noi | nghe | doc | viet | interview
   exercise_id: string;
   exercise_type: string;
   max_points: number;
@@ -51,48 +56,8 @@ type MockTest = {
   sections: MockTestSection[];
 };
 
-const DEFAULT_MAX_POINTS: Record<string, number> = {
-  uloha_1_topic_answers: 8,
-  uloha_2_dialogue_questions: 12,
-  uloha_3_story_narration: 10,
-  uloha_4_choice_reasoning: 7,
-  psani_1_formular: 8,
-  psani_2_email: 12,
-  poslech_1: 5, poslech_2: 5, poslech_3: 5, poslech_4: 5, poslech_5: 5,
-  cteni_1: 5, cteni_2: 5, cteni_3: 4, cteni_4: 6, cteni_5: 5,
-};
-
-const EXERCISE_TYPE_LABEL: Record<string, string> = {
-  uloha_1_topic_answers: 'Úloha 1 — Topic answers',
-  uloha_2_dialogue_questions: 'Úloha 2 — Dialogue questions',
-  uloha_3_story_narration: 'Úloha 3 — Story narration',
-  uloha_4_choice_reasoning: 'Úloha 4 — Choice & reasoning',
-  psani_1_formular: 'Psaní 1 — Formulář',
-  psani_2_email: 'Psaní 2 — E-mail',
-  poslech_1: 'Poslech 1', poslech_2: 'Poslech 2', poslech_3: 'Poslech 3',
-  poslech_4: 'Poslech 4', poslech_5: 'Poslech 5',
-  cteni_1: 'Čtení 1', cteni_2: 'Čtení 2', cteni_3: 'Čtení 3',
-  cteni_4: 'Čtení 4', cteni_5: 'Čtení 5',
-};
-
 const MOCK_TEST_API = '/api/admin/mock-tests';
 const EXERCISES_API = '/api/admin/exercises';
-
-type SkillKind = 'noi' | 'nghe' | 'doc' | 'viet';
-
-const SKILL_GROUPS: { kind: SkillKind; label: string; color: string; prefix: string }[] = [
-  { kind: 'noi',  label: 'Nói (Speaking)',   color: '#FF6A14', prefix: 'uloha_' },
-  { kind: 'nghe', label: 'Nghe (Listening)', color: '#3060B8', prefix: 'poslech_' },
-  { kind: 'doc',  label: 'Đọc (Reading)',    color: '#C28012', prefix: 'cteni_' },
-  { kind: 'viet', label: 'Viết (Writing)',   color: '#1F8A4D', prefix: 'psani_' },
-];
-
-function resequence(sections: MockTestSection[]): MockTestSection[] {
-  let seq = 0;
-  return SKILL_GROUPS.flatMap(g =>
-    sections.filter(s => s.skill_kind === g.kind).map(s => ({ ...s, sequence_no: ++seq }))
-  );
-}
 
 type FormState = {
   title: string;
