@@ -143,4 +143,10 @@ func TestV21BackfillUserLevels_FileShapesIdempotentBackfill(t *testing.T) {
 	// AND who have not taken placement, so re-runs are no-ops.
 	mustContain(t, sql, "current_level = 'a0'")
 	mustContain(t, sql, "placement_taken_at IS NULL")
+	// S8: explicit V21_EPOCH guard so the backfill only touches users
+	// that existed before V21 shipped; a new A0 sign-up landing in the
+	// gap between migration apply and first placement no longer gets
+	// auto-promoted to a2.
+	mustContain(t, sql, "created_at < ")
+	mustContain(t, sql, "2026-05-07")
 }
