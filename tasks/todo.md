@@ -7,6 +7,7 @@ frozen).
 For per-slice task lists with `[x]` / `[ ]` checkboxes, see the
 matching `<slice>-todo.md` file:
 
+- [v37-vocab-item-polly-tts-todo.md](v37-vocab-item-polly-tts-todo.md) — V37 Vocab Item Per-item Polly TTS (✅ shipped 2026-05-12)
 - [v36-interview-in-mock-exam-todo.md](v36-interview-in-mock-exam-todo.md) — V36 Interview-in-Mock-Exam (✅ implemented Phase A-D; Phase E iOS simulator smoke pending)
 - [v25-iap-wire-real-todo.md](v25-iap-wire-real-todo.md) — V25 IAP Wire Real (implemented Phase A-G + H1; H2/H3 operator-side remain)
 - [v24-doc-draft-generator-todo.md](v24-doc-draft-generator-todo.md) — V24 Doc Draft Generator (implemented; C4 manual Czech-quality gate pending)
@@ -43,9 +44,8 @@ All eight items landed in dedicated `fix(s1)..fix(s8)` commits.
   Flutter end-to-end (interview included). Includes B9 reseed:
   demo `cteni_5` exercise listed twice; demo `cteni_6` returned
   with empty `module_id`. **Operator task — no engineering.**
-- [→] Vocab item per-item Polly TTS (deferred from V11) →
-  [docs/ideas/v37-vocab-item-polly-tts.md](../docs/ideas/v37-vocab-item-polly-tts.md)
-  drafted 2026-05-12 awaiting promotion to spec.
+- [x] Vocab item per-item Polly TTS (deferred from V11) → shipped V37
+  2026-05-12. See [v37-vocab-item-polly-tts-todo.md](v37-vocab-item-polly-tts-todo.md).
 - [ ] V18.1 pilot — 20×6 photo gold set across 5 learners measuring
   handwriting OCR CER ≤10% before promoting OCR to default mode.
   **Operator pilot — no engineering until evidence lands.**

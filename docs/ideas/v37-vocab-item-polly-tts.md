@@ -1,6 +1,8 @@
 # V37 Vocab Item Per-item Polly TTS — Idea + Requirements
 
-> **Status**: 🟡 draft 2026-05-12. Promotion to spec sau khi user OK.
+> **Status**: ✅ promoted to spec on 2026-05-12. Spec authoritative:
+> `docs/specs/v37-vocab-item-polly-tts.md`. Idea kept as historical
+> pre-spec; nếu mâu thuẫn, theo spec.
 >
 > **Owner**: solo admin (tuananh.ngta@gmail.com).
 >

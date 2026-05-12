@@ -8,6 +8,7 @@ mega-file, frozen). V19+ slices each have their own plan/todo pair.
 
 | Slice | Plan | Todo | Spec | Status |
 |---|---|---|---|---|
+| V37 Vocab Item Per-item Polly TTS | [v37-vocab-item-polly-tts-plan.md](v37-vocab-item-polly-tts-plan.md) | [v37-vocab-item-polly-tts-todo.md](v37-vocab-item-polly-tts-todo.md) | [docs/specs/v37-vocab-item-polly-tts.md](../docs/specs/v37-vocab-item-polly-tts.md) | ✅ shipped |
 | V36 Interview-in-Mock-Exam | [v36-interview-in-mock-exam-plan.md](v36-interview-in-mock-exam-plan.md) | [v36-interview-in-mock-exam-todo.md](v36-interview-in-mock-exam-todo.md) | [docs/specs/v36-interview-in-mock-exam.md](../docs/specs/v36-interview-in-mock-exam.md) | ✅ implemented — Phase E smoke pending |
 | V25 IAP Wire Real | [v25-iap-wire-real-plan.md](v25-iap-wire-real-plan.md) | [v25-iap-wire-real-todo.md](v25-iap-wire-real-todo.md) | [docs/specs/iap-wire-real.md](../docs/specs/iap-wire-real.md) | ✅ implemented (Phase A-G + H1; H2 App Store Connect + H3 TestFlight remain operator-side) |
 | V24 Doc Draft Generator | [v24-doc-draft-generator-plan.md](v24-doc-draft-generator-plan.md) | [v24-doc-draft-generator-todo.md](v24-doc-draft-generator-todo.md) | [docs/specs/v24-doc-draft-generator.md](../docs/specs/v24-doc-draft-generator.md) | ✅ implemented (C4 manual Czech-quality gate pending before prod promotion) |

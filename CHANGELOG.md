@@ -10,6 +10,72 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V37 — Vocab Item Per-item Polly TTS — 2026-05-12
+
+Closes the V11 long-running backlog item. Vocab items now get a single
+Polly Czech MP3 per term, generated on-demand by admin and surfaced as
+a mic button on the QuizcardWidget front face. Reuses the existing
+ExerciseAudioGenerator pipeline (Polly in prod, Dev stub in tests) so
+no new TTS infrastructure landed.
+
+Slice docs: [docs/ideas/v37-vocab-item-polly-tts.md](docs/ideas/v37-vocab-item-polly-tts.md),
+[docs/specs/v37-vocab-item-polly-tts.md](docs/specs/v37-vocab-item-polly-tts.md),
+[tasks/v37-vocab-item-polly-tts-plan.md](tasks/v37-vocab-item-polly-tts-plan.md),
+[tasks/v37-vocab-item-polly-tts-todo.md](tasks/v37-vocab-item-polly-tts-todo.md).
+
+### Backend
+
+- Migration `029_v37_vocab_item_audio.sql` adds `vocabulary_items.audio_storage_key`
+  (TEXT NOT NULL DEFAULT ''); applied via `addColumnIfMissing` on startup
+  so prod RDS does not need an operator step.
+- `VocabularyItem.AudioStorageKey` + omitempty on the wire.
+- `VocabularyStore.SetVocabularyItemAudio` (memory + postgres impls).
+- `POST /v1/admin/vocabulary-items/:id/generate-audio` synthesises the
+  item's `Term` via the existing `ExerciseAudioGenerator` and persists
+  the storage key on the row. Dispatched via a new `handleAdminVocabItem`
+  router that splits the `/image` and `/generate-audio` suffix paths.
+- `QuizcardBasicDetail.AudioStorageKey` field; `v6_handlers.go` publish
+  hook injects it from the matched vocabulary_item alongside the V11
+  image_asset_id.
+
+### CMS
+
+- `vocabulary/page.tsx` adds a 🔊 column between the image + term cells
+  in the editor. Button states: `＋` no audio, `…` generating, `🔊` once
+  storage key persisted (cyan ring matches V36 interview accent).
+  Disabled until the row is saved (id !== undefined) and `term` is
+  non-empty. Errors surface via `window.alert`.
+- New Next.js route `/api/admin/vocabulary-items/[itemId]/generate-audio`
+  proxies the admin token server-side.
+
+### Flutter
+
+- `ExerciseDetail.flashcardAudioStorageKey` parsed from the wire.
+- `QuizcardWidget.audioUrl` optional parameter; mic button rendered top-right
+  of the front face only when set. `just_audio` plays the storage URL with
+  the same `authHeaders` already used by the image loader; playback errors
+  swallow silently.
+- Both QuizcardWidget call sites (`vocab_grammar_exercise_screen.dart`,
+  `deck_session_screen.dart`) forward `client.mediaUri(key)` when present.
+
+### Decisions worth remembering
+
+- Polly storage namespace reuses `exercise-audio/<id>/audio.{mp3,wav}` —
+  vocab item IDs prefix `vocitem-` so collisions cannot occur in practice.
+- No regen cap, no stale-audio warning when admin edits Term post-gen
+  (deferred until learner pilot data justifies it).
+- Audio blob retention on item delete: storage key only referenced from
+  the row, so orphan blobs are acceptable; cleanup deferred.
+
+### Tests
+
+Backend +3 (happy / 404 / empty term in `vocab_item_audio_test.go`);
+full `go test ./...` green. CMS 308 vitest tests unchanged (visual-only
+admin row action). Flutter 394 → 397 (+3 quizcard audio cases). CMS
+`lint` + `build` green.
+
+---
+
 ## V36 — Interview-in-Mock-Exam — 2026-05-12
 
 Open interview (`interview_conversation` + `interview_choice_explain`)
