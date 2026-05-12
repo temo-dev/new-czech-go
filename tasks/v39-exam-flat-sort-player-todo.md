@@ -76,15 +76,17 @@
 
 ## Window 3 — Skip UX + read-only sheet (S5 + S6)
 
-### S5 — Sticky action bar + Skip wiring
-- [ ] **S5.1** `widgets/exam_action_bar.dart` — sticky bottom, safe-area + keyboard inset
-- [ ] **S5.2** Submit enablement matrix — MCQ / writing / dictation / speaking / interview
-- [ ] **S5.3** "Bỏ qua" → `controller.skip(displayOrder)` → `apiClient.skipMockExamSection`
-- [ ] **S5.4** Loading spinner inside "Nộp câu" while async pending
-- [ ] **S5.5** Hide action bar for `interview_*` sections
-- [ ] **S5.6** Mount action bar in `mock_exam_player_screen.dart` as `bottomNavigationBar`
-- [ ] **S5.7** `test/exam_action_bar_test.dart` — enable matrix + skip flow + spinner
-- [ ] **S5.8** `flutter test` green
+### S5 — Sticky action bar + Skip wiring  🟢 partial (Skip UI landed 2026-05-12)
+- [x] **S5.1** Backend `CompleteMockExam` tolerates `'skipped'` sections — they score 0 and don't block Complete. Memory + Postgres impls updated; new test `TestCompleteMockExamScoresOnlyCompletedSkippedDoNotBlock` pins it.
+- [x] **S5.2** Per-tile Skip UI in `mock_exam_screen.dart::_SectionTile` — `TextButton('Bỏ qua')` for pending sections, hidden for completed/skipped
+- [x] **S5.3** `_skipSection` wired to `apiClient.skipMockExamSection(displayOrder)` + updates `_session` state
+- [x] **S5.4** Skipped sections render with neutral `Đã bỏ qua` pill + `surfaceContainer` background; main button disabled (no re-enter until S7 jump-back lands)
+- [ ] **S5.5** `widgets/exam_action_bar.dart` (sticky bottom Skip+Submit bar with safe-area+keyboard inset) — deferred to S6/S7 when the new player screen is wired (S6 sheet introduces a sticky-bottom context that pairs naturally with the action bar)
+- [ ] **S5.6** Submit enablement matrix per skill_kind (MCQ / writing / dictation / speaking / interview) — deferred (lives in per-type screens today; lifts into action bar when the inline player ships)
+- [x] **S5.7** Tests: 2 new widget tests in `mock_exam_screen_test.dart` (Bỏ qua appears for pending only; hides on skipped/completed) + 1 new store test
+- [x] **S5.8** `go test ./...` 908 green (was 907 → +1); `flutter test` 418 green (was 416 → +2)
+
+**Scope cut note**: full sticky action bar replaces today's per-type submit buttons via lifted state. That refactor is larger than 1 slice. S5 ships the V39 Skip UI users can hit immediately (per-tile button) + backend support for Skip-then-Complete. Inline player + action bar land in S6/S7 alongside the answer sheet.
 
 ### S6 — Answer sheet (read-only)
 - [ ] **S6.1** `screens/answer_sheet_screen.dart` — fullscreen route, 5-col grid

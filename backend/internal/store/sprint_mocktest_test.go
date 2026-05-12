@@ -668,6 +668,81 @@ func TestExpireMockExamReturnsNotFoundForUnknownID(t *testing.T) {
 	}
 }
 
+// V39 — Complete must tolerate 'skipped' sections (section_score=0) and
+// only score completed-attempt sections. Skipped sections do not block
+// CompleteMockExam.
+func TestCompleteMockExamScoresOnlyCompletedSkippedDoNotBlock(t *testing.T) {
+	repo := NewMemoryStore()
+	reading := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "cteni_1", Status: "published", Pool: "exam",
+	})
+	speaking := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_1_topic_answers", Status: "published", Pool: "exam",
+	})
+	mt, _ := repo.CreateMockTest(contracts.MockTest{
+		Title:                "Mixed skip + complete",
+		Status:               "published",
+		PassThresholdPercent: 60,
+		Sections: []contracts.MockTestSection{
+			// reading (5 pts) → display_order=1 by max_points ASC.
+			{SequenceNo: 1, SkillKind: "doc", ExerciseID: reading.ID, ExerciseType: reading.ExerciseType, MaxPoints: 5},
+			// speaking (8 pts) → display_order=2.
+			{SequenceNo: 2, SkillKind: "noi", ExerciseID: speaking.ID, ExerciseType: speaking.ExerciseType, MaxPoints: 8},
+		},
+	})
+	session, err := repo.CreateMockExam("learner-1", mt.ID)
+	if err != nil {
+		t.Fatalf("CreateMockExam: %v", err)
+	}
+	// Skip the reading section (display_order=1).
+	if _, err := repo.SkipMockExamSection(session.ID, 1); err != nil {
+		t.Fatalf("SkipMockExamSection: %v", err)
+	}
+	// Complete the speaking section with a scoring attempt.
+	att, err := repo.CreateAttempt("learner-1", speaking.ID, "ios", "1.0", "vi")
+	if err != nil {
+		t.Fatalf("CreateAttempt: %v", err)
+	}
+	repo.CompleteAttempt(att.ID,
+		contracts.Transcript{FullText: "ok"},
+		contracts.AttemptFeedback{ReadinessLevel: "ready"},
+	)
+	if _, err := repo.AdvanceMockExam(session.ID, att.ID); err != nil {
+		t.Fatalf("AdvanceMockExam: %v", err)
+	}
+	// Complete should succeed despite the skipped section.
+	completed, err := repo.CompleteMockExam(session.ID)
+	if err != nil {
+		t.Fatalf("CompleteMockExam: %v (skipped sections must not block)", err)
+	}
+	if completed.Status != "completed" {
+		t.Errorf("Status = %q, want completed", completed.Status)
+	}
+	// Skipped section keeps section_score=0; completed section gets 8.
+	var skippedSec, speakingSec contracts.MockExamSessionItem
+	for _, sec := range completed.Sections {
+		if sec.ExerciseID == reading.ID {
+			skippedSec = sec
+		}
+		if sec.ExerciseID == speaking.ID {
+			speakingSec = sec
+		}
+	}
+	if skippedSec.Status != "skipped" {
+		t.Errorf("reading section status = %q, want skipped", skippedSec.Status)
+	}
+	if skippedSec.SectionScore != 0 {
+		t.Errorf("skipped section score = %d, want 0", skippedSec.SectionScore)
+	}
+	if speakingSec.SectionScore != 8 {
+		t.Errorf("speaking section score = %d, want 8 (ready=full marks)", speakingSec.SectionScore)
+	}
+	// Overall = 8 (speaking) + 0 (skipped); no pronunciation bonus on mixed sprints.
+	if completed.OverallScore != 8 {
+		t.Errorf("overall = %d, want 8", completed.OverallScore)
+	}
+}
+
 func TestMockExamDisplayOrderStableAcrossReads(t *testing.T) {
 	repo := NewMemoryStore()
 	a := repo.CreateExercise(contracts.Exercise{

@@ -411,9 +411,11 @@ func (s *postgresMockExamStore) CompleteMockExam(id string) (contracts.MockExamS
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// V39: 'skipped' sections are a valid terminal state (no scoring,
+	// section_score=0). Only block Complete on rows that are still pending.
 	var pendingCount int
 	if err := s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM mock_exam_sections WHERE session_id = $1 AND status != 'completed'`, id,
+		`SELECT COUNT(*) FROM mock_exam_sections WHERE session_id = $1 AND status NOT IN ('completed', 'skipped')`, id,
 	).Scan(&pendingCount); err != nil {
 		return contracts.MockExamSession{}, fmt.Errorf("check sections: %w", err)
 	}
@@ -421,7 +423,8 @@ func (s *postgresMockExamStore) CompleteMockExam(id string) (contracts.MockExamS
 		return contracts.MockExamSession{}, fmt.Errorf("%d section(s) not yet completed", pendingCount)
 	}
 
-	// Load sections with attempt IDs, max_points, and feedback payloads.
+	// Load completed (attempt-backed) sections only. Skipped sections are
+	// later read back via MockExamByID at section_score=0.
 	srows, err := s.db.QueryContext(ctx,
 		`SELECT
 			ms.sequence_no,

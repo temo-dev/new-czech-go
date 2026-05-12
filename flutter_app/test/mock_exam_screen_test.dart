@@ -156,4 +156,113 @@ void main() {
     expect(find.textContaining('Listening 2'), findsOneWidget);
     expect(find.text('ULOHA_1_TOPIC_ANSWERS'), findsNothing);
   });
+
+  // V39 — Skip button per section tile.
+  testWidgets('MockExamScreen shows "Bỏ qua" per pending section tile', (
+    tester,
+  ) async {
+    final session = MockExamSessionView(
+      id: 'session-1',
+      status: 'in_progress',
+      mockTestId: 'mt-1',
+      overallScore: 0,
+      passed: false,
+      passThresholdPercent: 60,
+      overallReadinessLevel: '',
+      overallSummary: '',
+      sections: const [
+        MockExamSection(
+          sequenceNo: 1,
+          skillKind: 'doc',
+          exerciseId: 'ex-1',
+          exerciseType: 'cteni_1',
+          maxPoints: 5,
+          attemptId: '',
+          sectionScore: 0,
+          status: 'pending',
+          displayOrder: 1,
+        ),
+        MockExamSection(
+          sequenceNo: 2,
+          skillKind: 'noi',
+          exerciseId: 'ex-2',
+          exerciseType: 'uloha_1_topic_answers',
+          maxPoints: 8,
+          attemptId: '',
+          sectionScore: 0,
+          status: 'pending',
+          displayOrder: 2,
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: MockExamScreen(
+          client: ApiClient(),
+          initialSession: session,
+        ),
+      ),
+    );
+
+    // Two pending sections → two "Bỏ qua" buttons.
+    expect(find.text('Bỏ qua'), findsNWidgets(2));
+  });
+
+  testWidgets('MockExamScreen hides "Bỏ qua" for already-skipped or completed sections', (
+    tester,
+  ) async {
+    final session = MockExamSessionView(
+      id: 'session-1',
+      status: 'in_progress',
+      mockTestId: 'mt-1',
+      overallScore: 0,
+      passed: false,
+      passThresholdPercent: 60,
+      overallReadinessLevel: '',
+      overallSummary: '',
+      sections: const [
+        MockExamSection(
+          sequenceNo: 1,
+          skillKind: 'doc',
+          exerciseId: 'ex-1',
+          exerciseType: 'cteni_1',
+          maxPoints: 5,
+          attemptId: '',
+          sectionScore: 0,
+          status: 'skipped',
+          displayOrder: 1,
+        ),
+        MockExamSection(
+          sequenceNo: 2,
+          skillKind: 'noi',
+          exerciseId: 'ex-2',
+          exerciseType: 'uloha_1_topic_answers',
+          maxPoints: 8,
+          attemptId: 'a-2',
+          sectionScore: 8,
+          status: 'completed',
+          displayOrder: 2,
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: MockExamScreen(
+          client: ApiClient(),
+          initialSession: session,
+        ),
+      ),
+    );
+
+    // Neither section is pending → no Bỏ qua buttons.
+    expect(find.text('Bỏ qua'), findsNothing);
+    // Skipped section's main button text mirrors its status.
+    expect(find.text('Đã bỏ qua'), findsWidgets);
+  });
 }

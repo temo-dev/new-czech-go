@@ -164,6 +164,27 @@ class _MockExamScreenState extends State<MockExamScreen> {
     }
   }
 
+  // V39 — mark a pending section as 'skipped' so the learner can move past it.
+  // Once S7 ships jump-back, the same display_order is re-enterable via the
+  // answer sheet. For now the tile shows the new "đã bỏ qua" state and the
+  // learner advances to the next pending section.
+  Future<void> _skipSection(MockExamSection section) async {
+    try {
+      final payload = await widget.client.skipMockExamSection(
+        _session!.id,
+        displayOrder: section.displayOrder,
+      );
+      if (!mounted) return;
+      setState(() {
+        _session = MockExamSessionView.fromJson(payload);
+        _error = null;
+      });
+    } catch (err) {
+      if (!mounted) return;
+      setState(() => _error = err.toString());
+    }
+  }
+
   Future<void> _runSection(MockExamSection section) async {
     final navigator = Navigator.of(context);
     try {
@@ -444,7 +465,11 @@ class _MockExamScreenState extends State<MockExamScreen> {
         ),
         const SizedBox(height: AppSpacing.x5),
         for (final section in session.sections) ...[
-          _SectionTile(section: section, onStart: () => _runSection(section)),
+          _SectionTile(
+            section: section,
+            onStart: () => _runSection(section),
+            onSkip: section.isPending ? () => _skipSection(section) : null,
+          ),
           const SizedBox(height: AppSpacing.x3),
         ],
         if (err != null) ...[
@@ -539,30 +564,48 @@ class _MockExamScreenState extends State<MockExamScreen> {
 }
 
 class _SectionTile extends StatelessWidget {
-  const _SectionTile({required this.section, required this.onStart});
+  const _SectionTile({
+    required this.section,
+    required this.onStart,
+    this.onSkip,
+  });
 
   final MockExamSection section;
   final VoidCallback onStart;
+
+  /// V39 — fires when the learner taps "Bỏ qua" on this tile. Null for
+  /// sections that are already completed/skipped (button hidden).
+  final VoidCallback? onSkip;
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final skill = skillLabel(l, sectionSkillKind(section));
     final exercise = _exerciseTypeLabel(l, section.exerciseType);
-    final tone =
-        section.isCompleted
-            ? PillTone.info
-            : (section.isPending ? PillTone.primary : PillTone.neutral);
-    final label =
-        section.isCompleted
-            ? l.mockExamStatusRecorded
-            : l.mockExamStatusPending;
+    final PillTone tone;
+    final String label;
+    if (section.isCompleted) {
+      tone = PillTone.info;
+      label = l.mockExamStatusRecorded;
+    } else if (section.isSkipped) {
+      tone = PillTone.neutral;
+      label = 'Đã bỏ qua';
+    } else {
+      tone = PillTone.primary;
+      label = l.mockExamStatusPending;
+    }
     return Container(
       padding: const EdgeInsets.all(AppSpacing.x4),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: section.isSkipped
+            ? AppColors.surfaceContainer
+            : AppColors.surfaceContainerLowest,
         borderRadius: AppRadius.lgAll,
-        border: Border.all(color: AppColors.outlineVariant),
+        border: Border.all(
+          color: section.isSkipped
+              ? AppColors.outline
+              : AppColors.outlineVariant,
+        ),
       ),
       child: Row(
         children: [
@@ -580,10 +623,10 @@ class _SectionTile extends StatelessWidget {
                 Text(
                   section.maxPoints > 0
                       ? l.mockExamSectionMeta(
-                        skill,
-                        exercise,
-                        section.maxPoints,
-                      )
+                          skill,
+                          exercise,
+                          section.maxPoints,
+                        )
                       : '$skill · $exercise',
                   style: AppTypography.bodySmall.copyWith(
                     color: AppColors.onSurfaceVariant,
@@ -593,13 +636,35 @@ class _SectionTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.x3),
-          FilledButton(
-            onPressed: section.isPending ? onStart : null,
-            child: Text(
-              section.isCompleted
-                  ? l.mockExamActionDone
-                  : l.mockExamActionStart,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              FilledButton(
+                onPressed: section.isPending ? onStart : null,
+                child: Text(
+                  section.isCompleted
+                      ? l.mockExamActionDone
+                      : section.isSkipped
+                          ? 'Đã bỏ qua'
+                          : l.mockExamActionStart,
+                ),
+              ),
+              if (onSkip != null) ...[
+                const SizedBox(height: AppSpacing.x1),
+                TextButton(
+                  onPressed: onSkip,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.onSurfaceVariant,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.x3,
+                      vertical: AppSpacing.x1,
+                    ),
+                    minimumSize: const Size(0, 36),
+                  ),
+                  child: const Text('Bỏ qua'),
+                ),
+              ],
+            ],
           ),
         ],
       ),

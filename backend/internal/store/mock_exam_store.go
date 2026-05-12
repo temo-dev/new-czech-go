@@ -293,21 +293,31 @@ func (s *memoryMockExamStore) CompleteMockExam(id string) (contracts.MockExamSes
 		s.mu.Unlock()
 		return contracts.MockExamSession{}, fmt.Errorf("mock exam not found")
 	}
+	// V39: skipped sections are a valid terminal state — they contribute 0
+	// points but don't block Complete. Track which positions are "scoreable"
+	// (attempt-backed) vs "skipped" so we can splice section_score=0 back
+	// into the original order after the scoring rollup.
 	attemptIDs := make([]string, 0, len(session.Sections))
-	for _, sec := range session.Sections {
+	scoreablePositions := make([]int, 0, len(session.Sections))
+	for i, sec := range session.Sections {
+		if sec.Status == "skipped" {
+			continue
+		}
 		if sec.Status != "completed" || sec.AttemptID == "" {
 			s.mu.Unlock()
 			return contracts.MockExamSession{}, fmt.Errorf("section %d not completed", sec.SequenceNo)
 		}
 		attemptIDs = append(attemptIDs, sec.AttemptID)
+		scoreablePositions = append(scoreablePositions, i)
 	}
-	maxPoints := make([]int, len(session.Sections))
-	for i, sec := range session.Sections {
+	scoreableMaxPoints := make([]int, len(attemptIDs))
+	for k, pos := range scoreablePositions {
+		sec := session.Sections[pos]
 		mp := sec.MaxPoints
 		if mp == 0 {
 			mp = defaultMaxPoints[sec.ExerciseType]
 		}
-		maxPoints[i] = mp
+		scoreableMaxPoints[k] = mp
 	}
 	s.mu.Unlock()
 
@@ -322,10 +332,10 @@ func (s *memoryMockExamStore) CompleteMockExam(id string) (contracts.MockExamSes
 			return contracts.MockExamSession{}, fmt.Errorf("attempt %s is not completed", aid)
 		}
 		levels = append(levels, attempt.Feedback.ReadinessLevel)
-		inputs = append(inputs, mockExamScoringInputFromFeedback(attempt.Feedback, maxPoints[i]))
+		inputs = append(inputs, mockExamScoringInputFromFeedback(attempt.Feedback, scoreableMaxPoints[i]))
 	}
 	level, summary := rollupReadiness(levels)
-	sectionScores, _, overallScore, passed := computeScoring(inputs, session.PassThresholdPercent, shouldApplyPronunciationBonus(session.Sections))
+	scoreableScores, _, overallScore, passed := computeScoring(inputs, session.PassThresholdPercent, shouldApplyPronunciationBonus(session.Sections))
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -335,9 +345,11 @@ func (s *memoryMockExamStore) CompleteMockExam(id string) (contracts.MockExamSes
 	session.OverallSummary = summary
 	session.OverallScore = overallScore
 	session.Passed = passed
-	for i := range session.Sections {
-		if i < len(sectionScores) {
-			session.Sections[i].SectionScore = sectionScores[i]
+	// Splice scoreable scores back into their original section positions;
+	// skipped sections stay at section_score=0.
+	for k, pos := range scoreablePositions {
+		if k < len(scoreableScores) && pos < len(session.Sections) {
+			session.Sections[pos].SectionScore = scoreableScores[k]
 		}
 	}
 	return *session, nil
