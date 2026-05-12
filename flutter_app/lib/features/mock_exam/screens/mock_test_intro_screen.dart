@@ -191,13 +191,14 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
     );
   }
 
-  static const _skillKindOrder = ['noi', 'nghe', 'doc', 'viet'];
+  static const _skillKindOrder = ['noi', 'nghe', 'doc', 'viet', 'interview'];
 
   static String _skillGroupLabel(String kind) => switch (kind) {
     'noi' => 'Nói (Speaking)',
     'nghe' => 'Nghe (Listening)',
     'doc' => 'Đọc (Reading)',
     'viet' => 'Viết (Writing)',
+    'interview' => 'Hội thoại AI',
     _ => kind.toUpperCase(),
   };
 
@@ -206,6 +207,7 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
     'nghe' => AppColors.info,
     'doc' => AppColors.warning,
     'viet' => AppColors.success,
+    'interview' => AppColors.interview,
     _ => AppColors.onSurfaceVariant,
   };
 
@@ -214,6 +216,7 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
     'nghe' => Icons.headphones_outlined,
     'doc' => Icons.menu_book_outlined,
     'viet' => Icons.edit_outlined,
+    'interview' => Icons.forum_outlined,
     _ => Icons.school_outlined,
   };
 

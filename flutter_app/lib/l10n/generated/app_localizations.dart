@@ -401,6 +401,12 @@ abstract class AppLocalizations {
   /// **'Viết'**
   String get skillViet;
 
+  /// No description provided for @skillInterview.
+  ///
+  /// In vi, this message translates to:
+  /// **'Hội thoại AI'**
+  String get skillInterview;
+
   /// No description provided for @skillTuVung.
   ///
   /// In vi, this message translates to:

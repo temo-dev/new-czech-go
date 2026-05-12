@@ -184,6 +184,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get skillViet => 'Viết';
 
   @override
+  String get skillInterview => 'Hội thoại AI';
+
+  @override
   String get skillTuVung => 'Từ vựng';
 
   @override

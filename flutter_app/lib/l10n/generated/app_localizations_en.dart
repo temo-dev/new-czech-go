@@ -184,6 +184,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skillViet => 'Writing';
 
   @override
+  String get skillInterview => 'AI Conversation';
+
+  @override
   String get skillTuVung => 'Vocabulary';
 
   @override

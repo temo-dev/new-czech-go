@@ -60,6 +60,10 @@ abstract final class AppColors {
   static const info          = Color(0xFF3060B8);
   static const infoContainer = Color(0xFFDEE9F7);
 
+  // ── Interview / AI conversation (V36) ────────────────────────────────────
+  static const interview          = Color(0xFF0891B2);
+  static const interviewContainer = Color(0xFFCFF1F6);
+
   // ── Score grade bands ─────────────────────────────────────────────────────
   static const scoreExcellent = Color(0xFF1F8A4D); // 85–100
   static const scoreGood      = Color(0xFF3060B8); // 70–84
