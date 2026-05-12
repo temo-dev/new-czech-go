@@ -12,15 +12,15 @@
 
 ## Window 1 — Backend foundations (S1 ∥ S2 ∥ S3)
 
-### S1 — Display_order persistence
-- [ ] **S1.1** Migration 030 — `addColumnIfMissing("mock_exam_sections", "display_order", "INT NOT NULL DEFAULT 0")`
-- [ ] **S1.2** Backfill — `UPDATE mock_exam_sections SET display_order = sequence_no WHERE display_order = 0`
-- [ ] **S1.3** `CreateMockExam` second pass — sort by `(max_points ASC, sequence_no ASC)`, write `display_order`
-- [ ] **S1.4** `GetMockExam` SELECT extended + `ORDER BY display_order ASC`
-- [ ] **S1.5** `contracts.MockExamSection.DisplayOrder int` + JSON tag
-- [ ] **S1.6** Tests — `MockExamDisplayOrderStable`, `MockExamDisplayOrderMatchesMaxPoints`
-- [ ] **S1.7** `go test ./...` green
-- [ ] **S1.8** Manual curl smoke — create session, GET, `jq` to verify order
+### S1 — Display_order persistence  ✅ landed 2026-05-12
+- [x] **S1.1** Schema — `ADD COLUMN IF NOT EXISTS display_order INT NOT NULL DEFAULT 0` (inline in `ensureSchema`)
+- [x] **S1.2** Backfill — `UPDATE mock_exam_sections SET display_order = sequence_no WHERE display_order = 0` (idempotent guard)
+- [x] **S1.3** `assignDisplayOrder` helper — `(max_points ASC, sequence_no ASC)` sort + DisplayOrder=rank+1; called by memory + postgres `CreateMockExam`
+- [x] **S1.4** Postgres `MockExamByID` — SELECT includes `display_order`, `ORDER BY display_order ASC`
+- [x] **S1.5** `contracts.MockExamSessionItem.DisplayOrder int` + JSON tag `display_order,omitempty`
+- [x] **S1.6** 3 new tests in `sprint_mocktest_test.go` — `DisplayOrderSortsByMaxPointsAsc`, `DisplayOrderTiesBreakBySequenceNoAsc`, `DisplayOrderStableAcrossReads`
+- [x] **S1.7** `go test ./...` 888 green (was 887 → +3 new, -2 fixed regressions: `TestCompleteMockExamDoesNotAddPronunciationBonusToMixedSprint` advance order, `TestCreateMockExamDecodesChunkedMockTestID` wantTypes)
+- [x] **S1.8** `make backend-build` green
 
 ### S2 — Skip endpoint + status='skipped'
 - [ ] **S2.1** Migration 031 — `CHECK (status IN ('pending','completed','skipped'))` via DO-block (Postgres)

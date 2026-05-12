@@ -378,11 +378,15 @@ func TestCompleteMockExamDoesNotAddPronunciationBonusToMixedSprint(t *testing.T)
 			MaxScore: 5,
 		},
 	})
-	if _, err := repo.AdvanceMockExam(session.ID, speakingAttempt.ID); err != nil {
-		t.Fatalf("AdvanceMockExam speaking: %v", err)
-	}
+	// V39 flat-sort: sections are ordered by max_points ASC, so the reading
+	// section (5 points) comes before the speaking section (8 points). The
+	// memory store's strict first-pending check requires advancing in that
+	// order until S7 introduces target-display-order semantics.
 	if _, err := repo.AdvanceMockExam(session.ID, readingAttempt.ID); err != nil {
 		t.Fatalf("AdvanceMockExam reading: %v", err)
+	}
+	if _, err := repo.AdvanceMockExam(session.ID, speakingAttempt.ID); err != nil {
+		t.Fatalf("AdvanceMockExam speaking: %v", err)
 	}
 
 	completed, err := repo.CompleteMockExam(session.ID)
@@ -439,6 +443,138 @@ func TestAdvanceMockExamRejectsAttemptForDifferentExercise(t *testing.T) {
 	}
 	if unchanged.Sections[0].Status != "pending" || unchanged.Sections[0].AttemptID != "" {
 		t.Fatalf("section mutated after rejected advance: %+v", unchanged.Sections[0])
+	}
+}
+
+// ── V39 display_order tests ─────────────────────────────────────────────────
+
+func TestMockExamDisplayOrderSortsByMaxPointsAsc(t *testing.T) {
+	repo := NewMemoryStore()
+	ex8 := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_1_topic_answers", Status: "published", Pool: "exam",
+	})
+	ex12 := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_2_dialogue_questions", Status: "published", Pool: "exam",
+	})
+	ex7 := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_4_choice_reasoning", Status: "published", Pool: "exam",
+	})
+	mt, _ := repo.CreateMockTest(contracts.MockTest{
+		Title:  "Mixed points",
+		Status: "published",
+		Sections: []contracts.MockTestSection{
+			{SequenceNo: 1, ExerciseID: ex8.ID, ExerciseType: ex8.ExerciseType, MaxPoints: 8},
+			{SequenceNo: 2, ExerciseID: ex12.ID, ExerciseType: ex12.ExerciseType, MaxPoints: 12},
+			{SequenceNo: 3, ExerciseID: ex7.ID, ExerciseType: ex7.ExerciseType, MaxPoints: 7},
+		},
+	})
+	session, err := repo.CreateMockExam("learner-1", mt.ID)
+	if err != nil {
+		t.Fatalf("CreateMockExam: %v", err)
+	}
+	if len(session.Sections) != 3 {
+		t.Fatalf("section count = %d, want 3", len(session.Sections))
+	}
+	wantMaxPts := []int{7, 8, 12}
+	wantDispOrder := []int{1, 2, 3}
+	wantOriginalSeq := []int{3, 1, 2}
+	for i, sec := range session.Sections {
+		if sec.MaxPoints != wantMaxPts[i] {
+			t.Errorf("sections[%d].MaxPoints = %d, want %d", i, sec.MaxPoints, wantMaxPts[i])
+		}
+		if sec.DisplayOrder != wantDispOrder[i] {
+			t.Errorf("sections[%d].DisplayOrder = %d, want %d", i, sec.DisplayOrder, wantDispOrder[i])
+		}
+		if sec.SequenceNo != wantOriginalSeq[i] {
+			t.Errorf("sections[%d].SequenceNo = %d, want %d (original)", i, sec.SequenceNo, wantOriginalSeq[i])
+		}
+	}
+}
+
+func TestMockExamDisplayOrderTiesBreakBySequenceNoAsc(t *testing.T) {
+	repo := NewMemoryStore()
+	a := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_1_topic_answers", Status: "published", Pool: "exam",
+	})
+	b := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_2_dialogue_questions", Status: "published", Pool: "exam",
+	})
+	c := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_3_story_narration", Status: "published", Pool: "exam",
+	})
+	mt, _ := repo.CreateMockTest(contracts.MockTest{
+		Title:  "Tied points",
+		Status: "published",
+		Sections: []contracts.MockTestSection{
+			{SequenceNo: 1, ExerciseID: a.ID, ExerciseType: a.ExerciseType, MaxPoints: 5},
+			{SequenceNo: 2, ExerciseID: b.ID, ExerciseType: b.ExerciseType, MaxPoints: 5},
+			{SequenceNo: 3, ExerciseID: c.ID, ExerciseType: c.ExerciseType, MaxPoints: 10},
+		},
+	})
+	session, err := repo.CreateMockExam("learner-1", mt.ID)
+	if err != nil {
+		t.Fatalf("CreateMockExam: %v", err)
+	}
+	wantOrder := []string{a.ID, b.ID, c.ID}
+	wantDisp := []int{1, 2, 3}
+	for i, sec := range session.Sections {
+		if sec.ExerciseID != wantOrder[i] {
+			t.Errorf("sections[%d].ExerciseID = %s, want %s", i, sec.ExerciseID, wantOrder[i])
+		}
+		if sec.DisplayOrder != wantDisp[i] {
+			t.Errorf("sections[%d].DisplayOrder = %d, want %d", i, sec.DisplayOrder, wantDisp[i])
+		}
+	}
+}
+
+func TestMockExamDisplayOrderStableAcrossReads(t *testing.T) {
+	repo := NewMemoryStore()
+	a := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_1_topic_answers", Status: "published", Pool: "exam",
+	})
+	b := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_2_dialogue_questions", Status: "published", Pool: "exam",
+	})
+	mt, _ := repo.CreateMockTest(contracts.MockTest{
+		Title:  "Stable",
+		Status: "published",
+		Sections: []contracts.MockTestSection{
+			{SequenceNo: 1, ExerciseID: a.ID, ExerciseType: a.ExerciseType, MaxPoints: 10},
+			{SequenceNo: 2, ExerciseID: b.ID, ExerciseType: b.ExerciseType, MaxPoints: 5},
+		},
+	})
+	created, err := repo.CreateMockExam("learner-1", mt.ID)
+	if err != nil {
+		t.Fatalf("CreateMockExam: %v", err)
+	}
+	read1, ok := repo.MockExamByID(created.ID)
+	if !ok {
+		t.Fatal("MockExamByID first read failed")
+	}
+	read2, ok := repo.MockExamByID(created.ID)
+	if !ok {
+		t.Fatal("MockExamByID second read failed")
+	}
+	if len(read1.Sections) != 2 || len(read2.Sections) != 2 {
+		t.Fatalf("section counts: read1=%d read2=%d", len(read1.Sections), len(read2.Sections))
+	}
+	for i := 0; i < 2; i++ {
+		if read1.Sections[i].DisplayOrder != read2.Sections[i].DisplayOrder {
+			t.Errorf("read1.Sections[%d].DisplayOrder=%d != read2.Sections[%d].DisplayOrder=%d",
+				i, read1.Sections[i].DisplayOrder, i, read2.Sections[i].DisplayOrder)
+		}
+		if read1.Sections[i].ExerciseID != read2.Sections[i].ExerciseID {
+			t.Errorf("read1.Sections[%d].ExerciseID=%s != read2.Sections[%d].ExerciseID=%s",
+				i, read1.Sections[i].ExerciseID, i, read2.Sections[i].ExerciseID)
+		}
+	}
+	// Expected: B (max_points=5) first, A (max_points=10) second.
+	if read1.Sections[0].ExerciseID != b.ID {
+		t.Errorf("read1.Sections[0].ExerciseID = %s, want %s (lowest max_points)",
+			read1.Sections[0].ExerciseID, b.ID)
+	}
+	if read1.Sections[0].DisplayOrder != 1 {
+		t.Errorf("read1.Sections[0].DisplayOrder = %d, want 1", read1.Sections[0].DisplayOrder)
 	}
 }
 

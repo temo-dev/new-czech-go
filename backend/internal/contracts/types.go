@@ -759,6 +759,10 @@ type MockExamSessionItem struct {
 	AttemptID    string `json:"attempt_id,omitempty"`
 	SectionScore int    `json:"section_score,omitempty"`
 	Status       string `json:"status"`
+	// V39: flat-sort cursor. Server-computed at session create:
+	// rank by (max_points ASC, sequence_no ASC) starting at 1.
+	// Stable across reads. Pre-V39 sessions backfill DisplayOrder=SequenceNo.
+	DisplayOrder int `json:"display_order,omitempty"`
 }
 
 // ── V6: Vocabulary & Grammar LLM-Assisted Authoring ─────────────────────────

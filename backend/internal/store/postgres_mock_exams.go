@@ -68,7 +68,13 @@ ALTER TABLE mock_exam_sessions
 
 ALTER TABLE mock_exam_sections
     ADD COLUMN IF NOT EXISTS max_points    INTEGER NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS section_score INTEGER NOT NULL DEFAULT 0;
+    ADD COLUMN IF NOT EXISTS section_score INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS display_order INTEGER NOT NULL DEFAULT 0;
+
+-- V39 backfill: pre-V39 rows have display_order=0; fill with sequence_no
+-- so the new ORDER BY display_order ASC reproduces legacy sequence order.
+-- Idempotent — only touches rows that haven't been backfilled.
+UPDATE mock_exam_sections SET display_order = sequence_no WHERE display_order = 0;
 `)
 	return err
 }
@@ -124,6 +130,11 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 		}
 	}
 
+	// V39: rank sections by (max_points ASC, sequence_no ASC) and write
+	// display_order before INSERT. Mutates the slice in place so the returned
+	// session reflects the same order the API will serve on subsequent reads.
+	assignDisplayOrder(sections)
+
 	id := newUUIDLikeID()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -140,8 +151,8 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 
 	for _, sec := range sections {
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO mock_exam_sections (session_id, sequence_no, exercise_id, exercise_type, max_points, status) VALUES ($1,$2,$3,$4,$5,'pending')`,
-			id, sec.SequenceNo, sec.ExerciseID, sec.ExerciseType, sec.MaxPoints,
+			`INSERT INTO mock_exam_sections (session_id, sequence_no, exercise_id, exercise_type, max_points, status, display_order) VALUES ($1,$2,$3,$4,$5,'pending',$6)`,
+			id, sec.SequenceNo, sec.ExerciseID, sec.ExerciseType, sec.MaxPoints, sec.DisplayOrder,
 		); err != nil {
 			return contracts.MockExamSession{}, fmt.Errorf("insert mock exam section: %w", err)
 		}
@@ -178,7 +189,7 @@ func (s *postgresMockExamStore) MockExamByID(id string) (contracts.MockExamSessi
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT sequence_no, exercise_id, exercise_type, max_points, attempt_id, section_score, status FROM mock_exam_sections WHERE session_id = $1 ORDER BY sequence_no`,
+		`SELECT sequence_no, exercise_id, exercise_type, max_points, attempt_id, section_score, status, display_order FROM mock_exam_sections WHERE session_id = $1 ORDER BY display_order ASC`,
 		id,
 	)
 	if err != nil {
@@ -188,7 +199,7 @@ func (s *postgresMockExamStore) MockExamByID(id string) (contracts.MockExamSessi
 
 	for rows.Next() {
 		var sec contracts.MockExamSessionItem
-		if err := rows.Scan(&sec.SequenceNo, &sec.ExerciseID, &sec.ExerciseType, &sec.MaxPoints, &sec.AttemptID, &sec.SectionScore, &sec.Status); err != nil {
+		if err := rows.Scan(&sec.SequenceNo, &sec.ExerciseID, &sec.ExerciseType, &sec.MaxPoints, &sec.AttemptID, &sec.SectionScore, &sec.Status, &sec.DisplayOrder); err != nil {
 			return contracts.MockExamSession{}, false
 		}
 		sec.SkillKind = skillKindForExerciseType(sec.ExerciseType)

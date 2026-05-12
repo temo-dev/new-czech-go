@@ -1175,10 +1175,14 @@ func TestCreateMockExamDecodesChunkedMockTestID(t *testing.T) {
 		section := raw.(map[string]any)
 		gotTypes = append(gotTypes, section["exercise_type"].(string))
 	}
+	// V39 flat-sort: sections come back ordered by (max_points ASC,
+	// sequence_no ASC). Input was [uloha_1 (8,seq1), poslech_2 (5,seq2),
+	// cteni_1 (5,seq3), psani_1 (8,seq4)] → output ranks [poslech_2,
+	// cteni_1, uloha_1, psani_1].
 	wantTypes := []string{
-		"uloha_1_topic_answers",
 		"poslech_2",
 		"cteni_1",
+		"uloha_1_topic_answers",
 		"psani_1_formular",
 	}
 	for i := range wantTypes {

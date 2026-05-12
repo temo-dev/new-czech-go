@@ -2,10 +2,26 @@ package store
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
+
+// assignDisplayOrder sorts sections by (max_points ASC, sequence_no ASC)
+// and writes DisplayOrder = rank+1 into each section, mutating the slice
+// in place to reflect the new order. V39 flat-sort cursor.
+func assignDisplayOrder(sections []contracts.MockExamSessionItem) {
+	sort.SliceStable(sections, func(i, j int) bool {
+		if sections[i].MaxPoints != sections[j].MaxPoints {
+			return sections[i].MaxPoints < sections[j].MaxPoints
+		}
+		return sections[i].SequenceNo < sections[j].SequenceNo
+	})
+	for i := range sections {
+		sections[i].DisplayOrder = i + 1
+	}
+}
 
 // MockExamStore manages mock exam sessions. The learnerID parameter is stored
 // for persistence but not used for access control (HTTP layer enforces that).
@@ -86,6 +102,8 @@ func (s *memoryMockExamStore) CreateMockExam(learnerID, mockTestID string, mockT
 			})
 		}
 	}
+
+	assignDisplayOrder(sections)
 
 	id := fmt.Sprintf("mock-session-%d", s.nextSession)
 	s.nextSession++
