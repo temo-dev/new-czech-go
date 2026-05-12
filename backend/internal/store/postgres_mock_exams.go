@@ -357,6 +357,43 @@ func (s *postgresMockExamStore) ExpireMockExam(sessionID string) (contracts.Mock
 	return session, nil
 }
 
+// AdvanceSectionAt — V39 postgres impl. Updates the section at
+// (sessionID, displayOrder) with the provided attempt regardless of prior
+// status. Useful for sheet jump-back where the learner re-answers a
+// section that was previously 'skipped' or 'completed'.
+func (s *postgresMockExamStore) AdvanceSectionAt(sessionID, attemptID string, displayOrder int) (contracts.MockExamSession, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var sessionStatus string
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT status FROM mock_exam_sessions WHERE id = $1`, sessionID,
+	).Scan(&sessionStatus); err == sql.ErrNoRows {
+		return contracts.MockExamSession{}, ErrSectionNotFound
+	} else if err != nil {
+		return contracts.MockExamSession{}, fmt.Errorf("query mock exam: %w", err)
+	}
+	if sessionStatus == "completed" {
+		return contracts.MockExamSession{}, fmt.Errorf("mock exam already completed")
+	}
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE mock_exam_sections SET attempt_id = $1, status = 'completed' WHERE session_id = $2 AND display_order = $3`,
+		attemptID, sessionID, displayOrder,
+	)
+	if err != nil {
+		return contracts.MockExamSession{}, fmt.Errorf("advance section at: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil || n == 0 {
+		return contracts.MockExamSession{}, ErrSectionNotFound
+	}
+	session, ok := s.MockExamByID(sessionID)
+	if !ok {
+		return contracts.MockExamSession{}, fmt.Errorf("mock exam not found after advance-at")
+	}
+	return session, nil
+}
+
 func (s *postgresMockExamStore) AdvanceMockExam(id, attemptID string) (contracts.MockExamSession, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

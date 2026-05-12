@@ -101,6 +101,12 @@ class _MockExamScreenState extends State<MockExamScreen> {
   bool _analyzing = false;
   int _analyzeProgress = 0;
 
+  /// V39 S7 — when set, the next `_advanceSection` call passes this
+  /// `target_display_order` to the server so the attempt is attached to a
+  /// specific section (jump-back from the answer sheet). Reset to null
+  /// after consumption so the linear-advance path resumes.
+  int? _jumpTarget;
+
   @override
   void initState() {
     super.initState();
@@ -150,14 +156,17 @@ class _MockExamScreenState extends State<MockExamScreen> {
 
   Future<void> _advanceSection(String attemptId) async {
     try {
+      final target = _jumpTarget;
       final payload = await widget.client.advanceMockExam(
         _session!.id,
         attemptId: attemptId,
+        targetDisplayOrder: target,
       );
       if (!mounted) return;
       setState(() {
         _session = MockExamSessionView.fromJson(payload);
         _error = null;
+        _jumpTarget = null; // consume the jump target on first advance.
       });
     } catch (err) {
       if (!mounted) return;
@@ -403,20 +412,32 @@ class _MockExamScreenState extends State<MockExamScreen> {
       appBar: AppBar(
         title: Text(mockTitle.isNotEmpty ? mockTitle : l.mockExamTitle),
         actions: [
-          // V39 — open the read-only Answer Sheet. Disabled until the session
-          // has loaded; S7 turns the chips into jump-back actions.
+          // V39 — open the Answer Sheet. S7: tapping a chip pops with the
+          // section's display_order, and we re-run that section with the
+          // server's jump-back semantics (`target_display_order`).
           IconButton(
             icon: const Icon(Icons.grid_view_rounded),
             tooltip: 'Danh sách câu',
             onPressed: session == null
                 ? null
-                : () {
-                    Navigator.of(context).push(
+                : () async {
+                    final picked = await Navigator.of(context).push<int>(
                       MaterialPageRoute(
                         fullscreenDialog: true,
                         builder: (_) => AnswerSheetScreen(session: session),
                       ),
                     );
+                    if (!mounted || picked == null) return;
+                    MockExamSection? target;
+                    for (final s in _session!.sections) {
+                      if (s.displayOrder == picked) {
+                        target = s;
+                        break;
+                      }
+                    }
+                    if (target == null) return;
+                    setState(() => _jumpTarget = picked);
+                    await _runSection(target);
                   },
           ),
         ],

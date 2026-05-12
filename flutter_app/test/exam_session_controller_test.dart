@@ -31,6 +31,7 @@ class _FakeApi extends ApiClient {
   Future<Map<String, dynamic>> advanceMockExam(
     String id, {
     required String attemptId,
+    int? targetDisplayOrder,
   }) async {
     lastAdvanceAttemptId = attemptId;
     return _advanceResult!;

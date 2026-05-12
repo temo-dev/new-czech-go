@@ -171,11 +171,17 @@ class _SkillGrid extends StatelessWidget {
       runSpacing: AppSpacing.x3,
       children: [
         for (final s in sections)
-          QuestionStatusChip(
-            label: s.displayOrder.toString(),
-            state: sectionStateFor(s, currentDisplayOrder: currentDisplayOrder),
-            // S7 will set onTap → pop with the displayOrder so the
-            // caller can jump back. Kept null in S6 for read-only.
+          Builder(
+            builder: (cellContext) => QuestionStatusChip(
+              label: s.displayOrder.toString(),
+              state: sectionStateFor(
+                s,
+                currentDisplayOrder: currentDisplayOrder,
+              ),
+              // V39 S7 — tap pops with this section's displayOrder so the
+              // caller (mock-exam screen) can jump the player back to it.
+              onTap: () => Navigator.of(cellContext).pop(s.displayOrder),
+            ),
           ),
       ],
     );

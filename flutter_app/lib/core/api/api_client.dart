@@ -790,11 +790,20 @@ class ApiClient {
   Future<Map<String, dynamic>> advanceMockExam(
     String id, {
     required String attemptId,
+    // V39 — when set, jump-back semantics: the server attaches the attempt
+    // to the section at `targetDisplayOrder` regardless of its prior status
+    // (skipped sections become completed, completed sections get the new
+    // attempt_id). Omit for the legacy linear advance.
+    int? targetDisplayOrder,
   }) async {
+    final body = <String, dynamic>{'attempt_id': attemptId};
+    if (targetDisplayOrder != null && targetDisplayOrder > 0) {
+      body['target_display_order'] = targetDisplayOrder;
+    }
     final payload = await _authed(
       'POST',
       '/v1/mock-exams/$id/advance',
-      body: {'attempt_id': attemptId},
+      body: body,
     );
     return payload['data'] as Map<String, dynamic>;
   }

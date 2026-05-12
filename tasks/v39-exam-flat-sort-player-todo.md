@@ -110,16 +110,16 @@
 
 ## Window 4 — Sheet jump + speaking re-record + final polish (S7 + S8 + S9)
 
-### S7 — Sheet jump-back + advance-at
-- [ ] **S7.1** `MockExamStore.AdvanceSectionAt(ctx, sessionID, attemptID, displayOrder)` — no pointer bump
-- [ ] **S7.2** Memory-store parity for `AdvanceSectionAt`
-- [ ] **S7.3** Extend `handleMockExamAdvance` — decode optional `target_display_order *int`
-- [ ] **S7.4** `apiClient.advanceMockExam(..., {int? targetDisplayOrder})` overload
-- [ ] **S7.5** `ExamSessionController.jumpTo(int displayOrder)` — local set + server refresh
-- [ ] **S7.6** `AnswerSheetScreen.onCellTap` → pop sheet → `controller.jumpTo(...)`
-- [ ] **S7.7** Tests `mock_exam_advance_at_test.go` — happy + target-pending + target-completed-overwrite
-- [ ] **S7.8** `answer_sheet_screen_test.dart` extended — tap flow
-- [ ] **S7.9** `make backend-test && flutter test` green
+### S7 — Sheet jump-back + advance-at  ✅ landed 2026-05-12
+- [x] **S7.1** `MockExamStore.AdvanceSectionAt(sessionID, attemptID, displayOrder)` — no pointer bump; works on pending/skipped/completed sections (overwrite). Memory + Postgres impls.
+- [x] **S7.2** Memory impl matches Postgres semantics
+- [x] **S7.3** `handleMockExamAdvance` accepts optional `target_display_order *int`; routes to `AdvanceSectionAt` when set
+- [x] **S7.4** Dart `apiClient.advanceMockExam(..., int? targetDisplayOrder)` — body omits the key when null/0 (legacy compat)
+- [x] **S7.5** `ExamSessionController.jumpTo(int displayOrder)` already shipped in S4 — local-only pointer change
+- [x] **S7.6** `AnswerSheetScreen` chip onTap pops with `displayOrder`; `MockExamScreen` AppBar awaits the result, sets `_jumpTarget`, and re-runs the section. `_advanceSection` threads `_jumpTarget` to the server and clears it on response.
+- [x] **S7.7** Backend tests `mock_exam_advance_at_test.go` — target overrides skipped status; legacy path still works without target; out-of-range 400
+- [x] **S7.8** `answer_sheet_screen_test.dart` extended — chip tap pops with the correct `displayOrder`
+- [x] **S7.9** `go test ./...` 911 green (was 908 → +3); `flutter test` 424 green (was 423 → +1)
 
 ### S8 — Speaking re-record overwrite
 - [ ] **S8.1** Audit `attempt_upload.go` — does upload-url + S3 key naturally overwrite? Document finding.

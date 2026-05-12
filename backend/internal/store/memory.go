@@ -527,6 +527,12 @@ func (s *MemoryStore) SkipMockExamSection(sessionID string, displayOrder int) (c
 	return s.mockExams.SkipSection(sessionID, displayOrder)
 }
 
+// V39: jump-back advance — attach an attempt to a specific section by
+// `displayOrder` regardless of prior status.
+func (s *MemoryStore) AdvanceMockExamSectionAt(sessionID, attemptID string, displayOrder int) (contracts.MockExamSession, error) {
+	return s.mockExams.AdvanceSectionAt(sessionID, attemptID, displayOrder)
+}
+
 // V39: list mock-exam session IDs whose timer has run out.
 func (s *MemoryStore) ListExpiredMockExams(now time.Time) ([]string, error) {
 	return s.mockExams.ListExpired(now)

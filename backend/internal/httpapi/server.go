@@ -2060,8 +2060,13 @@ func (s *Server) handleMockExamAdvance(w http.ResponseWriter, r *http.Request, i
 		writeMethodNotAllowed(w)
 		return
 	}
+	// V39: optional `target_display_order` triggers jump-back semantics —
+	// the server attaches the attempt to that specific section without
+	// scanning for the first-pending row. Omit it for the legacy linear
+	// advance path; old clients keep working.
 	var req struct {
-		AttemptID string `json:"attempt_id"`
+		AttemptID          string `json:"attempt_id"`
+		TargetDisplayOrder *int   `json:"target_display_order,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.AttemptID) == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
@@ -2089,7 +2094,15 @@ func (s *Server) handleMockExamAdvance(w http.ResponseWriter, r *http.Request, i
 		writeError(w, http.StatusForbidden, "forbidden", "You do not have access to this mock exam.", false)
 		return
 	}
-	session, err := s.repo.AdvanceMockExam(id, req.AttemptID)
+	var (
+		session contracts.MockExamSession
+		err     error
+	)
+	if req.TargetDisplayOrder != nil && *req.TargetDisplayOrder > 0 {
+		session, err = s.repo.AdvanceMockExamSectionAt(id, req.AttemptID, *req.TargetDisplayOrder)
+	} else {
+		session, err = s.repo.AdvanceMockExam(id, req.AttemptID)
+	}
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
 			"error": map[string]any{"code": "mock_exam_advance_failed", "message": err.Error()},

@@ -50,6 +50,13 @@ type MockExamStore interface {
 	// CompleteMockExam path; expired sessions show the data available at
 	// timer expiry. Idempotent for already-completed sessions.
 	ExpireMockExam(sessionID string) (contracts.MockExamSession, error)
+	// V39: AdvanceSectionAt attaches `attemptID` to the section identified by
+	// (sessionID, displayOrder) and flips its status to 'completed' — even if
+	// the section was previously 'skipped' or 'completed' (jump-back from the
+	// answer sheet overwrites). Unlike `AdvanceMockExam`, this method does
+	// not search for the first-pending row by exercise match; the caller is
+	// authoritative.
+	AdvanceSectionAt(sessionID, attemptID string, displayOrder int) (contracts.MockExamSession, error)
 }
 
 // V39 — error sentinels for SkipSection. Handlers map them to 404/409.
@@ -199,6 +206,30 @@ func (s *memoryMockExamStore) AdvanceMockExam(id, attemptID string) (contracts.M
 		}
 	}
 	return contracts.MockExamSession{}, fmt.Errorf("no pending section")
+}
+
+// AdvanceSectionAt — V39 memory impl. Updates the section at (sessionID,
+// displayOrder) with the provided attempt regardless of prior status.
+// Returns ErrSectionNotFound for unknown session/section.
+func (s *memoryMockExamStore) AdvanceSectionAt(sessionID, attemptID string, displayOrder int) (contracts.MockExamSession, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.sessions[sessionID]
+	if !ok {
+		return contracts.MockExamSession{}, ErrSectionNotFound
+	}
+	if session.Status == "completed" {
+		return contracts.MockExamSession{}, fmt.Errorf("mock exam already completed")
+	}
+	for i := range session.Sections {
+		if session.Sections[i].DisplayOrder != displayOrder {
+			continue
+		}
+		session.Sections[i].AttemptID = attemptID
+		session.Sections[i].Status = "completed"
+		return *session, nil
+	}
+	return contracts.MockExamSession{}, ErrSectionNotFound
 }
 
 // ListExpired — V39 memory impl. Returns sessions whose timer has run out.

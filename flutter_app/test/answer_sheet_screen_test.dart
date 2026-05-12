@@ -129,6 +129,55 @@ void main() {
       expect(find.text('NÓI'), findsOneWidget);
     });
 
+    // V39 S7 — chip tap pops the sheet with that section's display_order.
+    testWidgets('tapping a chip pops with the displayOrder', (tester) async {
+      final session = _session([
+        _sec(
+          seq: 1,
+          disp: 1,
+          maxPts: 5,
+          skillKind: 'doc',
+          exerciseType: 'cteni_1',
+        ),
+        _sec(
+          seq: 2,
+          disp: 2,
+          maxPts: 8,
+          skillKind: 'noi',
+          exerciseType: 'uloha_1_topic_answers',
+        ),
+      ]);
+      int? popped;
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('vi'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (ctx) => Scaffold(
+              body: ElevatedButton(
+                onPressed: () async {
+                  popped = await Navigator.of(ctx).push<int>(
+                    MaterialPageRoute(
+                      fullscreenDialog: true,
+                      builder: (_) => AnswerSheetScreen(session: session),
+                    ),
+                  );
+                },
+                child: const Text('Open sheet'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open sheet'));
+      await tester.pumpAndSettle();
+      // Tap the chip for display_order=2.
+      await tester.tap(find.text('2'));
+      await tester.pumpAndSettle();
+      expect(popped, 2);
+    });
+
     testWidgets('legend renders three state items', (tester) async {
       final session = _session([
         _sec(
