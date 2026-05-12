@@ -345,11 +345,22 @@ silently expanding scope.
 
 ## Current Status
 
-All planned slices V2 → V21.2 shipped. See [CHANGELOG.md](CHANGELOG.md)
+All planned slices V2 → V38 shipped. See [CHANGELOG.md](CHANGELOG.md)
 for per-slice file changes, decisions, and final test counts.
 `tasks/todo.md` tracks active backlog.
 
-**Latest** (2026-05-07): V21.2 — exam-flow runtime hotfixes from MobAI
+**Latest** (2026-05-12): V38 — CMS hotfix. (1) Unlock `poslech_1..5`
+fixed shapes: `poslech-model.ts` respects raw collection length;
+`PoslechFields.tsx` exposes per-row `Xóa` + list-level `+ Thêm…`
+buttons (poslech_3/4 keep ≥2 options; removing an option clears item
+answers that point at it; option keys generate A..Z). Defaults stay
+5/7/6/5 to match A2 exam template. (2) `validation.ts` skips the
+`Phải chọn Module.` common check when `payload.pool === 'exam'`
+(matches form's conditional render). CMS only — backend already
+iterates collections dynamically. CMS tests 308 → 311 (+3 regression).
+`make cms-{lint,build}` + `npm test` green.
+
+**Previous** (2026-05-07): V21.2 — exam-flow runtime hotfixes from MobAI
 test on iPhone 17 Pro Max simulator. Fixes 1 Critical + 2 Important +
 adds admin escape hatch:
 

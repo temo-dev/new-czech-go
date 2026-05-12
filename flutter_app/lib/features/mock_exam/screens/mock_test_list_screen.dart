@@ -2,12 +2,22 @@ import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import 'mock_test_intro_screen.dart';
+
+// Card color palette — same vivid block + accent strip pattern used by the
+// course list cards. Each tuple = (card body color, bottom accent strip color,
+// foreground text color).
+const _examCardColors = [
+  (bg: Color(0xFF7C3AED), accent: Color(0xFFF97316), text: Colors.white),
+  (bg: Color(0xFFFB923C), accent: Color(0xFFB91C1C), text: Colors.white),
+  (bg: Color(0xFF22C55E), accent: Color(0xFFEAB308), text: Colors.white),
+  (bg: Color(0xFF3B82F6), accent: Color(0xFFA855F7), text: Colors.white),
+  (bg: Color(0xFFEC4899), accent: Color(0xFFF59E0B), text: Colors.white),
+];
 
 class MockTestListScreen extends StatefulWidget {
   const MockTestListScreen({super.key, required this.client});
@@ -137,174 +147,187 @@ class _MockTestCard extends StatelessWidget {
 
   bool get _hasBanner => test.bannerImageId.isNotEmpty;
 
+  String get _indexCode => (index + 1).toString().padLeft(2, '0');
+  String get _watermarkCode => _indexCode * 2;
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final colors = _examCardColors[index % _examCardColors.length];
+    final bgColor = colors.bg;
+    final accentColor = colors.accent;
+    final textColor = colors.text;
+
+    // Pass score derived from totalScoreMax × passThresholdPercent (ceil).
     final totalPts = test.totalScoreMax;
     final passScore = ((totalPts * test.passThresholdPercent) + 99) ~/ 100;
 
+    final subtitle =
+        '${l.mockTestCardMinutes(test.estimatedDurationMinutes)} • '
+        '${l.mockTestCardSections(test.sections.length)} • '
+        'Đạt $passScore/$totalPts';
+
+    // Decode banners at roughly card width × DPR to avoid keeping full-res
+    // upload bitmaps in memory for every card.
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final cardW =
+        MediaQuery.of(context).size.width - 2 * AppSpacing.pagePaddingH(context);
+    final imageCacheWidth = (cardW * dpr).round().clamp(200, 1600);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.x3),
-      child: InkWell(
+      child: GestureDetector(
         onTap: onTap,
-        borderRadius: AppRadius.lgAll,
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLowest,
-            borderRadius: AppRadius.lgAll,
-            border: Border.all(
-              color: AppColors.outlineVariant.withValues(alpha: 0.6),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Banner image (when available)
-              if (_hasBanner)
-                ClipRRect(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-                  child: Stack(
-                    children: [
-                      Image.network(
-                        client.mediaUri(test.bannerImageId).toString(),
-                        headers: client.authHeaders,
-                        height: 100,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                        loadingBuilder: (_, child, progress) => progress == null
-                            ? child
-                            : Container(height: 100, color: AppColors.surfaceContainerLow),
-                      ),
-                      Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.3)],
+        child: AspectRatio(
+          aspectRatio: 1.05,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Container(color: bgColor),
+
+                // Watermark big-number pattern when no banner — design-baked
+                // banner replaces this when present.
+                if (!_hasBanner)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: LayoutBuilder(
+                        builder: (ctx, c) {
+                          final fs = c.maxHeight * 0.68;
+                          return ClipRect(
+                            child: Center(
+                              child: Text(
+                                _watermarkCode,
+                                maxLines: 1,
+                                softWrap: false,
+                                style: TextStyle(
+                                  color: textColor.withAlpha(60),
+                                  fontSize: fs,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -fs * 0.035,
+                                  height: 0.9,
+                                ),
+                              ),
                             ),
-                          ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+
+                if (_hasBanner)
+                  Image.network(
+                    client.mediaUri(test.bannerImageId).toString(),
+                    headers: client.authHeaders,
+                    fit: BoxFit.cover,
+                    cacheWidth: imageCacheWidth,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    loadingBuilder: (_, child, progress) =>
+                        progress == null ? child : const SizedBox.shrink(),
+                  ),
+
+                // Bottom darkening gradient
+                Positioned(
+                  left: 0, right: 0, bottom: 0,
+                  child: IgnorePointer(
+                    child: Container(
+                      height: 140,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Color(0x80000000)],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Top-left brand pill — "MOCK 01"
+                Positioned(
+                  top: 18, left: 22,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(46),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      'MOCK $_indexCode',
+                      style: AppTypography.labelUppercase.copyWith(
+                        color: textColor,
+                        fontSize: 10,
+                        letterSpacing: 0.8,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Title + subtitle bottom-left
+                Positioned(
+                  left: 22, right: 80, bottom: 28,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        test.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.titleLarge.copyWith(
+                          color: textColor,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.bodySmall.copyWith(
+                          color: textColor.withAlpha(220),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
                 ),
 
-              Padding(
-              padding: const EdgeInsets.all(AppSpacing.x4),
-              child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Row 1: brand pill + chevron
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 4,
+                // White circular chevron CTA bottom-right
+                Positioned(
+                  right: 20, bottom: 26,
+                  child: Container(
+                    width: 36, height: 36,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
                     ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryContainer,
-                      borderRadius: BorderRadius.circular(AppRadius.full),
-                    ),
-                    child: Text(
-                      'MOCK ${(index + 1).toString().padLeft(2, '0')}',
-                      style: AppTypography.labelUppercase.copyWith(
-                        fontSize: 10,
-                        color: AppColors.primary,
-                        letterSpacing: 0.6,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: bgColor,
+                      size: 22,
                     ),
                   ),
-                  const Spacer(),
-                  const Icon(
-                    Icons.chevron_right,
-                    size: 18,
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.x3),
-
-              // Row 2: title
-              Text(
-                test.title,
-                style: AppTypography.titleMedium.copyWith(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  height: 1.25,
                 ),
-              ),
 
-              // Row 3: description
-              if (test.description.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.x1),
-                Text(
-                  test.description,
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                // Accent strip pinned to bottom edge
+                Positioned(
+                  left: 0, right: 0, bottom: 0,
+                  child: Container(height: 6, color: accentColor),
                 ),
               ],
-              const SizedBox(height: AppSpacing.x3),
-
-              // Row 4: metadata icons
-              Row(
-                children: [
-                  const Icon(
-                    Icons.timer_outlined,
-                    size: 13,
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    l.mockTestCardMinutes(test.estimatedDurationMinutes),
-                    style: AppTypography.bodySmall.copyWith(
-                      fontSize: 12,
-                      color: AppColors.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.x3),
-                  const Icon(
-                    Icons.view_list_rounded,
-                    size: 13,
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    l.mockTestCardSections(test.sections.length),
-                    style: AppTypography.bodySmall.copyWith(
-                      fontSize: 12,
-                      color: AppColors.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.x3),
-                  const Icon(
-                    Icons.flag_outlined,
-                    size: 13,
-                    color: AppColors.success,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Đạt $passScore/$totalPts',
-                    style: AppTypography.bodySmall.copyWith(
-                      fontSize: 12,
-                      color: AppColors.success,
-                    ),
-                  ),
-                ],
-              ),
-              ],
-            ),    // close inner Column
-          ),      // close inner Padding
-            ],    // close outer Column children
-          ),      // close outer Column
-        ),        // close outer Container
-      ),          // close InkWell
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

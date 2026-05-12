@@ -10,6 +10,79 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V38 — Poslech Dynamic Items + Pool=Exam Module Fix — 2026-05-12
+
+CMS hotfix slice. Two unrelated authoring papercuts surfaced while
+seeding mock-test content:
+
+1. Poslech 1..5 exercises were locked to fixed shapes (5 items, 7
+   options A-G for poslech_3, 6 options A-F for poslech_4, 5 fill
+   slots for poslech_5). Admins had no way to add or remove
+   questions/options, blocking shorter practice exercises and longer
+   exam variants.
+2. Editing any exercise and switching pool from `course` to `exam`
+   raised "Phải chọn Module." despite the form correctly hiding the
+   module picker for `pool=exam`. Validation never read `payload.pool`.
+
+CMS only — backend slices already iterate items/options/questions
+dynamically, so no backend or Flutter changes were needed.
+
+### CMS
+
+- `cms/components/exercise-form/poslech-model.ts` — replace the
+  fixed `ITEM_COUNT=5` initializer with per-type default constants
+  (`POSLECH_1..5_DEFAULT_*`) and respect `rawItems.length` /
+  `rawOpts.length` / `rawQs.length` when present. New helpers
+  `makeEmptyP12Item`, `makeEmptyMatchItem`, `makeEmptySharedOption`,
+  `makeEmptyFillSlot`, `optionKeyAt(i)` cover the add path. poslech_3/4
+  shared option keys generate sequentially (A, B, …, Z) rather than
+  living in a fixed `OPTION_KEYS_3/4` constant.
+- `cms/components/exercise-form/PoslechFields.tsx` — every collection
+  gets `+` and `Xóa` buttons:
+  - poslech_1 / poslech_2: add/remove items (≥1).
+  - poslech_3 / poslech_4: add/remove items (≥1) **and** shared
+    options (≥2). Removing an option clears any item answer pointing
+    at the deleted key so state never references a missing option.
+  - poslech_5: add/remove fill slots (≥1); new slots get `question_no
+    = max(existing) + 1` so 21..25 numbering stays sensible after edits.
+  - poslech_3/4 option-pool label now reports `match.options.length`
+    instead of the hard-coded "A-G" / "A-F".
+- `cms/components/exercise-form/validation.ts` —
+  - Common section: skip the module check when `payload.pool === 'exam'`
+    (matches the form's conditional render).
+  - poslech_1/2: min 1 item; answers must cover all items (not just
+    the first 5).
+  - poslech_3/4: min 1 item, min 2 options (need ≥1 distractor);
+    answers must cover all items.
+  - poslech_5: min 1 slot; answers must cover all slots; prompt-missing
+    error now uses each slot's own `question_no` rather than `21 + i`.
+
+### Decisions worth remembering
+
+- Defaults preserved at 5 items so existing CMS muscle memory still
+  matches the A2 exam template when admin creates a new poslech.
+- poslech_3/4 minimum of 2 options is generous on purpose — A2 exam
+  needs ≥7/≥6 options for distractors, but practice-pool authors may
+  legitimately want a 2-option drill.
+- Removing an option clears item answers pointing at it. Admin sees
+  the answer drop blank and re-picks; preferable to silently leaving
+  a dangling key the scorer never matches.
+- Pool=exam module exemption applies to every exercise type because
+  the offending check lives in the common section; per-type validation
+  never touched module_id.
+
+### Tests
+
+CMS 308 → 311 (+3 regression tests in
+`__tests__/exercise-form-validation.test.ts`: pool=exam skips module
+check, pool=course still enforces, exemption applies across
+`poslech_1` / `cteni_5` / `psani_1_formular` / `uloha_1`). Existing
+`poslech-image-options.test.ts` (which seeds 5-item poslech_1
+payloads) still passes — the new validator accepts the same shapes.
+`make cms-lint` + `make cms-build` green.
+
+---
+
 ## V37 — Vocab Item Per-item Polly TTS — 2026-05-12
 
 Closes the V11 long-running backlog item. Vocab items now get a single

@@ -22,3 +22,38 @@ describe('validateExercise reading forms', () => {
     expect(errors).toEqual([]);
   });
 });
+
+describe('validateExercise pool=exam skips module check (V38 fix)', () => {
+  it('does not require module_id when pool=exam', () => {
+    const errors = validateExercise('cteni_2', {
+      title: 'Bài thi mock',
+      pool: 'exam',
+      module_id: '',
+      detail: {
+        text: 'Đoạn văn',
+        questions: Array.from({ length: 5 }, (_, i) => ({ question_no: 6 + i, prompt: `Q${i}` })),
+      },
+    });
+    expect(errors).not.toContain('Phải chọn Module.');
+  });
+
+  it('still requires module_id when pool=course', () => {
+    const errors = validateExercise('cteni_2', {
+      title: 'Bài luyện',
+      pool: 'course',
+      module_id: '',
+      detail: {
+        text: 'Đoạn văn',
+        questions: Array.from({ length: 5 }, (_, i) => ({ question_no: 6 + i, prompt: `Q${i}` })),
+      },
+    });
+    expect(errors).toContain('Phải chọn Module.');
+  });
+
+  it('applies pool=exam exemption across exercise types', () => {
+    for (const type of ['poslech_1', 'cteni_5', 'psani_1_formular', 'uloha_1']) {
+      const errors = validateExercise(type, { title: 'T', pool: 'exam', module_id: '', detail: {} });
+      expect(errors).not.toContain('Phải chọn Module.');
+    }
+  });
+});

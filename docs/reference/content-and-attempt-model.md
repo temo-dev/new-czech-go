@@ -129,6 +129,20 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026).
 - `poslech_5` — Nghe voicemail → điền thông tin theo 5 câu hỏi
   `question_no=21..25`; mỗi câu phải có `prompt` hiển thị cho learner
   và một đáp án trong `correct_answers` (5 điểm)
+
+**V38 — Poslech dynamic shape**: số câu (`items` / `questions`) và
+shared options pool (`options`) cho `poslech_1..5` không còn cố định
+trong CMS. Defaults vẫn 5 items / 7 options (poslech_3) / 6 options
+(poslech_4) / 5 slots (poslech_5) để khớp A2 exam, nhưng admin có thể
+thêm/xóa:
+
+- poslech_1/2: items ≥1.
+- poslech_3/4: items ≥1, options ≥2 (cần ≥1 distractor). Khi xóa
+  option, item answer chỉ vào option đó tự clear.
+- poslech_5: slots ≥1; slot mới lấy `question_no = max(existing) + 1`.
+
+A2 mock-exam content vẫn phải tuân số gốc — V38 mở chỉ vì practice
+pool cần linh hoạt; backend đã iterate dynamic từ V2.
 - `poslech_6` — Nghe văn bản (TTS) → Ano/Ne, 1–5 câu (admin nhập điểm) — V13
 
 **Reading (doc) — V4:**

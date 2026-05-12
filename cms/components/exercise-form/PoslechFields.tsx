@@ -8,8 +8,13 @@ import { adminFetch } from '../../lib/api';
 import {
   initPoslechState,
   buildPoslechDetail,
+  makeEmptyFillSlot,
+  makeEmptyMatchItem,
+  makeEmptyP12Item,
+  makeEmptySharedOption,
   makeOptionImagePatcher,
   makeSharedOptionImagePatcher,
+  optionKeyAt,
   parseUploadResponse,
   sharedUploadingKeyFor,
   uploadingKeyFor,
@@ -138,9 +143,23 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
           next[i] = { ...next[i], ...partial };
           update({ ...p12!, items: next });
         }
+        // V38 — poslech_1 + poslech_2 cho phép xóa câu (giữ ≥1 câu)
+        const canRemove = p12.items.length > 1;
+        function removeItem() {
+          const next = p12!.items.filter((_, idx) => idx !== i);
+          update({ ...p12!, items: next });
+        }
         return (
           <div key={i} style={sectionStyle}>
-            <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Câu {i + 1}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Câu {i + 1}</span>
+              {canRemove && (
+                <button type="button" onClick={removeItem}
+                  style={{ background: 'transparent', color: 'var(--error)', border: '1px solid var(--error)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  Xóa câu này
+                </button>
+              )}
+            </div>
             <label style={{ display: 'grid', gap: 4 }}>
               <span style={labelStyle}>Câu hỏi (hiển thị cho học viên)</span>
               <input type="text" value={item.question} onChange={e => patch({ question: e.target.value })} placeholder="Ví dụ: Co se dozvíte z tohoto sdělení?" style={{ padding: '8px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }} />
@@ -222,12 +241,23 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
         );
       })}
 
+      {/* V38 — Add-question button (poslech_1 + poslech_2). */}
+      {p12 && (
+        <button type="button"
+          onClick={() => update({ ...p12, items: [...p12.items, makeEmptyP12Item()] })}
+          style={{ alignSelf: 'flex-start', background: 'var(--accent-soft)', color: 'var(--accent)', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+          + Thêm câu hỏi
+        </button>
+      )}
+
       {/* ── Poslech 3 / 4 — shared options pool ───────────────────── */}
       {match && (
         <>
           <div style={{ display: 'grid', gap: 6 }}>
             <span style={labelStyle}>
-              {match.type === 'poslech_4' ? 'Options A-F (ảnh)' : 'Options A-G (nội dung)'}
+              {match.type === 'poslech_4'
+                ? `Options (ảnh) — ${match.options.length} lựa chọn`
+                : `Options (nội dung) — ${match.options.length} lựa chọn`}
             </span>
             {match.options.map((opt, oi) => {
               const optionKey = opt.key as SharedImageOptionKey;
@@ -238,20 +268,39 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
                 next[targetIndex] = { ...next[targetIndex], label: assetId };
                 update({ ...match, options: next });
               }, optionKey);
+              // V38 — xóa option: giữ ≥2 (cần distractor); cũng clear answer
+              // của items đang chỉ vào option bị xóa.
+              const canRemoveOpt = match.options.length > 2;
+              function removeOption() {
+                const next = match!.options.filter((_, idx) => idx !== oi);
+                const nextItems = match!.items.map((it) =>
+                  it.answer === opt.key ? { ...it, answer: '' } : it,
+                );
+                update({ ...match!, options: next, items: nextItems });
+              }
 
               if (match.type !== 'poslech_4') {
                 return (
-                  <OptionRow
-                    key={opt.key}
-                    optionKey={opt.key}
-                    label={opt.label}
-                    placeholder={`Nội dung ${opt.key}`}
-                    onChange={v => {
-                      const next = [...match.options];
-                      next[oi] = { ...next[oi], label: v };
-                      update({ ...match, options: next });
-                    }}
-                  />
+                  <div key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ flex: 1 }}>
+                      <OptionRow
+                        optionKey={opt.key}
+                        label={opt.label}
+                        placeholder={`Nội dung ${opt.key}`}
+                        onChange={v => {
+                          const next = [...match.options];
+                          next[oi] = { ...next[oi], label: v };
+                          update({ ...match, options: next });
+                        }}
+                      />
+                    </div>
+                    {canRemoveOpt && (
+                      <button type="button" onClick={removeOption}
+                        style={{ background: 'transparent', color: 'var(--error)', border: '1px solid var(--error)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                        Xóa
+                      </button>
+                    )}
+                  </div>
                 );
               }
 
@@ -261,12 +310,22 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
               const otherUploadingBlocks = uploadingKey !== null && uploadingKey !== cellKey;
               return (
                 <div key={opt.key} style={{ display: 'grid', gap: 4 }}>
-                  <OptionRow
-                    optionKey={opt.key}
-                    label={opt.label}
-                    placeholder={`Storage key ảnh ${opt.key} (paste, upload hoặc AI tạo)`}
-                    onChange={patchSharedImage}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ flex: 1 }}>
+                      <OptionRow
+                        optionKey={opt.key}
+                        label={opt.label}
+                        placeholder={`Storage key ảnh ${opt.key} (paste, upload hoặc AI tạo)`}
+                        onChange={patchSharedImage}
+                      />
+                    </div>
+                    {canRemoveOpt && (
+                      <button type="button" onClick={removeOption}
+                        style={{ background: 'transparent', color: 'var(--error)', border: '1px solid var(--error)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                        Xóa
+                      </button>
+                    )}
+                  </div>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'stretch', paddingLeft: 34 }}>
                     <label style={{
                       flex: 1,
@@ -313,12 +372,31 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
                 </div>
               );
             })}
+            {/* V38 — Add-option button (poslech_3 + poslech_4). */}
+            <button type="button"
+              onClick={() => {
+                const newKey = optionKeyAt(match.options.length);
+                update({ ...match, options: [...match.options, makeEmptySharedOption(newKey)] });
+              }}
+              style={{ alignSelf: 'flex-start', background: 'var(--surface)', color: 'var(--accent)', border: '1px dashed var(--accent)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 600, marginTop: 4 }}>
+              + Thêm lựa chọn
+            </button>
           </div>
           {match.items.map((item, i) => {
             const displayNo = item.questionNo > 0 ? item.questionNo : i + 1;
+            const canRemoveItem = match.items.length > 1;
             return (
               <div key={i} style={sectionStyle}>
-                <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Câu {displayNo}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Câu {displayNo}</span>
+                  {canRemoveItem && (
+                    <button type="button"
+                      onClick={() => update({ ...match, items: match.items.filter((_, idx) => idx !== i) })}
+                      style={{ background: 'transparent', color: 'var(--error)', border: '1px solid var(--error)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      Xóa câu này
+                    </button>
+                  )}
+                </div>
                 {match.type === 'poslech_3' && (
                   <label style={{ display: 'grid', gap: 4 }}>
                     <span style={labelStyle}>Tên câu hỏi (hiển thị cho học viên)</span>
@@ -361,6 +439,15 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
               </div>
             );
           })}
+          {/* V38 — Add-question button (poslech_3 + poslech_4). */}
+          <button type="button"
+            onClick={() => {
+              const nextNo = match.items.length + 1;
+              update({ ...match, items: [...match.items, makeEmptyMatchItem(nextNo)] });
+            }}
+            style={{ alignSelf: 'flex-start', background: 'var(--accent-soft)', color: 'var(--accent)', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            + Thêm câu hỏi
+          </button>
         </>
       )}
 
@@ -378,12 +465,23 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
             </label>
           )}
           <div style={{ display: 'grid', gap: 8 }}>
-            <span style={labelStyle}>Câu hỏi + đáp án điền vào (5 câu)</span>
-            {(p5 as P5State).slots.map((slot, i) => (
+            <span style={labelStyle}>Câu hỏi + đáp án điền vào ({(p5 as P5State).slots.length} câu)</span>
+            {(p5 as P5State).slots.map((slot, i) => {
+              const canRemoveSlot = (p5 as P5State).slots.length > 1;
+              return (
               <div key={i} style={sectionStyle}>
-                <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>
-                  Câu {slot.questionNo > 0 ? slot.questionNo : 21 + i}
-                </span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>
+                    Câu {slot.questionNo > 0 ? slot.questionNo : 21 + i}
+                  </span>
+                  {canRemoveSlot && (
+                    <button type="button"
+                      onClick={() => update({ ...p5, slots: (p5 as P5State).slots.filter((_, idx) => idx !== i) })}
+                      style={{ background: 'transparent', color: 'var(--error)', border: '1px solid var(--error)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      Xóa câu này
+                    </button>
+                  )}
+                </div>
                 <input type="text" value={slot.prompt}
                   onChange={e => {
                     const next = [...(p5 as P5State).slots];
@@ -406,7 +504,20 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
                   />
                 </div>
               </div>
-            ))}
+              );
+            })}
+            {/* V38 — Add-slot button (poslech_5). */}
+            <button type="button"
+              onClick={() => {
+                const slots = (p5 as P5State).slots;
+                const nextNo = slots.length > 0
+                  ? Math.max(...slots.map((s) => s.questionNo)) + 1
+                  : 21;
+                update({ ...p5, slots: [...slots, makeEmptyFillSlot(nextNo)] });
+              }}
+              style={{ alignSelf: 'flex-start', background: 'var(--accent-soft)', color: 'var(--accent)', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, marginTop: 4 }}>
+              + Thêm câu điền
+            </button>
           </div>
         </>
       )}

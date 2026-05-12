@@ -50,8 +50,45 @@ export type P5State = { type: 'poslech_5'; voiceText: string; slots: FillSlot[] 
 export type PoslechState = P12State | MatchState | P5State;
 
 export const ITEM_COUNT = 5;
+// V38 — toàn bộ poslech 1..5 hết bị khóa cố định. Admin thêm/xóa tùy ý;
+// init mặc định khi tạo mới giữ pattern A2 exam quen thuộc.
+export const POSLECH_1_DEFAULT_ITEM_COUNT = 5;
+export const POSLECH_2_DEFAULT_ITEM_COUNT = 5;
+export const POSLECH_3_DEFAULT_ITEM_COUNT = 5;
+export const POSLECH_4_DEFAULT_ITEM_COUNT = 5;
+export const POSLECH_5_DEFAULT_SLOT_COUNT = 5;
+export const POSLECH_3_DEFAULT_OPTION_COUNT = 7;
+export const POSLECH_4_DEFAULT_OPTION_COUNT = 6;
 export const OPTION_KEYS_3 = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
 export const OPTION_KEYS_4 = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+// V38 — sinh key A, B, ..., Z theo index để options pool động.
+export function optionKeyAt(index: number): string {
+  return String.fromCharCode(65 + index);
+}
+
+export function makeEmptyP12Item(): P12Item {
+  return {
+    question: '',
+    text: '',
+    audioAssetId: '',
+    optA: '', optB: '', optC: '', optD: '',
+    imgA: '', imgB: '', imgC: '', imgD: '',
+    answer: '',
+  };
+}
+
+export function makeEmptyMatchItem(questionNo: number): MatchItem {
+  return { questionNo, question: '', text: '', answer: '' };
+}
+
+export function makeEmptySharedOption(key: string): SharedOption {
+  return { key, label: '' };
+}
+
+export function makeEmptyFillSlot(questionNo: number): FillSlot {
+  return { questionNo, prompt: '', answer: '' };
+}
 
 type RawOption = { key: string; text?: string; image_asset_id?: string };
 
@@ -68,7 +105,12 @@ export function initPoslechState(
 
   if (exerciseType === 'poslech_1' || exerciseType === 'poslech_2') {
     const rawItems = (detail.items ?? []) as Array<Record<string, unknown>>;
-    const items: P12Item[] = Array.from({ length: ITEM_COUNT }, (_, i) => {
+    // V38 — poslech_1 + poslech_2 hỗ trợ số câu tùy ý.
+    const defaultCount = exerciseType === 'poslech_1'
+      ? POSLECH_1_DEFAULT_ITEM_COUNT
+      : POSLECH_2_DEFAULT_ITEM_COUNT;
+    const itemCount = rawItems.length > 0 ? rawItems.length : defaultCount;
+    const items: P12Item[] = Array.from({ length: itemCount }, (_, i) => {
       const raw = rawItems[i] as Record<string, unknown> | undefined;
       const audio = (raw?.audio_source as Record<string, unknown>) ?? {};
       const segs = (audio.segments ?? []) as Array<{ speaker?: string; text: string }>;
@@ -100,12 +142,23 @@ export function initPoslechState(
   if (exerciseType === 'poslech_3' || exerciseType === 'poslech_4') {
     const rawItems = (detail.items ?? []) as Array<Record<string, unknown>>;
     const rawOpts = (detail.options ?? []) as Array<Record<string, unknown>>;
-    const keys = exerciseType === 'poslech_3' ? OPTION_KEYS_3 : OPTION_KEYS_4;
-    const options: SharedOption[] = keys.map((k, i) => {
+    // V38 — options pool động: dùng key có sẵn nếu rawOpts có data, không thì
+    // sinh A, B, ..., default count.
+    const defaultOptCount = exerciseType === 'poslech_3'
+      ? POSLECH_3_DEFAULT_OPTION_COUNT
+      : POSLECH_4_DEFAULT_OPTION_COUNT;
+    const optCount = rawOpts.length > 0 ? rawOpts.length : defaultOptCount;
+    const options: SharedOption[] = Array.from({ length: optCount }, (_, i) => {
       const raw = rawOpts[i] as Record<string, unknown> | undefined;
-      return { key: k, label: String(raw?.label ?? raw?.asset_id ?? '') };
+      const key = String(raw?.key ?? optionKeyAt(i));
+      return { key, label: String(raw?.label ?? raw?.asset_id ?? '') };
     });
-    const items: MatchItem[] = Array.from({ length: ITEM_COUNT }, (_, i) => {
+    // V38 — items động.
+    const defaultItemCount = exerciseType === 'poslech_3'
+      ? POSLECH_3_DEFAULT_ITEM_COUNT
+      : POSLECH_4_DEFAULT_ITEM_COUNT;
+    const itemCount = rawItems.length > 0 ? rawItems.length : defaultItemCount;
+    const items: MatchItem[] = Array.from({ length: itemCount }, (_, i) => {
       const raw = rawItems[i] as Record<string, unknown> | undefined;
       const questionNo = readQuestionNo(raw, i + 1);
       const segs = ((raw?.audio_source as Record<string, unknown>)?.segments ??
@@ -126,7 +179,9 @@ export function initPoslechState(
   const segs = ((detail.audio_source as Record<string, unknown>)?.segments ??
     []) as Array<{ text: string }>;
   const rawQs = (detail.questions ?? []) as Array<Record<string, unknown>>;
-  const slots: FillSlot[] = Array.from({ length: ITEM_COUNT }, (_, i) => {
+  // V38 — slots động. Tạo mới mặc định 5 slot; dữ liệu cũ tôn trọng raw length.
+  const slotCount = rawQs.length > 0 ? rawQs.length : POSLECH_5_DEFAULT_SLOT_COUNT;
+  const slots: FillSlot[] = Array.from({ length: slotCount }, (_, i) => {
     const fallbackNo = 21 + i;
     const raw =
       rawQs.find((q) => Number(q.question_no) === fallbackNo) ?? rawQs[i];

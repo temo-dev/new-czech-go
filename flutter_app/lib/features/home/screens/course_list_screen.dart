@@ -8,7 +8,6 @@ import '../../../core/iap/iap_service_provider.dart';
 import '../../../core/level_utils.dart';
 import '../../../core/streak/streak_models.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
@@ -25,13 +24,14 @@ import '../../progress/skill_labels.dart';
 import '../../progress/widgets/home_progress_card.dart';
 import 'course_detail_screen.dart';
 
-// Card color palette — cycles through these per course index
+// Card color palette — vivid block bg + contrasting accent strip on bottom edge.
+// Each tuple = (card body color, bottom accent strip color, foreground text color).
 const _cardColors = [
-  (bg: AppColors.primary, text: AppColors.onPrimary, badge: Color(0x33FFFFFF)),
-  (bg: AppColors.surfaceContainerLow, text: AppColors.onSurface, badge: AppColors.primaryFixed),
-  (bg: AppColors.secondaryContainer, text: AppColors.onSecondaryContainer, badge: AppColors.surfaceContainerLowest),
-  (bg: AppColors.tertiaryFixed, text: AppColors.onTertiaryFixed, badge: AppColors.surfaceContainerLowest),
-  (bg: AppColors.inverseSurfaceLight, text: AppColors.inverseOnSurfaceLight, badge: Color(0x33FFFFFF)),
+  (bg: Color(0xFF7C3AED), accent: Color(0xFFF97316), text: Colors.white), // purple / orange strip
+  (bg: Color(0xFFFB923C), accent: Color(0xFFB91C1C), text: Colors.white), // orange / red strip
+  (bg: Color(0xFF22C55E), accent: Color(0xFFEAB308), text: Colors.white), // green  / amber strip
+  (bg: Color(0xFF3B82F6), accent: Color(0xFFA855F7), text: Colors.white), // blue   / violet strip
+  (bg: Color(0xFFEC4899), accent: Color(0xFFF59E0B), text: Colors.white), // pink   / amber strip
 ];
 
 class CourseListScreen extends StatefulWidget {
@@ -361,8 +361,8 @@ class _CourseListScreenState extends State<CourseListScreen> {
                 course: c,
                 client: widget.client,
                 bgColor: colors.bg,
+                accentColor: colors.accent,
                 textColor: colors.text,
-                badgeColor: colors.badge,
                 isFeatured: i == 0,
                 onTap: () async {
                   await Navigator.of(context).push(MaterialPageRoute(
@@ -389,8 +389,8 @@ class _CourseCard extends StatelessWidget {
     required this.course,
     required this.client,
     required this.bgColor,
+    required this.accentColor,
     required this.textColor,
-    required this.badgeColor,
     required this.isFeatured,
     required this.onTap,
   });
@@ -398,200 +398,195 @@ class _CourseCard extends StatelessWidget {
   final Course course;
   final ApiClient client;
   final Color bgColor;
+  final Color accentColor;
   final Color textColor;
-  final Color badgeColor;
   final bool isFeatured;
   final VoidCallback onTap;
 
-  String get _statusLabel => switch (course.status) {
-    'published' => isFeatured ? 'BẠN ĐANG HỌC' : 'KHÓA HỌC',
-    'draft'     => 'SẮP RA MẮT',
-    _           => 'KHÓA HỌC',
-  };
-
   bool get _hasBanner => course.bannerImageId.isNotEmpty;
+
+  bool get _isDraft => course.status == 'draft';
+
+  String get _levelCode => course.level.name.toUpperCase();
+
+  String get _subtitle => 'Cấp độ $_levelCode';
+
+  // Top-left pill label. Draft state wins over "đang học" so we don't claim a
+  // learner is actively studying a coming-soon course.
+  String? get _pillLabel {
+    if (_isDraft) return 'SẮP RA MẮT';
+    if (isFeatured) return 'ĐANG HỌC';
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isLocked = course.status == 'draft';
+    final pill = _pillLabel;
+    // Decode banners to roughly card width × DPR so we don't keep full-res
+    // upload bitmaps in memory for every card.
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final cardW =
+        MediaQuery.of(context).size.width - 2 * AppSpacing.pagePaddingH(context);
+    final imageCacheWidth = (cardW * dpr).round().clamp(200, 1600);
+
     return GestureDetector(
-      onTap: isLocked ? null : onTap,
+      onTap: _isDraft ? null : onTap,
       child: Opacity(
-        opacity: isLocked ? 0.6 : 1.0,
-        child: Container(
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: AppRadius.lgAll,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Banner image (when available) or solid color header strip
-              if (_hasBanner)
-                ClipRRect(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-                  child: Stack(
-                    children: [
-                      Image.network(
-                        client.mediaUri(course.bannerImageId).toString(),
-                        headers: client.authHeaders,
-                        height: isFeatured ? 160 : 120,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(height: isFeatured ? 160 : 120, color: bgColor),
-                        loadingBuilder: (_, child, progress) => progress == null
-                            ? child
-                            : Container(height: isFeatured ? 160 : 120, color: bgColor),
-                      ),
-                      // Gradient overlay for text legibility
-                      Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.45)],
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Badge + lock on banner
-                      Positioned(
-                        left: isFeatured ? AppSpacing.x5 : AppSpacing.x4,
-                        right: isFeatured ? AppSpacing.x5 : AppSpacing.x4,
-                        bottom: isFeatured ? AppSpacing.x3 : AppSpacing.x2,
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.35),
-                                borderRadius: BorderRadius.circular(AppRadius.full),
-                              ),
+        opacity: _isDraft ? 0.55 : 1.0,
+        child: AspectRatio(
+          aspectRatio: 1.05, // ~square, slightly portrait — matches reference proportion
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Solid color body (always painted — fallback under banner load)
+                Container(color: bgColor),
+
+                // Watermark big-letter pattern when no banner image — design baked
+                // into banner_image_id will replace this when present.
+                if (!_hasBanner)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: LayoutBuilder(
+                        builder: (ctx, c) {
+                          // Size watermark to card height so it scales with the
+                          // device without overflowing or shrinking too small.
+                          final fs = c.maxHeight * 0.68;
+                          return ClipRect(
+                            child: Center(
                               child: Text(
-                                _statusLabel,
-                                style: AppTypography.labelUppercase.copyWith(
-                                  color: Colors.white.withAlpha(220),
-                                  fontSize: 10, letterSpacing: 0.8,
+                                _levelCode * 2,
+                                maxLines: 1,
+                                softWrap: false,
+                                style: TextStyle(
+                                  color: textColor.withAlpha(60),
+                                  fontSize: fs,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -fs * 0.035,
+                                  height: 0.9,
                                 ),
                               ),
                             ),
-                            const Spacer(),
-                            if (isLocked)
-                              const Icon(Icons.lock_outline_rounded, color: Colors.white70, size: 16),
-                          ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+
+                // Banner image (design-baked artwork w/ giant text overlay lives here)
+                if (_hasBanner)
+                  Image.network(
+                    client.mediaUri(course.bannerImageId).toString(),
+                    headers: client.authHeaders,
+                    fit: BoxFit.cover,
+                    cacheWidth: imageCacheWidth,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    loadingBuilder: (_, child, progress) =>
+                        progress == null ? child : const SizedBox.shrink(),
+                  ),
+
+                // Bottom darkening gradient so title stays readable on any art
+                Positioned(
+                  left: 0, right: 0, bottom: 0,
+                  child: IgnorePointer(
+                    child: Container(
+                      height: 140,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Color(0x80000000)],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Top-left status pill — "ĐANG HỌC" for the featured course,
+                // "SẮP RA MẮT" for draft. Hidden otherwise.
+                if (pill != null)
+                  Positioned(
+                    top: 18, left: 22,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(46),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        pill,
+                        style: AppTypography.labelUppercase.copyWith(
+                          color: textColor,
+                          fontSize: 10,
+                          letterSpacing: 0.8,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Title + subtitle anchored bottom-left
+                Positioned(
+                  left: 22, right: 80, bottom: 28,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        course.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.titleLarge.copyWith(
+                          color: textColor,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _subtitle,
+                        style: AppTypography.bodySmall.copyWith(
+                          color: textColor.withAlpha(220),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
                 ),
 
-              Padding(
-            padding: EdgeInsets.all(isFeatured ? AppSpacing.x5 : AppSpacing.x4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (!_hasBanner) ...[
-                // Top row: badge + lock icon
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: badgeColor,
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                      ),
-                      child: Text(
-                        _statusLabel,
-                        style: AppTypography.labelUppercase.copyWith(
-                          color: textColor.withAlpha(200),
-                          fontSize: 10,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
+                // White circular chevron CTA bottom-right
+                Positioned(
+                  right: 20, bottom: 26,
+                  child: Container(
+                    width: 36, height: 36,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
                     ),
-                    const Spacer(),
-                    if (isLocked)
-                      Icon(Icons.lock_outline_rounded, color: textColor.withAlpha(140), size: 16),
-                  ],
-                ),
-                SizedBox(height: isFeatured ? AppSpacing.x3 : AppSpacing.x2),
-                ],
-
-                // Title
-                Text(
-                  course.title,
-                  style: AppTypography.titleLarge.copyWith(
-                    color: textColor,
-                    fontSize: isFeatured ? 22 : 18,
-                    fontWeight: FontWeight.w700,
-                    height: 1.2,
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: bgColor,
+                      size: 22,
+                    ),
                   ),
                 ),
 
-                if (course.description.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.x1),
-                  Text(
-                    course.description,
-                    style: AppTypography.bodySmall.copyWith(
-                      color: textColor.withAlpha(180),
-                    ),
-                    maxLines: isFeatured ? 3 : 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-
-                SizedBox(height: isFeatured ? AppSpacing.x4 : AppSpacing.x3),
-
-                // Progress bar
-                if (!isLocked) ...[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                    child: LinearProgressIndicator(
-                      value: null, // indeterminate — real progress not available yet
-                      minHeight: 4,
-                      backgroundColor: textColor.withAlpha(25),
-                      valueColor: AlwaysStoppedAnimation<Color>(textColor.withAlpha(140)),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.x3),
-                ],
-
-                // Footer row
-                Row(
-                  children: [
-                    Icon(
-                      Icons.schedule_rounded,
-                      size: 13,
-                      color: textColor.withAlpha(140),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Nói • A2',
-                      style: AppTypography.labelSmall.copyWith(
-                        color: textColor.withAlpha(140),
-                        fontSize: 12,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: textColor.withAlpha(28),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(Icons.arrow_forward, color: textColor, size: 16),
-                    ),
-                  ],
+                // Accent strip pinned to bottom edge — replaces the old progress bar.
+                Positioned(
+                  left: 0, right: 0, bottom: 0,
+                  child: Container(height: 6, color: accentColor),
                 ),
               ],
             ),
-          ),    // close inner Padding
-          ],    // close outer Column children
-        ),      // close outer Column
-        ),      // close Container
-      ),        // close Opacity
+          ),
+        ),
+      ),
     );
   }
 }

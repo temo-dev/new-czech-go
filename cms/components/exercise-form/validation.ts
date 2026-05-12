@@ -10,17 +10,24 @@ export function validateExercise(exerciseType: ExerciseType, payload: AnyPayload
   // Common
   const title = String(payload.title ?? '').trim();
   if (!title) errors.push('Tiêu đề không được để trống.');
+  // Module chỉ bắt buộc cho pool=course. pool=exam (mock test) thì
+  // module_id="" hợp lệ — bài thi gắn vào MockTestSection chứ không Module.
+  const pool = String(payload.pool ?? 'course').trim();
   const moduleId = String(payload.module_id ?? '').trim();
-  if (!moduleId) errors.push('Phải chọn Module.');
+  if (pool !== 'exam' && !moduleId) errors.push('Phải chọn Module.');
 
   const detail = (payload.detail ?? {}) as Record<string, unknown>;
 
-  // Poslech 1/2: need 5 items with text + correct_answers
+  // Poslech 1/2: items with text + correct_answers.
+  // V38 — poslech_1 + poslech_2 cho phép số câu tùy ý (≥1).
   if (exerciseType === 'poslech_1' || exerciseType === 'poslech_2') {
     const items = (detail.items ?? []) as Array<Record<string, unknown>>;
-    if (items.length < 5) errors.push(`Poslech 1/2 cần đúng 5 đoạn nghe (hiện có ${items.length}).`);
     const ca = detail.correct_answers as Record<string, string> | undefined;
-    if (!ca || Object.keys(ca).length < 5) errors.push('Cần nhập đáp án cho tất cả 5 câu.');
+    const label = exerciseType === 'poslech_1' ? 'Poslech 1' : 'Poslech 2';
+    if (items.length < 1) errors.push(`${label} cần ít nhất 1 câu hỏi.`);
+    const need = items.length;
+    const have = ca ? Object.keys(ca).filter(k => String(ca[k] ?? '').trim()).length : 0;
+    if (have < need) errors.push(`Cần nhập đáp án cho tất cả ${need} câu (hiện có ${have}).`);
 
     // V27 — poslech_1 image_asset_id all-or-none per item. Drafts can hold
     // partial state while admin is uploading; published exercises must be
@@ -43,35 +50,34 @@ export function validateExercise(exerciseType: ExerciseType, payload: AnyPayload
     }
   }
 
-  // Poslech 3: need 5 items + options A-G + answers
-  if (exerciseType === 'poslech_3') {
+  // Poslech 3/4: items động + options pool động (giữ ≥2 options để có distractor).
+  // V38 — cho phép admin tùy biến số câu/lựa chọn.
+  if (exerciseType === 'poslech_3' || exerciseType === 'poslech_4') {
     const items = (detail.items ?? []) as unknown[];
     const options = (detail.options ?? []) as unknown[];
-    if (items.length < 5) errors.push(`Poslech 3 cần 5 đoạn nghe (hiện có ${items.length}).`);
-    if (options.length < 7) errors.push(`Poslech 3 cần 7 options A-G (hiện có ${options.length}).`);
+    const label = exerciseType === 'poslech_3' ? 'Poslech 3' : 'Poslech 4';
+    if (items.length < 1) errors.push(`${label} cần ít nhất 1 câu hỏi.`);
+    if (options.length < 2) errors.push(`${label} cần ít nhất 2 lựa chọn (hiện có ${options.length}).`);
+    const ca = detail.correct_answers as Record<string, string> | undefined;
+    const need = items.length;
+    const have = ca ? Object.keys(ca).filter(k => String(ca[k] ?? '').trim()).length : 0;
+    if (need > 0 && have < need) errors.push(`Cần nhập đáp án cho tất cả ${need} câu (hiện có ${have}).`);
   }
 
-  // Poslech 4: need 5 items + options A-F + answers
-  if (exerciseType === 'poslech_4') {
-    const items = (detail.items ?? []) as unknown[];
-    const options = (detail.options ?? []) as unknown[];
-    if (items.length < 5) errors.push(`Poslech 4 cần 5 đoạn (hiện có ${items.length}).`);
-    if (options.length < 6) errors.push(`Poslech 4 cần 6 options A-F (hiện có ${options.length}).`);
-  }
-
-  // Poslech 5: voicemail + 5 fill slots
+  // Poslech 5: voicemail + fill slots (V38 — số slot tùy ý, ≥1).
   if (exerciseType === 'poslech_5') {
     const questions = (detail.questions ?? []) as Array<Record<string, unknown>>;
-    if (questions.length < 5) errors.push(`Poslech 5 cần 5 câu hỏi điền vào (hiện có ${questions.length}).`);
-    questions.slice(0, 5).forEach((q, i) => {
+    if (questions.length < 1) errors.push('Poslech 5 cần ít nhất 1 câu hỏi điền vào.');
+    questions.forEach((q, i) => {
       if (!String(q.prompt ?? '').trim()) {
-        errors.push(`Poslech 5 câu ${21 + i}: thiếu câu hỏi hiển thị cho học viên.`);
+        const qn = Number(q.question_no) || 21 + i;
+        errors.push(`Poslech 5 câu ${qn}: thiếu câu hỏi hiển thị cho học viên.`);
       }
     });
     const ca = detail.correct_answers as Record<string, string> | undefined;
-    if (!ca || Object.values(ca).filter(v => String(v ?? '').trim()).length < 5) {
-      errors.push('Poslech 5 cần nhập đáp án cho đủ 5 câu.');
-    }
+    const need = questions.length;
+    const have = ca ? Object.values(ca).filter(v => String(v ?? '').trim()).length : 0;
+    if (need > 0 && have < need) errors.push(`Poslech 5 cần nhập đáp án cho đủ ${need} câu (hiện có ${have}).`);
   }
 
   // Cteni 1: need 5 items + 8 options + answers
