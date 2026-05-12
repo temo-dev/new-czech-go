@@ -12,7 +12,7 @@ type LevelProgressResponse struct {
 	UserID                 string                      `json:"user_id"`
 	CurrentLevel           string                      `json:"current_level"`
 	UnlockedLevels         []string                    `json:"unlocked_levels"`
-	NextLevel              string                      `json:"next_level"`
+	NextLevel              string                      `json:"next_level,omitempty"`
 	PlacementTakenAt       *time.Time                  `json:"placement_taken_at,omitempty"`
 	SkillMastery           map[string]SkillMasteryInfo `json:"skill_mastery"`
 	CoveragePct            float64                     `json:"coverage_pct"`
