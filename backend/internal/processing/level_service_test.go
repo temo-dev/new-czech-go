@@ -341,3 +341,31 @@ func TestLevelService_ComputeLevelProgress_SkillMasteryKeySetIsExhaustive(t *tes
 		t.Errorf("SkillMastery keys = %v, want %v", gotKeys, wantKeys)
 	}
 }
+
+// S5 — an empty courseLevel used to bypass the gate entirely ("unlocked").
+// That hid bugs in seed data and made pre-V21 backfill cases indistinguishable
+// from genuinely public courses. The new behaviour treats empty as a2 so
+// the legacy fallback only succeeds when the learner has actually reached A2.
+
+func TestResolveCourseUnlockWith_EmptyLevelTreatedAsA2(t *testing.T) {
+	cases := []struct {
+		name           string
+		unlockedLevels []string
+		demoID         string
+		want           string
+	}{
+		{"empty + a2 unlocked → unlocked", []string{"a0", "a1", "a2"}, "", "unlocked"},
+		{"empty + a2 unlocked + demo → unlocked", []string{"a0", "a1", "a2"}, "demo-ex", "unlocked"},
+		{"empty + no a2 + demo → demo", []string{"a0", "a1"}, "demo-ex", "demo"},
+		{"empty + no a2 + no demo → locked", []string{"a0", "a1"}, "", "locked"},
+		{"empty + no unlocks → locked", nil, "", "locked"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := ResolveCourseUnlockWith(tc.unlockedLevels, "", tc.demoID)
+			if got != tc.want {
+				t.Fatalf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
