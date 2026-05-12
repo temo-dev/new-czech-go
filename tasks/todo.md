@@ -42,10 +42,13 @@ All eight items landed in dedicated `fix(s1)..fix(s8)` commits.
 - [ ] Seed sample content via CMS — at least 1 exercise per type for
   Flutter end-to-end (interview included). Includes B9 reseed:
   demo `cteni_5` exercise listed twice; demo `cteni_6` returned
-  with empty `module_id`.
-- [ ] Vocab item per-item Polly TTS (deferred from V11).
+  with empty `module_id`. **Operator task — no engineering.**
+- [→] Vocab item per-item Polly TTS (deferred from V11) →
+  [docs/ideas/v37-vocab-item-polly-tts.md](../docs/ideas/v37-vocab-item-polly-tts.md)
+  drafted 2026-05-12 awaiting promotion to spec.
 - [ ] V18.1 pilot — 20×6 photo gold set across 5 learners measuring
   handwriting OCR CER ≤10% before promoting OCR to default mode.
+  **Operator pilot — no engineering until evidence lands.**
 
 ## Archive
 
