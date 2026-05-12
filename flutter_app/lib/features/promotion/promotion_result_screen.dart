@@ -52,7 +52,6 @@ class PromotionResultScreen extends StatefulWidget {
 class _PromotionResultScreenState extends State<PromotionResultScreen>
     with SingleTickerProviderStateMixin {
   AnimationController? _spring;
-  Timer? _cooldownTimer;
 
   @override
   void didChangeDependencies() {
@@ -66,20 +65,12 @@ class _PromotionResultScreenState extends State<PromotionResultScreen>
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    if (!widget.passed && widget.cooldownUntil != null) {
-      _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted) setState(() {});
-      });
-    }
-  }
+  // S4: cooldown ticking lives inside PromotionCooldownCaption now, so the
+  // screen no longer rebuilds the diagnostic table once per second.
 
   @override
   void dispose() {
     _spring?.dispose();
-    _cooldownTimer?.cancel();
     super.dispose();
   }
 
@@ -202,9 +193,9 @@ class _PromotionResultScreenState extends State<PromotionResultScreen>
           thresholdPct: widget.thresholdPct,
         ),
         const SizedBox(height: AppSpacing.x3),
-        if (widget.cooldownUntil != null) _CooldownCaption(
+        if (widget.cooldownUntil != null) PromotionCooldownCaption(
           cooldownUntil: widget.cooldownUntil!,
-          now: widget._now(),
+          clock: widget._clock,
         ),
         const Spacer(),
         if (weakest != null)
@@ -339,15 +330,46 @@ class _DiagnosticTable extends StatelessWidget {
   }
 }
 
-class _CooldownCaption extends StatelessWidget {
-  const _CooldownCaption({required this.cooldownUntil, required this.now});
+/// PromotionCooldownCaption owns the 1-second tick that drives the
+/// remaining-time display. Scoping the timer to this widget keeps the
+/// surrounding diagnostic table out of the rebuild cycle (S4 polish).
+class PromotionCooldownCaption extends StatefulWidget {
+  const PromotionCooldownCaption({
+    super.key = const Key('promotion_result_cooldown_timer'),
+    required this.cooldownUntil,
+    DateTime Function()? clock,
+  }) : _clock = clock;
 
   final DateTime cooldownUntil;
-  final DateTime now;
+  final DateTime Function()? _clock;
+
+  DateTime _now() => _clock?.call() ?? DateTime.now().toUtc();
+
+  @override
+  State<PromotionCooldownCaption> createState() =>
+      _PromotionCooldownCaptionState();
+}
+
+class _PromotionCooldownCaptionState extends State<PromotionCooldownCaption> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final remaining = cooldownUntil.difference(now);
+    final remaining = widget.cooldownUntil.difference(widget._now());
     if (remaining.isNegative) {
       return const SizedBox.shrink();
     }
@@ -358,7 +380,6 @@ class _CooldownCaption extends StatelessWidget {
         '${m.toString().padLeft(2, '0')}:'
         '${s.toString().padLeft(2, '0')}';
     return Container(
-      key: const Key('promotion_result_cooldown_timer'),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLow,
