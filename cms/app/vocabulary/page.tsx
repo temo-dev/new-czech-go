@@ -5,7 +5,7 @@ import { adminFetch } from '../../lib/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type VocabItem = { id?: string; term: string; meaning: string; part_of_speech?: string; image_asset_id?: string };
+type VocabItem = { id?: string; term: string; meaning: string; audio_storage_key?: string; part_of_speech?: string; image_asset_id?: string };
 
 type VocabSet = {
   id: string; module_id: string; title: string;
@@ -419,6 +419,19 @@ export default function VocabularyPage() {
     }
   }
 
+  // V37 — single-click Polly TTS for a saved vocab item.
+  async function handleItemAudioGenerate(itemId: string, itemIndex: number) {
+    setFItems(prev => prev.map((it, i) => i === itemIndex ? { ...it, audio_storage_key: '__loading__' } : it));
+    const res = await adminFetch(`/api/admin/vocabulary-items/${itemId}/generate-audio`, { method: 'POST' });
+    const j = await res.json();
+    if (res.ok && j.data?.audio_storage_key) {
+      setFItems(prev => prev.map((it, i) => i === itemIndex ? { ...it, audio_storage_key: j.data.audio_storage_key } : it));
+    } else {
+      setFItems(prev => prev.map((it, i) => i === itemIndex ? { ...it, audio_storage_key: '' } : it));
+      window.alert(j?.error?.message || 'Tạo audio thất bại.');
+    }
+  }
+
   async function handleResume(setId: string, jid: string) {
     const res = await adminFetch(`/api/admin/content-generation-jobs/${jid}`);
     const j = await res.json();
@@ -554,11 +567,11 @@ export default function VocabularyPage() {
             {/* Word list */}
             <div>
               <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700 }}>Danh sách từ</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr 90px 28px', gap: 6, fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 6, alignItems: 'center' }}>
-                <span>Ảnh</span><span>Từ Czech</span><span>Nghĩa Vietnamese</span><span>Loại từ</span><span />
+              <div style={{ display: 'grid', gridTemplateColumns: '44px 32px 1fr 1fr 90px 28px', gap: 6, fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 6, alignItems: 'center' }}>
+                <span>Ảnh</span><span>🔊</span><span>Từ Czech</span><span>Nghĩa Vietnamese</span><span>Loại từ</span><span />
               </div>
               {fItems.map((item, i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '44px 1fr 1fr 90px 28px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '44px 32px 1fr 1fr 90px 28px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
                   {/* Image cell — clickable upload for saved items, placeholder for new */}
                   {item.id ? (
                     <label title="Nhấp để tải ảnh" style={{ width: 40, height: 40, borderRadius: 6, border: `1.5px ${item.image_asset_id ? 'solid #22c55e' : 'dashed var(--border)'}`, overflow: 'hidden', background: item.image_asset_id ? '#f0fdf4' : 'var(--surface-alt)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer' }}>
@@ -570,6 +583,24 @@ export default function VocabularyPage() {
                   ) : (
                     <div title="Lưu bộ từ trước để thêm ảnh" style={{ width: 40, height: 40, borderRadius: 6, border: '1.5px dashed var(--border)', background: 'var(--surface-alt)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <span style={{ fontSize: 10, color: 'var(--ink-4)' }}>img</span>
+                    </div>
+                  )}
+                  {/* V37 — single-click Polly TTS for the term. Loading state
+                      uses a sentinel `__loading__` so the UI shows a spinner
+                      while the request is in flight. */}
+                  {item.id ? (
+                    <button
+                      type="button"
+                      title={item.audio_storage_key && item.audio_storage_key !== '__loading__' ? 'Đã có audio. Bấm để tạo lại.' : 'Tạo audio Polly cho từ này'}
+                      onClick={() => item.id && handleItemAudioGenerate(item.id, i)}
+                      disabled={!item.term.trim() || item.audio_storage_key === '__loading__'}
+                      style={{ width: 28, height: 28, borderRadius: 6, border: `1.5px ${item.audio_storage_key && item.audio_storage_key !== '__loading__' ? 'solid #0891B2' : 'dashed var(--border)'}`, background: item.audio_storage_key && item.audio_storage_key !== '__loading__' ? '#ECFEFF' : 'transparent', cursor: 'pointer', fontSize: 14, padding: 0 }}
+                    >
+                      {item.audio_storage_key === '__loading__' ? '…' : item.audio_storage_key ? '🔊' : '＋'}
+                    </button>
+                  ) : (
+                    <div title="Lưu bộ từ trước để tạo audio" style={{ width: 28, height: 28, borderRadius: 6, border: '1.5px dashed var(--border)', background: 'var(--surface-alt)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--ink-4)' }}>
+                      au
                     </div>
                   )}
                   <input value={item.term} placeholder="chodím" onChange={e => { const n = [...fItems]; n[i] = { ...item, term: e.target.value }; setFItems(n); }} style={inputStyle} />
