@@ -3,6 +3,7 @@ package httpapi
 import (
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -23,11 +24,22 @@ var allowedImageMIMEs = map[string]string{
 
 const maxImageBytes = 5 * 1024 * 1024 // 5 MB
 
-// ── Vocabulary Item Image ─────────────────────────────────────────────────────
+// ── Vocabulary Item: image upload + V37 audio generation ─────────────────────
 
-func (s *Server) handleAdminVocabItemImage(w http.ResponseWriter, r *http.Request, _ contracts.User) {
-	itemID := strings.TrimPrefix(r.URL.Path, "/v1/admin/vocabulary-items/")
-	itemID = strings.TrimSuffix(itemID, "/image")
+func (s *Server) handleAdminVocabItem(w http.ResponseWriter, r *http.Request, user contracts.User) {
+	path := strings.TrimPrefix(r.URL.Path, "/v1/admin/vocabulary-items/")
+	switch {
+	case strings.HasSuffix(path, "/image"):
+		s.handleAdminVocabItemImage(w, r, strings.TrimSuffix(path, "/image"))
+	case strings.HasSuffix(path, "/generate-audio"):
+		s.handleAdminVocabItemGenerateAudio(w, r, strings.TrimSuffix(path, "/generate-audio"))
+	default:
+		writeNotFound(w)
+	}
+	_ = user
+}
+
+func (s *Server) handleAdminVocabItemImage(w http.ResponseWriter, r *http.Request, itemID string) {
 	if itemID == "" {
 		writeNotFound(w)
 		return
@@ -59,6 +71,52 @@ func (s *Server) handleAdminVocabItemImage(w http.ResponseWriter, r *http.Reques
 	default:
 		writeMethodNotAllowed(w)
 	}
+}
+
+// V37 — POST /v1/admin/vocabulary-items/:id/generate-audio
+//
+// Polly synthesises an MP3 of item.Term and the resulting storage_key
+// is persisted on the vocabulary_items row. Storage path lives under
+// the existing exercise-audio namespace (vocitem-XYZ never collides
+// with exercise-XYZ in practice — vocab IDs always prefix "vocitem-")
+// so the existing media-file resolver works without changes.
+func (s *Server) handleAdminVocabItemGenerateAudio(w http.ResponseWriter, r *http.Request, itemID string) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	item, ok := s.repo.GetVocabularyItem(itemID)
+	if !ok {
+		writeNotFound(w)
+		return
+	}
+	term := strings.TrimSpace(item.Term)
+	if term == "" {
+		writeError(w, http.StatusBadRequest, "validation_error",
+			"Vocab item has no term to synthesize.", false)
+		return
+	}
+	audio, err := s.audioGenerator.GenerateAudio(item.ID, term)
+	if err != nil {
+		log.Printf("generate-audio vocab item %s: %v", item.ID, err)
+		writeError(w, http.StatusInternalServerError, "internal_error",
+			"Audio generation failed.", true)
+		return
+	}
+	if !s.repo.SetVocabularyItemAudio(item.ID, audio.StorageKey) {
+		writeNotFound(w)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"id":                item.ID,
+			"audio_storage_key": audio.StorageKey,
+			"mime_type":         audio.MimeType,
+			"source_type":       audio.SourceType,
+			"generated_at":      audio.GeneratedAt,
+		},
+		"meta": map[string]any{},
+	})
 }
 
 func (s *Server) handleVocabItemImageFile(w http.ResponseWriter, r *http.Request, _ contracts.User) {

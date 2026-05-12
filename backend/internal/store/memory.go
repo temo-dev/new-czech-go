@@ -400,6 +400,9 @@ func (s *MemoryStore) DeleteVocabularyItem(id string) bool {
 func (s *MemoryStore) SetVocabularyItemImage(id, storageKey string) bool {
 	return s.vocabulary.SetVocabularyItemImage(id, storageKey)
 }
+func (s *MemoryStore) SetVocabularyItemAudio(id, storageKey string) bool {
+	return s.vocabulary.SetVocabularyItemAudio(id, storageKey)
+}
 
 // Grammar delegates
 func (s *MemoryStore) CreateGrammarRule(rule contracts.GrammarRule) (contracts.GrammarRule, error) {

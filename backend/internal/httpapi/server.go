@@ -301,7 +301,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/admin/content-generation-jobs", s.withRole("admin", s.handleAdminGenJobs))
 	s.mux.HandleFunc("/v1/admin/content-generation-jobs/", s.withRole("admin", s.handleAdminGenJobByID))
 	// V11: Media enrichment — image upload/delete for vocab items, grammar rules, and course banners
-	s.mux.HandleFunc("/v1/admin/vocabulary-items/", s.withRole("admin", s.handleAdminVocabItemImage))
+	s.mux.HandleFunc("/v1/admin/vocabulary-items/", s.withRole("admin", s.handleAdminVocabItem))
 	s.mux.HandleFunc("/v1/vocabulary-items/", s.withRole("learner", s.handleVocabItemImageFile))
 	s.mux.HandleFunc("/v1/grammar-rules/", s.withRole("learner", s.handleGrammarRuleImageFile))
 	s.mux.HandleFunc("/v1/media/file", s.withAuth(s.handleMediaFile))

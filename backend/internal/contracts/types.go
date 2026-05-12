@@ -784,6 +784,9 @@ type VocabularyItem struct {
 	ExampleTranslation string `json:"example_translation,omitempty"`
 	SequenceNo         int    `json:"sequence_no"`
 	ImageAssetID       string `json:"image_asset_id,omitempty"`
+	// V37: Polly-generated MP3 storage key. Empty when no audio has been
+	// generated yet; admin clicks "🔊 Tạo audio" to populate.
+	AudioStorageKey string `json:"audio_storage_key,omitempty"`
 }
 
 type GrammarRule struct {

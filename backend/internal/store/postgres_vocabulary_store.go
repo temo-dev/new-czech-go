@@ -30,6 +30,11 @@ func NewPostgresVocabularyStore(databaseURL string) (VocabularyStore, error) {
 		db.Close()
 		return nil, fmt.Errorf("migrate vocabulary_items image_asset_id: %w", err)
 	}
+	// V37 migration 029: audio_storage_key on vocabulary_items.
+	if err := addColumnIfMissing(ctx, db, "vocabulary_items", "audio_storage_key", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate vocabulary_items audio_storage_key: %w", err)
+	}
 	return &postgresVocabularyStore{db: db}, nil
 }
 
@@ -151,7 +156,7 @@ func (s *postgresVocabularyStore) GetVocabularyItem(id string) (contracts.Vocabu
 	defer cancel()
 	var vi contracts.VocabularyItem
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, set_id, term, meaning, part_of_speech, example_sentence, example_translation, sequence_no, image_asset_id
+		`SELECT id, set_id, term, meaning, part_of_speech, example_sentence, example_translation, sequence_no, image_asset_id, audio_storage_key
 		 FROM vocabulary_items WHERE id = $1`, id,
 	).Scan(&vi.ID, &vi.SetID, &vi.Term, &vi.Meaning,
 		&vi.PartOfSpeech, &vi.ExampleSentence, &vi.ExampleTranslation, &vi.SequenceNo, &vi.ImageAssetID)
@@ -165,7 +170,7 @@ func (s *postgresVocabularyStore) ListVocabularyItems(setID string) []contracts.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, set_id, term, meaning, part_of_speech, example_sentence, example_translation, sequence_no, image_asset_id
+		`SELECT id, set_id, term, meaning, part_of_speech, example_sentence, example_translation, sequence_no, image_asset_id, audio_storage_key
 		 FROM vocabulary_items WHERE set_id = $1 ORDER BY sequence_no, id`, setID)
 	if err != nil {
 		return nil
@@ -175,7 +180,7 @@ func (s *postgresVocabularyStore) ListVocabularyItems(setID string) []contracts.
 	for rows.Next() {
 		var vi contracts.VocabularyItem
 		if err := rows.Scan(&vi.ID, &vi.SetID, &vi.Term, &vi.Meaning,
-			&vi.PartOfSpeech, &vi.ExampleSentence, &vi.ExampleTranslation, &vi.SequenceNo, &vi.ImageAssetID); err == nil {
+			&vi.PartOfSpeech, &vi.ExampleSentence, &vi.ExampleTranslation, &vi.SequenceNo, &vi.ImageAssetID, &vi.AudioStorageKey); err == nil {
 			out = append(out, vi)
 		}
 	}
@@ -187,6 +192,20 @@ func (s *postgresVocabularyStore) SetVocabularyItemImage(id, storageKey string) 
 	defer cancel()
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE vocabulary_items SET image_asset_id = $2 WHERE id = $1`,
+		id, storageKey,
+	)
+	if err != nil {
+		return false
+	}
+	n, _ := res.RowsAffected()
+	return n > 0
+}
+
+func (s *postgresVocabularyStore) SetVocabularyItemAudio(id, storageKey string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE vocabulary_items SET audio_storage_key = $2 WHERE id = $1`,
 		id, storageKey,
 	)
 	if err != nil {

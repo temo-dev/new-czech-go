@@ -18,6 +18,9 @@ type VocabularyStore interface {
 	ListVocabularyItems(setID string) []contracts.VocabularyItem
 	DeleteVocabularyItem(id string) bool
 	SetVocabularyItemImage(id, storageKey string) bool
+	// SetVocabularyItemAudio persists the Polly storage key produced by the
+	// V37 admin generate-audio endpoint. Returns false when no item matches.
+	SetVocabularyItemAudio(id, storageKey string) bool
 }
 
 type memoryVocabularyStore struct {
@@ -160,5 +163,16 @@ func (s *memoryVocabularyStore) SetVocabularyItemImage(id, storageKey string) bo
 		return false
 	}
 	item.ImageAssetID = storageKey
+	return true
+}
+
+func (s *memoryVocabularyStore) SetVocabularyItemAudio(id, storageKey string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	item, ok := s.items[id]
+	if !ok {
+		return false
+	}
+	item.AudioStorageKey = storageKey
 	return true
 }
