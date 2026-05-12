@@ -1,6 +1,7 @@
 # V36 Interview-in-Mock-Exam — Spec
 
-> **Status**: 🟡 draft 2026-05-12. Frozen sau khi ship.
+> **Status**: ✅ frozen on 2026-05-12 (slice shipped). Future changes
+> land in a later slice + reference fold, not by editing this file.
 >
 > **Linked idea**: [`docs/ideas/v36-interview-in-mock-exam.md`](../ideas/v36-interview-in-mock-exam.md).
 >

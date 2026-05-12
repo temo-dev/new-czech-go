@@ -10,6 +10,87 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V36 — Interview-in-Mock-Exam — 2026-05-12
+
+Open interview (`interview_conversation` + `interview_choice_explain`)
+as a 5th skill group on mock test sections, alongside noi/nghe/doc/viet.
+Surfaced by a user report: "interview exercise không assign vào exam
+được". Backend already accepted `pool='exam'` + `skill_kind='interview'`
+on `mock_test_sections`; both CMS authoring dashboard and Flutter
+mock-exam runner hardcoded the 4-skill list and blocked the flow end
+to end. No DB migration required (`mock_test_sections.skill_kind` is
+TEXT free-form).
+
+Slice docs: [docs/ideas/v36-interview-in-mock-exam.md](docs/ideas/v36-interview-in-mock-exam.md),
+[docs/specs/v36-interview-in-mock-exam.md](docs/specs/v36-interview-in-mock-exam.md),
+[tasks/v36-interview-in-mock-exam-plan.md](tasks/v36-interview-in-mock-exam-plan.md),
+[tasks/v36-interview-in-mock-exam-todo.md](tasks/v36-interview-in-mock-exam-todo.md).
+
+### CMS
+
+- `mock-test-dashboard-utils.ts` now owns `SkillKind`, `SKILL_GROUPS`,
+  `EXERCISE_TYPE_LABEL`, `DEFAULT_MAX_POINTS`, and `resequence` (moved
+  from the dashboard component for testability). Adds interview entries:
+  `kind='interview'`, `prefix='interview_'`, color `#0891B2`, label
+  "Hội thoại AI". Both interview types default to 20 max_points.
+- `mock-test-dashboard.tsx` now imports those constants instead of
+  redefining them locally; behaviour unchanged for the 4 existing skills.
+
+### Flutter
+
+- `app_colors.dart` adds `AppColors.interview` (#0891B2) +
+  `interviewContainer` (#CFF1F6).
+- `app_vi.arb` + `app_en.arb` add `skillInterview` ("Hội thoại AI" /
+  "AI Conversation"); l10n regenerated.
+- `mock_test_intro_screen.dart` extends `_skillKindOrder`,
+  `_skillGroupLabel`, `_skillGroupColor`, `_skillGroupIcon` with the
+  interview branch (Icons.forum_outlined).
+- New `mock_exam_skill_dispatch.dart` houses the dispatcher helpers
+  (`skillKindForExerciseType`, `sectionSkillKind`, `skillLabel`) so the
+  runner can be unit-tested. `mock_exam_screen.dart` imports them and
+  the `_runSection` flow gains an `interview` branch: create attempt
+  up-front (mirrors `interview_intro_screen`) → push
+  `InterviewSessionScreen` with `onSessionEnded` → `_advanceSection`.
+- `InterviewSessionScreen.onSessionEnded` is a new optional callback;
+  when set, `_endSession` pops back instead of pushing
+  `InterviewResultScreen`, so the mock-exam runner stays on top of the
+  navigation stack and can advance to the next section.
+- `section_result_card.dart` resolves `interview_*` exercises to the
+  `interview` kind and renders the generic `ResultCard` fallback
+  (transcript + LLM feedback); custom card deferred.
+
+### Backend
+
+- No code change. Verified via three new integration tests in
+  `mock_exam_interview_section_test.go`:
+  - single interview section → 'ready' attempt → overall 20/20 (pass).
+  - mixed reading + interview → 4/5 + 15/20 = 19/25 (76% pass at 60%).
+  - two interview sections → 20 + 10 = 30/40 (75% fail at 80%).
+- Scoring path reuses `readinessToFraction` already in
+  `backend/internal/store/mock_test_store.go`; interview attempts
+  populate `feedback.ReadinessLevel` via the existing
+  `POST /v1/attempts/:id/submit-interview` handler.
+
+### Decisions worth remembering
+
+- Interview is a 5th skill_kind, not a replacement for `noi`. Úloha 1-4
+  remain the canonical Speaking format.
+- CMS tab order: interview placed last (after Viết) to preserve parity
+  with course list view ordering.
+- Free-tier weekly interview cap (V17) applies regardless of context
+  (course vs exam) — same counter.
+- `_bulkAnalyze` stays speaking-only; interview attempts self-score in
+  `submit-interview` and never enter `_pendingAnalyses`.
+
+### Tests
+
+CMS 308 → 316 (+8). Flutter 375 → 386 (+11). Backend gains 3 tests in
+mock_exam_interview_section_test.go; full `go test ./...` green. CMS
+`lint` + `build` green. Flutter `analyze` clean on V36-touched files
+(pre-existing 10 unrelated warnings in V25/other files persist).
+
+---
+
 ## V35 — Poslech 4 Image Authoring Controls Hotfix — 2026-05-10
 
 POSLECH 4 already stores the shared A-F picture choices as

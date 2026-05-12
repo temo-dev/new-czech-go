@@ -1,6 +1,8 @@
 # V36 Interview-in-Mock-Exam — Idea + Requirements
 
-> **Status**: 🟡 draft 2026-05-12. Promotion to spec sau khi user OK.
+> **Status**: ✅ promoted to spec on 2026-05-12. Spec authoritative:
+> `docs/specs/v36-interview-in-mock-exam.md`. Idea kept as historical
+> pre-spec; nếu mâu thuẫn, theo spec.
 >
 > **Owner**: solo admin (tuananh.ngta@gmail.com).
 >

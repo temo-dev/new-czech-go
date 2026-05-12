@@ -527,9 +527,10 @@ One section within a MockTest template.
 | Field | Type | Required | Notes |
 |------|------|----------|------|
 | `sequence_no` | `int` | yes | Order in the exam |
+| `skill_kind` | `string` | yes | `noi`, `nghe`, `doc`, `viet`, `interview` (V36). Free-form TEXT in DB; CMS picker filters exercises per group prefix |
 | `exercise_id` | `uuid` | yes | Specific exercise to use |
 | `exercise_type` | `string` | yes | Denormalised from `Exercise` for display |
-| `max_points` | `int` | yes | Max score for this section (standard A2: Úloha1=8, Úloha2=12, Úloha3=10, Úloha4=7) |
+| `max_points` | `int` | yes | Max score for this section (standard A2: Úloha1=8, Úloha2=12, Úloha3=10, Úloha4=7; interview defaults to 20 per V36) |
 
 ## MockExamSession
 One learner's attempt at a MockTest. Created when the learner starts an exam.
