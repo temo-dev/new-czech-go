@@ -131,6 +131,9 @@ func (s *Server) handlePromotionAttempts(w http.ResponseWriter, r *http.Request,
 			"promotion_attempt_id": attempt.ID,
 			"full_session_id":      session.ID,
 			"target_level":         mock.TargetLevel,
+			// S7: inline the full session so the client doesn't need a
+			// follow-up GET /v1/mock-exams/:id round-trip.
+			"session": session,
 		},
 		"meta": map[string]any{},
 	})

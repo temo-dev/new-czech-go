@@ -228,4 +228,22 @@ func TestPromotionHandler_HappyPath_201(t *testing.T) {
 	if data["promotion_attempt_id"].(string) == "" {
 		t.Error("promotion_attempt_id missing")
 	}
+	// S7: full session payload inlined on 201 so the client does not need
+	// a follow-up GET /v1/mock-exams/:id.
+	session, ok := data["session"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected data.session map; got %T", data["session"])
+	}
+	if session["id"].(string) == "" {
+		t.Errorf("session.id missing")
+	}
+	if session["id"].(string) != data["full_session_id"].(string) {
+		t.Errorf("session.id %v != full_session_id %v", session["id"], data["full_session_id"])
+	}
+	if session["status"] != "in_progress" {
+		t.Errorf("session.status = %v, want in_progress", session["status"])
+	}
+	if _, ok := session["sections"]; !ok {
+		t.Errorf("session.sections missing")
+	}
 }

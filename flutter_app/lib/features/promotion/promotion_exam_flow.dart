@@ -53,7 +53,10 @@ class _PromotionExamFlowState extends State<PromotionExamFlow> {
       final attempt = await widget.levelApi.createPromotionAttempt(
         widget.promotionTestId,
       );
-      final raw = await widget.client.getMockExam(attempt.fullSessionId);
+      // S7: server inlines the session payload, so the follow-up GET
+      // /v1/mock-exams/:id is only needed against older builds.
+      final raw = attempt.session ??
+          await widget.client.getMockExam(attempt.fullSessionId);
       final session = MockExamSessionView.fromJson(raw);
       if (!mounted) return;
       setState(() {

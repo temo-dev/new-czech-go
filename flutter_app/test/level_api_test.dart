@@ -131,6 +131,41 @@ void main() {
     }
   });
 
+  test('createPromotionAttempt inlines session payload from 201 (S7)', () async {
+    final server = await _bindServer((request) async {
+      expect(request.method, 'POST');
+      expect(request.uri.path, '/v1/promotion-attempts');
+      request.response
+        ..statusCode = HttpStatus.created
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode({
+          'data': {
+            'promotion_attempt_id': 'pa_1',
+            'full_session_id': 'fs_1',
+            'target_level': 'b1',
+            'session': {
+              'id': 'fs_1',
+              'mock_test_id': 'mt_b1',
+              'status': 'in_progress',
+              'sections': [],
+            },
+          },
+        }));
+      await request.response.close();
+    });
+    final api = _client(server);
+    try {
+      final got = await api.createPromotionAttempt('mt_b1');
+      expect(got.fullSessionId, 'fs_1');
+      expect(got.promotionAttemptId, 'pa_1');
+      expect(got.session, isNotNull);
+      expect(got.session!['id'], 'fs_1');
+      expect(got.session!['status'], 'in_progress');
+    } finally {
+      await server.close(force: true);
+    }
+  });
+
   test('createPromotionAttempt cooldown_active throws LevelApiException with retry_after', () async {
     final server = await _bindServer((request) async {
       expect(request.uri.path, '/v1/promotion-attempts');

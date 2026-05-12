@@ -117,10 +117,14 @@ class LevelApi {
       body: {'mock_test_id': mockTestId},
     );
     final data = (raw['data'] as Map?)?.cast<String, dynamic>() ?? const {};
+    // S7: server now inlines the session payload, so the client can skip
+    // the follow-up GET /v1/mock-exams/:id round-trip when it's present.
+    final session = (data['session'] as Map?)?.cast<String, dynamic>();
     return PromotionAttemptResult(
       promotionAttemptId: data['promotion_attempt_id'] as String? ?? '',
       fullSessionId: data['full_session_id'] as String? ?? '',
       targetLevel: parseLevel(data['target_level'] as String?),
+      session: session,
     );
   }
 
@@ -243,8 +247,12 @@ class PromotionAttemptResult {
     required this.promotionAttemptId,
     required this.fullSessionId,
     required this.targetLevel,
+    this.session,
   });
   final String promotionAttemptId;
   final String fullSessionId;
   final CefrLevel targetLevel;
+  // S7: inline mock-exam session from the 201 response. Older servers
+  // omit it; callers must fall back to GET /v1/mock-exams/:id when null.
+  final Map<String, dynamic>? session;
 }
