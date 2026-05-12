@@ -14,6 +14,7 @@ import '../../exercise/screens/listening_exercise_screen.dart';
 import '../../exercise/screens/reading_exercise_screen.dart';
 import '../../exercise/screens/writing_exercise_screen.dart';
 import '../../interview/screens/interview_session_screen.dart';
+import 'answer_sheet_screen.dart';
 import 'mock_exam_section_detail_screen.dart';
 import 'mock_exam_skill_dispatch.dart';
 
@@ -397,9 +398,28 @@ class _MockExamScreenState extends State<MockExamScreen> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final mockTitle = widget.mockTest?.title.trim() ?? '';
+    final session = _session;
     return Scaffold(
       appBar: AppBar(
         title: Text(mockTitle.isNotEmpty ? mockTitle : l.mockExamTitle),
+        actions: [
+          // V39 — open the read-only Answer Sheet. Disabled until the session
+          // has loaded; S7 turns the chips into jump-back actions.
+          IconButton(
+            icon: const Icon(Icons.grid_view_rounded),
+            tooltip: 'Danh sách câu',
+            onPressed: session == null
+                ? null
+                : () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        fullscreenDialog: true,
+                        builder: (_) => AnswerSheetScreen(session: session),
+                      ),
+                    );
+                  },
+          ),
+        ],
       ),
       body: SafeArea(child: _buildBody(l)),
     );

@@ -88,14 +88,19 @@
 
 **Scope cut note**: full sticky action bar replaces today's per-type submit buttons via lifted state. That refactor is larger than 1 slice. S5 ships the V39 Skip UI users can hit immediately (per-tile button) + backend support for Skip-then-Complete. Inline player + action bar land in S6/S7 alongside the answer sheet.
 
-### S6 — Answer sheet (read-only)
-- [ ] **S6.1** `screens/answer_sheet_screen.dart` — fullscreen route, 5-col grid
-- [ ] **S6.2** Cosmetic skill-section headers (ČTENÍ / PSANÍ / POSLECH / MLUVENÍ / INTERVIEW)
-- [ ] **S6.3** Summary footer — "M/24 đã làm · K bỏ qua · X chưa"
-- [ ] **S6.4** Open animation — 200 ms scale 0.95→1 + fade; 150 ms fade when reduce-motion
-- [ ] **S6.5** Hook `exam_app_bar.onSheetTap` → `Navigator.push(MaterialPageRoute(fullscreenDialog: true))`
-- [ ] **S6.6** `test/answer_sheet_screen_test.dart` — 3-state render + summary + reduce-motion
-- [ ] **S6.7** `flutter test` green
+### S6 — Answer sheet (read-only)  ✅ landed 2026-05-12
+- [x] **S6.1** `screens/answer_sheet_screen.dart` — fullscreen route, `Wrap` grid of `QuestionStatusChip` per skill section
+- [x] **S6.2** Cosmetic skill-section headers — uppercase localized skill labels (ĐỌC / VIẾT / NGHE / NÓI / HỘI THOẠI AI), grouped from `sectionSkillKind`
+- [x] **S6.3** Summary footer — "N/total đã làm · K bỏ qua · X chưa" in `surfaceContainerLow`
+- [ ] **S6.4** Open animation — default Material fullscreenDialog transition (system handles reduce-motion). Custom 200 ms scale+fade deferred — system default is acceptable + respects accessibility.
+- [x] **S6.5** Sheet entry on `MockExamScreen`'s AppBar — top-right `grid_view_rounded` icon pushes `AnswerSheetScreen` via `MaterialPageRoute(fullscreenDialog: true)`. Disabled while session loading.
+- [x] **S6.6** Legend strip (✓ Đã làm / ⊘ Bỏ qua / ○ Chưa làm) right under the AppBar
+- [x] **S6.7** `test/answer_sheet_screen_test.dart` — 4 tests: chip-per-section, summary footer counts, skill headers when sections exist, legend renders 3 states
+- [x] **S6.8** `test/mock_exam_screen_test.dart` — AppBar grid icon pushes sheet + sheet content visible
+- [x] **S6.9** `flutter test` 423 green (was 418 → +5)
+- [x] **S6.10** `flutter analyze` clean (no new issues)
+
+**Tap-to-jump (S7) follow-up**: chip's `onTap` left null in S6. S7 will pop with `displayOrder` so the player jumps back.
 
 ### ✅ Checkpoint 2
 - [ ] `make verify` green

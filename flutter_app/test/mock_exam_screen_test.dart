@@ -211,6 +211,52 @@ void main() {
     expect(find.text('Bỏ qua'), findsNWidgets(2));
   });
 
+  // V39 — top-right grid icon opens the read-only Answer Sheet.
+  testWidgets('MockExamScreen AppBar action pushes the Answer Sheet route', (
+    tester,
+  ) async {
+    final session = MockExamSessionView(
+      id: 'session-1',
+      status: 'in_progress',
+      mockTestId: 'mt-1',
+      overallScore: 0,
+      passed: false,
+      passThresholdPercent: 60,
+      overallReadinessLevel: '',
+      overallSummary: '',
+      sections: const [
+        MockExamSection(
+          sequenceNo: 1,
+          skillKind: 'doc',
+          exerciseId: 'ex-1',
+          exerciseType: 'cteni_1',
+          maxPoints: 5,
+          attemptId: '',
+          sectionScore: 0,
+          status: 'pending',
+          displayOrder: 1,
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: MockExamScreen(
+          client: ApiClient(),
+          initialSession: session,
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.grid_view_rounded), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.grid_view_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('Danh sách câu'), findsOneWidget);
+    expect(find.text('0/1 đã làm · 0 bỏ qua · 1 chưa'), findsOneWidget);
+  });
+
   testWidgets('MockExamScreen hides "Bỏ qua" for already-skipped or completed sections', (
     tester,
   ) async {
