@@ -2031,6 +2031,8 @@ func (s *Server) handleMockExamByID(w http.ResponseWriter, r *http.Request, user
 		s.handleMockExamComplete(w, r, strings.TrimSuffix(path, "/complete"), user)
 	case strings.HasSuffix(path, "/skip"):
 		s.handleMockExamSkip(w, r, strings.TrimSuffix(path, "/skip"), user)
+	case strings.HasSuffix(path, "/expire"):
+		s.handleMockExamExpire(w, r, strings.TrimSuffix(path, "/expire"), user)
 	default:
 		if r.Method != http.MethodGet {
 			writeMethodNotAllowed(w)
@@ -2152,6 +2154,38 @@ func (s *Server) handleMockExamSkip(w http.ResponseWriter, r *http.Request, id s
 				"error": map[string]any{"code": "mock_exam_skip_failed", "message": err.Error()},
 			})
 		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})
+}
+
+// V39 — `POST /v1/mock-exams/:id/expire` is the learner-facing "Nộp bài
+// ngay" path. Marks remaining pending sections as 'skipped' and flips
+// the session to 'completed'. Same code path as the timer sweeper;
+// idempotent for already-completed sessions.
+func (s *Server) handleMockExamExpire(w http.ResponseWriter, r *http.Request, id string, user contracts.User) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	existing, ok := s.repo.MockExamByID(id)
+	if !ok {
+		writeNotFound(w)
+		return
+	}
+	if existing.LearnerID != "" && existing.LearnerID != user.ID {
+		writeError(w, http.StatusForbidden, "forbidden", "You do not have access to this mock exam.", false)
+		return
+	}
+	session, err := s.repo.ExpireMockExam(id)
+	if err != nil {
+		if errors.Is(err, store.ErrSectionNotFound) {
+			writeNotFound(w)
+			return
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": map[string]any{"code": "mock_exam_expire_failed", "message": err.Error()},
+		})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})

@@ -813,6 +813,13 @@ class ApiClient {
     return payload['data'] as Map<String, dynamic>;
   }
 
+  // V39 — "Nộp bài ngay" path. Server marks remaining pending sections as
+  // 'skipped' and flips the session to 'completed'. Idempotent.
+  Future<Map<String, dynamic>> expireMockExam(String id) async {
+    final payload = await _authed('POST', '/v1/mock-exams/$id/expire');
+    return payload['data'] as Map<String, dynamic>;
+  }
+
   // V39 — skip a pending section by display_order. Server flips the section's
   // status to 'skipped'; the answer sheet can still jump back to it later.
   Future<Map<String, dynamic>> skipMockExamSection(

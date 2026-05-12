@@ -225,6 +225,74 @@ func TestGetMockExam_OmitsServerTimeWhenQueryParamMissing(t *testing.T) {
 	}
 }
 
+// V39 S9 — `POST /v1/mock-exams/:id/expire` is the learner-facing
+// "Nộp bài ngay" path. Marks remaining pending sections as 'skipped'
+// and flips the session to 'completed' in one round-trip.
+
+func TestMockExamExpire_HappyPathFlipsPendingAndCompletes(t *testing.T) {
+	_, server, session := skipTestEnv(t)
+
+	status, decoded := postJSONAllowErrorWithToken(t, server,
+		"/v1/mock-exams/"+session.ID+"/expire", "dev-learner-token",
+		map[string]any{},
+	)
+	if status != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %#v", status, decoded)
+	}
+	data := decoded["data"].(map[string]any)
+	if data["status"] != "completed" {
+		t.Fatalf("session status = %v, want completed", data["status"])
+	}
+	for _, raw := range data["sections"].([]any) {
+		s := raw.(map[string]any)
+		if s["status"] == "pending" {
+			t.Errorf("pending section remained after expire: %v", s)
+		}
+	}
+}
+
+func TestMockExamExpire_IdempotentOnCompletedSession(t *testing.T) {
+	_, server, session := skipTestEnv(t)
+
+	// First call → completes.
+	if status, _ := postJSONAllowErrorWithToken(t, server,
+		"/v1/mock-exams/"+session.ID+"/expire", "dev-learner-token",
+		map[string]any{},
+	); status != http.StatusOK {
+		t.Fatalf("first expire expected 200, got %d", status)
+	}
+	// Second call → still 200 (no-op).
+	status, _ := postJSONAllowErrorWithToken(t, server,
+		"/v1/mock-exams/"+session.ID+"/expire", "dev-learner-token",
+		map[string]any{},
+	)
+	if status != http.StatusOK {
+		t.Fatalf("second expire expected 200 (idempotent), got %d", status)
+	}
+}
+
+func TestMockExamExpire_DifferentLearnerReturns403(t *testing.T) {
+	_, server, session := skipTestEnv(t)
+	status, decoded := postJSONAllowErrorWithToken(t, server,
+		"/v1/mock-exams/"+session.ID+"/expire", "dev-learner-2-token",
+		map[string]any{},
+	)
+	if status != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %#v", status, decoded)
+	}
+}
+
+func TestMockExamExpire_UnknownSessionReturns404(t *testing.T) {
+	_, server, _ := skipTestEnv(t)
+	status, _ := postJSONAllowErrorWithToken(t, server,
+		"/v1/mock-exams/no-such-id/expire", "dev-learner-token",
+		map[string]any{},
+	)
+	if status != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", status)
+	}
+}
+
 func TestMockExamSkip_DifferentLearnerReturns403(t *testing.T) {
 	_, server, session := skipTestEnv(t)
 

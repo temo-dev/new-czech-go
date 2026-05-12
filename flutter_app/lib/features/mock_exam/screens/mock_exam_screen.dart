@@ -15,6 +15,7 @@ import '../../exercise/screens/reading_exercise_screen.dart';
 import '../../exercise/screens/writing_exercise_screen.dart';
 import '../../interview/screens/interview_session_screen.dart';
 import '../widgets/rerecord_confirm_dialog.dart';
+import '../widgets/submit_now_confirm_dialog.dart';
 import 'answer_sheet_screen.dart';
 import 'mock_exam_section_detail_screen.dart';
 import 'mock_exam_skill_dispatch.dart';
@@ -168,6 +169,36 @@ class _MockExamScreenState extends State<MockExamScreen> {
         _session = MockExamSessionView.fromJson(payload);
         _error = null;
         _jumpTarget = null; // consume the jump target on first advance.
+      });
+    } catch (err) {
+      if (!mounted) return;
+      setState(() => _error = err.toString());
+    }
+  }
+
+  // V39 S9 — "Nộp bài ngay": if any section is still pending, show a
+  // destructive confirm with the pending count; otherwise submit directly.
+  // Server marks remaining pending sections as 'skipped' and flips the
+  // session to 'completed' in one call.
+  Future<void> _submitNow() async {
+    final session = _session;
+    if (session == null) return;
+    final pending = session.sections.where((s) => s.isPending).length;
+    final total = session.sections.length;
+    if (pending > 0) {
+      final ok = await SubmitNowConfirmDialog.show(
+        context,
+        unansweredCount: pending,
+        totalCount: total,
+      );
+      if (!mounted || !ok) return;
+    }
+    try {
+      final payload = await widget.client.expireMockExam(session.id);
+      if (!mounted) return;
+      setState(() {
+        _session = MockExamSessionView.fromJson(payload);
+        _error = null;
       });
     } catch (err) {
       if (!mounted) return;
@@ -452,6 +483,28 @@ class _MockExamScreenState extends State<MockExamScreen> {
                     setState(() => _jumpTarget = picked);
                     await _runSection(target);
                   },
+          ),
+          // V39 S9 — overflow ⋮ "Nộp bài ngay". Disabled while loading or
+          // after the session has already completed.
+          PopupMenuButton<String>(
+            tooltip: 'Tuỳ chọn',
+            icon: const Icon(Icons.more_vert_rounded),
+            enabled: session != null && !session.isCompleted,
+            onSelected: (key) {
+              if (key == 'submit-now') {
+                _submitNow();
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'submit-now',
+                child: ListTile(
+                  leading: Icon(Icons.flag_rounded),
+                  title: Text('Nộp bài ngay'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
         ],
       ),

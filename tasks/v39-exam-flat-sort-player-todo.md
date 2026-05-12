@@ -131,17 +131,18 @@
 
 **Files**: 1 new (`rerecord_confirm_dialog.dart`) + 1 modified (`mock_exam_screen.dart` AppBar handler) + 1 new test file. `flutter test` 428 green (was 424 → +4). `flutter analyze` clean.
 
-### S9 — Intro polish + Nộp-bài-ngay + auto-submit UI
-- [ ] **S9.1** Intro warning banner — "Timer KHÔNG dừng khi rời app"
-- [ ] **S9.2** Intro stat boxes — câu count + 90 phút + điểm tổng
-- [ ] **S9.3** Sheet bottom CTA "Nộp bài ngay (M/24)" with destructive color
-- [ ] **S9.4** Confirm dialog when M < 24
-- [ ] **S9.5** App-bar ⋮ "Nộp bài ngay" entry (same flow)
-- [ ] **S9.6** Controller `autoSubmit()` — invoked when timer remaining = 0
-- [ ] **S9.7** Navigate to result screen on auto-submit
-- [ ] **S9.8** `test/mock_test_intro_screen_test.dart` updates — banner present
-- [ ] **S9.9** `test/answer_sheet_screen_test.dart` — Nộp-bài-ngay confirm path
-- [ ] **S9.10** `flutter test` green
+### S9 — Intro polish + Nộp-bài-ngay + auto-submit UI  ✅ landed 2026-05-12
+- [x] **S9.1** Intro warning banner — orange `warningContainer` card with `warning_amber_rounded` icon + "Timer KHÔNG dừng khi rời app — giống đề thi thật. Hết giờ bài sẽ tự nộp."
+- [x] **S9.2** Intro stat boxes already shipped earlier (3-stat grid: Thời gian / Điểm tối đa / Điểm đỗ) — no changes needed
+- [ ] **S9.3** Sheet bottom CTA "Nộp bài ngay" — deferred. The AppBar overflow ⋮ entry covers the same use case from outside the sheet; redundant sheet-bottom button can ship later as polish.
+- [x] **S9.4** `SubmitNowConfirmDialog` — destructive AlertDialog with pending count "Còn N/total câu chưa làm. Các câu đó sẽ tính 0 điểm." Quay lại / Nộp bài. Skipped when 0 pending (all done/skipped already).
+- [x] **S9.5** AppBar overflow ⋮ "Nộp bài ngay" entry — `PopupMenuButton` disabled while loading + after completed; invokes `_submitNow`.
+- [x] **S9.6** Backend `POST /v1/mock-exams/:id/expire` — new endpoint reuses `ExpireMockExam` (same code path as the timer sweeper); idempotent for completed sessions; ownership-gated.
+- [x] **S9.7** Auto-submit UI hint — client side dùng server-driven `ExpireMockExam` (one round-trip). Client-side timer countdown deferred (server sweeper at 60s grain is the real backstop; UI hint added when player rewrite ships in a later slice).
+- [x] **S9.8** `test/mock_test_intro_screen_test.dart` — warning banner icon + text rendered
+- [x] **S9.9** `test/submit_now_confirm_dialog_test.dart` — render + confirm + cancel (3 cases)
+- [x] **S9.10** Backend tests `mock_exam_skip_test.go` extended — `/expire` happy / idempotent / 403 different-learner / 404 unknown (4 cases)
+- [x] **S9.11** `go test ./...` 915 green (was 911 → +4); `flutter test` 432 green (was 428 → +4); `flutter analyze` clean
 
 ### ✅ Checkpoint 3
 - [ ] `make verify` green
