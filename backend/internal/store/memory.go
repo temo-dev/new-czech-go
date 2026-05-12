@@ -527,6 +527,26 @@ func (s *MemoryStore) SkipMockExamSection(sessionID string, displayOrder int) (c
 	return s.mockExams.SkipSection(sessionID, displayOrder)
 }
 
+// V39: list mock-exam session IDs whose timer has run out.
+func (s *MemoryStore) ListExpiredMockExams(now time.Time) ([]string, error) {
+	return s.mockExams.ListExpired(now)
+}
+
+// V39: server-side auto-submit. Flips remaining pending sections to
+// 'skipped' + session to 'completed' (no scoring rollup).
+func (s *MemoryStore) ExpireMockExam(sessionID string) (contracts.MockExamSession, error) {
+	return s.mockExams.ExpireMockExam(sessionID)
+}
+
+// V39: test-only escape hatch for memory store.
+func (s *MemoryStore) SetMockExamStartedAtForTesting(sessionID string, startedAt time.Time) bool {
+	mes, ok := s.mockExams.(*memoryMockExamStore)
+	if !ok {
+		return false
+	}
+	return mes.SetSessionStartedAtForTesting(sessionID, startedAt)
+}
+
 // ExerciseAudio methods — delegate to exerciseAudioStore (memory or Postgres)
 
 func (s *MemoryStore) SetExerciseAudioStore(store ExerciseAudioStore) {

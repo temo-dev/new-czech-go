@@ -2045,7 +2045,13 @@ func (s *Server) handleMockExamByID(w http.ResponseWriter, r *http.Request, user
 			writeError(w, http.StatusForbidden, "forbidden", "You do not have access to this mock exam.", false)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})
+		meta := map[string]any{}
+		// V39 — clients pass ?include_server_time=true to anchor their local
+		// countdown against the server's clock without an extra round-trip.
+		if r.URL.Query().Get("include_server_time") == "true" {
+			meta["server_time"] = time.Now().UTC().Format(time.RFC3339Nano)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": meta})
 	}
 }
 

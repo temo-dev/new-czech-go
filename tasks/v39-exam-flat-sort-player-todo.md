@@ -35,21 +35,22 @@
 - [x] **S2.10** `flutter analyze` clean (11 pre-existing infos unrelated)
 - [x] **S2.11** `flutter test` 397 green (no regression)
 
-### S3 — Server-anchored timer + auto-submit
-- [ ] **S3.1** Migration 032 — `mock_exam_sessions.started_at TIMESTAMPTZ DEFAULT now()` (defensive)
-- [ ] **S3.2** Migration 033 — `mock_exam_sessions.duration_sec INT NOT NULL DEFAULT 0`
-- [ ] **S3.3** `CreateMockExam` sets `duration_sec = 5400`
-- [ ] **S3.4** `contracts.MockExamSession.StartedAt / DurationSec / ExpiresAt`
-- [ ] **S3.5** `MockExamStore.ListExpired(ctx, now time.Time) ([]string, error)`
-- [ ] **S3.6** `processing/mock_exam_timer.go` — `StartMockExamTimerSweeper(ctx, store, completer, interval)`
-- [ ] **S3.7** `cmd/api/main.go` wiring — `go processing.StartMockExamTimerSweeper(...)`
-- [ ] **S3.8** `GET /v1/mock-exams/:id?include_server_time=true` — returns `meta.server_time`
-- [ ] **S3.9** Tests — expiry completes, pre-V39 ignored, double-tick idempotent
-- [ ] **S3.10** `go test ./...` green
+### S3 — Server-anchored timer + auto-submit  ✅ landed 2026-05-12
+- [x] **S3.1** Re-use `mock_exam_sessions.created_at` as the timer anchor (saves 1 migration); `StartedAt` JSON field maps from `created_at` on read
+- [x] **S3.2** Migration — `ADD COLUMN IF NOT EXISTS duration_sec INT NOT NULL DEFAULT 0` inline in `ensureSchema`
+- [x] **S3.3** `CreateMockExam` writes `duration_sec = DefaultMockExamDurationSec` (5400)
+- [x] **S3.4** `contracts.MockExamSession.StartedAt / DurationSec / ExpiresAt` + `time` import
+- [x] **S3.5** `MockExamStore.ListExpired(now time.Time)` + `ExpireMockExam(sessionID)`; memory + postgres impls; new sentinel reuse
+- [x] **S3.6** `processing/mock_exam_timer.go` — `StartMockExamTimerSweeper` goroutine + `runMockExamTimerSweep` testable helper
+- [x] **S3.7** `cmd/api/main.go` wiring — sweep starts after handler ready, polls every 60 s with immediate first-tick
+- [x] **S3.8** `GET /v1/mock-exams/:id?include_server_time=true` — adds `meta.server_time` (RFC3339Nano)
+- [x] **S3.9** Tests: 6 store-side (timer fields, ListExpired returns/ignores, ExpireMockExam flip+idempotent+not-found) + 3 sweeper + 2 server_time = 11
+- [x] **S3.10** `go test ./...` 907 green (was 896 → +11)
+- [x] **S3.11** `make backend-build` green
 
-### ✅ Checkpoint 1
-- [ ] `make backend-build && make backend-test` green
-- [ ] `make smoke-exam-flow` still green (legacy path unaffected)
+### ✅ Checkpoint 1  — landed 2026-05-12
+- [x] `make backend-build && make backend-test` — 907 green
+- [ ] `make smoke-exam-flow` (deferred to Checkpoint 2 — needs Flutter scaffold)
 
 ---
 

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -172,6 +173,55 @@ func TestMockExamSkip_AlreadySkippedSectionReturns409(t *testing.T) {
 	)
 	if status != http.StatusConflict {
 		t.Fatalf("second skip expected 409, got %d: %#v", status, decoded)
+	}
+}
+
+// V39 — `GET /v1/mock-exams/:id?include_server_time=true` exposes the
+// server's clock under `meta.server_time` so the client can render the
+// countdown without drift assumptions.
+func TestGetMockExam_IncludeServerTimeAddsMetaField(t *testing.T) {
+	_, server, session := skipTestEnv(t)
+
+	req, err := http.NewRequest(http.MethodGet, server.URL+"/v1/mock-exams/"+session.ID+"?include_server_time=true", nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer dev-learner-token")
+	resp, err := server.Client().Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var decoded map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	meta, ok := decoded["meta"].(map[string]any)
+	if !ok {
+		t.Fatal("meta missing")
+	}
+	if _, present := meta["server_time"]; !present {
+		t.Errorf("meta.server_time absent; meta=%#v", meta)
+	}
+}
+
+func TestGetMockExam_OmitsServerTimeWhenQueryParamMissing(t *testing.T) {
+	_, server, session := skipTestEnv(t)
+
+	req, _ := http.NewRequest(http.MethodGet, server.URL+"/v1/mock-exams/"+session.ID, nil)
+	req.Header.Set("Authorization", "Bearer dev-learner-token")
+	resp, _ := server.Client().Do(req)
+	defer resp.Body.Close()
+	var decoded map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	meta, _ := decoded["meta"].(map[string]any)
+	if _, present := meta["server_time"]; present {
+		t.Errorf("meta.server_time should be omitted; meta=%#v", meta)
 	}
 }
 

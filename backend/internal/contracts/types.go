@@ -1,5 +1,7 @@
 package contracts
 
+import "time"
+
 type User struct {
 	ID                string `json:"id"`
 	Role              string `json:"role"`
@@ -748,6 +750,14 @@ type MockExamSession struct {
 	OverallReadinessLevel string                `json:"overall_readiness_level,omitempty"`
 	OverallSummary        string                `json:"overall_summary,omitempty"`
 	Sections              []MockExamSessionItem `json:"sections"`
+	// V39 — server-anchored timer fields. StartedAt mirrors the row's
+	// created_at; DurationSec is set at create time (default 5400 = 90 min).
+	// ExpiresAt is derived (StartedAt + DurationSec) and populated on read so
+	// the client can render countdown without doing arithmetic on its side.
+	// Pre-V39 sessions carry DurationSec=0; the timer sweeper ignores them.
+	StartedAt   time.Time `json:"started_at,omitempty"`
+	DurationSec int       `json:"duration_sec,omitempty"`
+	ExpiresAt   time.Time `json:"expires_at,omitempty"`
 }
 
 type MockExamSessionItem struct {

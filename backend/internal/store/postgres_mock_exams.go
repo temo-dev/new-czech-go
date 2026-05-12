@@ -71,6 +71,11 @@ ALTER TABLE mock_exam_sections
     ADD COLUMN IF NOT EXISTS section_score INTEGER NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS display_order INTEGER NOT NULL DEFAULT 0;
 
+-- V39 timer: pre-V39 rows default to duration_sec=0 so the sweeper ignores
+-- them. New sessions get 5400 (90 min) set explicitly in CreateMockExam.
+ALTER TABLE mock_exam_sessions
+    ADD COLUMN IF NOT EXISTS duration_sec INTEGER NOT NULL DEFAULT 0;
+
 -- V39 backfill: pre-V39 rows have display_order=0; fill with sequence_no
 -- so the new ORDER BY display_order ASC reproduces legacy sequence order.
 -- Idempotent — only touches rows that haven't been backfilled.
@@ -143,8 +148,8 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 	defer tx.Rollback()
 
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO mock_exam_sessions (id, learner_id, status, mock_test_id, pass_threshold_percent) VALUES ($1, $2, 'in_progress', $3, $4)`,
-		id, learnerID, mockTestID, threshold,
+		`INSERT INTO mock_exam_sessions (id, learner_id, status, mock_test_id, pass_threshold_percent, duration_sec) VALUES ($1, $2, 'in_progress', $3, $4, $5)`,
+		id, learnerID, mockTestID, threshold, DefaultMockExamDurationSec,
 	); err != nil {
 		return contracts.MockExamSession{}, fmt.Errorf("insert mock exam session: %w", err)
 	}
@@ -162,6 +167,7 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 		return contracts.MockExamSession{}, fmt.Errorf("commit mock exam: %w", err)
 	}
 
+	now := time.Now().UTC()
 	return contracts.MockExamSession{
 		ID:                   id,
 		LearnerID:            learnerID,
@@ -169,6 +175,9 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 		MockTestID:           mockTestID,
 		PassThresholdPercent: threshold,
 		Sections:             sections,
+		StartedAt:            now,
+		DurationSec:          DefaultMockExamDurationSec,
+		ExpiresAt:            now.Add(time.Duration(DefaultMockExamDurationSec) * time.Second),
 	}, nil
 }
 
@@ -178,14 +187,17 @@ func (s *postgresMockExamStore) MockExamByID(id string) (contracts.MockExamSessi
 
 	var session contracts.MockExamSession
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, learner_id, status, mock_test_id, overall_score, passed, pass_threshold_percent, overall_readiness_level, overall_summary FROM mock_exam_sessions WHERE id = $1`,
+		`SELECT id, learner_id, status, mock_test_id, overall_score, passed, pass_threshold_percent, overall_readiness_level, overall_summary, created_at, duration_sec FROM mock_exam_sessions WHERE id = $1`,
 		id,
-	).Scan(&session.ID, &session.LearnerID, &session.Status, &session.MockTestID, &session.OverallScore, &session.Passed, &session.PassThresholdPercent, &session.OverallReadinessLevel, &session.OverallSummary)
+	).Scan(&session.ID, &session.LearnerID, &session.Status, &session.MockTestID, &session.OverallScore, &session.Passed, &session.PassThresholdPercent, &session.OverallReadinessLevel, &session.OverallSummary, &session.StartedAt, &session.DurationSec)
 	if err == sql.ErrNoRows {
 		return contracts.MockExamSession{}, false
 	}
 	if err != nil {
 		return contracts.MockExamSession{}, false
+	}
+	if session.DurationSec > 0 {
+		session.ExpiresAt = session.StartedAt.Add(time.Duration(session.DurationSec) * time.Second)
 	}
 
 	rows, err := s.db.QueryContext(ctx,
@@ -259,6 +271,88 @@ func (s *postgresMockExamStore) SkipSection(sessionID string, displayOrder int) 
 	session, ok := s.MockExamByID(sessionID)
 	if !ok {
 		return contracts.MockExamSession{}, fmt.Errorf("mock exam not found after skip")
+	}
+	return session, nil
+}
+
+// ListExpired — V39 postgres impl.
+func (s *postgresMockExamStore) ListExpired(now time.Time) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id FROM mock_exam_sessions
+		 WHERE status = 'in_progress'
+		   AND duration_sec > 0
+		   AND $1 > created_at + (duration_sec || ' seconds')::interval
+		 ORDER BY id`, now.UTC(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query expired sessions: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan expired id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+// ExpireMockExam — V39 postgres impl. Marks pending sections 'skipped' and
+// flips the session to 'completed' in a single transaction. No scoring
+// rollup; idempotent for already-completed sessions.
+func (s *postgresMockExamStore) ExpireMockExam(sessionID string) (contracts.MockExamSession, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return contracts.MockExamSession{}, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	var status string
+	if err := tx.QueryRowContext(ctx,
+		`SELECT status FROM mock_exam_sessions WHERE id = $1 FOR UPDATE`, sessionID,
+	).Scan(&status); err == sql.ErrNoRows {
+		return contracts.MockExamSession{}, ErrSectionNotFound
+	} else if err != nil {
+		return contracts.MockExamSession{}, fmt.Errorf("lock session: %w", err)
+	}
+	if status == "completed" {
+		// Idempotent — return current snapshot.
+		_ = tx.Commit()
+		session, ok := s.MockExamByID(sessionID)
+		if !ok {
+			return contracts.MockExamSession{}, fmt.Errorf("mock exam vanished")
+		}
+		return session, nil
+	}
+
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE mock_exam_sections SET status='skipped' WHERE session_id=$1 AND status='pending'`,
+		sessionID,
+	); err != nil {
+		return contracts.MockExamSession{}, fmt.Errorf("expire sections: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE mock_exam_sessions
+		 SET status='completed',
+		     overall_summary = COALESCE(NULLIF(overall_summary, ''), 'Hết thời gian — bài thi đã tự động nộp.'),
+		     updated_at = now()
+		 WHERE id = $1`, sessionID,
+	); err != nil {
+		return contracts.MockExamSession{}, fmt.Errorf("expire session: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return contracts.MockExamSession{}, fmt.Errorf("commit expire: %w", err)
+	}
+	session, ok := s.MockExamByID(sessionID)
+	if !ok {
+		return contracts.MockExamSession{}, fmt.Errorf("mock exam not found after expire")
 	}
 	return session, nil
 }

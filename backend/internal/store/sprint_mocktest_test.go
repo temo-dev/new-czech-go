@@ -2,6 +2,7 @@ package store
 
 import (
 	"testing"
+	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
@@ -524,6 +525,146 @@ func TestMockExamDisplayOrderTiesBreakBySequenceNoAsc(t *testing.T) {
 		if sec.DisplayOrder != wantDisp[i] {
 			t.Errorf("sections[%d].DisplayOrder = %d, want %d", i, sec.DisplayOrder, wantDisp[i])
 		}
+	}
+}
+
+// ── V39 server-anchored timer tests ─────────────────────────────────────────
+
+func TestMockExamSessionHasTimerFieldsPopulated(t *testing.T) {
+	repo := NewMemoryStore()
+	ex := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_1_topic_answers", Status: "published", Pool: "exam",
+	})
+	mt, _ := repo.CreateMockTest(contracts.MockTest{
+		Title:  "Timer fields",
+		Status: "published",
+		Sections: []contracts.MockTestSection{
+			{SequenceNo: 1, ExerciseID: ex.ID, ExerciseType: ex.ExerciseType, MaxPoints: 5},
+		},
+	})
+	session, err := repo.CreateMockExam("learner-1", mt.ID)
+	if err != nil {
+		t.Fatalf("CreateMockExam: %v", err)
+	}
+	if session.DurationSec != DefaultMockExamDurationSec {
+		t.Errorf("DurationSec = %d, want %d", session.DurationSec, DefaultMockExamDurationSec)
+	}
+	if session.StartedAt.IsZero() {
+		t.Error("StartedAt is zero")
+	}
+	wantExpires := session.StartedAt.Add(time.Duration(DefaultMockExamDurationSec) * time.Second)
+	if !session.ExpiresAt.Equal(wantExpires) {
+		t.Errorf("ExpiresAt = %v, want %v", session.ExpiresAt, wantExpires)
+	}
+}
+
+func TestListExpiredReturnsOnlyExpiredInProgressSessions(t *testing.T) {
+	repo := NewMemoryStore()
+	ex := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_1_topic_answers", Status: "published", Pool: "exam",
+	})
+	mt, _ := repo.CreateMockTest(contracts.MockTest{
+		Title:  "ExpiredSweep",
+		Status: "published",
+		Sections: []contracts.MockTestSection{
+			{SequenceNo: 1, ExerciseID: ex.ID, ExerciseType: ex.ExerciseType, MaxPoints: 5},
+		},
+	})
+	fresh, _ := repo.CreateMockExam("learner-1", mt.ID)
+	expired, _ := repo.CreateMockExam("learner-1", mt.ID)
+	// Move "expired" 100 minutes into the past.
+	if !repo.SetMockExamStartedAtForTesting(expired.ID, time.Now().Add(-100*time.Minute)) {
+		t.Fatal("SetMockExamStartedAtForTesting failed")
+	}
+	ids, err := repo.ListExpiredMockExams(time.Now())
+	if err != nil {
+		t.Fatalf("ListExpiredMockExams: %v", err)
+	}
+	if len(ids) != 1 || ids[0] != expired.ID {
+		t.Errorf("ListExpiredMockExams = %v, want [%s] (fresh=%s)", ids, expired.ID, fresh.ID)
+	}
+}
+
+func TestListExpiredIgnoresCompletedSessionsAndZeroDuration(t *testing.T) {
+	repo := NewMemoryStore()
+	ex := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_1_topic_answers", Status: "published", Pool: "exam",
+	})
+	mt, _ := repo.CreateMockTest(contracts.MockTest{
+		Title:  "Ignore",
+		Status: "published",
+		Sections: []contracts.MockTestSection{
+			{SequenceNo: 1, ExerciseID: ex.ID, ExerciseType: ex.ExerciseType, MaxPoints: 5},
+		},
+	})
+	expired, _ := repo.CreateMockExam("learner-1", mt.ID)
+	repo.SetMockExamStartedAtForTesting(expired.ID, time.Now().Add(-100*time.Minute))
+	// Expire it once.
+	if _, err := repo.ExpireMockExam(expired.ID); err != nil {
+		t.Fatalf("ExpireMockExam: %v", err)
+	}
+	// Now it's completed; should not appear in ListExpired again.
+	ids, err := repo.ListExpiredMockExams(time.Now())
+	if err != nil {
+		t.Fatalf("ListExpired: %v", err)
+	}
+	for _, id := range ids {
+		if id == expired.ID {
+			t.Errorf("ListExpired included completed session %s", id)
+		}
+	}
+}
+
+func TestExpireMockExamFlipsPendingToSkippedAndSessionCompleted(t *testing.T) {
+	repo := NewMemoryStore()
+	ex := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_1_topic_answers", Status: "published", Pool: "exam",
+	})
+	mt, _ := repo.CreateMockTest(contracts.MockTest{
+		Title:  "Expire",
+		Status: "published",
+		Sections: []contracts.MockTestSection{
+			{SequenceNo: 1, ExerciseID: ex.ID, ExerciseType: ex.ExerciseType, MaxPoints: 5},
+		},
+	})
+	session, _ := repo.CreateMockExam("learner-1", mt.ID)
+	expired, err := repo.ExpireMockExam(session.ID)
+	if err != nil {
+		t.Fatalf("ExpireMockExam: %v", err)
+	}
+	if expired.Status != "completed" {
+		t.Errorf("Status = %q, want completed", expired.Status)
+	}
+	if expired.Sections[0].Status != "skipped" {
+		t.Errorf("Section status = %q, want skipped", expired.Sections[0].Status)
+	}
+}
+
+func TestExpireMockExamIdempotentForCompletedSession(t *testing.T) {
+	repo := NewMemoryStore()
+	ex := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_1_topic_answers", Status: "published", Pool: "exam",
+	})
+	mt, _ := repo.CreateMockTest(contracts.MockTest{
+		Title:  "Idempotent",
+		Status: "published",
+		Sections: []contracts.MockTestSection{
+			{SequenceNo: 1, ExerciseID: ex.ID, ExerciseType: ex.ExerciseType, MaxPoints: 5},
+		},
+	})
+	session, _ := repo.CreateMockExam("learner-1", mt.ID)
+	if _, err := repo.ExpireMockExam(session.ID); err != nil {
+		t.Fatalf("first ExpireMockExam: %v", err)
+	}
+	if _, err := repo.ExpireMockExam(session.ID); err != nil {
+		t.Fatalf("second ExpireMockExam: %v (want no-op)", err)
+	}
+}
+
+func TestExpireMockExamReturnsNotFoundForUnknownID(t *testing.T) {
+	repo := NewMemoryStore()
+	if _, err := repo.ExpireMockExam("does-not-exist"); err == nil {
+		t.Error("ExpireMockExam should return error for unknown session")
 	}
 }
 

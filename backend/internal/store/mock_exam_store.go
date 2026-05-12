@@ -4,9 +4,13 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
+
+// V39 default exam duration. 90 minutes ≈ real A2 total.
+const DefaultMockExamDurationSec = 5400
 
 // assignDisplayOrder sorts sections by (max_points ASC, sequence_no ASC)
 // and writes DisplayOrder = rank+1 into each section, mutating the slice
@@ -36,6 +40,16 @@ type MockExamStore interface {
 	// completed/skipped or the session has been completed; ErrSectionNotFound
 	// when no row matches.
 	SkipSection(sessionID string, displayOrder int) (contracts.MockExamSession, error)
+	// V39: ListExpired returns session IDs whose timer has run out at `now`
+	// (in_progress AND duration_sec > 0 AND now > started_at + duration_sec).
+	// Pre-V39 sessions carry duration_sec=0 and are never returned.
+	ListExpired(now time.Time) ([]string, error)
+	// V39: ExpireMockExam marks any remaining pending section as 'skipped'
+	// and flips the session status to 'completed'. Does not run the scoring
+	// rollup — completed-attempt scoring is the responsibility of the regular
+	// CompleteMockExam path; expired sessions show the data available at
+	// timer expiry. Idempotent for already-completed sessions.
+	ExpireMockExam(sessionID string) (contracts.MockExamSession, error)
 }
 
 // V39 — error sentinels for SkipSection. Handlers map them to 404/409.
@@ -118,6 +132,7 @@ func (s *memoryMockExamStore) CreateMockExam(learnerID, mockTestID string, mockT
 
 	id := fmt.Sprintf("mock-session-%d", s.nextSession)
 	s.nextSession++
+	now := time.Now().UTC()
 	session := &contracts.MockExamSession{
 		ID:                   id,
 		LearnerID:            learnerID,
@@ -125,6 +140,9 @@ func (s *memoryMockExamStore) CreateMockExam(learnerID, mockTestID string, mockT
 		MockTestID:           mockTestID,
 		PassThresholdPercent: threshold,
 		Sections:             sections,
+		StartedAt:            now,
+		DurationSec:          DefaultMockExamDurationSec,
+		ExpiresAt:            now.Add(time.Duration(DefaultMockExamDurationSec) * time.Second),
 	}
 	s.sessions[id] = session
 	return *session, nil
@@ -181,6 +199,66 @@ func (s *memoryMockExamStore) AdvanceMockExam(id, attemptID string) (contracts.M
 		}
 	}
 	return contracts.MockExamSession{}, fmt.Errorf("no pending section")
+}
+
+// ListExpired — V39 memory impl. Returns sessions whose timer has run out.
+func (s *memoryMockExamStore) ListExpired(now time.Time) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var ids []string
+	for id, sess := range s.sessions {
+		if sess.Status != "in_progress" {
+			continue
+		}
+		if sess.DurationSec <= 0 {
+			continue
+		}
+		if !now.After(sess.ExpiresAt) {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids, nil
+}
+
+// ExpireMockExam — V39 memory impl. Flips pending → skipped + session →
+// completed. No scoring rollup; partial results stay as captured.
+func (s *memoryMockExamStore) ExpireMockExam(sessionID string) (contracts.MockExamSession, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.sessions[sessionID]
+	if !ok {
+		return contracts.MockExamSession{}, ErrSectionNotFound
+	}
+	if session.Status == "completed" {
+		return *session, nil
+	}
+	for i := range session.Sections {
+		if session.Sections[i].Status == "pending" {
+			session.Sections[i].Status = "skipped"
+		}
+	}
+	session.Status = "completed"
+	if session.OverallSummary == "" {
+		session.OverallSummary = "Hết thời gian — bài thi đã tự động nộp."
+	}
+	return *session, nil
+}
+
+// SetSessionStartedAtForTesting overrides StartedAt + ExpiresAt on an
+// existing session so tests can simulate past timer expiry without
+// sleeping. Memory-only escape hatch.
+func (s *memoryMockExamStore) SetSessionStartedAtForTesting(sessionID string, startedAt time.Time) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sess, ok := s.sessions[sessionID]
+	if !ok {
+		return false
+	}
+	sess.StartedAt = startedAt
+	sess.ExpiresAt = startedAt.Add(time.Duration(sess.DurationSec) * time.Second)
+	return true
 }
 
 // SkipSection — V39 memory impl.

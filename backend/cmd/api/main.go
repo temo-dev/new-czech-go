@@ -202,6 +202,11 @@ func main() {
 		handler = httpapi.NewServerWithAudio(repo, processorInst, uploadProvider, audioURLProvider, audioSignSecret, levelDeps)
 	}
 
+	// V39 — server-anchored mock-exam timer. Sweeper polls every 60s and
+	// auto-submits any session whose duration_sec window has elapsed.
+	// Cancelled by process exit, which is sufficient for the V1 baseline.
+	processing.StartMockExamTimerSweeper(context.Background(), repo, 60*time.Second)
+
 	log.Printf("backend listening on %s", addr)
 	if err := http.ListenAndServe(addr, handler); err != nil {
 		log.Fatal(err)
