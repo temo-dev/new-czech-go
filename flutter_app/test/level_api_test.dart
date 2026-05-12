@@ -23,6 +23,26 @@ LevelApi _client(HttpServer server, {String token = 'test-token'}) {
 }
 
 void main() {
+  test('LevelApi reuses an injected HttpClient (S3)', () {
+    final shared = HttpClient();
+    addTearDown(() => shared.close(force: true));
+    final api = LevelApi(
+      baseUrl: 'http://example.test',
+      tokenProvider: () => null,
+      httpClient: shared,
+    );
+    expect(api.httpClient, same(shared));
+  });
+
+  test('LevelApi defaults to a self-managed HttpClient when none injected (S3)', () {
+    final api = LevelApi(
+      baseUrl: 'http://example.test',
+      tokenProvider: () => null,
+    );
+    expect(api.httpClient, isNotNull);
+    addTearDown(api.dispose);
+  });
+
   test('fetchLevelProgress parses the full server payload', () async {
     final server = await _bindServer((request) async {
       expect(request.method, 'GET');

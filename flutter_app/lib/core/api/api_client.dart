@@ -39,10 +39,27 @@ class ApiException extends HttpException {
 }
 
 class ApiClient {
-  ApiClient({String? baseUrl}) : baseUrl = _resolveBaseUrl(baseUrl);
+  ApiClient({String? baseUrl, HttpClient? httpClient})
+      : baseUrl = _resolveBaseUrl(baseUrl),
+        _httpClient = httpClient ?? HttpClient(),
+        _ownsClient = httpClient == null;
 
   final String baseUrl;
   String? _token;
+  final HttpClient _httpClient;
+  final bool _ownsClient;
+
+  // S3: expose the shared client so wiring code (main.dart) can hand it
+  // to LevelApi and avoid two separate HttpClient connection pools to
+  // the same backend.
+  HttpClient get httpClient => _httpClient;
+
+  /// Releases the underlying [HttpClient] when ApiClient owns it.
+  Future<void> dispose() async {
+    if (_ownsClient) {
+      _httpClient.close(force: true);
+    }
+  }
 
   Future<Map<String, dynamic>> login({
     required String email,
@@ -840,55 +857,50 @@ class ApiClient {
     Map<String, dynamic>? body,
     Map<String, String>? headers,
   }) async {
-    final client = HttpClient();
-    try {
-      final uri = Uri.parse('$baseUrl$path');
-      final request = await client.openUrl(method, uri);
-      request.headers.set(
-        HttpHeaders.contentTypeHeader,
-        'application/json; charset=utf-8',
-      );
-      headers?.forEach(request.headers.set);
-      if (body != null) {
-        // Use write() so Dart picks up charset=utf-8 from Content-Type and
-        // encodes with UTF-8 rather than the default latin1 IOSink encoding.
-        // This prevents ArgumentError for Czech characters (č, ž, etc.)
-        // whose code points exceed the latin1 range (>U+00FF).
-        request.write(jsonEncode(body));
-      }
-      final response = await request.close();
-      final text = await response.transform(utf8.decoder).join();
-      final payload = jsonDecode(text) as Map<String, dynamic>;
-      if (response.statusCode >= 400) {
-        // Two backend error shapes:
-        //   {"error":{"code":..,"message":..}}      (writeError envelope)
-        //   {"error":"<code>","message":"<text>"}   (auth gates: email_verify_required, etc.)
-        final err = payload['error'];
-        String? msg;
-        String? code;
-        if (err is Map) {
-          msg = err['message'] as String?;
-          code = err['code'] as String?;
-        } else if (err is String) {
-          code = err;
-        }
-        msg ??= payload['message'] as String?;
-        code ??= 'http_${response.statusCode}';
-        final headers = <String, String>{};
-        response.headers.forEach((name, values) {
-          if (values.isNotEmpty) headers[name.toLowerCase()] = values.first;
-        });
-        throw ApiException(
-          statusCode: response.statusCode,
-          errorCode: code,
-          message: msg ?? 'Request failed.',
-          headers: headers,
-        );
-      }
-      return payload;
-    } finally {
-      client.close(force: true);
+    final uri = Uri.parse('$baseUrl$path');
+    final request = await _httpClient.openUrl(method, uri);
+    request.headers.set(
+      HttpHeaders.contentTypeHeader,
+      'application/json; charset=utf-8',
+    );
+    headers?.forEach(request.headers.set);
+    if (body != null) {
+      // Use write() so Dart picks up charset=utf-8 from Content-Type and
+      // encodes with UTF-8 rather than the default latin1 IOSink encoding.
+      // This prevents ArgumentError for Czech characters (č, ž, etc.)
+      // whose code points exceed the latin1 range (>U+00FF).
+      request.write(jsonEncode(body));
     }
+    final response = await request.close();
+    final text = await response.transform(utf8.decoder).join();
+    final payload = jsonDecode(text) as Map<String, dynamic>;
+    if (response.statusCode >= 400) {
+      // Two backend error shapes:
+      //   {"error":{"code":..,"message":..}}      (writeError envelope)
+      //   {"error":"<code>","message":"<text>"}   (auth gates: email_verify_required, etc.)
+      final err = payload['error'];
+      String? msg;
+      String? code;
+      if (err is Map) {
+        msg = err['message'] as String?;
+        code = err['code'] as String?;
+      } else if (err is String) {
+        code = err;
+      }
+      msg ??= payload['message'] as String?;
+      code ??= 'http_${response.statusCode}';
+      final responseHeaders = <String, String>{};
+      response.headers.forEach((name, values) {
+        if (values.isNotEmpty) responseHeaders[name.toLowerCase()] = values.first;
+      });
+      throw ApiException(
+        statusCode: response.statusCode,
+        errorCode: code,
+        message: msg ?? 'Request failed.',
+        headers: responseHeaders,
+      );
+    }
+    return payload;
   }
 
   Future<Map<String, dynamic>> _uploadBinary({

@@ -18,10 +18,29 @@ class LevelApi {
   LevelApi({
     required this.baseUrl,
     required String? Function() tokenProvider,
-  }) : _tokenProvider = tokenProvider;
+    HttpClient? httpClient,
+  })  : _tokenProvider = tokenProvider,
+        _httpClient = httpClient ?? HttpClient(),
+        _ownsClient = httpClient == null;
 
   final String baseUrl;
   final String? Function() _tokenProvider;
+  final HttpClient _httpClient;
+  final bool _ownsClient;
+
+  // S3: surface the underlying client so callers (main.dart wiring) can
+  // share one HttpClient between LevelApi + ApiClient and avoid per-call
+  // TCP/TLS handshakes against the same backend.
+  HttpClient get httpClient => _httpClient;
+
+  /// Releases the underlying [HttpClient] when LevelApi owns it (i.e. was
+  /// constructed without an explicit `httpClient`). Safe no-op for shared
+  /// clients — the owner is responsible for closing those.
+  Future<void> dispose() async {
+    if (_ownsClient) {
+      _httpClient.close(force: true);
+    }
+  }
 
   /// GET /v1/users/me/level-progress
   Future<LevelProgressResponse> fetchLevelProgress() async {
@@ -111,36 +130,31 @@ class LevelApi {
     Map<String, dynamic>? body,
   }) async {
     final token = _tokenProvider();
-    final client = HttpClient();
-    try {
-      final uri = Uri.parse('$baseUrl$path');
-      final request = await client.openUrl(method, uri);
-      request.headers.set(
-        HttpHeaders.contentTypeHeader,
-        'application/json; charset=utf-8',
-      );
-      if (token != null && token.isNotEmpty) {
-        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
-      }
-      if (body != null) {
-        request.write(jsonEncode(body));
-      }
-      final response = await request.close();
-      final text = await response.transform(utf8.decoder).join();
-      Map<String, dynamic>? payload;
-      if (text.isNotEmpty) {
-        final decoded = jsonDecode(text);
-        if (decoded is Map<String, dynamic>) {
-          payload = decoded;
-        }
-      }
-      if (response.statusCode >= 400) {
-        throw _parseError(response.statusCode, payload);
-      }
-      return payload ?? const {};
-    } finally {
-      client.close(force: true);
+    final uri = Uri.parse('$baseUrl$path');
+    final request = await _httpClient.openUrl(method, uri);
+    request.headers.set(
+      HttpHeaders.contentTypeHeader,
+      'application/json; charset=utf-8',
+    );
+    if (token != null && token.isNotEmpty) {
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
     }
+    if (body != null) {
+      request.write(jsonEncode(body));
+    }
+    final response = await request.close();
+    final text = await response.transform(utf8.decoder).join();
+    Map<String, dynamic>? payload;
+    if (text.isNotEmpty) {
+      final decoded = jsonDecode(text);
+      if (decoded is Map<String, dynamic>) {
+        payload = decoded;
+      }
+    }
+    if (response.statusCode >= 400) {
+      throw _parseError(response.statusCode, payload);
+    }
+    return payload ?? const {};
   }
 
   LevelApiException _parseError(int statusCode, Map<String, dynamic>? payload) {

@@ -225,6 +225,7 @@ class _CefrOnboardingState extends State<_CefrOnboarding> {
     _levelApi = LevelApi(
       baseUrl: _client.baseUrl,
       tokenProvider: () => _client.currentToken,
+      httpClient: _client.httpClient, // S3: share connection pool
     );
   }
 
@@ -442,6 +443,7 @@ class _LearnerShellState extends State<LearnerShell> {
         levelApi: LevelApi(
           baseUrl: _client.baseUrl,
           tokenProvider: () => _client.currentToken,
+          httpClient: _client.httpClient, // S3: share connection pool
         ),
       );
     }
