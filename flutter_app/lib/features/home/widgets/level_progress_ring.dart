@@ -40,7 +40,9 @@ class LevelProgressRing extends StatefulWidget {
 
 class _LevelProgressRingState extends State<LevelProgressRing>
     with SingleTickerProviderStateMixin {
-  static const _skillOrder = ['noi', 'viet', 'nghe', 'doc', 'tu_vung', 'ngu_phap'];
+  // S2: skill order comes from the server payload's insertion order so a
+  // new skill (e.g. V36 interview) renders without a client release.
+  List<String> get _skillOrder => widget.skillMastery.keys.toList();
 
   AnimationController? _pulseController;
 
@@ -122,13 +124,14 @@ class _LevelProgressRingState extends State<LevelProgressRing>
   }
 
   double _readinessPct() {
-    if (widget.skillMastery.isEmpty) return 0;
+    final order = _skillOrder;
+    if (order.isEmpty) return 0;
     double sum = 0;
-    for (final k in _skillOrder) {
+    for (final k in order) {
       final info = widget.skillMastery[k];
       if (info != null) sum += info.pct;
     }
-    return sum / _skillOrder.length;
+    return sum / order.length;
   }
 }
 

@@ -70,6 +70,27 @@ void main() {
     await tester.pumpWidget(_wrap(const SizedBox.shrink()));
   });
 
+  testWidgets('LevelProgressRing derives ring slots from server-provided skill_mastery keys (S2)', (tester) async {
+    // Server returned just 3 skills (including interview from V36) at 100%.
+    // Pre-S2 the ring hardcoded 6 skills, so the readiness average would be
+    // 200/6 ≈ 33% (only noi + doc match the hardcoded list). After S2 the
+    // client uses the map's keys, so 300/3 = 100% renders.
+    final mastery = <String, SkillMasteryInfo>{
+      'noi': SkillMasteryInfo(pct: 100, thresholdPct: 70, passes: true),
+      'doc': SkillMasteryInfo(pct: 100, thresholdPct: 70, passes: true),
+      'interview': SkillMasteryInfo(pct: 100, thresholdPct: 70, passes: true),
+    };
+    await tester.pumpWidget(_wrap(LevelProgressRing(
+      currentLevel: CefrLevel.a2,
+      nextLevel: CefrLevel.b1,
+      skillMastery: mastery,
+      coveragePct: 100,
+      coverageThresholdPct: 80,
+      promotionUnlocked: false,
+    )));
+    expect(find.textContaining('100%'), findsOneWidget);
+  });
+
   testWidgets('LevelProgressRing reduced motion shows static Sẵn sàng pill', (tester) async {
     await tester.pumpWidget(_wrap(
       LevelProgressRing(
