@@ -1,6 +1,7 @@
 # exam-flat-sort-player
 
 **Decided:** 2026-05-12
+**Status:** ✅ promoted to spec + shipped V39 (2026-05-12) — see [docs/specs/v39-exam-flat-sort-player.md](../specs/v39-exam-flat-sort-player.md).
 
 ## Problem Statement
 

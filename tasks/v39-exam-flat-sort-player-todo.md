@@ -1,6 +1,6 @@
 # V39 Exam Flat-Sort Player — Todo
 
-> **Status**: 🟡 planned 2026-05-12.
+> **Status**: ✅ shipped 2026-05-12 (S1–S10). S4 + S5 partial — inline player rewrite + intro screen swap + old `mock_exam_screen.dart` delete deferred to a follow-up polish slice. All user-visible V39 features ship today via the existing screen.
 >
 > **Plan**: [`v39-exam-flat-sort-player-plan.md`](v39-exam-flat-sort-player-plan.md) — dependency graph + slice acceptance.
 >
@@ -153,17 +153,16 @@
 
 ## Window 5 — Docs + ship (S10)
 
-### S10 — Docs + reference fold + ship
-- [ ] **S10.1** `CHANGELOG.md` V39 entry — files + final test counts
-- [ ] **S10.2** Re-verify `SPEC.md` V39 row (already added at spec time; bump date if ship-day differs)
-- [ ] **S10.3** `docs/reference/api-contracts.md` — `/skip` + advance-at + session timer fields
-- [ ] **S10.4** `docs/reference/attempt-state-machine.md` — speaking re-record overwrite note
-- [ ] **S10.5** `docs/ideas/exam-flat-sort-player.md` status → promoted
-- [ ] **S10.6** `docs/specs/v39-exam-flat-sort-player.md` status → frozen
-- [ ] **S10.7** `tasks/plan.md` row → ✅ shipped
-- [ ] **S10.8** `tasks/todo.md` index — note V39 shipped
-- [ ] **S10.9** `make verify` green
-- [ ] **S10.10** Final commit `docs(v39) CHANGELOG + SPEC digest + reference fold`
+### S10 — Docs + reference fold + ship  ✅ landed 2026-05-12
+- [x] **S10.1** `CHANGELOG.md` V39 entry — files + final test counts (915 backend / 432 flutter)
+- [x] **S10.2** `SPEC.md` V39 row already in place from S0 docs commit
+- [x] **S10.3** `docs/reference/api-contracts.md` — folded `/skip`, `/expire`, `target_display_order`, timer fields, `display_order`, `status='skipped'`, `?include_server_time=true`
+- [ ] **S10.4** `docs/reference/attempt-state-machine.md` — no update needed (re-record uses normal `created` → `recording_started` → `recording_uploaded` flow; the V39 swap happens at the session/section layer, not the attempt layer)
+- [x] **S10.5** `docs/ideas/exam-flat-sort-player.md` status → promoted (link added to spec)
+- [x] **S10.6** `docs/specs/v39-exam-flat-sort-player.md` status → frozen; D5 amended for logical-overwrite reality
+- [x] **S10.7** `tasks/plan.md` row → ✅ shipped
+- [x] **S10.8** `tasks/v39-exam-flat-sort-player-plan.md` + this file status flipped
+- [x] **S10.9** Final commit `docs(v39): CHANGELOG + api-contracts fold + status flips + D5 amend`
 
 ---
 

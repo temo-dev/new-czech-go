@@ -10,6 +10,80 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V39 — Exam Flat-Sort Player — 2026-05-12
+
+End-to-end overhaul of the mock-exam runner. Sections now flat-sort
+cross-skill by `max_points` ASC (lowest-stakes warm-up first), each
+session carries a server-anchored 90-minute timer, learners can skip
+sections + revisit them later from a fullscreen Answer Sheet, and
+the player accepts a "Nộp bài ngay" early-submit. Old Flutter
+clients keep working because wire changes are additive (extra fields
++ new optional body keys).
+
+**Scope cuts** vs. the original plan:
+- `mock_exam_player_screen.dart` rewrite + intro screen swap + old
+  942-line file delete were deferred. S4 ships the foundation
+  modules (controller, app bar, status chip, section state model);
+  S5–S9 wire V39 features into the existing `MockExamScreen` so
+  every commit ships visible user value without regressing
+  production. The big-bang rewrite folds into a future polish slice.
+
+### File changes
+
+Backend:
+- `backend/internal/contracts/types.go` — `MockExamSessionItem.DisplayOrder int`; `MockExamSession.StartedAt`/`DurationSec`/`ExpiresAt`; `+import "time"`.
+- `backend/internal/store/mock_exam_store.go` — `assignDisplayOrder` helper, `DefaultMockExamDurationSec=5400`, new interface methods `SkipSection` / `ListExpired` / `ExpireMockExam` / `AdvanceSectionAt`, sentinel errors `ErrSectionNotFound` / `ErrSectionNotSkippable`. Memory impls.
+- `backend/internal/store/postgres_mock_exams.go` — schema `display_order` + `duration_sec` columns + backfill; postgres impls of new methods; `MockExamByID` selects + sorts by `display_order`; `CompleteMockExam` tolerates `'skipped'` sections.
+- `backend/internal/store/memory.go` — public proxies `SkipMockExamSection`, `ListExpiredMockExams`, `ExpireMockExam`, `AdvanceMockExamSectionAt`, `SetMockExamStartedAtForTesting`.
+- `backend/internal/processing/mock_exam_timer.go` (new) — `StartMockExamTimerSweeper` goroutine + `runMockExamTimerSweep` testable helper.
+- `backend/cmd/api/main.go` — sweeper wire-up.
+- `backend/internal/httpapi/server.go` — new handlers `handleMockExamSkip` + `handleMockExamExpire`; `handleMockExamAdvance` accepts optional `target_display_order`; `handleMockExamByID` adds `?include_server_time=true` → `meta.server_time`.
+- Tests: `sprint_mocktest_test.go` (display_order + timer + skip + complete-tolerates-skipped), `mock_exam_skip_test.go` (new — `/skip` + `/expire` + `?include_server_time`), `mock_exam_advance_at_test.go` (new — target_display_order), `mock_exam_timer_test.go` (new — sweeper).
+
+Flutter:
+- `flutter_app/lib/models/models.dart` — `MockExamSection.displayOrder`/`isSkipped`; `MockExamSessionView.startedAt`/`durationSec`/`expiresAt` + `hasTimer`/`remainingAt(now)`.
+- `flutter_app/lib/features/mock_exam/models/exam_section_state.dart` (new) — `SectionState` enum + `sectionStateFor` mapper.
+- `flutter_app/lib/features/mock_exam/controllers/exam_session_controller.dart` (new) — pointer + ticker + skip / advance / jumpTo / refresh.
+- `flutter_app/lib/features/mock_exam/widgets/exam_app_bar.dart` (new) — timer/progress/sheet btn/⋮ for future inline player.
+- `flutter_app/lib/features/mock_exam/widgets/question_status_chip.dart` (new) — 64 pt 4-state chip.
+- `flutter_app/lib/features/mock_exam/widgets/rerecord_confirm_dialog.dart` (new) — destructive confirm for speaking sheet-jump.
+- `flutter_app/lib/features/mock_exam/widgets/submit_now_confirm_dialog.dart` (new) — destructive confirm for Nộp bài ngay with pending sections.
+- `flutter_app/lib/features/mock_exam/screens/answer_sheet_screen.dart` (new) — fullscreen modal grid with legend + skill-grouped chips + summary footer.
+- `flutter_app/lib/features/mock_exam/screens/mock_exam_screen.dart` — `_SectionTile` skip button; AppBar grid icon → sheet (with jump-back wire), ⋮ "Nộp bài ngay"; `_jumpTarget` plumbed through `_advanceSection`; sheet pop result + speaking re-record confirm dialog.
+- `flutter_app/lib/features/mock_exam/screens/mock_test_intro_screen.dart` — V39 no-pause warning banner above the start CTA.
+- `flutter_app/lib/core/api/api_client.dart` — `skipMockExamSection`, `advanceMockExam(..., targetDisplayOrder)`, `expireMockExam`.
+- Tests: `exam_section_state_test.dart`, `exam_session_controller_test.dart`, `question_status_chip_test.dart`, `exam_app_bar_test.dart`, `answer_sheet_screen_test.dart`, `rerecord_confirm_dialog_test.dart`, `submit_now_confirm_dialog_test.dart`, `mock_test_intro_screen_test.dart`; `mock_exam_screen_test.dart` extended.
+
+Docs:
+- `docs/ideas/exam-flat-sort-player.md` (new) — idea one-pager.
+- `docs/specs/v39-exam-flat-sort-player.md` (new) — 6-section slice spec, 15 decisions (D5 amended for logical-overwrite reality).
+- `tasks/v39-exam-flat-sort-player-plan.md` + `tasks/v39-exam-flat-sort-player-todo.md` (new) — 10-slice vertical plan with dependency graph + checkbox tracking.
+- `docs/reference/api-contracts.md` — folded `/skip`, `/expire`, `target_display_order`, timer fields, `display_order`, `status='skipped'`, `?include_server_time=true`.
+- `SPEC.md`, `docs/specs/README.md`, `tasks/plan.md` — index updates.
+
+### Decisions worth remembering
+
+1. **Sections are sorted by max_points ASC.** Pre-V39 sessions backfill `display_order = sequence_no` so the wire order stays identical for them.
+2. **Skipped sections do not block /complete.** They score 0; only `pending` rows are a precondition violation.
+3. **One global 90-min timer.** Per-skill timers (real A2 has Čtení 50' / Psaní 60' / Poslech 30' / Mluvení 10') are dropped; flat cross-skill sort is incompatible with them. Lower exam fidelity for UX simplicity.
+4. **Server is the timer authority.** A 60-second-interval goroutine sweeps `mock_exam_sessions WHERE in_progress AND now > created_at + duration_sec`. Client side `?include_server_time=true` lets countdowns anchor without drift. The /expire endpoint is the same logic exposed for the "Nộp bài ngay" path.
+5. **Speaking re-record is a logical overwrite, not byte-replace.** New attempt + AdvanceSectionAt swap; old attempt + audio become inert. (Spec D5 amended.)
+6. **Background pause: intentionally not implemented.** Mirrors paper exam.
+
+### Final test counts
+
+- Backend: 915 (was 887 → +28 for V39).
+- Flutter: 432 (was 397 → +35 for V39).
+- `make backend-build`, `flutter analyze`, `flutter test` all green.
+
+### Spec + Plan + Todo
+
+- Spec: [docs/specs/v39-exam-flat-sort-player.md](docs/specs/v39-exam-flat-sort-player.md) (frozen).
+- Plan: [tasks/v39-exam-flat-sort-player-plan.md](tasks/v39-exam-flat-sort-player-plan.md).
+- Todo: [tasks/v39-exam-flat-sort-player-todo.md](tasks/v39-exam-flat-sort-player-todo.md).
+
+---
+
 ## V38 — Poslech Dynamic Items + Pool=Exam Module Fix — 2026-05-12
 
 CMS hotfix slice. Two unrelated authoring papercuts surfaced while

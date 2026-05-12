@@ -1,6 +1,6 @@
 # V39 Exam Flat-Sort Player — Plan
 
-> **Status**: 🟡 planned 2026-05-12.
+> **Status**: ✅ shipped 2026-05-12 (S4 + S5 partial — see todo for scope notes).
 >
 > **Spec**: [`docs/specs/v39-exam-flat-sort-player.md`](../docs/specs/v39-exam-flat-sort-player.md).
 >

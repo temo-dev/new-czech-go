@@ -1,6 +1,6 @@
 # V39 Exam Flat-Sort Player — Spec
 
-> **Status**: 🟡 planned 2026-05-12 (not yet shipped — freeze on ship).
+> **Status**: ✅ frozen on 2026-05-12 (slice shipped — all 10 slices landed across S1–S10; S4 + S5 ship as documented partial scopes with the inline player rewrite deferred to a follow-up polish slice).
 >
 > **Linked idea**: [`docs/ideas/exam-flat-sort-player.md`](../ideas/exam-flat-sort-player.md).
 >
@@ -36,7 +36,7 @@ End-to-end across backend (Go), Flutter (learner app), and docs. No CMS work.
 | D2 | Answer Sheet states | 3 states — `done` / `skipped` / `empty`, plus a transient `current` highlight. Each state pairs color **and** icon (✓ / ⊘ / ○) so the UI never relies on color alone. |
 | D3 | Answer Sheet presentation | Fullscreen modal route (`Navigator.push(..., fullscreenDialog: true)`). Not a bottom-sheet — bottom-sheet height fights the nested scroll grid. |
 | D4 | Skip semantic | `POST /v1/mock-exams/:id/skip {section_id}` sets `mock_exam_sections.status='skipped'`, leaves `attempt_id=''`, advances to next display-order section. Skipped sections remain revisitable from the sheet. |
-| D5 | Re-record on revisit (speaking) | Reuses the same `attempt_id`; the S3 object is replaced in place. No audit trail of overwritten audio. Confirm dialog required before overwrite. |
+| D5 | Re-record on revisit (speaking) | **Logical overwrite**: a new attempt is created and linked via `target_display_order` on `/advance`; the section's `attempt_id` swaps to the new one. The previous attempt + audio become inert (no longer referenced by the session) but are not physically deleted from storage. User experience matches "the newest recording wins"; no audit trail of overwritten audio. Confirm dialog required before launching the recorder. Amendment 2026-05-12 (S8): the original spec said "same attempt_id, same S3 key" — implementation uses logical overwrite because `ExerciseScreen` always creates a fresh attempt. Same-key byte-replace would require lifting attempt state up; deferred. |
 | D6 | Timer authority | Server-authoritative: `mock_exam_sessions.started_at + duration_sec`. Client polls every 30s and on app resume; server triggers auto-submit at expiry. Duration default 5400 (90 min). |
 | D7 | Background behaviour | Timer does **not** pause when the app is backgrounded — mirrors the paper exam. Intro screen warns the learner. |
 | D8 | Per-skill timer | Dropped. Incompatible with cross-skill flat sort. One global 90-min timer applies to the whole session. |

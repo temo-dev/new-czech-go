@@ -702,6 +702,8 @@ Returns all published mock test templates. Learner uses this to pick an exam bef
 ## POST /v1/mock-exams
 Creates a new mock oral exam session. `mock_test_id` is optional — if omitted, falls back to hardcoded one-exercise-per-type selection.
 
+V39 — every new session carries a server-anchored timer: `started_at` (mirrors `created_at`), `duration_sec` (5400 = 90 min default), and `expires_at` (derived). Sections include a `display_order` int — server ranks them by `(max_points ASC, sequence_no ASC)` and exposes them already sorted. Pre-V39 sessions report `duration_sec=0`; the timer sweeper ignores them.
+
 ### Request
 ```json
 {
@@ -718,11 +720,14 @@ Creates a new mock oral exam session. `mock_test_id` is optional — if omitted,
     "mock_test_id": "mt-1",
     "overall_score": 0,
     "passed": false,
+    "started_at": "2026-05-12T10:00:00Z",
+    "duration_sec": 5400,
+    "expires_at": "2026-05-12T11:30:00Z",
     "sections": [
-      { "sequence_no": 1, "exercise_id": "...", "exercise_type": "uloha_1_topic_answers", "max_points": 8, "status": "pending" },
-      { "sequence_no": 2, "exercise_id": "...", "exercise_type": "uloha_2_dialogue_questions", "max_points": 12, "status": "pending" },
-      { "sequence_no": 3, "exercise_id": "...", "exercise_type": "uloha_3_story_narration", "max_points": 10, "status": "pending" },
-      { "sequence_no": 4, "exercise_id": "...", "exercise_type": "uloha_4_choice_reasoning", "max_points": 7, "status": "pending" }
+      { "sequence_no": 4, "display_order": 1, "exercise_id": "...", "exercise_type": "uloha_4_choice_reasoning", "max_points": 7, "status": "pending" },
+      { "sequence_no": 1, "display_order": 2, "exercise_id": "...", "exercise_type": "uloha_1_topic_answers", "max_points": 8, "status": "pending" },
+      { "sequence_no": 3, "display_order": 3, "exercise_id": "...", "exercise_type": "uloha_3_story_narration", "max_points": 10, "status": "pending" },
+      { "sequence_no": 2, "display_order": 4, "exercise_id": "...", "exercise_type": "uloha_2_dialogue_questions", "max_points": 12, "status": "pending" }
     ]
   },
   "meta": {}
@@ -730,7 +735,9 @@ Creates a new mock oral exam session. `mock_test_id` is optional — if omitted,
 ```
 
 ## GET /v1/mock-exams/:session_id
-Returns mock exam session progress and section status.
+Returns mock exam session progress and section status. Sections sorted by `display_order` ASC.
+
+V39 — pass `?include_server_time=true` to receive `meta.server_time` (RFC3339Nano) so the client can anchor countdown without drift.
 
 ### Response
 ```json
@@ -741,21 +748,31 @@ Returns mock exam session progress and section status.
     "mock_test_id": "mt-1",
     "overall_score": 0,
     "passed": false,
+    "started_at": "2026-05-12T10:00:00Z",
+    "duration_sec": 5400,
+    "expires_at": "2026-05-12T11:30:00Z",
     "sections": [
-      { "sequence_no": 1, "exercise_id": "...", "exercise_type": "uloha_1_topic_answers", "max_points": 8, "attempt_id": "0c64ff53-...", "section_score": 0, "status": "completed" },
-      { "sequence_no": 2, "exercise_id": "...", "exercise_type": "uloha_2_dialogue_questions", "max_points": 12, "attempt_id": "", "section_score": 0, "status": "pending" }
+      { "sequence_no": 4, "display_order": 1, "exercise_id": "...", "exercise_type": "uloha_4_choice_reasoning", "max_points": 7, "attempt_id": "0c64ff53-...", "section_score": 0, "status": "completed" },
+      { "sequence_no": 1, "display_order": 2, "exercise_id": "...", "exercise_type": "uloha_1_topic_answers", "max_points": 8, "attempt_id": "", "section_score": 0, "status": "skipped" },
+      { "sequence_no": 3, "display_order": 3, "exercise_id": "...", "exercise_type": "uloha_3_story_narration", "max_points": 10, "attempt_id": "", "section_score": 0, "status": "pending" }
     ]
   },
-  "meta": {}
+  "meta": { "server_time": "2026-05-12T10:05:30.123Z" }
 }
 ```
 
+Section `status` values (V39): `pending` | `completed` | `skipped`.
+
 ## POST /v1/mock-exams/:session_id/advance
-Associates the next pending section with an attempt ID.
+Associates a section with an attempt ID. Two modes:
+
+**Linear (default)** — server finds the next pending section whose exercise matches the attempt and marks it `completed`.
+
+**Jump-back (V39)** — when `target_display_order` is present, the server attaches the attempt to the section at that `display_order` regardless of prior status. Used by the answer-sheet revisit flow; works on `pending` / `skipped` / `completed` sections (overwrites the prior `attempt_id` on the latter two).
 
 Notes:
 - the attempt must belong to the authenticated learner
-- the attempt exercise must match the next pending section exercise
+- linear mode: the attempt exercise must match the next pending section exercise
 - for speaking sections, the attempt may be recorded but not analysed yet; this lets the learner complete all recordings before the bulk analysis step
 - for listening, reading, and writing sections, the Flutter flow calls this only after the section attempt is already scored
 - this endpoint does not compute section scores
@@ -765,16 +782,53 @@ Notes:
 { "attempt_id": "0c64ff53-3f06-4e86-bede-2b5fe1d4c481" }
 ```
 
+With jump-back:
+```json
+{
+  "attempt_id": "0c64ff53-...",
+  "target_display_order": 3
+}
+```
+
 ### Response
 Updated session (same shape as GET).
+
+## POST /v1/mock-exams/:session_id/skip
+V39 — marks a pending section as `skipped` so the learner can move past it. The section stays addressable from the answer sheet; revisits land on `/advance` with `target_display_order` and overwrite the skipped state with the new attempt.
+
+### Request
+```json
+{ "display_order": 3 }
+```
+
+### Response
+- 200 OK → updated session (same shape as GET) with that section's `status='skipped'`, `attempt_id=''`
+- 400 invalid_request → `display_order` missing or ≤ 0
+- 403 forbidden → caller is not the session owner
+- 404 not_found → unknown session or `(session_id, display_order)` does not exist
+- 409 section_not_skippable → section is already `completed`/`skipped` or the session has been completed
+
+## POST /v1/mock-exams/:session_id/expire
+V39 — learner-facing "Nộp bài ngay". Marks remaining `pending` sections as `skipped` and flips the session to `completed`. Same logic the server-side timer sweeper invokes when `expires_at` passes; idempotent for already-completed sessions. No scoring rollup — completed-attempt scoring happens through the regular `/complete` path or shows up at section_score=0 when expired.
+
+### Request
+```json
+{}
+```
+
+### Response
+- 200 OK → updated session (same shape as GET) with `status='completed'`
+- 403 forbidden → caller is not the session owner
+- 404 not_found → unknown session
 
 ## POST /v1/mock-exams/:session_id/complete
 Computes scores, marks session complete, returns final result.
 
-Preconditions:
-- every section has a linked attempt
+Preconditions (V39 updated):
+- every section is either `completed` (linked to a scored attempt) or `skipped`
 - every linked attempt has `status=completed`
 - every linked attempt has feedback or objective scoring metadata
+- skipped sections score 0 and do not block this endpoint
 - speaking-only mock tests receive the 3-point pronunciation/readiness bonus only for the canonical 4-section, 37-point oral exam shape
 
 ### Request
