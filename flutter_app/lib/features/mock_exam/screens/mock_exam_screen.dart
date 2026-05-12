@@ -13,7 +13,9 @@ import '../../exercise/screens/exercise_screen.dart' as exercise_feature;
 import '../../exercise/screens/listening_exercise_screen.dart';
 import '../../exercise/screens/reading_exercise_screen.dart';
 import '../../exercise/screens/writing_exercise_screen.dart';
+import '../../interview/screens/interview_session_screen.dart';
 import 'mock_exam_section_detail_screen.dart';
+import 'mock_exam_skill_dispatch.dart';
 
 class _PendingAnalysis {
   const _PendingAnalysis({
@@ -28,28 +30,6 @@ class _PendingAnalysis {
   final int fileSizeBytes;
   final int durationMs;
 }
-
-String _skillKindForExerciseType(String exerciseType) {
-  if (exerciseType.startsWith('uloha_')) return 'noi';
-  if (exerciseType.startsWith('poslech_')) return 'nghe';
-  if (exerciseType.startsWith('cteni_')) return 'doc';
-  if (exerciseType.startsWith('psani_')) return 'viet';
-  return 'noi';
-}
-
-String _sectionSkillKind(MockExamSection section) {
-  return section.skillKind.isNotEmpty
-      ? section.skillKind
-      : _skillKindForExerciseType(section.exerciseType);
-}
-
-String _skillLabel(AppLocalizations l, String skillKind) => switch (skillKind) {
-  'noi' => l.skillNoi,
-  'nghe' => l.skillNghe,
-  'doc' => l.skillDoc,
-  'viet' => l.skillViet,
-  _ => skillKind.toUpperCase(),
-};
 
 int? _exerciseTypeNumber(String exerciseType) {
   final match = RegExp(r'_(\d+)').firstMatch(exerciseType);
@@ -192,7 +172,7 @@ class _MockExamScreenState extends State<MockExamScreen> {
       );
       if (!mounted) return;
 
-      final kind = _sectionSkillKind(section);
+      final kind = sectionSkillKind(section);
 
       if (kind == 'noi') {
         // Speaking: collect recording, bulk-analyze after all sections done.
@@ -234,6 +214,27 @@ class _MockExamScreenState extends State<MockExamScreen> {
           _pendingAnalyses.add(rec);
           _error = null;
         });
+      } else if (kind == 'interview') {
+        // V36 — interview attempts are created up-front (mirrors course
+        // intro flow) and the session screen fires onSessionEnded after
+        // submit-interview resolves; the runner advances on that callback.
+        final attemptRaw = await widget.client.createAttempt(detail.id);
+        final attemptId = attemptRaw['id'] as String;
+        if (!mounted) return;
+        await navigator.push(
+          MaterialPageRoute(
+            builder: (_) => InterviewSessionScreen(
+              client: widget.client,
+              exerciseId: detail.id,
+              attemptId: attemptId,
+              detail: detail,
+              onSessionEnded: (id) async {
+                await _advanceSection(id);
+              },
+            ),
+          ),
+        );
+        if (!mounted) return;
       } else {
         // Non-speaking: route to correct screen; callback advances session in background.
         await navigator.push(
@@ -408,7 +409,7 @@ class _MockExamScreenState extends State<MockExamScreen> {
     }
     final session = _session!;
     final hasSpeaking = session.sections.any(
-      (s) => _sectionSkillKind(s) == 'noi',
+      (s) => sectionSkillKind(s) == 'noi',
     );
     if (session.isCompleted) {
       if (widget.onCompleted != null) {
@@ -546,7 +547,7 @@ class _SectionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final skill = _skillLabel(l, _sectionSkillKind(section));
+    final skill = skillLabel(l, sectionSkillKind(section));
     final exercise = _exerciseTypeLabel(l, section.exerciseType);
     final tone =
         section.isCompleted
@@ -789,7 +790,7 @@ class _MockExamResultView extends StatelessWidget {
                                     client: _client(context),
                                     attemptId: section.attemptId,
                                     sequenceNo: section.sequenceNo,
-                                    skillKind: _sectionSkillKind(section),
+                                    skillKind: sectionSkillKind(section),
                                     maxPoints: section.maxPoints,
                                   ),
                             ),

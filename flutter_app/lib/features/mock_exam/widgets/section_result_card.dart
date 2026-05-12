@@ -44,6 +44,7 @@ class SectionResultCard extends StatelessWidget {
     if (t.startsWith('poslech_')) return 'nghe';
     if (t.startsWith('cteni_')) return 'doc';
     if (t.startsWith('psani_')) return 'viet';
+    if (t.startsWith('interview_')) return 'interview';
     return 'noi';
   }
 
@@ -180,6 +181,7 @@ class _SectionHeader extends StatelessWidget {
     'nghe' => l.skillNghe,
     'doc' => l.skillDoc,
     'viet' => l.skillViet,
+    'interview' => l.skillInterview,
     _ => kind.toUpperCase(),
   };
 
@@ -188,6 +190,7 @@ class _SectionHeader extends StatelessWidget {
     'nghe' => Icons.headphones_outlined,
     'doc' => Icons.menu_book_outlined,
     'viet' => Icons.edit_outlined,
+    'interview' => Icons.forum_outlined,
     _ => Icons.quiz_outlined,
   };
 }

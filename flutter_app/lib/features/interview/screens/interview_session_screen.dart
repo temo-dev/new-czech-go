@@ -241,6 +241,7 @@ class InterviewSessionScreen extends StatefulWidget {
     required this.attemptId,
     required this.detail,
     this.selectedOption,
+    this.onSessionEnded,
   });
 
   final ApiClient client;
@@ -248,6 +249,12 @@ class InterviewSessionScreen extends StatefulWidget {
   final String attemptId;
   final ExerciseDetail detail;
   final String? selectedOption;
+
+  /// V36 — fired after `submit-interview` succeeds. When non-null the
+  /// session pops back to the caller instead of pushing the standalone
+  /// InterviewResultScreen, letting the mock-exam runner advance to the
+  /// next section without an extra screen in the back stack.
+  final void Function(String attemptId)? onSessionEnded;
 
   @override
   State<InterviewSessionScreen> createState() => _InterviewSessionScreenState();
@@ -1170,16 +1177,22 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
           .timeout(const Duration(seconds: 10));
 
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder:
-              (_) => InterviewResultScreen(
-                client: widget.client,
-                attemptId: widget.attemptId,
-                turns: _turns,
-              ),
-        ),
-      );
+      final onEnded = widget.onSessionEnded;
+      if (onEnded != null) {
+        onEnded(widget.attemptId);
+        Navigator.of(context).pop();
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder:
+                (_) => InterviewResultScreen(
+                  client: widget.client,
+                  attemptId: widget.attemptId,
+                  turns: _turns,
+                ),
+          ),
+        );
+      }
     } catch (err, stack) {
       debugPrint(
         'Interview submit failed for attempt ${widget.attemptId}: $err',
