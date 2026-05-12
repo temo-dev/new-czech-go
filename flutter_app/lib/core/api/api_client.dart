@@ -804,6 +804,20 @@ class ApiClient {
     return payload['data'] as Map<String, dynamic>;
   }
 
+  // V39 — skip a pending section by display_order. Server flips the section's
+  // status to 'skipped'; the answer sheet can still jump back to it later.
+  Future<Map<String, dynamic>> skipMockExamSection(
+    String sessionId, {
+    required int displayOrder,
+  }) async {
+    final payload = await _authed(
+      'POST',
+      '/v1/mock-exams/$sessionId/skip',
+      body: {'display_order': displayOrder},
+    );
+    return payload['data'] as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> getAttemptReview(String attemptId) async {
     final payload = await _authed('GET', '/v1/attempts/$attemptId/review');
     return payload['data'] as Map<String, dynamic>;

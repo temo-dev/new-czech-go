@@ -2029,6 +2029,8 @@ func (s *Server) handleMockExamByID(w http.ResponseWriter, r *http.Request, user
 		s.handleMockExamAdvance(w, r, strings.TrimSuffix(path, "/advance"), user)
 	case strings.HasSuffix(path, "/complete"):
 		s.handleMockExamComplete(w, r, strings.TrimSuffix(path, "/complete"), user)
+	case strings.HasSuffix(path, "/skip"):
+		s.handleMockExamSkip(w, r, strings.TrimSuffix(path, "/skip"), user)
 	default:
 		if r.Method != http.MethodGet {
 			writeMethodNotAllowed(w)
@@ -2086,6 +2088,51 @@ func (s *Server) handleMockExamAdvance(w http.ResponseWriter, r *http.Request, i
 		writeJSON(w, http.StatusBadRequest, map[string]any{
 			"error": map[string]any{"code": "mock_exam_advance_failed", "message": err.Error()},
 		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})
+}
+
+// V39 — `POST /v1/mock-exams/:id/skip` flips a pending section to 'skipped'
+// and advances the learner past it. The section remains addressable by
+// display_order so the answer sheet can jump back later (S7).
+func (s *Server) handleMockExamSkip(w http.ResponseWriter, r *http.Request, id string, user contracts.User) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	var req struct {
+		DisplayOrder int `json:"display_order"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.DisplayOrder <= 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": map[string]any{"code": "invalid_request", "message": "display_order must be a positive integer"},
+		})
+		return
+	}
+	existing, ok := s.repo.MockExamByID(id)
+	if !ok {
+		writeNotFound(w)
+		return
+	}
+	if existing.LearnerID != "" && existing.LearnerID != user.ID {
+		writeError(w, http.StatusForbidden, "forbidden", "You do not have access to this mock exam.", false)
+		return
+	}
+	session, err := s.repo.SkipMockExamSection(id, req.DisplayOrder)
+	if err != nil {
+		switch {
+		case errors.Is(err, store.ErrSectionNotFound):
+			writeNotFound(w)
+		case errors.Is(err, store.ErrSectionNotSkippable):
+			writeJSON(w, http.StatusConflict, map[string]any{
+				"error": map[string]any{"code": "section_not_skippable", "message": "section is already completed, skipped, or the session has been completed"},
+			})
+		default:
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"error": map[string]any{"code": "mock_exam_skip_failed", "message": err.Error()},
+			})
+		}
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": session, "meta": map[string]any{}})

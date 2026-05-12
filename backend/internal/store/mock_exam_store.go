@@ -31,7 +31,18 @@ type MockExamStore interface {
 	MockExamByID(id string) (contracts.MockExamSession, bool)
 	AdvanceMockExam(id, attemptID string) (contracts.MockExamSession, error)
 	CompleteMockExam(id string) (contracts.MockExamSession, error)
+	// V39: SkipSection marks the section identified by (sessionID, displayOrder)
+	// as 'skipped'. Returns ErrSectionNotSkippable when the section is already
+	// completed/skipped or the session has been completed; ErrSectionNotFound
+	// when no row matches.
+	SkipSection(sessionID string, displayOrder int) (contracts.MockExamSession, error)
 }
+
+// V39 — error sentinels for SkipSection. Handlers map them to 404/409.
+var (
+	ErrSectionNotFound     = fmt.Errorf("section not found")
+	ErrSectionNotSkippable = fmt.Errorf("section not skippable")
+)
 
 var mockExamTaskTypes = []string{
 	"uloha_1_topic_answers",
@@ -170,6 +181,31 @@ func (s *memoryMockExamStore) AdvanceMockExam(id, attemptID string) (contracts.M
 		}
 	}
 	return contracts.MockExamSession{}, fmt.Errorf("no pending section")
+}
+
+// SkipSection — V39 memory impl.
+func (s *memoryMockExamStore) SkipSection(sessionID string, displayOrder int) (contracts.MockExamSession, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session, ok := s.sessions[sessionID]
+	if !ok {
+		return contracts.MockExamSession{}, ErrSectionNotFound
+	}
+	if session.Status == "completed" {
+		return contracts.MockExamSession{}, ErrSectionNotSkippable
+	}
+	for i := range session.Sections {
+		if session.Sections[i].DisplayOrder != displayOrder {
+			continue
+		}
+		if session.Sections[i].Status != "pending" {
+			return contracts.MockExamSession{}, ErrSectionNotSkippable
+		}
+		session.Sections[i].Status = "skipped"
+		return *session, nil
+	}
+	return contracts.MockExamSession{}, ErrSectionNotFound
 }
 
 func (s *memoryMockExamStore) CompleteMockExam(id string) (contracts.MockExamSession, error) {

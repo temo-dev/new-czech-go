@@ -22,16 +22,18 @@
 - [x] **S1.7** `go test ./...` 888 green (was 887 → +3 new, -2 fixed regressions: `TestCompleteMockExamDoesNotAddPronunciationBonusToMixedSprint` advance order, `TestCreateMockExamDecodesChunkedMockTestID` wantTypes)
 - [x] **S1.8** `make backend-build` green
 
-### S2 — Skip endpoint + status='skipped'
-- [ ] **S2.1** Migration 031 — `CHECK (status IN ('pending','completed','skipped'))` via DO-block (Postgres)
-- [ ] **S2.2** `MockExamStore.SkipSection(ctx, sessionID, displayOrder int)` — atomic guarded UPDATE
-- [ ] **S2.3** Memory store parity for `SkipSection`
-- [ ] **S2.4** Route dispatch in `handleMockExamByID` — `/skip` suffix
-- [ ] **S2.5** `handleMockExamSkip` — decode body, auth + ownership, store call, return updated session
-- [ ] **S2.6** `apiClient.skipMockExamSection(String sessionId, int displayOrder)` in Dart
-- [ ] **S2.7** Tests `mock_exam_skip_test.go` — happy / 404 / 409×2 / 400 / ownership 404
-- [ ] **S2.8** `go test ./...` green
-- [ ] **S2.9** `flutter analyze` green
+### S2 — Skip endpoint + status='skipped'  ✅ landed 2026-05-12
+- [x] **S2.1** Status enum extended at storage layer — Postgres `status` TEXT accepts `'skipped'` (no CHECK constraint today; new value treated as data, not schema). Defer explicit CHECK to a hardening pass.
+- [x] **S2.2** `MockExamStore.SkipSection(sessionID string, displayOrder int) (Session, error)` — interface + sentinel errors `ErrSectionNotFound`, `ErrSectionNotSkippable`
+- [x] **S2.3** Memory store parity — guard pending status, mutate to skipped
+- [x] **S2.4** Postgres `SkipSection` — atomic guarded UPDATE + 404/409 disambiguation via second SELECT
+- [x] **S2.5** Route dispatch in `handleMockExamByID` — `/skip` suffix added
+- [x] **S2.6** `handleMockExamSkip` — body decode, ownership 403, sentinel→status mapping
+- [x] **S2.7** `apiClient.skipMockExamSection(String sessionId, {required int displayOrder})` in Dart
+- [x] **S2.8** Tests `mock_exam_skip_test.go` — 8 cases: happy / missing field 400 / zero-value 400 / session 404 / out-of-range 404 / already-completed 409 / already-skipped 409 / different-learner 403
+- [x] **S2.9** `go test ./...` 896 green (was 888 → +8 new S2)
+- [x] **S2.10** `flutter analyze` clean (11 pre-existing infos unrelated)
+- [x] **S2.11** `flutter test` 397 green (no regression)
 
 ### S3 — Server-anchored timer + auto-submit
 - [ ] **S3.1** Migration 032 — `mock_exam_sessions.started_at TIMESTAMPTZ DEFAULT now()` (defensive)

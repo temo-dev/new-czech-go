@@ -208,6 +208,61 @@ func (s *postgresMockExamStore) MockExamByID(id string) (contracts.MockExamSessi
 	return session, true
 }
 
+// SkipSection — V39 postgres impl. Atomic guarded UPDATE that flips the
+// section's status to 'skipped' only when it is currently 'pending'. Returns
+// ErrSectionNotSkippable when the guard fails, ErrSectionNotFound when the
+// (session_id, display_order) pair does not exist.
+func (s *postgresMockExamStore) SkipSection(sessionID string, displayOrder int) (contracts.MockExamSession, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var sessionStatus string
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT status FROM mock_exam_sessions WHERE id = $1`, sessionID,
+	).Scan(&sessionStatus); err == sql.ErrNoRows {
+		return contracts.MockExamSession{}, ErrSectionNotFound
+	} else if err != nil {
+		return contracts.MockExamSession{}, fmt.Errorf("query mock exam: %w", err)
+	}
+	if sessionStatus == "completed" {
+		return contracts.MockExamSession{}, ErrSectionNotSkippable
+	}
+
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE mock_exam_sections SET status='skipped' WHERE session_id=$1 AND display_order=$2 AND status='pending'`,
+		sessionID, displayOrder,
+	)
+	if err != nil {
+		return contracts.MockExamSession{}, fmt.Errorf("skip section: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return contracts.MockExamSession{}, fmt.Errorf("skip section affected rows: %w", err)
+	}
+	if n == 0 {
+		// Either the row doesn't exist or status != 'pending'. Distinguish
+		// so handlers can return 404 vs 409 correctly.
+		var existingStatus string
+		err := s.db.QueryRowContext(ctx,
+			`SELECT status FROM mock_exam_sections WHERE session_id=$1 AND display_order=$2`,
+			sessionID, displayOrder,
+		).Scan(&existingStatus)
+		if err == sql.ErrNoRows {
+			return contracts.MockExamSession{}, ErrSectionNotFound
+		}
+		if err != nil {
+			return contracts.MockExamSession{}, fmt.Errorf("lookup section after no-op skip: %w", err)
+		}
+		return contracts.MockExamSession{}, ErrSectionNotSkippable
+	}
+
+	session, ok := s.MockExamByID(sessionID)
+	if !ok {
+		return contracts.MockExamSession{}, fmt.Errorf("mock exam not found after skip")
+	}
+	return session, nil
+}
+
 func (s *postgresMockExamStore) AdvanceMockExam(id, attemptID string) (contracts.MockExamSession, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

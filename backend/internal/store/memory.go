@@ -522,6 +522,11 @@ func (s *MemoryStore) CompleteMockExam(id string) (contracts.MockExamSession, er
 	return s.mockExams.CompleteMockExam(id)
 }
 
+// V39: skip the section identified by (sessionID, displayOrder).
+func (s *MemoryStore) SkipMockExamSection(sessionID string, displayOrder int) (contracts.MockExamSession, error) {
+	return s.mockExams.SkipSection(sessionID, displayOrder)
+}
+
 // ExerciseAudio methods — delegate to exerciseAudioStore (memory or Postgres)
 
 func (s *MemoryStore) SetExerciseAudioStore(store ExerciseAudioStore) {
