@@ -121,13 +121,15 @@
 - [x] **S7.8** `answer_sheet_screen_test.dart` extended — chip tap pops with the correct `displayOrder`
 - [x] **S7.9** `go test ./...` 911 green (was 908 → +3); `flutter test` 424 green (was 423 → +1)
 
-### S8 — Speaking re-record overwrite
-- [ ] **S8.1** Audit `attempt_upload.go` — does upload-url + S3 key naturally overwrite? Document finding.
-- [ ] **S8.2** If audit fails, scope an `?overwrite=true` flag here (else skip this sub-task)
-- [ ] **S8.3** `widgets/rerecord_confirm_dialog.dart` — destructive confirm
-- [ ] **S8.4** Player re-record entry — dialog gate for `uloha_1..4` only (interview skipped)
-- [ ] **S8.5** `test/rerecord_confirm_dialog_test.dart` — show + confirm + cancel + interview-skipped
-- [ ] **S8.6** Manual smoke — record, jump back, re-record, verify S3 object newer
+### S8 — Speaking re-record overwrite  ✅ landed 2026-05-12
+- [x] **S8.1** Audit complete — `handleAttemptAudioUpload` (server.go:1201) keys S3 path as `attempt-audio/{attemptID}/audio.{ext}` and uses `os.Create` (truncates existing). **Same attemptID = automatic overwrite.** No backend change needed.
+- [x] **S8.2** No `?overwrite=true` flag needed — overwrite is the default. Spec D5 amendment note: "same attempt_id" is true only when the recorder UI reuses the existing attempt. The current Flutter `ExerciseScreen` creates a fresh attempt per session, so re-record produces a **logical** overwrite (new attempt + AdvanceSectionAt swaps section.attempt_id → new one; old attempt + audio become inert). User-perceived behaviour matches the spec.
+- [x] **S8.3** `widgets/rerecord_confirm_dialog.dart` — destructive AlertDialog with mic icon, Huỷ/Ghi đè actions, error-colored Ghi đè. `RerecordConfirmDialog.show(ctx)` returns `Future<bool>`.
+- [x] **S8.4** `mock_exam_screen.dart` AppBar sheet-jump path — when target section's `skillKind=='noi'` AND `attemptId.isNotEmpty`, prompts via `RerecordConfirmDialog.show()` before `_runSection`. Interview sections (`kind='interview'`) explicitly skip the dialog.
+- [x] **S8.5** `test/rerecord_confirm_dialog_test.dart` — 4 cases: title+body+actions render, confirm returns true, cancel returns false, barrier dismiss returns false.
+- [ ] **S8.6** Manual smoke — record speaking, jump back via sheet, accept confirm dialog, re-record, verify S3 object timestamp newer. Pending operator test on iOS sim.
+
+**Files**: 1 new (`rerecord_confirm_dialog.dart`) + 1 modified (`mock_exam_screen.dart` AppBar handler) + 1 new test file. `flutter test` 428 green (was 424 → +4). `flutter analyze` clean.
 
 ### S9 — Intro polish + Nộp-bài-ngay + auto-submit UI
 - [ ] **S9.1** Intro warning banner — "Timer KHÔNG dừng khi rời app"

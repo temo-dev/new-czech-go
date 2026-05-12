@@ -14,6 +14,7 @@ import '../../exercise/screens/listening_exercise_screen.dart';
 import '../../exercise/screens/reading_exercise_screen.dart';
 import '../../exercise/screens/writing_exercise_screen.dart';
 import '../../interview/screens/interview_session_screen.dart';
+import '../widgets/rerecord_confirm_dialog.dart';
 import 'answer_sheet_screen.dart';
 import 'mock_exam_section_detail_screen.dart';
 import 'mock_exam_skill_dispatch.dart';
@@ -436,6 +437,18 @@ class _MockExamScreenState extends State<MockExamScreen> {
                       }
                     }
                     if (target == null) return;
+                    // V39 S8 — speaking sections with an existing attempt
+                    // require a destructive confirm before re-record. Old
+                    // attempt audio becomes inert (new attempt linked via
+                    // target_display_order from S7). Interview sections use
+                    // a different lifecycle and skip the dialog.
+                    final kind = sectionSkillKind(target);
+                    final needsConfirm = kind == 'noi' &&
+                        target.attemptId.isNotEmpty;
+                    if (needsConfirm) {
+                      final ok = await RerecordConfirmDialog.show(context);
+                      if (!mounted || !ok) return;
+                    }
                     setState(() => _jumpTarget = picked);
                     await _runSection(target);
                   },
