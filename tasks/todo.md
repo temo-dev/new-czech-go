@@ -24,24 +24,18 @@ matching `<slice>-todo.md` file:
 - [→] **V21-Wiring** subsumed by V21.3 CEFR UI Wire-up
 - [→] **V21-i18n** subsumed by V21.3 § F1
 
-## Suggestion polish (S1–S8 from V21 review)
+## Suggestion polish (S1–S8 from V21 review) — ✅ shipped 2026-05-12
 
-Lower priority — none deploy-blockers:
+All eight items landed in dedicated `fix(s1)..fix(s8)` commits.
 
-- [ ] S1 Always trust server `next_level` in Flutter (drop client
-  fallback compute via `nextCefrLevel`)
-- [ ] S2 Derive `_skillOrder` in Flutter from server-provided keys
-- [ ] S3 Share a single `HttpClient` between `LevelApi` + `ApiClient`
-- [ ] S4 Scope `Timer.periodic(1s)` rebuild to the cooldown caption
-  only (not the whole diagnostic table)
-- [ ] S5 Tighten `LevelService.ResolveCourseUnlock` empty-level
-  passthrough — log + treat as `a2`, not auto-unlocked
-- [ ] S6 Replace overloaded empty-string `next_level` with nullable
-  field on the wire
-- [ ] S7 Include the session payload in the `POST /v1/promotion-attempts`
-  201 response so the client doesn't follow up with `GET /v1/mock-exams/:id`
-- [ ] S8 Migration 026 backfill — add explicit `created_at < V21_EPOCH`
-  guard rather than relying on the placement-taken null sentinel
+- [x] S1 Always trust server `next_level` in Flutter — `fix(s1)`
+- [x] S2 Derive `_skillOrder` in Flutter from server-provided keys — `fix(s2)`
+- [x] S3 Share a single `HttpClient` between `LevelApi` + `ApiClient` — `fix(s3)`
+- [x] S4 Scope `Timer.periodic(1s)` rebuild to the cooldown caption only — `fix(s4)`
+- [x] S5 Tighten `LevelService.ResolveCourseUnlock` empty-level passthrough — `fix(s5)`
+- [x] S6 Replace overloaded empty-string `next_level` with omitempty wire — `fix(s6)`
+- [x] S7 Inline the session payload in `POST /v1/promotion-attempts` 201 — `fix(s7)`
+- [x] S8 Migration 026 — add explicit `created_at < V21_EPOCH` guard — `fix(s8)`
 
 ## Long-running backlog
 
