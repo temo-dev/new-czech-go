@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
@@ -109,10 +111,61 @@ class _MockExamScreenState extends State<MockExamScreen> {
   /// after consumption so the linear-advance path resumes.
   int? _jumpTarget;
 
+  /// V39 — auto-launch the first pending section once after the session
+  /// loads so the learner lands directly inside the exam (no section-list
+  /// landing). Guarded by a one-shot flag so returning from per-section
+  /// screens drops the learner back onto the section overview (which now
+  /// acts as a fallback navigation surface alongside the answer sheet).
+  bool _autoLaunchedFirst = false;
+
+  /// V39 — 1-second ticker driving the AppBar countdown. Active only while
+  /// the session has a server-anchored timer (`duration_sec > 0`).
+  Timer? _timerTicker;
+
   @override
   void initState() {
     super.initState();
     _bootstrap();
+  }
+
+  @override
+  void dispose() {
+    _timerTicker?.cancel();
+    super.dispose();
+  }
+
+  // V39 — kick off the per-second ticker driving the AppBar countdown.
+  // Safe to call multiple times; previous timer is cancelled.
+  void _startTickerIfNeeded() {
+    _timerTicker?.cancel();
+    final session = _session;
+    if (session == null || !session.hasTimer) return;
+    _timerTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {}); // re-render the timer chip
+    });
+  }
+
+  // V39 — auto-launch the first pending section once after the session
+  // loads. Subsequent returns from per-section screens land on the
+  // section overview (acts as fallback navigation when the answer sheet
+  // is closed).
+  Future<void> _autoLaunchFirstPendingIfNeeded() async {
+    if (_autoLaunchedFirst) return;
+    final session = _session;
+    if (session == null || session.isCompleted) return;
+    MockExamSection? first;
+    final sorted = [...session.sections]
+      ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+    for (final s in sorted) {
+      if (s.isPending) {
+        first = s;
+        break;
+      }
+    }
+    if (first == null) return;
+    _autoLaunchedFirst = true;
+    await _runSection(first);
   }
 
   Future<void> _bootstrap() async {
@@ -122,6 +175,13 @@ class _MockExamScreenState extends State<MockExamScreen> {
       setState(() {
         _session = initial;
         _loading = false;
+      });
+      _startTickerIfNeeded();
+      // V39 — dispatch first-pending after the current frame so
+      // Navigator.push from initState-driven async path runs after the
+      // widget tree settles.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _autoLaunchFirstPendingIfNeeded();
       });
       return;
     }
@@ -146,6 +206,10 @@ class _MockExamScreenState extends State<MockExamScreen> {
       setState(() {
         _session = session;
         _loading = false;
+      });
+      _startTickerIfNeeded();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _autoLaunchFirstPendingIfNeeded();
       });
     } catch (err) {
       if (!mounted) return;
@@ -436,13 +500,56 @@ class _MockExamScreenState extends State<MockExamScreen> {
   }
 
   @override
+  // V39 — server-anchored countdown rendered in AppBar.title row. Falls
+  // back to the plain title when the session hasn't loaded a timer yet
+  // (pre-V39 sessions or the loading state).
+  Widget _buildAppBarTitle(String mockTitle, AppLocalizations l) {
+    final session = _session;
+    final title = mockTitle.isNotEmpty ? mockTitle : l.mockExamTitle;
+    final remaining = session != null && session.hasTimer
+        ? session.remainingAt(DateTime.now())
+        : null;
+    if (remaining == null) {
+      return Text(title);
+    }
+    final mins = remaining.inMinutes;
+    final secs = remaining.inSeconds % 60;
+    final timerStr =
+        '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+    final warning = remaining < const Duration(minutes: 5);
+    final timerColor = warning ? AppColors.error : AppColors.onSurface;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.timer_outlined, size: 18, color: timerColor),
+        const SizedBox(width: 6),
+        Text(
+          timerStr,
+          style: AppTypography.titleMedium.copyWith(
+            color: timerColor,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+        const SizedBox(width: AppSpacing.x3),
+        Flexible(
+          child: Text(
+            title,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.titleMedium,
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final mockTitle = widget.mockTest?.title.trim() ?? '';
     final session = _session;
     return Scaffold(
       appBar: AppBar(
-        title: Text(mockTitle.isNotEmpty ? mockTitle : l.mockExamTitle),
+        title: _buildAppBarTitle(mockTitle, l),
         actions: [
           // V39 — open the Answer Sheet. S7: tapping a chip pops with the
           // section's display_order, and we re-run that section with the

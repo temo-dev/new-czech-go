@@ -257,6 +257,105 @@ void main() {
     expect(find.text('0/1 đã làm · 0 bỏ qua · 1 chưa'), findsOneWidget);
   });
 
+  // V39 — AppBar shows server-anchored countdown when the session carries
+  // a timer (duration_sec > 0 + expires_at set).
+  testWidgets('MockExamScreen AppBar renders timer when session.hasTimer', (
+    tester,
+  ) async {
+    final now = DateTime.now().toUtc();
+    final session = MockExamSessionView(
+      id: 'session-1',
+      status: 'in_progress',
+      mockTestId: 'mt-1',
+      overallScore: 0,
+      passed: false,
+      passThresholdPercent: 60,
+      overallReadinessLevel: '',
+      overallSummary: '',
+      sections: const [
+        MockExamSection(
+          sequenceNo: 1,
+          skillKind: 'doc',
+          exerciseId: 'ex-1',
+          exerciseType: 'cteni_1',
+          maxPoints: 5,
+          attemptId: '',
+          sectionScore: 0,
+          status: 'pending',
+          displayOrder: 1,
+        ),
+      ],
+      startedAt: now,
+      durationSec: 5400,
+      expiresAt: now.add(const Duration(seconds: 5400)),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: MockExamScreen(
+          client: ApiClient(),
+          initialSession: session,
+        ),
+      ),
+    );
+    expect(find.byIcon(Icons.timer_outlined), findsOneWidget);
+    // Timer text should match MM:SS pattern; the exact value depends on
+    // elapsed wall-clock between pumpWidget and assertion, but the
+    // 89-90 minute range is safe given a 5400-second window.
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w is Text &&
+            (w.data?.startsWith('89:') == true ||
+                w.data?.startsWith('90:') == true),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('MockExamScreen AppBar omits timer for pre-V39 sessions', (
+    tester,
+  ) async {
+    final session = MockExamSessionView(
+      id: 'session-1',
+      status: 'in_progress',
+      mockTestId: 'mt-1',
+      overallScore: 0,
+      passed: false,
+      passThresholdPercent: 60,
+      overallReadinessLevel: '',
+      overallSummary: '',
+      sections: const [
+        MockExamSection(
+          sequenceNo: 1,
+          skillKind: 'doc',
+          exerciseId: 'ex-1',
+          exerciseType: 'cteni_1',
+          maxPoints: 5,
+          attemptId: '',
+          sectionScore: 0,
+          status: 'pending',
+          displayOrder: 1,
+        ),
+      ],
+      // durationSec=0, no expiresAt → no timer
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: MockExamScreen(
+          client: ApiClient(),
+          initialSession: session,
+        ),
+      ),
+    );
+    expect(find.byIcon(Icons.timer_outlined), findsNothing);
+  });
+
   testWidgets('MockExamScreen hides "Bỏ qua" for already-skipped or completed sections', (
     tester,
   ) async {
