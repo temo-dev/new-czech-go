@@ -96,8 +96,8 @@ Source: Modelový test A2, NPI ČR (platný od dubna 2026).
 - `uloha_4_choice_reasoning` — Chọn 1/3 phương án + lý do (7 điểm)
 
 **Writing (viet) — V2:**
-- `psani_1_formular` — 3 câu hỏi form, mỗi câu ≥10 từ (8 điểm)
-- `psani_2_email` — Viết email theo 5 ảnh, ≥35 từ (12 điểm)
+- `psani_1_formular` — 1+ câu hỏi form, mỗi câu trả lời ≥10 từ (8 điểm)
+- `psani_2_email` — Viết email theo 1+ ảnh/topic gợi ý, ≥35 từ (12 điểm)
 
 **Listening (nghe) — V3:**
 - `poslech_1` — 5 đoạn ngắn → chọn A-D (5 điểm). **V26**: audio
@@ -531,7 +531,7 @@ Admin-defined exam template. Defines which exercises appear in each section and 
 | `id` | `uuid` | yes | Primary identifier |
 | `title` | `string` | yes | Display name, e.g. "Modelový test 2 — Mluvení" |
 | `description` | `text` | no | Shown on the intro screen |
-| `estimated_duration_minutes` | `int` | yes | Shown on the intro screen (e.g. 15) |
+| `estimated_duration_minutes` | `int` | yes | Shown on the intro screen and copied into `MockExamSession.duration_sec` at start (e.g. 15 → 900s) |
 | `status` | `string` | yes | `draft`, `published` |
 | `sections` | `[]MockTestSection` | yes | Ordered list of sections |
 
@@ -555,6 +555,9 @@ One learner's attempt at a MockTest. Created when the learner starts an exam.
 | `user_id` | `uuid` | yes | FK to `User` |
 | `mock_test_id` | `string` | no | FK to `MockTest`; empty if created without a template |
 | `status` | `string` | yes | `in_progress`, `completed` |
+| `started_at` | `timestamp` | no | Server start time for the session timer |
+| `duration_sec` | `int` | no | Server-anchored timer duration copied from `MockTest.estimated_duration_minutes * 60`; `0` on pre-V39 sessions |
+| `expires_at` | `timestamp` | no | Derived as `started_at + duration_sec` |
 | `overall_readiness_level` | `FeedbackReadinessLevel` | no | Computed on completion |
 | `overall_summary` | `text` | no | Human-readable summary |
 | `overall_score` | `int` | no | 0–40, computed on completion |

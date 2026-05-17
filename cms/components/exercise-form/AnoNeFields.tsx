@@ -121,6 +121,10 @@ export function AnoNeFields({
         {isPoslech && (
           <p style={{ fontSize: 12, color: 'var(--ink-3)', margin: 0 }}>
             Nhập dạng văn xuôi — không dùng bảng cột. Ví dụ: &ldquo;V pondělí je úřad otevřen od osmi do jedenácti hodin třicet.&rdquo;
+            <br />
+            <span style={{ color: 'var(--ink-2)' }}>
+              Hội thoại 2 giọng: mỗi dòng bắt đầu bằng <code>[Žena]:</code> hoặc <code>[Muž]:</code> để TTS tự đọc 2 giọng khác nhau.
+            </span>
           </p>
         )}
         <textarea

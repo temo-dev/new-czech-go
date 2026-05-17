@@ -20,10 +20,40 @@ export type C5State = { type: 'cteni_5'; text: string; slots: { prompt: string; 
 
 export type CteniState = C1State | C24State | C3State | C5State;
 
+// V39 — số item / option mặc định khớp template A2. Dynamic counts cho phép admin thêm/xóa.
+export const CTENI_1_DEFAULT_ITEM_COUNT = 5;
+export const CTENI_1_DEFAULT_OPTION_COUNT = 8;
+export const CTENI_2_DEFAULT_QUESTION_COUNT = 5;
+export const CTENI_3_DEFAULT_TEXT_COUNT = 4;
+export const CTENI_3_DEFAULT_PERSON_COUNT = 5;
+export const CTENI_4_DEFAULT_QUESTION_COUNT = 6;
+export const CTENI_5_DEFAULT_SLOT_COUNT = 5;
+
 export const OPTION_KEYS_1 = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 export const OPTION_KEYS_3 = ['A', 'B', 'C', 'D', 'E'];
 
+// Sinh key A, B, ..., Z theo index. Trả '' nếu vượt Z (cap 26 options).
+export function optionKeyAt(index: number): string {
+  if (index < 0 || index >= 26) return '';
+  return String.fromCharCode(65 + index);
+}
+
+// Tìm key A-Z chưa dùng trong used. Trả '' nếu đã đầy 26 keys.
+export function nextFreeKey(used: Iterable<string>): string {
+  const set = new Set(used);
+  for (let i = 0; i < 26; i += 1) {
+    const k = optionKeyAt(i);
+    if (!set.has(k)) return k;
+  }
+  return '';
+}
+
 export const emptyQ = (): CQItem => ({ prompt: '', optA: '', optB: '', optC: '', optD: '', answer: '' });
+export const emptyC1Item = (): C1Item => ({ mode: 'text', text: '', assetId: '', answer: '' });
+export const emptyC1Option = (key: string) => ({ key, text: '' });
+export const emptyC3Text = () => ({ text: '', answer: '' });
+export const emptyC3Person = (key: string) => ({ key, name: '', description: '' });
+export const emptyC5Slot = () => ({ prompt: '', answer: '' });
 
 export function initCteniState(type: CteniType, detail: Record<string, unknown>): CteniState {
   const ca = (detail.correct_answers ?? {}) as Record<string, string>;
@@ -31,7 +61,9 @@ export function initCteniState(type: CteniType, detail: Record<string, unknown>)
   if (type === 'cteni_1') {
     const rawItems = (detail.items ?? []) as Array<{ item_no?: number; text?: string; asset_id?: string }>;
     const rawOpts = (detail.options ?? []) as Array<{ key?: string; text?: string }>;
-    const items: C1Item[] = Array.from({ length: 5 }, (_, i) => {
+    // V39 — count động: dùng raw length nếu có data, không thì default.
+    const itemCount = rawItems.length > 0 ? rawItems.length : CTENI_1_DEFAULT_ITEM_COUNT;
+    const items: C1Item[] = Array.from({ length: itemCount }, (_, i) => {
       const raw = rawItems.find((item) => item.item_no === i + 1) ?? rawItems[i];
       const assetId = raw?.asset_id ?? '';
       return {
@@ -41,17 +73,21 @@ export function initCteniState(type: CteniType, detail: Record<string, unknown>)
         answer: ca[String(i + 1)] ?? '',
       };
     });
-    const options = OPTION_KEYS_1.map((k, i) => ({
-      key: k,
-      text: rawOpts.find((o) => o.key === k)?.text ?? rawOpts[i]?.text ?? '',
-    }));
+    const optCount = rawOpts.length > 0 ? rawOpts.length : CTENI_1_DEFAULT_OPTION_COUNT;
+    const options = Array.from({ length: optCount }, (_, i) => {
+      const fallbackKey = optionKeyAt(i);
+      const raw = rawOpts.find((o) => o.key === fallbackKey) ?? rawOpts[i];
+      return { key: String(raw?.key ?? fallbackKey), text: String(raw?.text ?? '') };
+    });
     return { type, items, options };
   }
 
   if (type === 'cteni_2' || type === 'cteni_4') {
     const startNo = type === 'cteni_4' ? 15 : 6;
-    const count = type === 'cteni_4' ? 6 : 5;
+    const defaultCount = type === 'cteni_4' ? CTENI_4_DEFAULT_QUESTION_COUNT : CTENI_2_DEFAULT_QUESTION_COUNT;
     const rawQs = (detail.questions ?? []) as Array<Record<string, unknown>>;
+    // V39 — count động.
+    const count = rawQs.length > 0 ? rawQs.length : defaultCount;
     const questions: CQItem[] = Array.from({ length: count }, (_, i) => {
       const qNo = startNo + i;
       const rq = rawQs.find((q) => q.question_no === qNo) ?? rawQs[i];
@@ -70,17 +106,21 @@ export function initCteniState(type: CteniType, detail: Record<string, unknown>)
   if (type === 'cteni_3') {
     const rawTexts = (detail.texts ?? []) as Array<{ item_no?: number; text?: string }>;
     const rawPerson = (detail.persons ?? []) as Array<{ key?: string; name?: string; description?: string }>;
-    const texts = Array.from({ length: 4 }, (_, i) => {
+    // V39 — count động cho cả texts và persons.
+    const textCount = rawTexts.length > 0 ? rawTexts.length : CTENI_3_DEFAULT_TEXT_COUNT;
+    const texts = Array.from({ length: textCount }, (_, i) => {
       const raw = rawTexts.find((txt) => txt.item_no === i + 1) ?? rawTexts[i];
       return {
         text: raw?.text ?? '',
         answer: ca[String(i + 1)] ?? '',
       };
     });
-    const persons = OPTION_KEYS_3.map((k, i) => {
-      const raw = rawPerson.find((p) => p.key === k) ?? rawPerson[i];
+    const personCount = rawPerson.length > 0 ? rawPerson.length : CTENI_3_DEFAULT_PERSON_COUNT;
+    const persons = Array.from({ length: personCount }, (_, i) => {
+      const fallbackKey = optionKeyAt(i);
+      const raw = rawPerson.find((p) => p.key === fallbackKey) ?? rawPerson[i];
       return {
-        key: k,
+        key: String(raw?.key ?? fallbackKey),
         name: raw?.name ?? '',
         description: raw?.description ?? '',
       };
@@ -89,7 +129,9 @@ export function initCteniState(type: CteniType, detail: Record<string, unknown>)
   }
 
   const rawQs = (detail.questions ?? []) as Array<{ question_no?: number; prompt?: string }>;
-  const slots = Array.from({ length: 5 }, (_, i) => {
+  // V39 — count động.
+  const slotCount = rawQs.length > 0 ? rawQs.length : CTENI_5_DEFAULT_SLOT_COUNT;
+  const slots = Array.from({ length: slotCount }, (_, i) => {
     const qNo = 21 + i;
     const raw = rawQs.find((q) => q.question_no === qNo) ?? rawQs[i];
     return {

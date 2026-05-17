@@ -38,6 +38,8 @@ import {
   secondaryActionStyle,
   SKILL_KIND_EXERCISE_TYPES,
   SKILL_KIND_META,
+  supportsScenarioImage,
+  withScenarioImageAssetId,
 } from '../exercise-utils';
 
 type Props = {
@@ -325,6 +327,21 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
     setForm((f) => ({ ...f, moduleId, skillKind: '' }));
   }
 
+  async function persistScenarioImageAssetId(assetId: string) {
+    if (!editingId || !supportsScenarioImage(form.exerciseType)) return;
+    const nextForm = withScenarioImageAssetId(form, assetId);
+    const response = await adminFetch(`${adminApi}/${editingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildUpdatePayload(nextForm)),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error?.message ?? 'Could not update scenario image.');
+    }
+    setForm(nextForm);
+  }
+
   async function handleAssetUpload(file: File, assetKind = 'image') {
     if (!editingId) {
       setAssetError('Save the exercise first before uploading images.');
@@ -344,8 +361,11 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error?.message ?? 'Could not upload asset.');
       const assetId = payload.data?.asset?.id as string | undefined;
+      if (assetId && assetKind === 'context_image') {
+        await persistScenarioImageAssetId(assetId);
+      }
       onSaved(); // reload so assets appear
-      if (assetId && form.exerciseType === 'uloha_3_story_narration') {
+      if (assetId && assetKind === 'image' && form.exerciseType === 'uloha_3_story_narration') {
         setForm((current) => ({
           ...current,
           imageAssetIds: appendLineIfMissing(current.imageAssetIds, assetId),
@@ -360,32 +380,49 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
 
   async function handleContextImageUpload(file: File) {
     if (!editingId) { setAssetError('Save the exercise first.'); return; }
-    // Delete existing context_image first to avoid accumulation
-    const existing = currentAssets.find((a: PromptAsset) => a.asset_kind === 'context_image');
-    if (existing) {
-      await adminFetch(`/api/admin/exercises/${editingId}/assets/${existing.id}`, { method: 'DELETE' });
+    setAssetError(null);
+    try {
+      // Delete existing context_image first to avoid accumulation
+      const existing = currentAssets.find((a: PromptAsset) => a.asset_kind === 'context_image');
+      if (existing) {
+        const response = await adminFetch(`/api/admin/exercises/${editingId}/assets/${existing.id}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Could not delete existing image.');
+      }
+      await handleAssetUpload(file, 'context_image');
+    } catch (err) {
+      setAssetError(err instanceof Error ? err.message : 'Unknown image replace error');
     }
-    await handleAssetUpload(file, 'context_image');
   }
 
   async function handleAiContextImageCreated(result: AiImageResult) {
     if (!editingId) return;
-    // Replace existing context_image if any.
-    const existing = currentAssets.find((a: PromptAsset) => a.asset_kind === 'context_image');
-    if (existing) {
-      await adminFetch(`/api/admin/exercises/${editingId}/assets/${existing.id}`, { method: 'DELETE' });
+    setAssetError(null);
+    try {
+      // Replace existing context_image if any.
+      const existing = currentAssets.find((a: PromptAsset) => a.asset_kind === 'context_image');
+      if (existing) {
+        const deleteResponse = await adminFetch(`/api/admin/exercises/${editingId}/assets/${existing.id}`, { method: 'DELETE' });
+        if (!deleteResponse.ok) throw new Error('Could not delete existing image.');
+      }
+      const response = await adminFetch(`/api/admin/exercises/${editingId}/assets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: result.assetId,
+          asset_kind: 'context_image',
+          storage_key: result.storageKey,
+          mime_type: 'image/jpeg',
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error?.message ?? 'Could not register generated image.');
+      }
+      await persistScenarioImageAssetId(result.assetId);
+      onSaved();
+    } catch (err) {
+      setAssetError(err instanceof Error ? err.message : 'Unknown AI image error');
     }
-    await adminFetch(`/api/admin/exercises/${editingId}/assets`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: result.assetId,
-        asset_kind: 'context_image',
-        storage_key: result.storageKey,
-        mime_type: 'image/jpeg',
-      }),
-    });
-    onSaved();
   }
 
   async function handleAiPromptAssetCreated(result: AiImageResult) {
@@ -413,9 +450,17 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
   async function handleContextImageDelete() {
     if (!editingId) return;
     const existing = currentAssets.find((a: PromptAsset) => a.asset_kind === 'context_image');
-    if (!existing) return;
-    await adminFetch(`/api/admin/exercises/${editingId}/assets/${existing.id}`, { method: 'DELETE' });
-    onSaved();
+    setAssetError(null);
+    try {
+      if (existing) {
+        const response = await adminFetch(`/api/admin/exercises/${editingId}/assets/${existing.id}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Could not delete image.');
+      }
+      await persistScenarioImageAssetId('');
+      onSaved();
+    } catch (err) {
+      setAssetError(err instanceof Error ? err.message : 'Unknown image delete error');
+    }
   }
 
   async function handleCopyAssetId(assetId: string) {
@@ -522,6 +567,13 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
       return [e instanceof Error ? e.message : 'Format nhập liệu không hợp lệ.'];
     }
   })();
+  const scenarioImageAssetId = form.scenarioImageAssetId.trim();
+  const contextImageAsset =
+    currentAssets.find((a: PromptAsset) => a.asset_kind === 'context_image') ??
+    currentAssets.find((a: PromptAsset) => a.id === scenarioImageAssetId);
+  const hasContextImage =
+    Boolean(contextImageAsset) ||
+    (supportsScenarioImage(form.exerciseType) && scenarioImageAssetId !== '');
 
   return (
     <>
@@ -1056,7 +1108,7 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                   <span>
                     🖼 Ảnh minh họa{' '}
                     <span style={{ fontWeight: 400, color: 'var(--ink-4)' }}>(tùy chọn)</span>
-                    {currentAssets.some((a: PromptAsset) => a.asset_kind === 'context_image') && (
+                    {hasContextImage && (
                       <span style={{ marginLeft: 8, background: '#22c55e', color: '#fff', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>
                         ✓ Đã có ảnh
                       </span>
@@ -1069,7 +1121,7 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                     Ảnh hiển thị phía trên câu hỏi trên Flutter app. Với quizcard: ảnh hiển thị trong thẻ.
                   </p>
                   {(() => {
-                    const ctxAsset = currentAssets.find((a: PromptAsset) => a.asset_kind === 'context_image');
+                    const ctxAsset = contextImageAsset;
                     return (
                       <>
                         {ctxAsset && (
@@ -1101,7 +1153,42 @@ export function ExerciseSlideOver({ open, editingItem, modules, prefillModuleId,
                             </div>
                           </div>
                         )}
-                        {!ctxAsset && (
+                        {!ctxAsset && hasContextImage && (
+                          <div style={{ display: 'grid', gap: 8 }}>
+                            <div
+                              style={{
+                                padding: '10px 12px',
+                                borderRadius: 10,
+                                border: '1px dashed var(--border)',
+                                background: 'var(--surface-alt)',
+                                fontSize: 12,
+                                color: 'var(--ink-3)',
+                              }}
+                            >
+                              Đang gắn asset id <code>{scenarioImageAssetId}</code> nhưng asset không còn trong danh sách.
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: '1px dashed var(--border)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--ink-3)' }}>
+                                📁 Đổi ảnh
+                                <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+                                  onChange={e => { const f = e.target.files?.[0]; if (f) void handleContextImageUpload(f); e.target.value = ''; }} />
+                              </label>
+                              <AiImageButton
+                                onAssetCreated={result => void handleAiContextImageCreated(result)}
+                                disabled={!editingId}
+                                existingAssetId={scenarioImageAssetId}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => void handleContextImageDelete()}
+                                style={{ flex: 1, border: '1px solid var(--danger)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--danger)', background: 'transparent' }}
+                              >
+                                Xóa ảnh
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {!hasContextImage && (
                           !editingId ? (
                             <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-4)' }}>Lưu bài tập trước rồi upload ảnh.</p>
                           ) : (

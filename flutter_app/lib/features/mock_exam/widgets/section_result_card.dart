@@ -38,13 +38,10 @@ class SectionResultCard extends StatelessWidget {
   final VoidCallback? onNext;
 
   String get _resolvedKind {
-    if (skillKind.isNotEmpty) return skillKind;
     final t = result.exerciseType;
-    if (t.startsWith('uloha_')) return 'noi';
-    if (t.startsWith('poslech_')) return 'nghe';
-    if (t.startsWith('cteni_')) return 'doc';
-    if (t.startsWith('psani_')) return 'viet';
-    if (t.startsWith('interview_')) return 'interview';
+    final inferred = _knownSkillKindForExerciseType(t);
+    if (inferred != null) return inferred;
+    if (skillKind.isNotEmpty) return skillKind;
     return 'noi';
   }
 
@@ -92,6 +89,15 @@ class SectionResultCard extends StatelessWidget {
       onNext: onNext,
     );
   }
+}
+
+String? _knownSkillKindForExerciseType(String exerciseType) {
+  if (exerciseType.startsWith('uloha_')) return 'noi';
+  if (exerciseType.startsWith('poslech_')) return 'nghe';
+  if (exerciseType.startsWith('cteni_')) return 'doc';
+  if (exerciseType.startsWith('psani_')) return 'viet';
+  if (exerciseType.startsWith('interview_')) return 'interview';
+  return null;
 }
 
 // ── Section header ────────────────────────────────────────────────────────────

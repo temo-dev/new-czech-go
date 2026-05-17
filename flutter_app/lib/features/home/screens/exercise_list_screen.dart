@@ -201,9 +201,11 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
   }
 
   List<ExerciseSummary> get _filtered {
-    // Use stored skill_kind from API response (reliable since migration 017).
-    // Fallback to exercise_type prefix matching for exercises without skill_kind.
+    // Known exercise_type prefixes are authoritative; stale skill_kind values
+    // should not hide poslech/cteni/psani items from their skill tabs.
     final kindFiltered = _exercises.where((e) {
+      final inferred = skillKindForExerciseType(e.exerciseType);
+      if (inferred.isNotEmpty) return inferred == widget.skillKind;
       if (e.skillKind.isNotEmpty) return e.skillKind == widget.skillKind;
       return _exerciseMatchesSkillKindByType(e.exerciseType, widget.skillKind);
     }).toList();

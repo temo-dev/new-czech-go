@@ -225,6 +225,107 @@ func TestPlacementHandler_Complete_HappyPath(t *testing.T) {
 	}
 }
 
+func TestPlacementHandler_Complete_RollsUpSessionBeforeAssigningLevel(t *testing.T) {
+	srv, repo, _, _ := newPlacementTestServer(t, time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC), true)
+	defer srv.Close()
+
+	ex := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "cteni_1",
+		Status:       "published",
+		Pool:         "exam",
+	})
+	placement, err := repo.CreateMockTest(contracts.MockTest{
+		Title:       "Placement score rollup",
+		Status:      "published",
+		IsPlacement: true,
+		Sections: []contracts.MockTestSection{
+			{SequenceNo: 1, SkillKind: "doc", ExerciseID: ex.ID, ExerciseType: ex.ExerciseType, MaxPoints: 100},
+		},
+	})
+	if err != nil {
+		t.Fatalf("seed placement mock: %v", err)
+	}
+	session, err := repo.CreateMockExam("user-learner-1", placement.ID)
+	if err != nil {
+		t.Fatalf("create placement session: %v", err)
+	}
+	attempt, err := repo.CreateAttempt("user-learner-1", ex.ID, "ios", "1.0", "vi")
+	if err != nil {
+		t.Fatalf("create attempt: %v", err)
+	}
+	repo.CompleteAttempt(attempt.ID,
+		contracts.Transcript{FullText: "Q1: A", Locale: "vi", IsSynthetic: true, Provider: "objective_scorer"},
+		contracts.AttemptFeedback{
+			ReadinessLevel: "ready_for_mock",
+			ObjectiveResult: &contracts.ObjectiveResult{
+				Score:    1,
+				MaxScore: 1,
+			},
+		},
+	)
+	if _, err := repo.AdvanceMockExam(session.ID, attempt.ID); err != nil {
+		t.Fatalf("advance session: %v", err)
+	}
+
+	status, body := placementPost(t, srv, "/v1/users/me/placement-test/complete", "dev-learner-token",
+		map[string]string{"full_session_id": session.ID})
+	if status != http.StatusOK {
+		t.Fatalf("complete status = %d; body=%v", status, body)
+	}
+	data := body["data"].(map[string]any)
+	if got := data["assigned_level"].(string); got != "a2" {
+		t.Fatalf("assigned_level = %q, want a2 after score rollup", got)
+	}
+	if got := data["score_pct"].(float64); got != 100 {
+		t.Fatalf("score_pct = %v, want 100", got)
+	}
+}
+
+func TestPlacementHandler_Complete_RejectsWhenScoringNotReady(t *testing.T) {
+	srv, repo, userLevels, _ := newPlacementTestServer(t, time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC), true)
+	defer srv.Close()
+
+	ex := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_1_topic_answers",
+		Status:       "published",
+		Pool:         "exam",
+	})
+	placement, err := repo.CreateMockTest(contracts.MockTest{
+		Title:       "Placement pending scoring",
+		Status:      "published",
+		IsPlacement: true,
+		Sections: []contracts.MockTestSection{
+			{SequenceNo: 1, SkillKind: "noi", ExerciseID: ex.ID, ExerciseType: ex.ExerciseType, MaxPoints: 100},
+		},
+	})
+	if err != nil {
+		t.Fatalf("seed placement mock: %v", err)
+	}
+	session, err := repo.CreateMockExam("user-learner-1", placement.ID)
+	if err != nil {
+		t.Fatalf("create placement session: %v", err)
+	}
+	attempt, err := repo.CreateAttempt("user-learner-1", ex.ID, "ios", "1.0", "vi")
+	if err != nil {
+		t.Fatalf("create attempt: %v", err)
+	}
+	if _, err := repo.AdvanceMockExam(session.ID, attempt.ID); err != nil {
+		t.Fatalf("advance session: %v", err)
+	}
+
+	status, body := placementPost(t, srv, "/v1/users/me/placement-test/complete", "dev-learner-token",
+		map[string]string{"full_session_id": session.ID})
+	if status != http.StatusConflict {
+		t.Fatalf("complete status = %d, want 409; body=%v", status, body)
+	}
+	if code := errCode(body); code != "placement_score_not_ready" {
+		t.Fatalf("error.code = %q, want placement_score_not_ready", code)
+	}
+	if got, ok := userLevels.GetUserLevel("user-learner-1"); ok && got.PlacementTakenAt != nil {
+		t.Fatalf("placement should not be persisted when scoring is pending: %+v", got)
+	}
+}
+
 func TestPlacementHandler_Complete_WrongOwner_404(t *testing.T) {
 	srv, repo, _, placementID := newPlacementTestServer(t, time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC), false)
 	defer srv.Close()

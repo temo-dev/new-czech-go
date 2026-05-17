@@ -503,6 +503,78 @@ abstract class AppLocalizations {
   /// **'Ngưỡng đạt: {pct}%'**
   String mockExamResultPassThreshold(int pct);
 
+  /// No description provided for @mockExamSkillSummaryTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nhận xét theo kỹ năng'**
+  String get mockExamSkillSummaryTitle;
+
+  /// No description provided for @mockExamSkillCommentStrong.
+  ///
+  /// In vi, this message translates to:
+  /// **'{skill}: tốt. Giữ nhịp này và luyện thêm bài khó hơn.'**
+  String mockExamSkillCommentStrong(String skill);
+
+  /// No description provided for @mockExamSkillCommentOk.
+  ///
+  /// In vi, this message translates to:
+  /// **'{skill}: ổn nhưng còn điểm cần củng cố. Xem từng bài bên dưới để biết lỗi cụ thể.'**
+  String mockExamSkillCommentOk(String skill);
+
+  /// No description provided for @mockExamSkillCommentNeedsWork.
+  ///
+  /// In vi, this message translates to:
+  /// **'{skill}: cần luyện thêm. Bắt đầu từ các bài sai hoặc đã bỏ qua.'**
+  String mockExamSkillCommentNeedsWork(String skill);
+
+  /// No description provided for @mockExamSectionBreakdownTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Từng bài trong đề'**
+  String get mockExamSectionBreakdownTitle;
+
+  /// No description provided for @mockExamTapSectionHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chạm vào một bài để xem đáp án, transcript và nhận xét chi tiết.'**
+  String get mockExamTapSectionHint;
+
+  /// No description provided for @placementStartLearningCta.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bắt đầu học'**
+  String get placementStartLearningCta;
+
+  /// No description provided for @placementResultDialogPassTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chúc mừng, bạn đã vượt qua bài kiểm tra đầu vào!'**
+  String get placementResultDialogPassTitle;
+
+  /// No description provided for @placementResultDialogPassBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cấp độ hiện tại của bạn là {level}. Điểm phân loại: {score}%.'**
+  String placementResultDialogPassBody(String level, int score);
+
+  /// No description provided for @placementResultDialogEncourageTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cố gắng thêm một chút nhé'**
+  String get placementResultDialogEncourageTitle;
+
+  /// No description provided for @placementResultDialogEncourageBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cấp độ hiện tại của bạn là {level}. Điểm phân loại: {score}%. Hãy bắt đầu từ các bài nền tảng, mình sẽ mở đường luyện phù hợp cho bạn.'**
+  String placementResultDialogEncourageBody(String level, int score);
+
+  /// No description provided for @placementResultDialogCta.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xem kết quả bài thi'**
+  String get placementResultDialogCta;
+
   /// No description provided for @mockExamSectionScoreLabel.
   ///
   /// In vi, this message translates to:
@@ -1378,6 +1450,18 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Nộp đáp án'**
   String get submitAnswersCta;
+
+  /// No description provided for @submitAnswersContentInvalid.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bài này đang thiếu đáp án trong hệ thống. Vui lòng báo admin.'**
+  String get submitAnswersContentInvalid;
+
+  /// No description provided for @submitAnswersScoringUnavailable.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa thể chấm bài lúc này. Vui lòng thử lại sau.'**
+  String get submitAnswersScoringUnavailable;
 
   /// No description provided for @submitWritingCta.
   ///

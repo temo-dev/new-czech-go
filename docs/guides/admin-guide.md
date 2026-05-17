@@ -83,8 +83,8 @@ Nói / Viết / Nghe / Đọc / Từ vựng / Ngữ pháp
 | `Úloha 2` | Hội thoại — hỏi để lấy thông tin còn thiếu |
 | `Úloha 3` | Kể chuyện theo 4 tranh |
 | `Úloha 4` | Chọn 1 trong 3 phương án và giải thích lý do |
-| `Psaní 1` | Điền form (3 câu hỏi, ≥10 từ/câu) |
-| `Psaní 2` | Viết email theo 5 ảnh gợi ý (≥35 từ) |
+| `Psaní 1` | Điền form (1+ câu hỏi, ≥10 từ/câu) |
+| `Psaní 2` | Viết email theo 1+ ảnh/topic gợi ý (≥35 từ) |
 | `Poslech 1–5` | Các dạng nghe khác nhau |
 | `Čtení 1–5` | Các dạng đọc khác nhau |
 | `Phỏng vấn hội thoại` | Hội thoại thực tế với avatar AI examiner (V14) |

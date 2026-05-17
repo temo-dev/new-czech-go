@@ -247,6 +247,52 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get mockExamSkillSummaryTitle => 'Skill feedback';
+
+  @override
+  String mockExamSkillCommentStrong(String skill) {
+    return '$skill: strong. Keep this rhythm and try harder items next.';
+  }
+
+  @override
+  String mockExamSkillCommentOk(String skill) {
+    return '$skill: solid, with a few points to tighten. Open each item below for the exact feedback.';
+  }
+
+  @override
+  String mockExamSkillCommentNeedsWork(String skill) {
+    return '$skill: needs more practice. Start with the missed or skipped items.';
+  }
+
+  @override
+  String get mockExamSectionBreakdownTitle => 'Items in this exam';
+
+  @override
+  String get mockExamTapSectionHint => 'Tap an item to review answers, transcript, and detailed feedback.';
+
+  @override
+  String get placementStartLearningCta => 'Start learning';
+
+  @override
+  String get placementResultDialogPassTitle => 'Congratulations, you passed the placement test!';
+
+  @override
+  String placementResultDialogPassBody(String level, int score) {
+    return 'Your current level is $level. Placement score: $score%.';
+  }
+
+  @override
+  String get placementResultDialogEncourageTitle => 'Keep going, you are close';
+
+  @override
+  String placementResultDialogEncourageBody(String level, int score) {
+    return 'Your current level is $level. Placement score: $score%. Start with the foundations and we will open the right practice path for you.';
+  }
+
+  @override
+  String get placementResultDialogCta => 'Review exam result';
+
+  @override
   String mockExamSectionScoreLabel(int n, int score, int max) {
     return 'Úloha $n: $score/$max pts';
   }
@@ -717,6 +763,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get submitAnswersCta => 'Submit answers';
+
+  @override
+  String get submitAnswersContentInvalid => 'This exercise is missing answer keys. Please tell an admin.';
+
+  @override
+  String get submitAnswersScoringUnavailable => 'Could not score this attempt right now. Please try again later.';
 
   @override
   String get submitWritingCta => 'Submit';

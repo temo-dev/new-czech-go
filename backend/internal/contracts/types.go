@@ -94,8 +94,9 @@ type ScoringPreview struct {
 }
 
 type Uloha1Prompt struct {
-	TopicLabel      string   `json:"topic_label"`
-	QuestionPrompts []string `json:"question_prompts"`
+	TopicLabel           string   `json:"topic_label"`
+	QuestionPrompts      []string `json:"question_prompts"`
+	ScenarioImageAssetID string   `json:"scenario_image_asset_id,omitempty"`
 }
 
 type RequiredInfoSlot struct {
@@ -105,10 +106,11 @@ type RequiredInfoSlot struct {
 }
 
 type Uloha2Detail struct {
-	ScenarioTitle      string             `json:"scenario_title"`
-	ScenarioPrompt     string             `json:"scenario_prompt"`
-	RequiredInfoSlots  []RequiredInfoSlot `json:"required_info_slots"`
-	CustomQuestionHint string             `json:"custom_question_hint,omitempty"`
+	ScenarioTitle        string             `json:"scenario_title"`
+	ScenarioPrompt       string             `json:"scenario_prompt"`
+	RequiredInfoSlots    []RequiredInfoSlot `json:"required_info_slots"`
+	CustomQuestionHint   string             `json:"custom_question_hint,omitempty"`
+	ScenarioImageAssetID string             `json:"scenario_image_asset_id,omitempty"`
 }
 
 type Uloha3Detail struct {
@@ -116,6 +118,7 @@ type Uloha3Detail struct {
 	ImageAssetIDs        []string `json:"image_asset_ids"`
 	NarrativeCheckpoints []string `json:"narrative_checkpoints"`
 	GrammarFocus         []string `json:"grammar_focus,omitempty"`
+	ScenarioImageAssetID string   `json:"scenario_image_asset_id,omitempty"`
 }
 
 type ChoiceOption struct {
@@ -129,6 +132,7 @@ type Uloha4Detail struct {
 	ScenarioPrompt        string         `json:"scenario_prompt"`
 	Options               []ChoiceOption `json:"options"`
 	ExpectedReasoningAxes []string       `json:"expected_reasoning_axes,omitempty"`
+	ScenarioImageAssetID  string         `json:"scenario_image_asset_id,omitempty"`
 }
 
 // --- Listening (V3) ---
@@ -430,19 +434,19 @@ type InterviewSubmitRequest struct {
 // --- Writing (V2) ---
 
 type Psani1Detail struct {
-	Questions []string `json:"questions"` // 3 câu hỏi
+	Questions []string `json:"questions"` // 1+ câu hỏi
 	MinWords  int      `json:"min_words"` // default 10
 }
 
 type Psani2Detail struct {
 	Prompt        string   `json:"prompt"`          // "Jste na dovolené..."
-	ImageAssetIDs []string `json:"image_asset_ids"` // 5 ảnh
+	ImageAssetIDs []string `json:"image_asset_ids"` // optional image prompts
 	Topics        []string `json:"topics"`          // ["KDE JSTE?", ...]
 	MinWords      int      `json:"min_words"`       // default 35
 }
 
 // WritingSubmission is the body of POST /v1/attempts/:id/submit-text.
-// Use Answers for psani_1_formular (3 items), Text for psani_2_email.
+// Use Answers for psani_1_formular (one per question), Text for psani_2_email.
 // Use Sentences for psani_3_dictation (V18). Handler dispatches on exercise type.
 type WritingSubmission struct {
 	Answers          []string                  `json:"answers,omitempty"`
@@ -625,16 +629,16 @@ type Transcript struct {
 }
 
 type AttemptFeedback struct {
-	ReadinessLevel   string             `json:"readiness_level"`
-	OverallSummary   string             `json:"overall_summary"`
-	Strengths        []string           `json:"strengths"`
-	Improvements     []string           `json:"improvements"`
-	TaskCompletion   TaskCompletion     `json:"task_completion"`
-	GrammarFeedback  GrammarFeedback    `json:"grammar_feedback"`
-	RetryAdvice      []string           `json:"retry_advice"`
-	SampleAnswer     string             `json:"sample_answer_text,omitempty"`
-	ObjectiveResult  *ObjectiveResult   `json:"objective_result,omitempty"`  // V3/V4: listening/reading
-	DictationResult  *DictationFeedback `json:"dictation_result,omitempty"`  // V18: psani_3_dictation
+	ReadinessLevel  string             `json:"readiness_level"`
+	OverallSummary  string             `json:"overall_summary"`
+	Strengths       []string           `json:"strengths"`
+	Improvements    []string           `json:"improvements"`
+	TaskCompletion  TaskCompletion     `json:"task_completion"`
+	GrammarFeedback GrammarFeedback    `json:"grammar_feedback"`
+	RetryAdvice     []string           `json:"retry_advice"`
+	SampleAnswer    string             `json:"sample_answer_text,omitempty"`
+	ObjectiveResult *ObjectiveResult   `json:"objective_result,omitempty"` // V3/V4: listening/reading
+	DictationResult *DictationFeedback `json:"dictation_result,omitempty"` // V18: psani_3_dictation
 }
 
 type AttemptReviewArtifactSummary struct {
@@ -715,19 +719,19 @@ type UploadTarget struct {
 }
 
 type MockTest struct {
-	ID                       string            `json:"id"`
-	Title                    string            `json:"title"`
-	Description              string            `json:"description"`
-	EstimatedDurationMinutes int               `json:"estimated_duration_minutes"`
-	Status                   string            `json:"status"`                    // draft, published
-	ExamMode                 string            `json:"exam_mode"`                 // "real" | "practice" | "" (default practice)
-	PassThresholdPercent     int               `json:"pass_threshold_percent"`    // 0 = use default 60
-	BannerImageID            string            `json:"banner_image_id,omitempty"` // storage key for exam card banner
+	ID                       string `json:"id"`
+	Title                    string `json:"title"`
+	Description              string `json:"description"`
+	EstimatedDurationMinutes int    `json:"estimated_duration_minutes"`
+	Status                   string `json:"status"`                    // draft, published
+	ExamMode                 string `json:"exam_mode"`                 // "real" | "practice" | "" (default practice)
+	PassThresholdPercent     int    `json:"pass_threshold_percent"`    // 0 = use default 60
+	BannerImageID            string `json:"banner_image_id,omitempty"` // storage key for exam card banner
 	// V21 CEFR level progression flags. Mutually exclusive (enforced by
 	// mock_tests_promotion_placement_mutex CHECK in migration 025).
-	IsPromotion bool   `json:"is_promotion,omitempty"`
-	IsPlacement bool   `json:"is_placement,omitempty"`
-	TargetLevel string `json:"target_level,omitempty"` // a0|a1|a2|b1; required when IsPromotion=true
+	IsPromotion bool              `json:"is_promotion,omitempty"`
+	IsPlacement bool              `json:"is_placement,omitempty"`
+	TargetLevel string            `json:"target_level,omitempty"` // a0|a1|a2|b1; required when IsPromotion=true
 	Sections    []MockTestSection `json:"sections"`
 }
 
@@ -751,24 +755,26 @@ type MockExamSession struct {
 	OverallSummary        string                `json:"overall_summary,omitempty"`
 	Sections              []MockExamSessionItem `json:"sections"`
 	// V39 — server-anchored timer fields. StartedAt mirrors the row's
-	// created_at; DurationSec is set at create time (default 5400 = 90 min).
-	// ExpiresAt is derived (StartedAt + DurationSec) and populated on read so
-	// the client can render countdown without doing arithmetic on its side.
-	// Pre-V39 sessions carry DurationSec=0; the timer sweeper ignores them.
+	// created_at; DurationSec is set at create time from the MockTest template
+	// duration, falling back to 5400 for template-less legacy starts. ExpiresAt
+	// is derived (StartedAt + DurationSec) and populated on read so the client
+	// can render countdown without doing arithmetic on its side. Pre-V39
+	// sessions carry DurationSec=0; the timer sweeper ignores them.
 	StartedAt   time.Time `json:"started_at,omitempty"`
 	DurationSec int       `json:"duration_sec,omitempty"`
 	ExpiresAt   time.Time `json:"expires_at,omitempty"`
 }
 
 type MockExamSessionItem struct {
-	SequenceNo   int    `json:"sequence_no"`
-	SkillKind    string `json:"skill_kind"`
-	ExerciseID   string `json:"exercise_id"`
-	ExerciseType string `json:"exercise_type"`
-	MaxPoints    int    `json:"max_points,omitempty"`
-	AttemptID    string `json:"attempt_id,omitempty"`
-	SectionScore int    `json:"section_score,omitempty"`
-	Status       string `json:"status"`
+	SequenceNo    int    `json:"sequence_no"`
+	SkillKind     string `json:"skill_kind"`
+	ExerciseID    string `json:"exercise_id"`
+	ExerciseType  string `json:"exercise_type"`
+	ExerciseTitle string `json:"exercise_title,omitempty"`
+	MaxPoints     int    `json:"max_points,omitempty"`
+	AttemptID     string `json:"attempt_id,omitempty"`
+	SectionScore  int    `json:"section_score,omitempty"`
+	Status        string `json:"status"`
 	// V39: flat-sort cursor. Server-computed at session create:
 	// rank by (max_points ASC, sequence_no ASC) starting at 1.
 	// Stable across reads. Pre-V39 sessions backfill DisplayOrder=SequenceNo.
@@ -851,12 +857,12 @@ type GenerationJobInput struct {
 // ── V6 Exercise Detail Types ────────────────────────────────────────────────
 
 type QuizcardBasicDetail struct {
-	FrontText          string            `json:"front_text"`
-	BackText           string            `json:"back_text"`
-	ExampleSentence    string            `json:"example_sentence,omitempty"`
-	ExampleTranslation string            `json:"example_translation,omitempty"`
-	Explanation        string            `json:"explanation,omitempty"`
-	ImageAssetID       string            `json:"image_asset_id,omitempty"` // storage key for flashcard image
+	FrontText          string `json:"front_text"`
+	BackText           string `json:"back_text"`
+	ExampleSentence    string `json:"example_sentence,omitempty"`
+	ExampleTranslation string `json:"example_translation,omitempty"`
+	Explanation        string `json:"explanation,omitempty"`
+	ImageAssetID       string `json:"image_asset_id,omitempty"` // storage key for flashcard image
 	// V37: injected at publish time from vocabulary_items.audio_storage_key.
 	// Empty when the admin has not generated audio for this term yet.
 	AudioStorageKey string            `json:"audio_storage_key,omitempty"`

@@ -396,10 +396,50 @@ class _PromptCard extends StatelessWidget {
             tone: PillTone.primary,
           ),
           const SizedBox(height: AppSpacing.x4),
+          if (detail.scenarioImageAssetId.isNotEmpty) ...[
+            _ScenarioImage(detail: detail, client: client),
+            const SizedBox(height: AppSpacing.x4),
+          ],
           Text(detail.learnerInstruction, style: AppTypography.bodyLarge),
           const SizedBox(height: AppSpacing.x4),
           UlohaPrompt(detail: detail, client: client),
         ],
+      ),
+    );
+  }
+}
+
+class _ScenarioImage extends StatelessWidget {
+  const _ScenarioImage({required this.detail, required this.client});
+  final ExerciseDetail detail;
+  final ApiClient client;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: AppRadius.mdAll,
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Image.network(
+          client
+              .exerciseAssetUri(detail.id, detail.scenarioImageAssetId)
+              .toString(),
+          headers: client.authHeaders,
+          fit: BoxFit.cover,
+          loadingBuilder: (_, child, progress) {
+            if (progress == null) return child;
+            return Container(
+              color: AppColors.surfaceContainerLow,
+              child: const Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            );
+          },
+          errorBuilder: (_, __, ___) => Container(
+            color: AppColors.surfaceContainerLow,
+            child: const Icon(Icons.broken_image_outlined),
+          ),
+        ),
       ),
     );
   }

@@ -146,8 +146,8 @@ export function AdminGuide() {
               ['🎙️ Nói', 'Úloha 2', 'Hội thoại — hỏi để lấy thông tin (slot_key | label | sample question)'],
               ['🎙️ Nói', 'Úloha 3', 'Kể chuyện theo tranh (story title + checkpoints + ảnh)'],
               ['🎙️ Nói', 'Úloha 4', 'Chọn 1/3 phương án và giải thích (option_key | label | description)'],
-              ['✏️ Viết', 'Psaní 1', 'Điền form 3 câu hỏi (≥10 từ/câu)'],
-              ['✏️ Viết', 'Psaní 2', 'Viết email từ 5 ảnh gợi ý (≥35 từ)'],
+              ['✏️ Viết', 'Psaní 1', 'Điền form 1+ câu hỏi (≥10 từ/câu)'],
+              ['✏️ Viết', 'Psaní 2', 'Viết email từ 1+ ảnh/topic gợi ý (≥35 từ)'],
               ['🎧 Nghe', 'Poslech 1–5', '5 đoạn hội thoại → chọn A-D / ghép / điền'],
               ['📖 Đọc', 'Čtení 1–5', 'Văn bản → chọn A-D / ghép / điền'],
             ].map(([skill, type, desc]) => (

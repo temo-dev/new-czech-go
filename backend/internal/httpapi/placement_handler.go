@@ -166,6 +166,21 @@ func (s *Server) handlePlacementTestComplete(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	if session.Status != "completed" && placementSessionHasPendingSections(session) {
+		writeError(w, http.StatusConflict, "placement_not_finished",
+			"Placement test is not finished yet.", false)
+		return
+	}
+	if placementSessionHasScorableAttempts(session) {
+		completed, err := s.repo.CompleteMockExam(session.ID)
+		if err != nil {
+			writeError(w, http.StatusConflict, "placement_score_not_ready",
+				"Placement scoring is not ready yet. Try again shortly.", true)
+			return
+		}
+		session = completed
+	}
+
 	scorePct := processing.OverallScorePctFromSession(session)
 	assignedLevel := s.levelService.MapPlacementScoreToLevel(scorePct)
 	updated, err := s.userLevelStore.MarkPlacementTaken(user.ID, assignedLevel, time.Now().UTC())
@@ -186,6 +201,24 @@ func (s *Server) handlePlacementTestComplete(w http.ResponseWriter, r *http.Requ
 		},
 		"meta": map[string]any{},
 	})
+}
+
+func placementSessionHasScorableAttempts(session contracts.MockExamSession) bool {
+	for _, sec := range session.Sections {
+		if sec.Status == "completed" && sec.AttemptID != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func placementSessionHasPendingSections(session contracts.MockExamSession) bool {
+	for _, sec := range session.Sections {
+		if sec.Status == "pending" {
+			return true
+		}
+	}
+	return false
 }
 
 // handlePlacementTestSkip parks a fresh learner at A0 without running the

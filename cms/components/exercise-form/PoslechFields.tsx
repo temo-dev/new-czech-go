@@ -51,10 +51,18 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<{ key: string; message: string } | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  // V39 — per-item audio cache-buster. Storage keys stay stable across
+  // regenerations (`item-<n>.mp3`) so the browser would otherwise serve
+  // the stale audio. Bumping `audioCacheKey` whenever the form re-inits
+  // forces `<audio>` to re-fetch the freshly generated MP3.
+  const [audioCacheKey, setAudioCacheKey] = useState<number>(() => Date.now());
 
   // Re-init when switching exercise or opening a different one in edit mode
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setState(initPoslechState(exerciseType, initialData)); }, [exerciseType, JSON.stringify(initialData)]);
+  useEffect(() => {
+    setState(initPoslechState(exerciseType, initialData));
+    setAudioCacheKey(Date.now());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exerciseType, JSON.stringify(initialData)]);
 
   function update(next: PoslechState) { setState(next); onChange(buildPoslechDetail(next, audioSource)); }
   function updateAudioSrc(src: 'text' | 'upload') { setAudioSource(src); onChange(buildPoslechDetail(state, src)); }
@@ -169,6 +177,22 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
                 <span style={labelStyle}>Transcript</span>
                 <textarea rows={2} value={item.text} onChange={e => patch({ text: e.target.value })} placeholder="Nội dung đoạn nghe..." style={txStyle} />
               </label>
+            )}
+            {/* V39 — mini-player per câu để admin nghe lại audio vừa tạo,
+                xác nhận đúng giọng/đoạn (đặc biệt cho dialog [Žena]/[Muž]). */}
+            {exerciseType === 'poslech_1' && item.audioAssetId && (
+              <div style={{ display: 'grid', gap: 4 }}>
+                <span style={{ ...labelStyle, fontSize: 12, color: 'var(--ink-3)' }}>
+                  🔊 Nghe ngay
+                </span>
+                <audio
+                  controls
+                  preload="none"
+                  key={`${item.audioAssetId}-${audioCacheKey}`}
+                  src={`/api/media/file?key=${encodeURIComponent(item.audioAssetId)}&v=${audioCacheKey}`}
+                  style={{ width: '100%', height: 36 }}
+                />
+              </div>
             )}
             <div style={{ display: 'grid', gap: 8 }}>
               <span style={labelStyle}>Lựa chọn A-D (V27: paste asset_id, V28: ✨ AI tạo)</span>
@@ -439,10 +463,15 @@ export function PoslechFields({ exerciseType, initialData, onChange, editingId, 
               </div>
             );
           })}
-          {/* V38 — Add-question button (poslech_3 + poslech_4). */}
+          {/* V38 — Add-question button (poslech_3 + poslech_4).
+              Use max+1 (not length+1) so a delete-then-add cycle does not
+              produce duplicate question_no values that would collide in
+              correct_answers and break Flutter's submit gate. */}
           <button type="button"
             onClick={() => {
-              const nextNo = match.items.length + 1;
+              const nextNo = match.items.length > 0
+                ? Math.max(...match.items.map((it) => it.questionNo > 0 ? it.questionNo : 0)) + 1
+                : 1;
               update({ ...match, items: [...match.items, makeEmptyMatchItem(nextNo)] });
             }}
             style={{ alignSelf: 'flex-start', background: 'var(--accent-soft)', color: 'var(--accent)', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>

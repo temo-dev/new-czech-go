@@ -9,6 +9,8 @@ import {
   buildCreatePayload,
   buildUpdatePayload,
   createInitialFormState,
+  supportsScenarioImage,
+  withScenarioImageAssetId,
   Exercise,
 } from '../components/exercise-utils';
 
@@ -202,6 +204,35 @@ describe('createInitialFormState', () => {
   });
 });
 
+describe('scenario image helpers', () => {
+  it('marks speaking Uloha types as scenario-image capable', () => {
+    expect(supportsScenarioImage('uloha_1_topic_answers')).toBe(true);
+    expect(supportsScenarioImage('uloha_4_choice_reasoning')).toBe(true);
+    expect(supportsScenarioImage('poslech_1')).toBe(false);
+  });
+
+  it('replaces and clears Uloha scenario image asset ids', () => {
+    const form = {
+      ...createInitialFormState(),
+      exerciseType: 'uloha_1_topic_answers' as const,
+      scenarioImageAssetId: 'old-img',
+    };
+
+    expect(withScenarioImageAssetId(form, ' new-img ').scenarioImageAssetId).toBe('new-img');
+    expect(withScenarioImageAssetId(form, '').scenarioImageAssetId).toBe('');
+  });
+
+  it('leaves non-Uloha scenario image ids unchanged', () => {
+    const form = {
+      ...createInitialFormState(),
+      exerciseType: 'poslech_1' as const,
+      scenarioImageAssetId: 'old-img',
+    };
+
+    expect(withScenarioImageAssetId(form, 'new-img').scenarioImageAssetId).toBe('old-img');
+  });
+});
+
 // ─── buildCreatePayload ───────────────────────────────────────────────────────
 
 describe('buildCreatePayload', () => {
@@ -246,6 +277,32 @@ describe('buildCreatePayload', () => {
     expect((payload as { detail: unknown }).detail).toEqual({ text: 'passage', questions: [] });
   });
 
+  it('builds uloha_4 payload preserving pool and skill_kind', () => {
+    // Regression: the default fallback branch (uloha_4) used to drop pool and
+    // skill_kind, so an exam-pool uloha_4 silently saved as course.
+    const form = {
+      ...createInitialFormState(),
+      exerciseType: 'uloha_4_choice_reasoning' as const,
+      title: 'Choose the flat',
+      skillKind: 'noi',
+      moduleId: 'mod-9',
+      choiceScenarioPrompt: 'Hledate bydleni...',
+      choiceOptions: 'A | Byt 1 | Levny\nB | Byt 2 | Drahy',
+      expectedReasoningAxes: 'cena\nlokalita',
+      status: 'draft',
+      pool: 'exam',
+    };
+    const payload = buildCreatePayload(form) as {
+      pool: string;
+      skill_kind: string;
+      detail: { scenario_prompt: string; options: unknown[] };
+    };
+    expect(payload.pool).toBe('exam');
+    expect(payload.skill_kind).toBe('noi');
+    expect(payload.detail.scenario_prompt).toBe('Hledate bydleni...');
+    expect(payload.detail.options).toHaveLength(2);
+  });
+
   it('builds psani_1 payload with detail.questions', () => {
     const form = {
       ...createInitialFormState(),
@@ -278,6 +335,43 @@ describe('buildUpdatePayload', () => {
     };
     const payload = buildUpdatePayload(form) as { prompt: { question_prompts: string[] } };
     expect(payload.prompt.question_prompts).toEqual(['Q1?', 'Q2?']);
+  });
+
+  it('builds uloha_1 update payload with clearable scenario image id', () => {
+    const withImage = {
+      ...createInitialFormState(),
+      exerciseType: 'uloha_1_topic_answers' as const,
+      title: 'Weather',
+      questions: 'Q1?\nQ2?',
+      scenarioImageAssetId: 'asset-new',
+    };
+    const setPayload = buildUpdatePayload(withImage) as {
+      prompt: { scenario_image_asset_id: string };
+    };
+    expect(setPayload.prompt.scenario_image_asset_id).toBe('asset-new');
+
+    const clearPayload = buildUpdatePayload({
+      ...withImage,
+      scenarioImageAssetId: '',
+    }) as { prompt: { scenario_image_asset_id: string } };
+    expect(clearPayload.prompt.scenario_image_asset_id).toBe('');
+  });
+
+  it('builds uloha_4 update payload preserving pool and skill_kind', () => {
+    const form = {
+      ...createInitialFormState(),
+      exerciseType: 'uloha_4_choice_reasoning' as const,
+      title: 'Choose',
+      skillKind: 'noi',
+      moduleId: 'mod-9',
+      choiceScenarioPrompt: 'p',
+      choiceOptions: 'A | Byt | x',
+      status: 'published',
+      pool: 'exam',
+    };
+    const payload = buildUpdatePayload(form) as { pool: string; skill_kind: string };
+    expect(payload.pool).toBe('exam');
+    expect(payload.skill_kind).toBe('noi');
   });
 });
 

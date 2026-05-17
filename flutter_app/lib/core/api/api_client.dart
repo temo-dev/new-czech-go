@@ -117,8 +117,16 @@ class ApiClient {
     return payload['data'] as List<dynamic>? ?? const [];
   }
 
-  Future<Map<String, dynamic>> getExercise(String exerciseId) async {
-    final payload = await _authed('GET', '/v1/exercises/$exerciseId');
+  Future<Map<String, dynamic>> getExercise(
+    String exerciseId, {
+    String? mockExamSessionId,
+  }) async {
+    var path = '/v1/exercises/$exerciseId';
+    if (mockExamSessionId != null && mockExamSessionId.isNotEmpty) {
+      path +=
+          '?mock_exam_session_id=${Uri.encodeQueryComponent(mockExamSessionId)}';
+    }
+    final payload = await _authed('GET', path);
     return payload['data'] as Map<String, dynamic>;
   }
 
@@ -525,7 +533,7 @@ class ApiClient {
   }
 
   /// Submit written text for psani_1_formular or psani_2_email.
-  /// [answers] = 3 strings for psani_1, [text] = full email for psani_2.
+  /// [answers] = one string per psani_1 question, [text] = full email for psani_2.
   /// [preferredVoiceId] is optional; empty/null → backend uses default voice.
   Future<void> submitText(
     String attemptId, {
@@ -921,7 +929,9 @@ class ApiClient {
       code ??= 'http_${response.statusCode}';
       final responseHeaders = <String, String>{};
       response.headers.forEach((name, values) {
-        if (values.isNotEmpty) responseHeaders[name.toLowerCase()] = values.first;
+        if (values.isNotEmpty) {
+          responseHeaders[name.toLowerCase()] = values.first;
+        }
       });
       throw ApiException(
         statusCode: response.statusCode,

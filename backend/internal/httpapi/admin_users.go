@@ -23,6 +23,8 @@ type adminUserView struct {
 	DisplayName       string     `json:"display_name"`
 	Role              string     `json:"role"`
 	ProTier           string     `json:"pro_tier"`
+	CurrentLevel      string     `json:"current_level"`
+	UnlockedLevels    []string   `json:"unlocked_levels"`
 	GraceAttemptsLeft int        `json:"grace_attempts_left"`
 	AttemptsToday     int        `json:"attempts_today"`
 	AttemptsCap       int        `json:"attempts_cap"`
@@ -31,7 +33,13 @@ type adminUserView struct {
 	ProExpiresAt      *time.Time `json:"pro_expires_at,omitempty"`
 }
 
-func toAdminUserView(u contracts.UserAccount, attemptsToday int) adminUserView {
+func toAdminUserView(u contracts.UserAccount, attemptsToday int, level contracts.UserLevel) adminUserView {
+	if level.CurrentLevel == "" {
+		level.CurrentLevel = "a0"
+	}
+	if len(level.UnlockedLevels) == 0 {
+		level.UnlockedLevels = []string{"a0"}
+	}
 	return adminUserView{
 		ID:                u.ID,
 		Email:             u.Email,
@@ -39,6 +47,8 @@ func toAdminUserView(u contracts.UserAccount, attemptsToday int) adminUserView {
 		DisplayName:       u.DisplayName,
 		Role:              u.Role,
 		ProTier:           u.ProTier,
+		CurrentLevel:      level.CurrentLevel,
+		UnlockedLevels:    append([]string(nil), level.UnlockedLevels...),
 		GraceAttemptsLeft: u.GraceAttemptsLeft,
 		AttemptsToday:     attemptsToday,
 		AttemptsCap:       freeTierAttemptsPerDay,
@@ -46,6 +56,30 @@ func toAdminUserView(u contracts.UserAccount, attemptsToday int) adminUserView {
 		UpdatedAt:         u.UpdatedAt,
 		ProExpiresAt:      u.ProExpiresAt,
 	}
+}
+
+func (s *Server) adminUserLevelState(userID string) contracts.UserLevel {
+	if s.userLevelStore != nil {
+		level, _ := s.userLevelStore.GetUserLevel(userID)
+		if level.CurrentLevel != "" || len(level.UnlockedLevels) > 0 {
+			return level
+		}
+	}
+	return contracts.UserLevel{
+		UserID:         userID,
+		CurrentLevel:   "a0",
+		UnlockedLevels: []string{"a0"},
+	}
+}
+
+func adminAttemptsToday(s *Server, userID string, now time.Time) int {
+	if s.dailyUsageStore == nil {
+		return 0
+	}
+	if usage, ok := s.dailyUsageStore.DailyUsageByUserDay(userID, now); ok {
+		return usage.AttemptsCount
+	}
+	return 0
 }
 
 // handleAdminUsers serves GET /v1/admin/users. Returns paginated, optionally
@@ -85,13 +119,7 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request, _ cont
 	now := time.Now().UTC()
 	views := make([]adminUserView, 0, len(users))
 	for _, u := range users {
-		var today int
-		if s.dailyUsageStore != nil {
-			if usage, ok := s.dailyUsageStore.DailyUsageByUserDay(u.ID, now); ok {
-				today = usage.AttemptsCount
-			}
-		}
-		views = append(views, toAdminUserView(u, today))
+		views = append(views, toAdminUserView(u, adminAttemptsToday(s, u.ID, now), s.adminUserLevelState(u.ID)))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": views,
@@ -130,6 +158,10 @@ func (s *Server) handleAdminUserByID(w http.ResponseWriter, r *http.Request, cal
 			s.handleAdminResetUserUsage(w, r, id)
 		case "state":
 			s.handleAdminUserState(w, r, caller, id)
+		case "pro":
+			s.handleAdminSetUserPro(w, r, id)
+		case "level":
+			s.handleAdminSetUserLevel(w, r, id)
 		default:
 			writeNotFound(w)
 		}
@@ -262,4 +294,178 @@ func (s *Server) handleAdminResetUserUsage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type adminSetUserLevelRequest struct {
+	CurrentLevel string `json:"current_level"`
+}
+
+func cefrLevelRank(level string) (int, bool) {
+	switch level {
+	case "a0":
+		return 0, true
+	case "a1":
+		return 1, true
+	case "a2":
+		return 2, true
+	case "b1":
+		return 3, true
+	default:
+		return 0, false
+	}
+}
+
+// handleAdminSetUserLevel serves POST /v1/admin/users/:id/level.
+//
+// Body: { "current_level": "a1" }
+//
+// This is a support/admin promotion lever for cases where placement or the
+// promotion exam should be bypassed manually. It is intentionally monotonic:
+// UserLevelStore.SetUserLevel appends to unlocked_levels, so this endpoint
+// refuses downgrades instead of producing current_level=a1 with b1 still
+// unlocked.
+func (s *Server) handleAdminSetUserLevel(w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	if s.userLevelStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "level_store_unavailable",
+			"V21 user level store is not wired on this backend", false)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	var req adminSetUserLevelRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_body", "request body is not valid JSON", false)
+		return
+	}
+	targetLevel := strings.ToLower(strings.TrimSpace(req.CurrentLevel))
+	if _, ok := validCefrLevels[targetLevel]; !ok {
+		writeError(w, http.StatusBadRequest, "invalid_level",
+			"current_level must be one of a0, a1, a2, b1", false)
+		return
+	}
+
+	target, ok := s.userStore.UserAccountByID(id)
+	if !ok {
+		writeNotFound(w)
+		return
+	}
+	if target.Role == "admin" {
+		writeError(w, http.StatusForbidden, "admin_level_forbidden",
+			"admin accounts do not use learner CEFR progression", false)
+		return
+	}
+
+	current := s.adminUserLevelState(id)
+	currentRank, ok := cefrLevelRank(current.CurrentLevel)
+	if !ok {
+		currentRank = 0
+	}
+	targetRank, _ := cefrLevelRank(targetLevel)
+	if targetRank < currentRank {
+		writeError(w, http.StatusBadRequest, "level_downgrade_forbidden",
+			"manual level changes can only keep or raise the learner level", false)
+		return
+	}
+
+	updatedLevel, err := s.userLevelStore.SetUserLevel(id, targetLevel)
+	if err != nil {
+		log.Printf("admin set level: user_id=%s level=%s err=%v", id, targetLevel, err)
+		writeError(w, http.StatusInternalServerError, "update_failed",
+			"could not update learner level", false)
+		return
+	}
+	now := time.Now().UTC()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": toAdminUserView(target, adminAttemptsToday(s, id, now), updatedLevel),
+		"meta": map[string]any{},
+	})
+}
+
+// adminSetProRequest is the request body for the Pro grant/downgrade endpoint.
+// DurationDays > 0 grants or extends Pro by that many days; DurationDays == 0
+// downgrades the user to free.
+type adminSetProRequest struct {
+	DurationDays int `json:"duration_days"`
+}
+
+// proGrantMaxDays caps a single admin grant. Higher values usually indicate
+// admin typos rather than a real intent to grant decade-long Pro.
+const proGrantMaxDays = 3650 // ~10 years
+
+// handleAdminSetUserPro serves POST /v1/admin/users/:id/pro.
+//
+// Body: { "duration_days": int }
+//   - duration_days > 0: ProTier="pro", ProExpiresAt = max(now, current expiry
+//     if still active) + duration_days*24h. Extending an already-Pro user adds
+//     time on top of the remaining entitlement instead of overwriting from now.
+//   - duration_days == 0: ProTier="free", ProExpiresAt=nil.
+//
+// Refuses admin targets (admins are managed out-of-band). Refuses negative or
+// implausibly large values.
+func (s *Server) handleAdminSetUserPro(w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	if s.userStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "users_unavailable",
+			"V17 user store is not wired on this backend", false)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	var req adminSetProRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_body", "request body is not valid JSON", false)
+		return
+	}
+	if req.DurationDays < 0 {
+		writeError(w, http.StatusBadRequest, "invalid_duration",
+			"duration_days must be >= 0", false)
+		return
+	}
+	if req.DurationDays > proGrantMaxDays {
+		writeError(w, http.StatusBadRequest, "invalid_duration",
+			"duration_days exceeds maximum grant length", false)
+		return
+	}
+
+	target, ok := s.userStore.UserAccountByID(id)
+	if !ok {
+		writeNotFound(w)
+		return
+	}
+	if target.Role == "admin" {
+		writeError(w, http.StatusForbidden, "admin_pro_forbidden",
+			"admin accounts do not use the Pro entitlement", false)
+		return
+	}
+
+	now := time.Now().UTC()
+	updated, ok := s.userStore.UpdateUser(id, func(u *contracts.UserAccount) {
+		if req.DurationDays == 0 {
+			u.ProTier = "free"
+			u.ProExpiresAt = nil
+			return
+		}
+		base := now
+		if u.ProTier == "pro" && u.ProExpiresAt != nil && u.ProExpiresAt.After(now) {
+			base = *u.ProExpiresAt
+		}
+		exp := base.Add(time.Duration(req.DurationDays) * 24 * time.Hour)
+		u.ProTier = "pro"
+		u.ProExpiresAt = &exp
+	})
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "update_failed",
+			"could not update Pro entitlement", false)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": toAdminUserView(updated, adminAttemptsToday(s, updated.ID, now), s.adminUserLevelState(updated.ID)),
+		"meta": map[string]any{},
+	})
 }

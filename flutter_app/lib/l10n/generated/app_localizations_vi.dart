@@ -247,6 +247,52 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String get mockExamSkillSummaryTitle => 'Nhận xét theo kỹ năng';
+
+  @override
+  String mockExamSkillCommentStrong(String skill) {
+    return '$skill: tốt. Giữ nhịp này và luyện thêm bài khó hơn.';
+  }
+
+  @override
+  String mockExamSkillCommentOk(String skill) {
+    return '$skill: ổn nhưng còn điểm cần củng cố. Xem từng bài bên dưới để biết lỗi cụ thể.';
+  }
+
+  @override
+  String mockExamSkillCommentNeedsWork(String skill) {
+    return '$skill: cần luyện thêm. Bắt đầu từ các bài sai hoặc đã bỏ qua.';
+  }
+
+  @override
+  String get mockExamSectionBreakdownTitle => 'Từng bài trong đề';
+
+  @override
+  String get mockExamTapSectionHint => 'Chạm vào một bài để xem đáp án, transcript và nhận xét chi tiết.';
+
+  @override
+  String get placementStartLearningCta => 'Bắt đầu học';
+
+  @override
+  String get placementResultDialogPassTitle => 'Chúc mừng, bạn đã vượt qua bài kiểm tra đầu vào!';
+
+  @override
+  String placementResultDialogPassBody(String level, int score) {
+    return 'Cấp độ hiện tại của bạn là $level. Điểm phân loại: $score%.';
+  }
+
+  @override
+  String get placementResultDialogEncourageTitle => 'Cố gắng thêm một chút nhé';
+
+  @override
+  String placementResultDialogEncourageBody(String level, int score) {
+    return 'Cấp độ hiện tại của bạn là $level. Điểm phân loại: $score%. Hãy bắt đầu từ các bài nền tảng, mình sẽ mở đường luyện phù hợp cho bạn.';
+  }
+
+  @override
+  String get placementResultDialogCta => 'Xem kết quả bài thi';
+
+  @override
   String mockExamSectionScoreLabel(int n, int score, int max) {
     return 'Úloha $n: $score/$max điểm';
   }
@@ -717,6 +763,12 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get submitAnswersCta => 'Nộp đáp án';
+
+  @override
+  String get submitAnswersContentInvalid => 'Bài này đang thiếu đáp án trong hệ thống. Vui lòng báo admin.';
+
+  @override
+  String get submitAnswersScoringUnavailable => 'Chưa thể chấm bài lúc này. Vui lòng thử lại sau.';
 
   @override
   String get submitWritingCta => 'Nộp bài';

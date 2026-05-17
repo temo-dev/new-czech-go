@@ -48,3 +48,18 @@ export function labelForLevel(value: unknown): string {
 export function isLowestLevel(value: CefrLevel): boolean {
   return value === CEFR_LEVELS[0];
 }
+
+export function cefrLevelRank(value: unknown): number {
+  if (!isCefrLevel(value)) return 0;
+  return CEFR_LEVELS.indexOf(value);
+}
+
+export function nextCefrLevel(value: unknown): CefrLevel | null {
+  const currentRank = cefrLevelRank(value);
+  return CEFR_LEVELS[currentRank + 1] ?? null;
+}
+
+export function canRaiseLevel(current: unknown, target: unknown): target is CefrLevel {
+  if (!isCefrLevel(target)) return false;
+  return cefrLevelRank(target) >= cefrLevelRank(current);
+}

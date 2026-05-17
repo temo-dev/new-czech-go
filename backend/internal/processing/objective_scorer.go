@@ -8,6 +8,19 @@ import (
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
 
+// ObjectiveContentError means the learner submission is valid, but the
+// exercise content cannot be scored because its answer key is malformed.
+type ObjectiveContentError struct {
+	Reason string
+}
+
+func (e ObjectiveContentError) Error() string {
+	if e.Reason == "" {
+		return "objective content invalid"
+	}
+	return e.Reason
+}
+
 // ScoreObjectiveAnswers compares learner answers to correct answers.
 // Fill-in answers use case-insensitive substring match.
 // Multiple-choice answers (≤4 chars) use case-insensitive exact match.
@@ -197,8 +210,11 @@ func extractCorrectAnswers(exercise contracts.Exercise) (map[string]string, erro
 		return nil, err
 	}
 	var d withCorrectAnswers
-	if err := json.Unmarshal(b, &d); err != nil || len(d.CorrectAnswers) == 0 {
-		return nil, fmt.Errorf("no correct_answers in detail")
+	if err := json.Unmarshal(b, &d); err != nil {
+		return nil, ObjectiveContentError{Reason: "invalid correct_answers in detail"}
+	}
+	if len(d.CorrectAnswers) == 0 {
+		return nil, ObjectiveContentError{Reason: "no correct_answers in detail"}
 	}
 	return d.CorrectAnswers, nil
 }

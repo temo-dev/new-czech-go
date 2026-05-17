@@ -25,15 +25,15 @@ func writingText(exerciseType string, sub contracts.WritingSubmission) string {
 }
 
 // validateWritingSubmission checks word-count rules per SPEC:
-// psani_1_formular: must have exactly 3 answers, each ≥10 words.
+// psani_1_formular: must have at least 1 answer, each ≥10 words.
 // psani_2_email: Text must be ≥35 words.
 func ValidateWritingSubmission(exerciseType string, sub contracts.WritingSubmission) error {
 	const maxWordsPerAnswer = 500
 	const maxWordsEmail = 500
 	switch exerciseType {
 	case "psani_1_formular":
-		if len(sub.Answers) != 3 {
-			return fmt.Errorf("psani_1_formular requires exactly 3 answers, got %d", len(sub.Answers))
+		if len(sub.Answers) < 1 {
+			return fmt.Errorf("psani_1_formular requires at least 1 answer, got %d", len(sub.Answers))
 		}
 		for i, a := range sub.Answers {
 			wc := countWords(a)

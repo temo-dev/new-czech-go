@@ -3,6 +3,33 @@
 
 type ExerciseType = string;
 type AnyPayload = Record<string, unknown>;
+type DetailRow = Record<string, unknown>;
+
+function answerKeys(rows: DetailRow[], keyField: string, fallbackStart: number): string[] {
+  return rows.map((row, i) => {
+    const rawNo = Number(row[keyField]);
+    const no = Number.isFinite(rawNo) && rawNo > 0 ? rawNo : fallbackStart + i;
+    return String(no);
+  });
+}
+
+function countAnswers(detail: Record<string, unknown>, keys: string[]): number {
+  const ca = detail.correct_answers as Record<string, string> | undefined;
+  return keys.filter((key) => String(ca?.[key] ?? '').trim()).length;
+}
+
+function requireAnswers(
+  errors: string[],
+  label: string,
+  detail: Record<string, unknown>,
+  keys: string[],
+): void {
+  const need = keys.length;
+  const have = countAnswers(detail, keys);
+  if (need > 0 && have < need) {
+    errors.push(`${label} cần nhập đáp án cho đủ ${need} câu (hiện có ${have}).`);
+  }
+}
 
 export function validateExercise(exerciseType: ExerciseType, payload: AnyPayload): string[] {
   const errors: string[] = [];
@@ -80,54 +107,61 @@ export function validateExercise(exerciseType: ExerciseType, payload: AnyPayload
     if (need > 0 && have < need) errors.push(`Poslech 5 cần nhập đáp án cho đủ ${need} câu (hiện có ${have}).`);
   }
 
-  // Cteni 1: need 5 items + 8 options + answers
+  // V39 — count động: chỉ ràng buộc tối thiểu hợp lý (cần ≥1 item, options ≥2 để có distractor).
   if (exerciseType === 'cteni_1') {
-    const items = (detail.items ?? []) as unknown[];
+    const items = (detail.items ?? []) as DetailRow[];
     const options = (detail.options ?? []) as unknown[];
-    if (items.length < 5) errors.push(`Čtení 1 cần 5 items (hiện có ${items.length}).`);
-    if (options.length < 8) errors.push(`Čtení 1 cần 8 options A-H (hiện có ${options.length}).`);
+    if (items.length < 1) errors.push('Čtení 1 cần ít nhất 1 item.');
+    if (options.length < 2) errors.push(`Čtení 1 cần ít nhất 2 options (hiện có ${options.length}).`);
+    requireAnswers(errors, 'Čtení 1', detail, answerKeys(items, 'item_no', 1));
   }
 
-  // Cteni 2 needs a reading text. Cteni 4 context is optional per V24,
-  // so it only needs the six A-D questions.
+  // Cteni 2 needs a reading text. Cteni 4 context is optional per V24.
   if (exerciseType === 'cteni_2' || exerciseType === 'cteni_4') {
     if (exerciseType === 'cteni_2') {
       const text = String(detail.text ?? '').trim();
       if (!text) errors.push('Cần nhập đoạn văn đọc.');
     }
-    const questions = (detail.questions ?? []) as unknown[];
-    const minQ = exerciseType === 'cteni_4' ? 6 : 5;
-    if (questions.length < minQ) errors.push(`${exerciseType.toUpperCase()} cần ${minQ} câu hỏi (hiện có ${questions.length}).`);
+    const questions = (detail.questions ?? []) as DetailRow[];
+    if (questions.length < 1) errors.push(`${exerciseType.toUpperCase()} cần ít nhất 1 câu hỏi.`);
+    requireAnswers(
+      errors,
+      exerciseType.toUpperCase(),
+      detail,
+      answerKeys(questions, 'question_no', exerciseType === 'cteni_4' ? 15 : 6),
+    );
   }
 
-  // Cteni 3: need 4 texts + 5 persons + answers
+  // Cteni 3: persons ≥2 (cần distractor để matching có ý nghĩa).
   if (exerciseType === 'cteni_3') {
-    const texts = (detail.texts ?? []) as unknown[];
+    const texts = (detail.texts ?? []) as DetailRow[];
     const persons = (detail.persons ?? []) as unknown[];
-    if (texts.length < 4) errors.push(`Čtení 3 cần 4 đoạn văn (hiện có ${texts.length}).`);
-    if (persons.length < 5) errors.push(`Čtení 3 cần 5 nhân vật A-E (hiện có ${persons.length}).`);
+    if (texts.length < 1) errors.push('Čtení 3 cần ít nhất 1 đoạn văn.');
+    if (persons.length < 2) errors.push(`Čtení 3 cần ít nhất 2 nhân vật (hiện có ${persons.length}).`);
+    requireAnswers(errors, 'Čtení 3', detail, answerKeys(texts, 'item_no', 1));
   }
 
-  // Cteni 5: need text + 5 slots
   if (exerciseType === 'cteni_5') {
     const text = String(detail.text ?? '').trim();
     if (!text) errors.push('Cần nhập đoạn văn đọc.');
-    const questions = (detail.questions ?? []) as unknown[];
-    if (questions.length < 5) errors.push(`Čtení 5 cần 5 câu điền vào (hiện có ${questions.length}).`);
+    const questions = (detail.questions ?? []) as DetailRow[];
+    if (questions.length < 1) errors.push('Čtení 5 cần ít nhất 1 câu điền vào.');
+    requireAnswers(errors, 'Čtení 5', detail, answerKeys(questions, 'question_no', 21));
   }
 
-  // Psaní 1: need exactly 3 questions
+  // Psaní 1: need at least 1 question. Admin can add more for drills.
   if (exerciseType === 'psani_1_formular') {
     const d = detail as Record<string, unknown>;
     const questions = (d.questions ?? []) as unknown[];
-    if (questions.length !== 3) errors.push(`Psaní 1 cần đúng 3 câu hỏi (hiện có ${questions.length}).`);
+    if (questions.length < 1) errors.push('Psaní 1 cần ít nhất 1 câu hỏi.');
   }
 
-  // Psaní 2: need prompt + 5 topics
+  // Psaní 2: need at least one topic/image prompt. Admin can add more
+  // freely for non-standard drills.
   if (exerciseType === 'psani_2_email') {
     const d = detail as Record<string, unknown>;
     const topics = (d.topics ?? []) as unknown[];
-    if (topics.length !== 5) errors.push(`Psaní 2 cần đúng 5 chủ đề ảnh (hiện có ${topics.length}).`);
+    if (topics.length < 1) errors.push('Psaní 2 cần ít nhất 1 chủ đề/gợi ý ảnh.');
   }
 
   // Psaní 3: dictation needs complete sentence rows. Audio is required only

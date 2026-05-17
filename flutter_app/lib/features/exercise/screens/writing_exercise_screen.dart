@@ -38,7 +38,7 @@ class WritingExerciseScreen extends StatefulWidget {
 }
 
 class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
-  // psani_1: one controller per question (3 total)
+  // psani_1: one controller per form question
   late final List<TextEditingController> _controllers;
   // psani_2: single controller
   late final TextEditingController _emailController;
@@ -156,9 +156,9 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         title: Text(
-          d.isPsani1
-              ? 'Psaní 1 — Formulář'
-              : 'Psaní 2 — E-mail', // Czech exercise names, not translated
+          d.title.isNotEmpty
+              ? d.title
+              : (d.isPsani1 ? 'Psaní 1 — Formulář' : 'Psaní 2 — E-mail'),
           style: AppTypography.titleMedium,
         ),
       ),

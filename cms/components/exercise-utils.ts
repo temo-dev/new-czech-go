@@ -33,6 +33,7 @@ export type Exercise = {
   prompt?: {
     topic_label?: string;
     question_prompts?: string[];
+    scenario_image_asset_id?: string;
   };
   detail?: Record<string, unknown>;
   // V23 — admin-list-only quality projection. Backend computes per
@@ -95,6 +96,7 @@ export type ExerciseFormState = {
   choiceScenarioPrompt: string;
   choiceOptions: string;
   expectedReasoningAxes: string;
+  scenarioImageAssetId: string;
   sampleAnswerText: string;
   status: string;
   pool: string;
@@ -125,8 +127,8 @@ export const exerciseTypeOptions: Array<{ value: ExerciseType; label: string; hi
   { value: 'uloha_2_dialogue_questions', label: 'Uloha 2',           hint: 'Dialogue task where the learner asks for missing information.' },
   { value: 'uloha_3_story_narration',  label: 'Uloha 3',             hint: 'Story narration from four images or checkpoints.' },
   { value: 'uloha_4_choice_reasoning', label: 'Uloha 4',             hint: 'Choose one option and justify the choice.' },
-  { value: 'psani_1_formular',         label: 'Psaní 1 — Formulář',  hint: 'Writing: 3 form questions, ≥10 words each (8 pts).' },
-  { value: 'psani_2_email',            label: 'Psaní 2 — E-mail',    hint: 'Writing: email from 5 image prompts, ≥35 words (12 pts).' },
+  { value: 'psani_1_formular',         label: 'Psaní 1 — Formulář',  hint: 'Writing: 1+ form questions, ≥10 words each (8 pts).' },
+  { value: 'psani_2_email',            label: 'Psaní 2 — E-mail',    hint: 'Writing: email from 1+ image/topic prompts, ≥35 words (12 pts).' },
   { value: 'psani_3_dictation',        label: 'Psaní 3 — Chính tả',  hint: 'Writing: dictation drill — Polly đọc 3–8 câu, learner gõ lại (course pool).' },
   { value: 'poslech_1',  label: 'Poslech 1', hint: 'Listening: 5 short passages → A-D (5 pts).' },
   { value: 'poslech_2',  label: 'Poslech 2', hint: 'Listening: 5 short passages → A-D (5 pts).' },
@@ -301,6 +303,7 @@ export function createInitialFormState(): ExerciseFormState {
     choiceOptions:
       'flat_a | Byt A | Levnejsi, ale daleko od centra.\nflat_b | Byt B | Blizko centra, ale mensi.\nflat_c | Byt C | Vetsi a klidny, ale drazsi.',
     expectedReasoningAxes: 'price\nlocation\nspace',
+    scenarioImageAssetId: '',
     sampleAnswerText: '',
     status: 'draft',
     pool: 'course',
@@ -322,6 +325,25 @@ export function createInitialFormState(): ExerciseFormState {
     cteniQuestions: 'Otázka 1?\nOtázka 2?\nOtázka 3?\nOtázka 4?\nOtázka 5?',
     cteniCorrectAnswers: '1=A\n2=B\n3=C\n4=D\n5=A',
   };
+}
+
+const SCENARIO_IMAGE_EXERCISE_TYPES = new Set([
+  'uloha_1_topic_answers',
+  'uloha_2_dialogue_questions',
+  'uloha_3_story_narration',
+  'uloha_4_choice_reasoning',
+]);
+
+export function supportsScenarioImage(exerciseType: string): boolean {
+  return SCENARIO_IMAGE_EXERCISE_TYPES.has(exerciseType);
+}
+
+export function withScenarioImageAssetId(
+  form: ExerciseFormState,
+  assetId: string,
+): ExerciseFormState {
+  if (!supportsScenarioImage(form.exerciseType)) return form;
+  return { ...form, scenarioImageAssetId: assetId.trim() };
 }
 
 export function parseLineList(input: string): string[] {
@@ -492,6 +514,9 @@ export function formStateFromExercise(item: Exercise): ExerciseFormState {
     expectedReasoningAxes: Array.isArray(detail.expected_reasoning_axes)
       ? (detail.expected_reasoning_axes as unknown[]).map(String).join('\n')
       : '',
+    scenarioImageAssetId: String(
+      detail.scenario_image_asset_id ?? prompt.scenario_image_asset_id ?? '',
+    ),
     sampleAnswerText: item.sample_answer_text ?? '',
     status: item.status ?? 'draft',
     pool: (item as { pool?: string }).pool ?? 'course',
@@ -719,6 +744,9 @@ export function buildCreatePayload(form: ExerciseFormState) {
       sample_answer_enabled: true, sample_answer_text: form.sampleAnswerText.trim(),
       status: form.status, pool: form.pool,
       questions: parseLineList(form.questions),
+      detail: form.scenarioImageAssetId.trim()
+        ? { scenario_image_asset_id: form.scenarioImageAssetId.trim() }
+        : undefined,
     };
   }
   if (form.exerciseType === 'uloha_2_dialogue_questions') {
@@ -733,6 +761,7 @@ export function buildCreatePayload(form: ExerciseFormState) {
         scenario_title: form.scenarioTitle, scenario_prompt: form.scenarioPrompt,
         required_info_slots: parseRequiredInfoSlots(form.requiredInfoSlots),
         custom_question_hint: form.customQuestionHint,
+        scenario_image_asset_id: form.scenarioImageAssetId.trim(),
       },
     };
   }
@@ -749,6 +778,7 @@ export function buildCreatePayload(form: ExerciseFormState) {
         image_asset_ids: parseLineList(form.imageAssetIds),
         narrative_checkpoints: parseLineList(form.narrativeCheckpoints),
         grammar_focus: parseLineList(form.grammarFocus),
+        scenario_image_asset_id: form.scenarioImageAssetId.trim(),
       },
     };
   }
@@ -797,15 +827,17 @@ export function buildCreatePayload(form: ExerciseFormState) {
     };
   }
   return {
-    module_id: form.moduleId, exercise_type: form.exerciseType, title: form.title,
+    module_id: form.moduleId, skill_kind: form.skillKind,
+    exercise_type: form.exerciseType, title: form.title,
     short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
     estimated_duration_sec: 90, prep_time_sec: 10, recording_time_limit_sec: 45,
     sample_answer_enabled: true, sample_answer_text: form.sampleAnswerText.trim(),
-    status: form.status,
+    status: form.status, pool: form.pool,
     detail: {
       scenario_prompt: form.choiceScenarioPrompt,
       options: parseChoiceOptions(form.choiceOptions),
       expected_reasoning_axes: parseLineList(form.expectedReasoningAxes),
+      scenario_image_asset_id: form.scenarioImageAssetId.trim(),
     },
   };
 }
@@ -837,7 +869,11 @@ export function buildUpdatePayload(form: ExerciseFormState) {
       estimated_duration_sec: 90, prep_time_sec: 10, recording_time_limit_sec: 45,
       sample_answer_enabled: true, sample_answer_text: form.sampleAnswerText.trim(),
       status: form.status, pool: form.pool,
-      prompt: { topic_label: form.title, question_prompts: parseLineList(form.questions) },
+      prompt: {
+        topic_label: form.title,
+        question_prompts: parseLineList(form.questions),
+        scenario_image_asset_id: form.scenarioImageAssetId.trim(),
+      },
     };
   }
   if (form.exerciseType === 'uloha_2_dialogue_questions') {
@@ -852,6 +888,7 @@ export function buildUpdatePayload(form: ExerciseFormState) {
         scenario_title: form.scenarioTitle, scenario_prompt: form.scenarioPrompt,
         required_info_slots: parseRequiredInfoSlots(form.requiredInfoSlots),
         custom_question_hint: form.customQuestionHint,
+        scenario_image_asset_id: form.scenarioImageAssetId.trim(),
       },
     };
   }
@@ -868,6 +905,7 @@ export function buildUpdatePayload(form: ExerciseFormState) {
         image_asset_ids: parseLineList(form.imageAssetIds),
         narrative_checkpoints: parseLineList(form.narrativeCheckpoints),
         grammar_focus: parseLineList(form.grammarFocus),
+        scenario_image_asset_id: form.scenarioImageAssetId.trim(),
       },
     };
   }
@@ -916,15 +954,17 @@ export function buildUpdatePayload(form: ExerciseFormState) {
     };
   }
   return {
-    module_id: form.moduleId, exercise_type: form.exerciseType, title: form.title,
+    module_id: form.moduleId, skill_kind: form.skillKind,
+    exercise_type: form.exerciseType, title: form.title,
     short_instruction: form.shortInstruction, learner_instruction: form.learnerInstruction,
     estimated_duration_sec: 90, prep_time_sec: 10, recording_time_limit_sec: 45,
     sample_answer_enabled: true, sample_answer_text: form.sampleAnswerText.trim(),
-    status: form.status,
+    status: form.status, pool: form.pool,
     detail: {
       scenario_prompt: form.choiceScenarioPrompt,
       options: parseChoiceOptions(form.choiceOptions),
       expected_reasoning_axes: parseLineList(form.expectedReasoningAxes),
+      scenario_image_asset_id: form.scenarioImageAssetId.trim(),
     },
   };
 }

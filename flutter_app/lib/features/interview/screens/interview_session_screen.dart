@@ -254,7 +254,7 @@ class InterviewSessionScreen extends StatefulWidget {
   /// session pops back to the caller instead of pushing the standalone
   /// InterviewResultScreen, letting the mock-exam runner advance to the
   /// next section without an extra screen in the back stack.
-  final void Function(String attemptId)? onSessionEnded;
+  final FutureOr<void> Function(String attemptId)? onSessionEnded;
 
   @override
   State<InterviewSessionScreen> createState() => _InterviewSessionScreenState();
@@ -1179,7 +1179,8 @@ class _InterviewSessionScreenState extends State<InterviewSessionScreen> {
       if (!mounted) return;
       final onEnded = widget.onSessionEnded;
       if (onEnded != null) {
-        onEnded(widget.attemptId);
+        await onEnded(widget.attemptId);
+        if (!mounted) return;
         Navigator.of(context).pop();
       } else {
         Navigator.of(context).pushReplacement(

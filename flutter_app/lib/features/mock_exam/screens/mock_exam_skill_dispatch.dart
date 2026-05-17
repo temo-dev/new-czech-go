@@ -7,15 +7,21 @@ import '../../../models/models.dart';
 // other kinds keep their pre-V36 routing.
 
 String skillKindForExerciseType(String exerciseType) {
+  return _knownSkillKindForExerciseType(exerciseType) ?? 'noi';
+}
+
+String? _knownSkillKindForExerciseType(String exerciseType) {
   if (exerciseType.startsWith('uloha_')) return 'noi';
   if (exerciseType.startsWith('poslech_')) return 'nghe';
   if (exerciseType.startsWith('cteni_')) return 'doc';
   if (exerciseType.startsWith('psani_')) return 'viet';
   if (exerciseType.startsWith('interview_')) return 'interview';
-  return 'noi';
+  return null;
 }
 
 String sectionSkillKind(MockExamSection section) {
+  final inferred = _knownSkillKindForExerciseType(section.exerciseType);
+  if (inferred != null) return inferred;
   return section.skillKind.isNotEmpty
       ? section.skillKind
       : skillKindForExerciseType(section.exerciseType);

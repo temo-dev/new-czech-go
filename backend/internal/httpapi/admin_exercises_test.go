@@ -183,6 +183,37 @@ func TestAdminExercises_CreateDefaultsPoolToCourse(t *testing.T) {
 	}
 }
 
+func TestAdminExercises_PublishedReadingRequiresCorrectAnswers(t *testing.T) {
+	server, _ := newAdminExercisesEnv(t)
+
+	status, body := postJSONAllowErrorWithToken(t, server, "/v1/admin/exercises", "dev-admin-token", map[string]any{
+		"title":         "Missing answer keys",
+		"exercise_type": "cteni_5",
+		"skill_kind":    "doc",
+		"pool":          "exam",
+		"status":        "published",
+		"detail": map[string]any{
+			"text": "Hledám podnájemníka do pokoje v Praze 4.",
+			"questions": []map[string]any{
+				{"question_no": 21, "prompt": "Kdy je pokoj volný?"},
+				{"question_no": 22, "prompt": "Co je v ceně?"},
+			},
+			"correct_answers": map[string]string{"21": "1. června"},
+		},
+	})
+
+	if status != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d: %#v", status, body)
+	}
+	errPayload := body["error"].(map[string]any)
+	if errPayload["code"] != "validation_error" {
+		t.Fatalf("error code = %v, want validation_error", errPayload["code"])
+	}
+	if got := errPayload["message"].(string); got != "cteni_5 question 22 is missing correct answer." {
+		t.Fatalf("message = %q", got)
+	}
+}
+
 func TestAdminExercises_PoolFilterStillWorks(t *testing.T) {
 	server, repo := newAdminExercisesEnv(t)
 

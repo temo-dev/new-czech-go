@@ -7,17 +7,70 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
 
+// speakerLineRE matches lines that start with a `[Speaker]:` prefix, e.g.
+// "[Žena]: Dobrý den." Groups: 1 = speaker name, 2 = utterance text.
+// Mirrors the CMS regex in `poslech-model.ts` so admins type the same
+// markup everywhere (form fields, P6 passage textarea).
+var speakerLineRE = regexp.MustCompile(`^\s*\[([^\]]+)\]:\s*(.*)$`)
+
+// parseSpeakerPassage splits a prose passage into AudioSegments using the
+// `[Speaker]: utterance` line convention. Lines without a speaker prefix keep
+// the previous speaker when they are direct continuations; blank lines reset
+// that continuation state. Trailing whitespace is trimmed per segment. Used
+// by poslech_6 to opt into
+// multi-speaker TTS without changing AnoNeDetail's wire shape. V39.
+func parseSpeakerPassage(passage string) []contracts.AudioSegment {
+	var out []contracts.AudioSegment
+	currentSpeaker := ""
+	for _, raw := range strings.Split(passage, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			currentSpeaker = ""
+			continue
+		}
+		if m := speakerLineRE.FindStringSubmatch(line); m != nil {
+			currentSpeaker = strings.TrimSpace(m[1])
+			text := strings.TrimSpace(m[2])
+			if text == "" {
+				continue
+			}
+			out = append(out, contracts.AudioSegment{Speaker: currentSpeaker, Text: text})
+			continue
+		}
+		if currentSpeaker != "" {
+			if len(out) > 0 && out[len(out)-1].Speaker == currentSpeaker {
+				out[len(out)-1].Text = strings.TrimSpace(out[len(out)-1].Text + " " + line)
+			} else {
+				out = append(out, contracts.AudioSegment{Speaker: currentSpeaker, Text: line})
+			}
+			continue
+		}
+		out = append(out, contracts.AudioSegment{Text: line})
+	}
+	return out
+}
+
 // ItemText pairs a listening item's question_no with its synthesizable text.
 // V26 — used by per-item audio generation for poslech_1.
 type ItemText struct {
 	ItemNo int
 	Text   string
+}
+
+// ItemDialog pairs a listening item's question_no with its dialog segments,
+// preserving speaker labels so per-item audio generation can route each turn
+// to the correct voice (e.g. [Žena]/[Muž]).
+// V39 — used by per-item dialog audio generation for poslech_1.
+type ItemDialog struct {
+	ItemNo   int
+	Segments []contracts.AudioSegment
 }
 
 // BuildExerciseItemTexts returns per-item synthesis input for poslech_1.
@@ -41,6 +94,119 @@ func BuildExerciseItemTexts(exercise contracts.Exercise) []ItemText {
 		out = append(out, ItemText{ItemNo: item.QuestionNo, Text: text})
 	}
 	return out
+}
+
+// BuildExerciseItemDialogs returns per-item dialog segments for poslech_1,
+// preserving speaker labels so the caller can route each segment to a
+// distinct TTS voice. Items with an uploaded AssetID or no text segments
+// are skipped. V39 — fixes the V26 per-item path which collapsed every
+// segment into one flat text and rendered multi-speaker items in a single
+// voice.
+func BuildExerciseItemDialogs(exercise contracts.Exercise) []ItemDialog {
+	if exercise.ExerciseType != "poslech_1" {
+		return nil
+	}
+	items := toListening1Detail(exercise.Detail)
+	var out []ItemDialog
+	for _, item := range items {
+		if item.AudioSource.AssetID != "" {
+			continue
+		}
+		var segs []contracts.AudioSegment
+		for _, seg := range item.AudioSource.Segments {
+			if t := strings.TrimSpace(seg.Text); t != "" {
+				segs = append(segs, contracts.AudioSegment{Speaker: seg.Speaker, Text: t})
+			}
+		}
+		if len(segs) == 0 {
+			continue
+		}
+		out = append(out, ItemDialog{ItemNo: item.QuestionNo, Segments: segs})
+	}
+	return out
+}
+
+// ItemDialogHasMultipleSpeakers reports whether an item's segments contain
+// ≥2 distinct non-empty speaker labels — i.e. it should use 2-voice
+// synthesis.
+func ItemDialogHasMultipleSpeakers(segments []contracts.AudioSegment) bool {
+	seen := map[string]bool{}
+	for _, seg := range segments {
+		if seg.Speaker == "" {
+			continue
+		}
+		seen[seg.Speaker] = true
+		if len(seen) >= 2 {
+			return true
+		}
+	}
+	return false
+}
+
+type speakerVoiceRole int
+
+const (
+	speakerVoiceUnknown speakerVoiceRole = iota
+	speakerVoicePrimary
+	speakerVoiceSecondary
+)
+
+func speakerVoiceMap(segments []contracts.AudioSegment, primary, secondary TTSProvider) map[string]TTSProvider {
+	out := map[string]TTSProvider{}
+	var unknown []string
+	for _, seg := range segments {
+		speaker := strings.TrimSpace(seg.Speaker)
+		if speaker == "" {
+			continue
+		}
+		if _, seen := out[speaker]; seen {
+			continue
+		}
+		switch voiceRoleForSpeakerLabel(speaker) {
+		case speakerVoicePrimary:
+			out[speaker] = primary
+		case speakerVoiceSecondary:
+			out[speaker] = secondary
+			if out[speaker] == nil {
+				out[speaker] = primary
+			}
+		default:
+			unknown = append(unknown, speaker)
+		}
+	}
+	for _, speaker := range unknown {
+		if _, seen := out[speaker]; seen {
+			continue
+		}
+		if len(out) == 0 && secondary != nil {
+			out[speaker] = secondary
+		} else {
+			out[speaker] = primary
+		}
+	}
+	return out
+}
+
+func voiceRoleForSpeakerLabel(label string) speakerVoiceRole {
+	normalized := normalizeSpeakerLabel(label)
+	switch {
+	case strings.Contains(normalized, "muz") || strings.Contains(normalized, "pan ") || normalized == "pan":
+		return speakerVoiceSecondary
+	case strings.Contains(normalized, "zena") || strings.Contains(normalized, "pani") || strings.Contains(normalized, "slecn"):
+		return speakerVoicePrimary
+	default:
+		return speakerVoiceUnknown
+	}
+}
+
+func normalizeSpeakerLabel(label string) string {
+	lower := strings.ToLower(strings.TrimSpace(label))
+	replacer := strings.NewReplacer(
+		"á", "a", "č", "c", "ď", "d", "é", "e", "ě", "e", "í", "i",
+		"ň", "n", "ó", "o", "ř", "r", "š", "s", "ť", "t", "ú", "u",
+		"ů", "u", "ý", "y", "ž", "z",
+	)
+	return replacer.Replace(lower)
 }
 
 // Poslech1MissingTranscripts returns the QuestionNo of every poslech_1 item
@@ -90,17 +256,18 @@ func BuildExerciseAudioText(exercise contracts.Exercise) string {
 }
 
 func buildAnoNeAudioText(detail any) string {
-	b, err := json.Marshal(detail)
-	if err != nil {
+	passage := toAnoNePassage(detail)
+	if passage == "" {
 		return ""
 	}
-	var d struct {
-		Passage string `json:"passage"`
+	// V39 — strip optional `[Speaker]:` line prefixes so single-voice
+	// fallback never reads "Žena colon ..." literally. Multi-speaker
+	// passages take the dialog path before reaching this function.
+	segs := parseSpeakerPassage(passage)
+	if len(segs) == 0 {
+		return passage
 	}
-	if err := json.Unmarshal(b, &d); err != nil {
-		return ""
-	}
-	return strings.TrimSpace(d.Passage)
+	return joinSegments(segs)
 }
 
 func buildFromAudioSource(src contracts.ListeningAudioSource) string {
@@ -226,6 +393,18 @@ type ItemAudioGenerator interface {
 	GenerateItemAudio(exerciseID string, itemNo int, text string) (*contracts.ExerciseAudio, error)
 }
 
+// ItemDialogAudioGenerator extends ItemAudioGenerator with V39 per-item
+// 2-voice synthesis for poslech_1. Segments are synthesized one by one
+// using speaker-based voice routing (`[Muž]` → ttsB, `[Žena]` → primary
+// voice), then concatenated into a single per-item MP3 stored at
+// `exercise-audio/<exerciseID>/item-<itemNo>.mp3`. Implemented by Polly when
+// a second TTS voice is wired; the admin handler falls back to flat
+// GenerateItemAudio when the assertion fails or only one speaker is present.
+type ItemDialogAudioGenerator interface {
+	ItemAudioGenerator
+	GenerateItemDialogAudio(exerciseID string, itemNo int, segments []contracts.AudioSegment) (*contracts.ExerciseAudio, error)
+}
+
 // HasMultipleSpeakers returns true when the exercise has segments with ≥2 distinct
 // speaker labels, indicating dialog (2-voice) TTS should be used.
 func HasMultipleSpeakers(exercise contracts.Exercise) bool {
@@ -276,8 +455,34 @@ func allExerciseSegments(exercise contracts.Exercise) []contracts.AudioSegment {
 		return segs
 	case "poslech_5":
 		return toListening5Source(exercise.Detail).Segments
+	case "poslech_6":
+		// V39 — poslech_6 keeps a single Passage string on the wire, but the
+		// admin can opt into 2-voice synthesis by prefixing lines with
+		// `[Speaker]:`. We parse those markers into AudioSegments so the
+		// shared HasMultipleSpeakers / BuildExerciseDialogSegments code path
+		// can route them to the dialog generator. Passages without markers
+		// produce a single anonymous segment, which keeps HasMultipleSpeakers
+		// returning false and routes back to the flat passage path.
+		return parseSpeakerPassage(toAnoNePassage(exercise.Detail))
 	}
 	return nil
+}
+
+// toAnoNePassage extracts the prose passage from an AnoNe detail blob. Returns
+// "" when the detail does not unmarshal — callers treat empty passage as
+// "nothing to synthesize" already.
+func toAnoNePassage(v any) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	var d struct {
+		Passage string `json:"passage"`
+	}
+	if err := json.Unmarshal(b, &d); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(d.Passage)
 }
 
 // DevExerciseAudioGenerator writes a stub silent WAV file for use in development.
@@ -343,6 +548,13 @@ func (DevExerciseAudioGenerator) GenerateItemAudio(exerciseID string, itemNo int
 		SourceType:  "dev",
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 	}, nil
+}
+
+// GenerateItemDialogAudio for dev: writes a stub silent WAV per (exercise,
+// item) — same storage shape as GenerateItemAudio. Speaker labels are
+// ignored in dev mode (the stub never plays). V39.
+func (DevExerciseAudioGenerator) GenerateItemDialogAudio(exerciseID string, itemNo int, _ []contracts.AudioSegment) (*contracts.ExerciseAudio, error) {
+	return (DevExerciseAudioGenerator{}).GenerateItemAudio(exerciseID, itemNo, "")
 }
 
 // devSilentWAV returns a minimal valid 44-byte WAV file (0 audio samples).
@@ -451,6 +663,61 @@ func (g *PollyExerciseAudioGenerator) GenerateItemAudio(exerciseID string, itemN
 	}, nil
 }
 
+// GenerateItemDialogAudio for Polly: synthesizes each segment of a single
+// poslech_1 item with speaker-based voice assignment, concatenates the
+// per-segment MP3 blobs, and writes the merged stream at
+// `exercise-audio/<exerciseID>/item-<itemNo>.mp3`. Voice routing mirrors
+// GenerateDialogAudio so `[Muž]` routes to ttsB and `[Žena]` routes to the
+// primary voice regardless of which speaker appears first.
+// V39 — fixes V26 per-item path that always used a single voice.
+func (g *PollyExerciseAudioGenerator) GenerateItemDialogAudio(exerciseID string, itemNo int, segments []contracts.AudioSegment) (*contracts.ExerciseAudio, error) {
+	if len(segments) == 0 {
+		return nil, fmt.Errorf("exercise %s item %d: no dialog segments", exerciseID, itemNo)
+	}
+
+	speakerVoice := speakerVoiceMap(segments, g.tts, g.ttsB)
+
+	var audioParts [][]byte
+	for i, seg := range segments {
+		var provider TTSProvider
+		if speaker := strings.TrimSpace(seg.Speaker); speaker != "" {
+			provider = speakerVoice[speaker]
+		}
+		if provider == nil {
+			provider = g.tts
+			if g.ttsB != nil && i%2 == 1 {
+				provider = g.ttsB
+			}
+		}
+		result, err := provider.Generate(fmt.Sprintf("%s-item-%d-seg-%d", exerciseID, itemNo, i), seg.Text)
+		if err != nil {
+			return nil, fmt.Errorf("generate item %d segment %d: %w", itemNo, i, err)
+		}
+		data, err := os.ReadFile(localReviewAudioPath(result.StorageKey))
+		if err != nil {
+			return nil, fmt.Errorf("read item %d segment %d audio: %w", itemNo, i, err)
+		}
+		audioParts = append(audioParts, data)
+	}
+
+	merged := concatMP3(audioParts)
+	storageKey := fmt.Sprintf("exercise-audio/%s/item-%d.mp3", exerciseID, itemNo)
+	dstPath := localExerciseAudioPath(storageKey)
+	if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
+		return nil, fmt.Errorf("prepare item dialog audio dir: %w", err)
+	}
+	if err := os.WriteFile(dstPath, merged, 0o644); err != nil {
+		return nil, fmt.Errorf("write item dialog audio: %w", err)
+	}
+	return &contracts.ExerciseAudio{
+		ExerciseID:  exerciseID,
+		StorageKey:  storageKey,
+		MimeType:    "audio/mpeg",
+		SourceType:  "polly",
+		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
+	}, nil
+}
+
 // GenerateSentenceAudio for Polly: synthesizes one MP3 per dictation sentence.
 // Storage key is `exercise-audio/<exerciseID>/sentence-<idx>.mp3` so each
 // sentence is addressable independently of the whole-exercise audio file.
@@ -526,36 +793,20 @@ func concatMP3(parts [][]byte) []byte {
 
 // GenerateDialogAudio synthesizes each segment with speaker-based voice assignment
 // when speaker labels are present, otherwise falls back to index alternation.
-// Voice mapping: first unique speaker → ttsB (custom voice), second → tts (primary).
-// This ensures [Muž] (typically first) uses the cloned voice and [Žena] uses Polly.
+// Voice mapping: labels like [Muž] route to ttsB and labels like [Žena] route
+// to the primary voice, regardless of which speaker appears first.
 func (g *PollyExerciseAudioGenerator) GenerateDialogAudio(exerciseID string, segments []contracts.AudioSegment) (*contracts.ExerciseAudio, error) {
 	if len(segments) == 0 {
 		return nil, fmt.Errorf("exercise %s: no dialog segments", exerciseID)
 	}
 
-	// Build speaker → provider mapping from first two unique speakers.
-	// First speaker → ttsB (custom/cloned voice), second → tts (primary).
-	speakerVoice := map[string]TTSProvider{}
-	for _, seg := range segments {
-		if seg.Speaker == "" {
-			continue
-		}
-		if _, seen := speakerVoice[seg.Speaker]; seen {
-			continue
-		}
-		if len(speakerVoice) == 0 {
-			speakerVoice[seg.Speaker] = g.ttsB // first speaker → voice B (e.g. ElevenLabs male)
-		} else {
-			speakerVoice[seg.Speaker] = g.tts // second speaker → voice A (e.g. Polly female)
-			break
-		}
-	}
+	speakerVoice := speakerVoiceMap(segments, g.tts, g.ttsB)
 
 	var audioParts [][]byte
 	for i, seg := range segments {
 		var provider TTSProvider
-		if seg.Speaker != "" {
-			provider = speakerVoice[seg.Speaker]
+		if speaker := strings.TrimSpace(seg.Speaker); speaker != "" {
+			provider = speakerVoice[speaker]
 		}
 		if provider == nil {
 			// No speaker label or first speaker has no ttsB: index-based fallback.

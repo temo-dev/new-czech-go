@@ -222,12 +222,15 @@ func TestHandleGenerateImage_ReplicateTimeout(t *testing.T) {
 	replicateBaseURL = hangServer.URL
 	t.Cleanup(func() { replicateBaseURL = orig })
 
+	origTimeout := aiImageTimeout
+	aiImageTimeout = 2 * time.Second
+	t.Cleanup(func() { aiImageTimeout = origTimeout })
+
 	repo := store.NewMemoryStore()
 	appServer := httptest.NewServer(NewServer(repo, nil, nil))
 	defer appServer.Close()
 
-	// Use a client with longer timeout so the request can complete after 30s.
-	client := &http.Client{Timeout: 45 * time.Second}
+	client := &http.Client{Timeout: 10 * time.Second}
 	payload := `{"prompt":"a test that will timeout"}`
 	req, _ := http.NewRequest(http.MethodPost, appServer.URL+"/v1/admin/ai/generate-image", strings.NewReader(payload))
 	req.Header.Set("Authorization", "Bearer dev-admin-token")
@@ -241,6 +244,62 @@ func TestHandleGenerateImage_ReplicateTimeout(t *testing.T) {
 
 	if resp.StatusCode != http.StatusGatewayTimeout {
 		t.Fatalf("expected 504, got %d", resp.StatusCode)
+	}
+}
+
+func TestHandleGenerateImage_StuckStarting_FailsFastWith503(t *testing.T) {
+	// Replicate returns "starting" forever — mimics an account whose billing
+	// is exhausted. We expect a 503 with provider_unavailable well before
+	// aiImageTimeout (180s in prod, but the request still completes inside
+	// our short stuck-starting budget here).
+	stuckMux := http.NewServeMux()
+	stuckMux.HandleFunc("/v1/models/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": "pred-stuck", "status": "starting"})
+	})
+	stuckMux.HandleFunc("/v1/predictions/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":     "pred-stuck",
+			"status": "starting",
+		})
+	})
+	stuckServer := httptest.NewServer(stuckMux)
+	defer stuckServer.Close()
+
+	t.Setenv("REPLICATE_API_KEY", "test-key-123")
+	origBase := replicateBaseURL
+	replicateBaseURL = stuckServer.URL
+	t.Cleanup(func() { replicateBaseURL = origBase })
+
+	// Shrink the stuck-starting budget so the test runs in ~1s instead of 20s.
+	origStuck := aiImageStuckStartingTimeout
+	aiImageStuckStartingTimeout = 1 * time.Second
+	t.Cleanup(func() { aiImageStuckStartingTimeout = origStuck })
+
+	repo := store.NewMemoryStore()
+	appServer := httptest.NewServer(NewServer(repo, nil, nil))
+	defer appServer.Close()
+
+	start := time.Now()
+	status, resp := postJSONAllowErrorWithToken(t, appServer, "/v1/admin/ai/generate-image", "dev-admin-token",
+		map[string]any{"prompt": "a stuck prediction"})
+	elapsed := time.Since(start)
+
+	if status != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d — resp: %v", status, resp)
+	}
+	errBody, _ := resp["error"].(map[string]any)
+	if code, _ := errBody["code"].(string); code != "provider_unavailable" {
+		t.Errorf("expected error.code=provider_unavailable, got %q", code)
+	}
+	if msg, _ := errBody["message"].(string); !strings.Contains(msg, "billing") {
+		t.Errorf("expected billing hint in message, got %q", msg)
+	}
+	// Must fail well before the full 180s end-to-end budget.
+	if elapsed > 5*time.Second {
+		t.Errorf("expected fast-fail under 5s, took %v", elapsed)
 	}
 }
 

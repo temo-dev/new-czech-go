@@ -265,6 +265,13 @@ Returns learner-visible exercises for one module. **Deprecated** — use `/v1/sk
 ## GET /v1/exercises/:exercise_id
 Returns full learner-facing exercise detail.
 
+### Query Parameters
+- `mock_exam_session_id` (optional) — V39.1 mock-exam context. When
+  provided, the level/course unlock gate may be bypassed only if the
+  authenticated learner owns that mock-exam session and the requested
+  exercise is one of its sections. Borrowed or unrelated session IDs
+  still return `403 level_locked`.
+
 ### Response
 ```json
 {
@@ -702,7 +709,7 @@ Returns all published mock test templates. Learner uses this to pick an exam bef
 ## POST /v1/mock-exams
 Creates a new mock oral exam session. `mock_test_id` is optional — if omitted, falls back to hardcoded one-exercise-per-type selection.
 
-V39 — every new session carries a server-anchored timer: `started_at` (mirrors `created_at`), `duration_sec` (5400 = 90 min default), and `expires_at` (derived). Sections include a `display_order` int — server ranks them by `(max_points ASC, sequence_no ASC)` and exposes them already sorted. Pre-V39 sessions report `duration_sec=0`; the timer sweeper ignores them.
+V39 — every new session carries a server-anchored timer: `started_at` (mirrors `created_at`), `duration_sec` (copied from `mock_tests.estimated_duration_minutes * 60`, with 5400 only as the template-less fallback), and `expires_at` (derived). Sections include a `display_order` int — server ranks them by `(max_points ASC, sequence_no ASC)` and exposes them already sorted. Pre-V39 sessions report `duration_sec=0`; the timer sweeper ignores them.
 
 ### Request
 ```json
@@ -721,8 +728,8 @@ V39 — every new session carries a server-anchored timer: `started_at` (mirrors
     "overall_score": 0,
     "passed": false,
     "started_at": "2026-05-12T10:00:00Z",
-    "duration_sec": 5400,
-    "expires_at": "2026-05-12T11:30:00Z",
+    "duration_sec": 900,
+    "expires_at": "2026-05-12T10:15:00Z",
     "sections": [
       { "sequence_no": 4, "display_order": 1, "exercise_id": "...", "exercise_type": "uloha_4_choice_reasoning", "max_points": 7, "status": "pending" },
       { "sequence_no": 1, "display_order": 2, "exercise_id": "...", "exercise_type": "uloha_1_topic_answers", "max_points": 8, "status": "pending" },
@@ -749,8 +756,8 @@ V39 — pass `?include_server_time=true` to receive `meta.server_time` (RFC3339N
     "overall_score": 0,
     "passed": false,
     "started_at": "2026-05-12T10:00:00Z",
-    "duration_sec": 5400,
-    "expires_at": "2026-05-12T11:30:00Z",
+    "duration_sec": 900,
+    "expires_at": "2026-05-12T10:15:00Z",
     "sections": [
       { "sequence_no": 4, "display_order": 1, "exercise_id": "...", "exercise_type": "uloha_4_choice_reasoning", "max_points": 7, "attempt_id": "0c64ff53-...", "section_score": 0, "status": "completed" },
       { "sequence_no": 1, "display_order": 2, "exercise_id": "...", "exercise_type": "uloha_1_topic_answers", "max_points": 8, "attempt_id": "", "section_score": 0, "status": "skipped" },
@@ -1134,7 +1141,7 @@ Triggers async LLM scoring — poll `GET /v1/attempts/:attempt_id` until
 ### Request
 ```json
 {
-  "answers": ["câu trả lời 1", "câu trả lời 2", "câu trả lời 3"],
+  "answers": ["câu trả lời 1", "câu trả lời 2"],
   "text": "full email text",
   "sentences": [
     { "idx": 0, "text": "Pavel jde do kavárny.", "replay_count": 1 },
@@ -1142,7 +1149,7 @@ Triggers async LLM scoring — poll `GET /v1/attempts/:attempt_id` until
   ]
 }
 ```
-- `answers`: 3 strings for `psani_1_formular`. Each ≥10 words (server-side validation, 400 otherwise).
+- `answers`: one string per `psani_1_formular` question; at least 1 answer. Each ≥10 words (server-side validation, 400 otherwise).
 - `text`: single string for `psani_2_email`. ≥35 words.
 - `sentences`: V18 dictation — count must match exercise sentence count, each text ≤200 runes. `replay_count` is telemetry only (never affects score).
 - Only one field is used per `exercise_type`.
@@ -1273,6 +1280,15 @@ Scoring là **synchronous** — response trả về attempt đã `completed`, kh
   "meta": {}
 }
 ```
+
+### Errors
+- `400 validation_error` — body invalid hoặc `answers` rỗng
+- `403 forbidden` — caller không sở hữu attempt
+- `409 attempt_not_pending` — attempt không còn ở trạng thái `created`
+- `422 content_invalid` — bài khách quan đã publish nhưng thiếu
+  `correct_answers`, nên backend không thể chấm. Admin cần bổ sung đáp án
+  trong CMS rồi học viên làm lại attempt mới.
+- `500 internal_error` — lỗi scorer ngoài lỗi cấu hình nội dung đã biết
 
 ---
 
@@ -1443,6 +1459,8 @@ List tài khoản học viên đang active (chưa soft-delete), paginate + optio
       "display_name": "tuan anh",
       "role": "learner",
       "pro_tier": "free",
+      "current_level": "a0",
+      "unlocked_levels": ["a0"],
       "grace_attempts_left": 3,
       "attempts_today": 4,
       "attempts_cap": 7,
@@ -1458,6 +1476,8 @@ List tài khoản học viên đang active (chưa soft-delete), paginate + optio
 is `freeTierAttemptsPerDay` (currently 7) — the same constant the gate uses
 to decide 429. Pro accounts are unlimited; the field is still returned
 (both still numeric) but the CMS hides it behind a Pro badge.
+`current_level` + `unlocked_levels` mirror the V21 user-level store so
+admin can see and manually raise a learner's CEFR level from the Users desk.
 
 ### Errors
 - `401` — không có Bearer token
@@ -1546,6 +1566,129 @@ Empty body (POST không cần payload).
 ### Errors
 - `404` — user không tồn tại
 - `503 usage_unavailable` — V17 dailyUsageStore chưa wired
+
+---
+
+## POST /v1/admin/users/:id/level
+
+Admin manually raises a learner's CEFR level, e.g. a learner at A0 can be
+set to A1 without running placement / promotion exam flow.
+
+### Auth
+Admin Bearer.
+
+### Request
+```json
+{ "current_level": "a1" }
+```
+
+- `current_level` is case-insensitive on input and normalised to lowercase.
+- Valid values: `a0`, `a1`, `a2`, `b1`.
+- The change is monotonic: same-level is idempotent, higher levels are
+  accepted, lower levels return `400 level_downgrade_forbidden`.
+
+### Response
+`200 OK`
+```json
+{
+  "data": {
+    "id": "u_…",
+    "email": "learner@example.com",
+    "email_verified": true,
+    "display_name": "Học viên",
+    "role": "learner",
+    "pro_tier": "free",
+    "current_level": "a1",
+    "unlocked_levels": ["a0", "a1"],
+    "grace_attempts_left": 0,
+    "attempts_today": 0,
+    "attempts_cap": 7,
+    "created_at": "2026-04-01T...",
+    "updated_at": "2026-05-12T..."
+  },
+  "meta": {}
+}
+```
+
+Cùng shape với row của `GET /v1/admin/users`.
+
+### Side Effects
+1. Calls `UserLevelStore.SetUserLevel(user_id, current_level)`.
+2. `users.current_level` becomes the target level.
+3. Target level is appended to `users.unlocked_levels` if missing.
+4. No `promotion_attempts` row is created; this is an explicit admin override.
+
+### Errors
+- `400 invalid_body` — JSON malformed
+- `400 invalid_level` — `current_level` không thuộc `{a0,a1,a2,b1}`
+- `400 level_downgrade_forbidden` — target thấp hơn current level
+- `403 admin_level_forbidden` — target có `role="admin"`
+- `404` — user không tồn tại
+- `503 level_store_unavailable` — V21 userLevelStore chưa wired
+
+---
+
+## POST /v1/admin/users/:id/pro
+
+Admin grant / extend / downgrade Pro entitlement on a learner account.
+Manual lever — không liên quan tới Apple IAP flow (`ProPurchase` ledger giữ
+nguyên). Dùng cho promo, bồi thường, demo trial, comp account.
+
+### Auth
+Admin Bearer.
+
+### Request
+```json
+{ "duration_days": 30 }
+```
+
+- `duration_days` **integer**, bắt buộc.
+- `> 0` → grant or extend. Set `pro_tier="pro"` và:
+  - Nếu user đang **free** hoặc Pro đã hết hạn: `pro_expires_at = now + duration_days * 24h`.
+  - Nếu user đang **Pro với hạn còn**: `pro_expires_at = current_expiry + duration_days * 24h` (cộng dồn, học viên không mất ngày còn lại).
+- `= 0` → downgrade. Set `pro_tier="free"` và `pro_expires_at=null`.
+- `< 0` hoặc `> 3650` (~10 năm) → `400 invalid_duration`.
+
+### Response
+`200 OK`
+```json
+{
+  "data": {
+    "id": "u_…",
+    "email": "learner@example.com",
+    "email_verified": true,
+    "display_name": "Học viên",
+    "role": "learner",
+    "pro_tier": "pro",
+    "pro_expires_at": "2026-06-11T15:00:00Z",
+    "current_level": "a1",
+    "unlocked_levels": ["a0", "a1"],
+    "grace_attempts_left": 0,
+    "attempts_today": 3,
+    "attempts_cap": 7,
+    "created_at": "2026-04-01T...",
+    "updated_at": "2026-05-12T..."
+  },
+  "meta": {}
+}
+```
+
+Cùng shape với row của `GET /v1/admin/users`.
+
+### Errors
+- `400 invalid_body` — JSON malformed
+- `400 invalid_duration` — `duration_days` âm hoặc vượt 3650
+- `403 admin_pro_forbidden` — target có `role="admin"` (admin không dùng Pro entitlement)
+- `404` — user không tồn tại
+- `503 users_unavailable` — V17 userStore chưa wired
+
+### Notes
+- Endpoint chỉ chạm `users.pro_tier` + `users.pro_expires_at`. Không tạo
+  `ProPurchase` row (admin grant ≠ Apple receipt).
+- Free-tier daily attempts gate (V21.2) tự bypass khi Pro còn hạn — không
+  cần reset `daily_usage` riêng sau khi nâng cấp.
+- Đảo chiều an toàn: gọi lại với `duration_days=0` để hạ về free; gọi tiếp
+  với `>0` để bật lại (rebase từ now nếu lúc đó Pro đã expired).
 
 ---
 

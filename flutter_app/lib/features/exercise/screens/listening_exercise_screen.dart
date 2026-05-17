@@ -9,6 +9,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../objective_submit_error.dart';
 import '../widgets/ano_ne_widget.dart';
 import '../widgets/exercise_context_image.dart';
 import '../widgets/fill_in_widget.dart';
@@ -115,9 +116,21 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
         (q) => _answers[q.questionNo.toString()]?.isNotEmpty == true,
       );
     }
-    final count = d.poslechItems.isNotEmpty ? d.poslechItems.length : 5;
+    // Use the wire `question_no` (not the index) — when admins delete or
+    // reorder items in CMS, question_no can skip values (e.g. [1,3,4,5]) and
+    // the answer keys we store in `_answers` follow item.questionNo. Falling
+    // back to (i+1) for legacy seeds that have no question_no.
+    if (d.poslechItems.isNotEmpty) {
+      return d.poslechItems.asMap().entries.every((e) {
+        final key =
+            e.value.questionNo > 0
+                ? e.value.questionNo.toString()
+                : (e.key + 1).toString();
+        return _answers[key]?.isNotEmpty == true;
+      });
+    }
     return List.generate(
-      count,
+      5,
       (i) => (i + 1).toString(),
     ).every((k) => _answers[k]?.isNotEmpty == true);
   }
@@ -145,7 +158,10 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _submitError = e.toString();
+          _submitError = objectiveSubmitErrorMessage(
+            AppLocalizations.of(context),
+            e,
+          );
         });
       }
     } finally {
@@ -187,7 +203,9 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         title: Text(
-          d.exerciseType.replaceAll('_', ' ').toUpperCase(),
+          d.title.isNotEmpty
+              ? d.title
+              : d.exerciseType.replaceAll('_', ' ').toUpperCase(),
           style: AppTypography.titleMedium,
         ),
       ),
@@ -217,11 +235,12 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
             if (d.isPoslech6)
               AnoNeWidget(
                 statements: d.anoNeStatements,
-                onAnswersChanged: (a) => setState(() {
-                  _answers
-                    ..clear()
-                    ..addAll(a);
-                }),
+                onAnswersChanged:
+                    (a) => setState(() {
+                      _answers
+                        ..clear()
+                        ..addAll(a);
+                    }),
                 result: _result?.feedback?.objectiveResult,
                 enabled: _result == null,
               )
@@ -324,7 +343,9 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
               questionNo: item.questionNo,
               options: opts,
               selected: _answers[item.questionNo.toString()],
-              onSelect: (k) => setState(() => _answers[item.questionNo.toString()] = k),
+              onSelect:
+                  (k) =>
+                      setState(() => _answers[item.questionNo.toString()] = k),
               mediaUri: widget.client.mediaUri,
               authHeaders: widget.client.authHeaders,
             ),
@@ -553,22 +574,23 @@ class _AudioBarShell extends StatelessWidget {
           Icon(Icons.headphones_rounded, color: AppColors.secondary, size: 20),
           const SizedBox(width: 10),
           Expanded(
-            child: error
-                ? Text(
-                    AppLocalizations.of(context).audioError,
-                    style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.error,
-                    ),
-                  )
-                : loading
+            child:
+                error
                     ? Text(
-                        AppLocalizations.of(context).audioLoading,
-                        style: AppTypography.bodySmall,
-                      )
-                    : Text(
-                        AppLocalizations.of(context).audioHint,
-                        style: AppTypography.bodySmall,
+                      AppLocalizations.of(context).audioError,
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.error,
                       ),
+                    )
+                    : loading
+                    ? Text(
+                      AppLocalizations.of(context).audioLoading,
+                      style: AppTypography.bodySmall,
+                    )
+                    : Text(
+                      AppLocalizations.of(context).audioHint,
+                      style: AppTypography.bodySmall,
+                    ),
           ),
           if (error && onRetry != null)
             IconButton(

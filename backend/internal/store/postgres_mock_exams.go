@@ -72,7 +72,7 @@ ALTER TABLE mock_exam_sections
     ADD COLUMN IF NOT EXISTS display_order INTEGER NOT NULL DEFAULT 0;
 
 -- V39 timer: pre-V39 rows default to duration_sec=0 so the sweeper ignores
--- them. New sessions get 5400 (90 min) set explicitly in CreateMockExam.
+-- them. New template-backed sessions copy mock_tests.estimated_duration_minutes.
 ALTER TABLE mock_exam_sessions
     ADD COLUMN IF NOT EXISTS duration_sec INTEGER NOT NULL DEFAULT 0;
 
@@ -91,6 +91,7 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 	var sections []contracts.MockExamSessionItem
 
 	threshold := 60
+	durationSec := DefaultMockExamDurationSec
 	if mockTestID != "" && mockTests != nil {
 		mt, ok := mockTests.MockTestByID(mockTestID)
 		if !ok {
@@ -99,6 +100,7 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 		if mt.PassThresholdPercent > 0 {
 			threshold = mt.PassThresholdPercent
 		}
+		durationSec = mockExamDurationSec(mt)
 		sections = make([]contracts.MockExamSessionItem, 0, len(mt.Sections))
 		for _, mts := range mt.Sections {
 			sections = append(sections, contracts.MockExamSessionItem{
@@ -149,7 +151,7 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO mock_exam_sessions (id, learner_id, status, mock_test_id, pass_threshold_percent, duration_sec) VALUES ($1, $2, 'in_progress', $3, $4, $5)`,
-		id, learnerID, mockTestID, threshold, DefaultMockExamDurationSec,
+		id, learnerID, mockTestID, threshold, durationSec,
 	); err != nil {
 		return contracts.MockExamSession{}, fmt.Errorf("insert mock exam session: %w", err)
 	}
@@ -167,18 +169,13 @@ func (s *postgresMockExamStore) CreateMockExam(learnerID, mockTestID string, moc
 		return contracts.MockExamSession{}, fmt.Errorf("commit mock exam: %w", err)
 	}
 
-	now := time.Now().UTC()
-	return contracts.MockExamSession{
-		ID:                   id,
-		LearnerID:            learnerID,
-		Status:               "in_progress",
-		MockTestID:           mockTestID,
-		PassThresholdPercent: threshold,
-		Sections:             sections,
-		StartedAt:            now,
-		DurationSec:          DefaultMockExamDurationSec,
-		ExpiresAt:            now.Add(time.Duration(DefaultMockExamDurationSec) * time.Second),
-	}, nil
+	// Re-read so the response carries JOIN-populated exercise titles plus
+	// server-anchored timer fields without duplicating the title-lookup logic.
+	session, ok := s.MockExamByID(id)
+	if !ok {
+		return contracts.MockExamSession{}, fmt.Errorf("mock exam not found after create")
+	}
+	return session, nil
 }
 
 func (s *postgresMockExamStore) MockExamByID(id string) (contracts.MockExamSession, bool) {
@@ -201,7 +198,11 @@ func (s *postgresMockExamStore) MockExamByID(id string) (contracts.MockExamSessi
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT sequence_no, exercise_id, exercise_type, max_points, attempt_id, section_score, status, display_order FROM mock_exam_sections WHERE session_id = $1 ORDER BY display_order ASC`,
+		`SELECT s.sequence_no, s.exercise_id, s.exercise_type, s.max_points, s.attempt_id, s.section_score, s.status, s.display_order, COALESCE(e.title, '')
+		 FROM mock_exam_sections s
+		 LEFT JOIN exercises e ON e.id = s.exercise_id
+		 WHERE s.session_id = $1
+		 ORDER BY s.display_order ASC`,
 		id,
 	)
 	if err != nil {
@@ -211,7 +212,7 @@ func (s *postgresMockExamStore) MockExamByID(id string) (contracts.MockExamSessi
 
 	for rows.Next() {
 		var sec contracts.MockExamSessionItem
-		if err := rows.Scan(&sec.SequenceNo, &sec.ExerciseID, &sec.ExerciseType, &sec.MaxPoints, &sec.AttemptID, &sec.SectionScore, &sec.Status, &sec.DisplayOrder); err != nil {
+		if err := rows.Scan(&sec.SequenceNo, &sec.ExerciseID, &sec.ExerciseType, &sec.MaxPoints, &sec.AttemptID, &sec.SectionScore, &sec.Status, &sec.DisplayOrder, &sec.ExerciseTitle); err != nil {
 			return contracts.MockExamSession{}, false
 		}
 		sec.SkillKind = skillKindForExerciseType(sec.ExerciseType)

@@ -406,6 +406,31 @@ describe('PoslechFields image_asset_id (V27)', () => {
         'exercise-audio/ex-1/item-1.mp3',
       );
     });
+
+    it('keeps wrapped speaker transcript lines on the previous speaker turn', () => {
+      const state = stateWithImages(['', '', '', '']);
+      state.items[0].text =
+        '[Žena]: Dobrý den, tady jazyková škola Atlas. Vy jste poslal přihlášku\n' +
+        'do kurzu češtiny pro cizince?\n' +
+        '[Muž]: Ano, poslal jsem ji minulý týden.';
+
+      const detail = buildPoslechDetail(state, 'text') as {
+        items: Array<{
+          audio_source: {
+            segments: Array<{ speaker?: string; text: string }>;
+          };
+        }>;
+      };
+
+      expect(detail.items[0].audio_source.segments).toEqual([
+        {
+          speaker: 'Žena',
+          text:
+            'Dobrý den, tady jazyková škola Atlas. Vy jste poslal přihlášku do kurzu češtiny pro cizince?',
+        },
+        { speaker: 'Muž', text: 'Ano, poslal jsem ji minulý týden.' },
+      ]);
+    });
   });
 
   describe('countItemImages helper', () => {

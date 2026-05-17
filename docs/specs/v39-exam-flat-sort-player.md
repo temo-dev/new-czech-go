@@ -2,6 +2,19 @@
 
 > **Status**: ✅ frozen on 2026-05-12 (slice shipped — all 10 slices landed across S1–S10; S4 + S5 ship as documented partial scopes with the inline player rewrite deferred to a follow-up polish slice).
 >
+> **Process-flow amendment (2026-05-12)**: the shipped existing
+> `MockExamScreen` must still behave like an exam process: after the intro
+> CTA, it opens the first `display_order` question immediately; after a
+> successful section submit or skip, it opens the next pending question. The
+> section overview is only a fallback when the learner backs out or an error
+> interrupts the process.
+>
+> **Level-gate amendment (2026-05-12)**: `GET /v1/exercises/:id` accepts
+> `mock_exam_session_id` for mock-exam playback. A locked course exercise is
+> readable only when that session belongs to the learner and includes the
+> exercise; this prevents the V21 course gate from bouncing exam sections back
+> to the overview while keeping normal course locks intact.
+>
 > **Linked idea**: [`docs/ideas/exam-flat-sort-player.md`](../ideas/exam-flat-sort-player.md).
 >
 > **Plan**: [`tasks/v39-exam-flat-sort-player-plan.md`](../../tasks/v39-exam-flat-sort-player-plan.md).
@@ -14,8 +27,9 @@
 
 Replace today's strict-linear MockExam player with a flat-sort, skip-and-revisit player:
 
-- Tap "Bắt đầu" on the intro screen → first question of a flat,
-  cross-skill list sorted by `max_points` ascending.
+- Tap "Bắt đầu thi" on the intro screen → first question of a flat,
+  cross-skill list sorted by `max_points` ascending. There is no in-exam
+  section-list stop between the CTA and question 1.
 - Submitting a question auto-advances; "Bỏ qua" marks the section
   `status='skipped'` and also advances.
 - A top-right button opens a fullscreen Answer Sheet (3 states: done /
@@ -40,9 +54,9 @@ End-to-end across backend (Go), Flutter (learner app), and docs. No CMS work.
 | D6 | Timer authority | Server-authoritative: `mock_exam_sessions.started_at + duration_sec`. Client polls every 30s and on app resume; server triggers auto-submit at expiry. Duration default 5400 (90 min). |
 | D7 | Background behaviour | Timer does **not** pause when the app is backgrounded — mirrors the paper exam. Intro screen warns the learner. |
 | D8 | Per-skill timer | Dropped. Incompatible with cross-skill flat sort. One global 90-min timer applies to the whole session. |
-| D9 | Intro screen | Tap "Làm bài" → intro screen showing question count + 90 min + no-pause warning + "Bắt đầu" CTA. Server timer only starts on "Bắt đầu" (POST creates the session). |
+| D9 | Intro screen | Tap "Làm bài" → intro screen showing question count + 90 min + no-pause warning + "Bắt đầu thi" CTA. Server timer only starts on that CTA (POST creates the session), then the runner immediately opens the first pending section by `display_order`. |
 | D10 | Submit-button enablement | MCQ: any choice selected. Speaking: recording upload completed. Dictation: at least 1 character. Disabled with helper text otherwise. |
-| D11 | Auto-advance | 400 ms scale-feedback (1.0 → 1.05 → 1.0) on the ✓ icon, then transition to the next section. Drops to 150 ms fade when `MediaQuery.disableAnimations` is on. |
+| D11 | Auto-advance | After successful section submit, transition to the next pending section by `display_order`; wrap to the first pending section when revisiting a later item. If no pending section remains, proceed to bulk analysis / final submit. Back/cancel returns to the fallback overview instead of re-opening the same section. The future inline player may add the planned 400 ms scale-feedback (1.0 → 1.05 → 1.0) on the ✓ icon; reduce-motion drops to 150 ms fade. |
 | D12 | Listening replay budget on revisit | Keep the existing 2-replay default; revisits do not refresh the budget. Anti-cheat behaviour is part of the listening contract, not the player slice. |
 | D13 | "Nộp bài ngay" guard | Confirm dialog with the unanswered count when at least 1 section is still `empty`. Skip the dialog when all 24 sections are `done` or `skipped`. |
 | D14 | Status enum extension | `mock_exam_sections.status` gains `'skipped'`. No existing rows touched by the migration. |
@@ -115,6 +129,13 @@ Now callable by the server itself when the timer expires. The current authentica
 
 A new query parameter `?include_server_time=true` on `GET /v1/mock-exams/:session_id` adds `meta.server_time` (RFC3339) so the client can compute drift on resume without an extra endpoint.
 
+**Exercise detail during mock exam**
+
+`GET /v1/exercises/:exercise_id?mock_exam_session_id=<session_id>` allows
+the runner to fetch a section exercise even when the underlying course is
+not unlocked yet, but only if the authenticated learner owns that session
+and the session contains the exercise.
+
 ### 3.3 Flutter
 
 New files under `flutter_app/lib/features/mock_exam/`:
@@ -131,6 +152,10 @@ Modified:
 
 - `core/api/api_client.dart` — `skipMockExamSection`, `advanceMockExam(sessionId, attemptId, {int? targetDisplayOrder})`, `getMockExam(sessionId, {bool includeServerTime})`.
 - `features/mock_exam/screens/mock_test_intro_screen.dart` — adds no-pause warning + question count.
+- `features/mock_exam/screens/mock_exam_screen.dart` — until the inline player
+  rewrite replaces it, the legacy runner owns process-mode: auto-open the first
+  pending section after intro, auto-open the next pending section after submit
+  or skip, and keep the section overview only as a fallback navigation surface.
 
 The legacy `mock_exam_screen.dart` is deleted in Phase B (the new `mock_exam_player_screen.dart` replaces it).
 
@@ -165,6 +190,8 @@ No CMS work in this slice.
   - timer-expiry path completes the session and computes overall_score
   - advance with `target_display_order` updates the right section
 - **Flutter** (`mock_exam_player_test.dart`, `answer_sheet_test.dart`):
+  - existing runner opens the first question immediately after intro
+  - successful section submit opens the next pending question
   - sheet renders 3 states with correct icon + color
   - tapping a sheet cell calls the controller's `jumpTo(displayOrder)`
   - "Nộp câu" disabled on empty MCQ / mid-upload speaking / empty dictation

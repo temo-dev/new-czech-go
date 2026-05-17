@@ -21,14 +21,15 @@ import (
 // returned httptest.Server is the URL clients hit; the *email.RecorderSender
 // lets the test assert on dispatched emails after a goroutine flush.
 type authTestEnv struct {
-	srv         *httptest.Server
-	users       store.UserStore
-	tokens      store.AuthTokenStore
-	streaks     store.StreakStore
-	usage       store.DailyUsageStore
-	purchases   store.ProPurchaseStore
-	emails      *email.RecorderSender
-	verifier    *iap.FakeAppleVerifier
+	srv       *httptest.Server
+	users     store.UserStore
+	tokens    store.AuthTokenStore
+	streaks   store.StreakStore
+	usage     store.DailyUsageStore
+	purchases store.ProPurchaseStore
+	levels    store.UserLevelStore
+	emails    *email.RecorderSender
+	verifier  *iap.FakeAppleVerifier
 }
 
 func newAuthTestEnv(t *testing.T) *authTestEnv {
@@ -39,6 +40,7 @@ func newAuthTestEnv(t *testing.T) *authTestEnv {
 	streaks := store.NewMemoryStreakStore()
 	usage := store.NewMemoryDailyUsageStore()
 	purchases := store.NewMemoryProPurchaseStore()
+	levels := store.NewMemoryUserLevelStore()
 	rec := email.NewRecorderSender()
 	verifier := &iap.FakeAppleVerifier{}
 
@@ -53,12 +55,14 @@ func newAuthTestEnv(t *testing.T) *authTestEnv {
 		BaseURL:       "https://api.example.test",
 		VerifyTTL:     24 * time.Hour,
 	}
-	handler := NewServerWithAuth(repo, nil, nil, nil, nil, deps)
+	handler := NewServerWithAuth(repo, nil, nil, nil, nil, deps, &LevelDeps{
+		UserLevels: levels,
+	})
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 	return &authTestEnv{
 		srv: srv, users: users, tokens: tokens,
-		streaks: streaks, usage: usage, purchases: purchases,
+		streaks: streaks, usage: usage, purchases: purchases, levels: levels,
 		emails: rec, verifier: verifier,
 	}
 }
@@ -996,9 +1000,9 @@ func TestPatchMe_IgnoresImmutableFields(t *testing.T) {
 	// Try to escalate role via the patch payload — must be silently
 	// ignored because patchMeRequest does not list it.
 	_, body := env.patchMe(t, tok, map[string]string{
-		"role":          "admin",
-		"pro_tier":      "pro",
-		"display_name":  "OK",
+		"role":         "admin",
+		"pro_tier":     "pro",
+		"display_name": "OK",
 	})
 	user := body["user"].(map[string]any)
 	if user["role"] == "admin" {

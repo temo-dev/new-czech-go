@@ -584,6 +584,11 @@ void main() {
     // no min_words: psani_1 defaults to 10, psani_2 defaults to 35
     expect(makeWriting('psani_1_formular').writingMinWords, 10);
     expect(makeWriting('psani_2_email').writingMinWords, 35);
+
+    // min_words=0 (legacy / hand-edited DB) falls back to per-type default
+    // rather than disabling the word-count gate.
+    expect(makeWriting('psani_1_formular', minWords: 0).writingMinWords, 10);
+    expect(makeWriting('psani_2_email', minWords: 0).writingMinWords, 35);
   });
 
   // ── _hasEnoughWords logic (pure function, tested via model layer) ──────────
@@ -630,6 +635,71 @@ void main() {
     expect(detail.cteniQuestions.length, 1);
     expect(detail.cteniQuestions[0].questionNo, 3);
     expect(detail.cteniQuestions[0].prompt, 'Kdo napsal?');
+  });
+
+  test('cteni_4 context falls back to cteniText when text is absent', () {
+    final detail = ExerciseDetail.fromJson(<String, dynamic>{
+      'id': 'c4',
+      'title': 'Čtení 4',
+      'exercise_type': 'cteni_4',
+      'detail': <String, dynamic>{
+        'context': 'Reading passage for cteni_4.',
+        'questions': [
+          {
+            'question_no': 15,
+            'prompt': 'What is the topic?',
+            'options': [
+              {'key': 'A', 'text': 'A1'},
+              {'key': 'B', 'text': 'B1'},
+              {'key': 'C', 'text': 'C1'},
+              {'key': 'D', 'text': 'D1'},
+            ],
+          },
+        ],
+      },
+    });
+    expect(detail.cteniText, 'Reading passage for cteni_4.');
+    expect(detail.cteniQuestions.length, 1);
+    expect(detail.cteniQuestions[0].questionNo, 15);
+  });
+
+  test('cteni_2 text remains primary source for cteniText', () {
+    final detail = ExerciseDetail.fromJson(<String, dynamic>{
+      'id': 'c2',
+      'title': 'Čtení 2',
+      'exercise_type': 'cteni_2',
+      'detail': <String, dynamic>{
+        'text': 'Reading passage for cteni_2.',
+        'context': 'should-be-ignored-when-text-present',
+        'questions': [],
+      },
+    });
+    expect(detail.cteniText, 'Reading passage for cteni_2.');
+  });
+
+  test('cteni_3 persons map name→text and description→label', () {
+    final detail = ExerciseDetail.fromJson(<String, dynamic>{
+      'id': 'c3',
+      'title': 'Čtení 3',
+      'exercise_type': 'cteni_3',
+      'detail': <String, dynamic>{
+        'texts': [
+          {'item_no': 1, 'text': 'Kurz vaření pro začátečníky.'},
+        ],
+        'persons': [
+          {'key': 'A', 'name': 'Pavel', 'description': 'chce se naučit vařit'},
+          {'key': 'B', 'name': 'Eva'},
+        ],
+        'correct_answers': {'1': 'A'},
+      },
+    });
+    expect(detail.cteniOptions.length, 2);
+    expect(detail.cteniOptions[0].key, 'A');
+    expect(detail.cteniOptions[0].text, 'Pavel');
+    expect(detail.cteniOptions[0].label, 'chce se naučit vařit');
+    expect(detail.cteniOptions[1].key, 'B');
+    expect(detail.cteniOptions[1].text, 'Eva');
+    expect(detail.cteniOptions[1].label, '');
   });
 
   test('FillQuestionView.fromJson handles missing fields gracefully', () {
@@ -792,6 +862,59 @@ void main() {
     expect(sprint.passThresholdPercent, equals(75));
     expect(sprint.sections.length, equals(4));
     expect(sprint.totalMaxPoints, equals(26));
+  });
+
+  test('models prefer known exercise_type over stale skill_kind', () {
+    final summary = ExerciseSummary.fromJson({
+      'id': 'ex-poslech',
+      'title': 'Listening',
+      'skill_kind': 'noi',
+      'exercise_type': 'poslech_2',
+      'short_instruction': '',
+    });
+    expect(summary.skillKind, equals('nghe'));
+
+    final mockTest = MockTest.fromJson({
+      'id': 'mt-mixed',
+      'title': 'Mixed',
+      'description': '',
+      'estimated_duration_minutes': 15,
+      'status': 'published',
+      'sections': [
+        {
+          'sequence_no': 1,
+          'skill_kind': 'noi',
+          'exercise_id': 'ex-poslech',
+          'exercise_type': 'poslech_2',
+          'max_points': 5,
+        },
+      ],
+    });
+    expect(mockTest.sections.single.skillKind, equals('nghe'));
+
+    final session = MockExamSessionView.fromJson({
+      'id': 'ses-mixed',
+      'status': 'in_progress',
+      'mock_test_id': 'mt-mixed',
+      'overall_score': 0,
+      'passed': false,
+      'pass_threshold_percent': 60,
+      'overall_readiness_level': '',
+      'overall_summary': '',
+      'sections': [
+        {
+          'sequence_no': 1,
+          'skill_kind': 'noi',
+          'exercise_id': 'ex-poslech',
+          'exercise_type': 'poslech_2',
+          'max_points': 5,
+          'attempt_id': '',
+          'section_score': 0,
+          'status': 'pending',
+        },
+      ],
+    });
+    expect(session.sections.single.skillKind, equals('nghe'));
   });
 
   // ── V9 exam_mode model tests ─────────────────────────────────────────────

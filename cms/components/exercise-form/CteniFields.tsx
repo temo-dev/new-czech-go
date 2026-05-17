@@ -11,8 +11,14 @@ import { AiDraftPanel } from '../ai-draft/AiDraftPanel';
 import {
   buildCteniDetail,
   emptyQ,
+  emptyC1Item,
+  emptyC1Option,
+  emptyC3Text,
+  emptyC3Person,
+  emptyC5Slot,
   initCteniState,
   isCteniDirty,
+  nextFreeKey,
   type C1Item,
   type CQItem,
   type CteniState,
@@ -88,46 +94,88 @@ export function CteniFields({ exerciseType, initialData, onChange, exerciseId }:
         onApply={handleAiApply}
       />
 
-      {/* ── Čtení 1 — images/msgs → A-H ───────────────────────────── */}
+      {/* ── Čtení 1 — images/msgs → A..Z ──────────────────────────── */}
       {c1 && (
         <>
           <div style={{ display: 'grid', gap: 6 }}>
-            <span style={labelStyle}>Options A-H (nội dung lựa chọn)</span>
-            {c1.options.map((opt, oi) => (
-              <OptionRow
-                key={opt.key}
-                optionKey={opt.key}
-                label={opt.text}
-                placeholder={`Nội dung lựa chọn ${opt.key}...`}
-                onChange={v => {
-                  const next = [...c1.options];
-                  next[oi] = { ...next[oi], text: v };
-                  update({ ...c1, options: next });
-                }}
-              />
-            ))}
+            <span style={labelStyle}>Options (nội dung lựa chọn) — {c1.options.length} lựa chọn</span>
+            {c1.options.map((opt, oi) => {
+              const canRemoveOpt = c1!.options.length > 2;
+              function removeOption() {
+                const removedKey = opt.key;
+                const nextOpts = c1!.options.filter((_, idx) => idx !== oi);
+                // V39 — clear answers tham chiếu tới option đã xóa.
+                const nextItems = c1!.items.map((it) =>
+                  it.answer === removedKey ? { ...it, answer: '' } : it,
+                );
+                update({ ...c1!, options: nextOpts, items: nextItems });
+              }
+              return (
+                <div key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ flex: 1 }}>
+                    <OptionRow
+                      optionKey={opt.key}
+                      label={opt.text}
+                      placeholder={`Nội dung lựa chọn ${opt.key}...`}
+                      onChange={v => {
+                        const next = [...c1.options];
+                        next[oi] = { ...next[oi], text: v };
+                        update({ ...c1, options: next });
+                      }}
+                    />
+                  </div>
+                  {canRemoveOpt && (
+                    <button type="button" onClick={removeOption}
+                      style={{ background: 'transparent', color: 'var(--error)', border: '1px solid var(--error)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                      Xóa
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            <button type="button"
+              disabled={c1.options.length >= 26}
+              onClick={() => {
+                const newKey = nextFreeKey(c1.options.map((o) => o.key));
+                if (!newKey) return;
+                update({ ...c1, options: [...c1.options, emptyC1Option(newKey)] });
+              }}
+              style={{ alignSelf: 'flex-start', background: 'var(--surface)', color: 'var(--accent)', border: '1px dashed var(--accent)', borderRadius: 8, padding: '6px 14px', cursor: c1.options.length >= 26 ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, marginTop: 4, opacity: c1.options.length >= 26 ? 0.5 : 1 }}>
+              + Thêm lựa chọn
+            </button>
           </div>
           <div style={{ display: 'grid', gap: 8 }}>
-            <span style={labelStyle}>5 ảnh / tin nhắn</span>
+            <span style={labelStyle}>{c1.items.length} ảnh / tin nhắn</span>
             {uploadError && <p style={{ margin: 0, fontSize: 12, color: 'var(--danger)' }}>{uploadError}</p>}
-            {c1.items.map((item, i) => (
+            {c1.items.map((item, i) => {
+              const canRemoveItem = c1.items.length > 1;
+              return (
               <div key={i} style={sectionStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Item {i + 1}</span>
-                  {/* Mode toggle */}
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {(['image', 'text'] as const).map(m => (
-                      <button key={m} type="button"
-                        onClick={() => {
-                          const next = [...c1.items] as C1Item[];
-                          next[i] = { ...next[i], mode: m };
-                          update({ ...c1, items: next });
-                        }}
-                        style={{ padding: '3px 10px', borderRadius: 6, border: `1px solid ${item.mode === m ? 'var(--brand)' : 'var(--border)'}`, background: item.mode === m ? 'var(--brand)' : 'transparent', color: item.mode === m ? '#fff' : 'var(--ink-3)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
-                      >
-                        {m === 'image' ? '🖼 Ảnh' : '💬 Văn bản'}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {/* Mode toggle */}
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {(['image', 'text'] as const).map(m => (
+                        <button key={m} type="button"
+                          onClick={() => {
+                            const next = [...c1.items] as C1Item[];
+                            next[i] = { ...next[i], mode: m };
+                            update({ ...c1, items: next });
+                          }}
+                          style={{ padding: '3px 10px', borderRadius: 6, border: `1px solid ${item.mode === m ? 'var(--brand)' : 'var(--border)'}`, background: item.mode === m ? 'var(--brand)' : 'transparent', color: item.mode === m ? '#fff' : 'var(--ink-3)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          {m === 'image' ? '🖼 Ảnh' : '💬 Văn bản'}
+                        </button>
+                      ))}
+                    </div>
+                    {canRemoveItem && (
+                      <button type="button"
+                        onClick={() => update({ ...c1, items: c1.items.filter((_, idx) => idx !== i) })}
+                        style={{ background: 'transparent', color: 'var(--error)', border: '1px solid var(--error)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                        Xóa item
                       </button>
-                    ))}
+                    )}
                   </div>
                 </div>
 
@@ -208,7 +256,13 @@ export function CteniFields({ exerciseType, initialData, onChange, exerciseId }:
                   }}
                 />
               </div>
-            ))}
+              );
+            })}
+            <button type="button"
+              onClick={() => update({ ...c1, items: [...c1.items, emptyC1Item()] })}
+              style={{ alignSelf: 'flex-start', background: 'var(--accent-soft)', color: 'var(--accent)', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+              + Thêm item
+            </button>
           </div>
         </>
       )}
@@ -234,9 +288,19 @@ export function CteniFields({ exerciseType, initialData, onChange, exerciseId }:
               next[i] = { ...next[i], ...partial };
               update({ ...c24!, questions: next });
             }
+            const canRemoveQ = c24!.questions.length > 1;
             return (
               <div key={i} style={sectionStyle}>
-                <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Câu {startNo + i}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Câu {startNo + i}</span>
+                  {canRemoveQ && (
+                    <button type="button"
+                      onClick={() => update({ ...c24!, questions: c24!.questions.filter((_, idx) => idx !== i) })}
+                      style={{ background: 'transparent', color: 'var(--error)', border: '1px solid var(--error)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      Xóa câu này
+                    </button>
+                  )}
+                </div>
                 <label style={{ display: 'grid', gap: 4 }}>
                   <span style={labelStyle}>Đề câu hỏi</span>
                   <input type="text" value={q.prompt} onChange={e => patchQ({ prompt: e.target.value })} placeholder="Câu hỏi..." style={{ padding: '7px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }} />
@@ -258,13 +322,15 @@ export function CteniFields({ exerciseType, initialData, onChange, exerciseId }:
         </>
       )}
 
-      {/* ── Čtení 3 — 4 texts → persons A-E ──────────────────────── */}
+      {/* ── Čtení 3 — texts → persons A..Z ──────────────────────── */}
       {c3 && (
         <>
           <div style={{ display: 'grid', gap: 6 }}>
-            <span style={labelStyle}>Nhân vật A-E</span>
-            {c3.persons.map((p, pi) => (
-              <div key={p.key} style={{ display: 'grid', gridTemplateColumns: '28px minmax(0, 1fr) minmax(0, 1fr)', alignItems: 'center', gap: 8 }}>
+            <span style={labelStyle}>Nhân vật ({c3.persons.length})</span>
+            {c3.persons.map((p, pi) => {
+              const canRemovePerson = c3.persons.length > 2;
+              return (
+              <div key={p.key} style={{ display: 'grid', gridTemplateColumns: '28px minmax(0, 1fr) minmax(0, 1fr) auto', alignItems: 'center', gap: 8 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, background: 'var(--accent-soft)', color: 'var(--accent)', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{p.key}</span>
                 <input type="text" value={p.name} onChange={e => { const next = [...c3.persons]; next[pi] = { ...next[pi], name: e.target.value }; update({ ...c3, persons: next }); }}
                   placeholder={`Tên nhân vật ${p.key}...`}
@@ -272,23 +338,65 @@ export function CteniFields({ exerciseType, initialData, onChange, exerciseId }:
                 <input type="text" value={p.description} onChange={e => { const next = [...c3.persons]; next[pi] = { ...next[pi], description: e.target.value }; update({ ...c3, persons: next }); }}
                   placeholder="Mô tả / nghề nghiệp..."
                   style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }} />
+                {canRemovePerson ? (
+                  <button type="button"
+                    onClick={() => {
+                      const removedKey = p.key;
+                      const nextPersons = c3.persons.filter((_, idx) => idx !== pi);
+                      const nextTexts = c3.texts.map((t) =>
+                        t.answer === removedKey ? { ...t, answer: '' } : t,
+                      );
+                      update({ ...c3, persons: nextPersons, texts: nextTexts });
+                    }}
+                    style={{ background: 'transparent', color: 'var(--error)', border: '1px solid var(--error)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+                    Xóa
+                  </button>
+                ) : <span />}
               </div>
-            ))}
+              );
+            })}
+            <button type="button"
+              disabled={c3.persons.length >= 26}
+              onClick={() => {
+                const newKey = nextFreeKey(c3.persons.map((p) => p.key));
+                if (!newKey) return;
+                update({ ...c3, persons: [...c3.persons, emptyC3Person(newKey)] });
+              }}
+              style={{ alignSelf: 'flex-start', background: 'var(--surface)', color: 'var(--accent)', border: '1px dashed var(--accent)', borderRadius: 8, padding: '6px 14px', cursor: c3.persons.length >= 26 ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, marginTop: 4, opacity: c3.persons.length >= 26 ? 0.5 : 1 }}>
+              + Thêm nhân vật
+            </button>
           </div>
-          {c3.texts.map((t, i) => (
+          {c3.texts.map((t, i) => {
+            const canRemoveText = c3.texts.length > 1;
+            return (
             <div key={i} style={sectionStyle}>
-              <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Đoạn {i + 1}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Đoạn {i + 1}</span>
+                {canRemoveText && (
+                  <button type="button"
+                    onClick={() => update({ ...c3, texts: c3.texts.filter((_, idx) => idx !== i) })}
+                    style={{ background: 'transparent', color: 'var(--error)', border: '1px solid var(--error)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                    Xóa đoạn
+                  </button>
+                )}
+              </div>
               <textarea rows={4} value={t.text}
                 onChange={e => { const next = [...c3.texts]; next[i] = { ...next[i], text: e.target.value }; update({ ...c3, texts: next }); }}
                 placeholder="Nội dung đoạn văn..." style={txStyle} />
               <AnswerSelect label="Nhân vật:" options={c3.persons.map(p => ({ key: p.key, label: p.name }))} value={t.answer}
                 onChange={v => { const next = [...c3.texts]; next[i] = { ...next[i], answer: v }; update({ ...c3, texts: next }); }} />
             </div>
-          ))}
+            );
+          })}
+          <button type="button"
+            onClick={() => update({ ...c3, texts: [...c3.texts, emptyC3Text()] })}
+            style={{ alignSelf: 'flex-start', background: 'var(--accent-soft)', color: 'var(--accent)', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            + Thêm đoạn văn
+          </button>
         </>
       )}
 
-      {/* ── Čtení 5 — reading + fill-in 5 slots ───────────────────── */}
+      {/* ── Čtení 5 — reading + fill-in slots ───────────────────── */}
       {c5 && (
         <>
           <label style={{ display: 'grid', gap: 6 }}>
@@ -296,10 +404,21 @@ export function CteniFields({ exerciseType, initialData, onChange, exerciseId }:
             <textarea rows={10} value={c5.text} onChange={e => update({ ...c5, text: e.target.value })} placeholder="Přečtěte si text..." style={txStyle} />
           </label>
           <div style={{ display: 'grid', gap: 8 }}>
-            <span style={labelStyle}>Câu điền vào (5 câu)</span>
-            {c5.slots.map((slot, i) => (
+            <span style={labelStyle}>Câu điền vào ({c5.slots.length} câu)</span>
+            {c5.slots.map((slot, i) => {
+              const canRemoveSlot = c5.slots.length > 1;
+              return (
               <div key={i} style={sectionStyle}>
-                <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Câu {21 + i}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ ...labelStyle, color: 'var(--accent)', fontSize: 12 }}>Câu {21 + i}</span>
+                  {canRemoveSlot && (
+                    <button type="button"
+                      onClick={() => update({ ...c5, slots: c5.slots.filter((_, idx) => idx !== i) })}
+                      style={{ background: 'transparent', color: 'var(--error)', border: '1px solid var(--error)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      Xóa câu này
+                    </button>
+                  )}
+                </div>
                 <input type="text" value={slot.prompt}
                   onChange={e => { const next = [...c5.slots]; next[i] = { ...next[i], prompt: e.target.value }; update({ ...c5, slots: next }); }}
                   placeholder="Đề câu điền vào..." style={{ padding: '7px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }} />
@@ -311,7 +430,13 @@ export function CteniFields({ exerciseType, initialData, onChange, exerciseId }:
                     style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border-strong)', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }} />
                 </div>
               </div>
-            ))}
+              );
+            })}
+            <button type="button"
+              onClick={() => update({ ...c5, slots: [...c5.slots, emptyC5Slot()] })}
+              style={{ alignSelf: 'flex-start', background: 'var(--accent-soft)', color: 'var(--accent)', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, marginTop: 4 }}>
+              + Thêm câu điền
+            </button>
           </div>
         </>
       )}

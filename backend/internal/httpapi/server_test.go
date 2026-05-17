@@ -1240,6 +1240,39 @@ func TestAdvanceMockExamRejectsAttemptOwnedByAnotherLearner(t *testing.T) {
 	}
 }
 
+func TestSubmitAnswersMissingCorrectAnswersReturnsContentInvalid(t *testing.T) {
+	repo := store.NewMemoryStore()
+	exercise := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "cteni_5",
+		Status:       "published",
+		Pool:         "exam",
+		Detail: contracts.Cteni5Detail{
+			Text: "Hledám podnájemníka do pokoje v Praze 4.",
+			Questions: []contracts.FillQuestion{
+				{QuestionNo: 21, Prompt: "Kdy je pokoj volný?"},
+			},
+		},
+	})
+	attempt, err := repo.CreateAttempt("user-learner-1", exercise.ID, "ios", "0.1.0", "vi")
+	if err != nil {
+		t.Fatalf("CreateAttempt: %v", err)
+	}
+	server := httptest.NewServer(NewServer(repo, nil, nil))
+	defer server.Close()
+
+	status, body := postJSONAllowError(t, server, "/v1/attempts/"+attempt.ID+"/submit-answers", map[string]any{
+		"answers": map[string]string{"21": "1. června"},
+	})
+
+	if status != http.StatusUnprocessableEntity {
+		t.Fatalf("want 422, got %d: %#v", status, body)
+	}
+	errorPayload := body["error"].(map[string]any)
+	if errorPayload["code"] != "content_invalid" {
+		t.Fatalf("error code = %v, want content_invalid", errorPayload["code"])
+	}
+}
+
 func TestAdvanceMockExamAcceptsRecordedSpeakingAttemptBeforeAnalysis(t *testing.T) {
 	repo := store.NewMemoryStore()
 	exercise := repo.CreateExercise(contracts.Exercise{

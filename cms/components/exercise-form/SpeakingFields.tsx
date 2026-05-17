@@ -17,6 +17,7 @@ type SpeakingForm = {
   choiceScenarioPrompt: string;
   choiceOptions: string;
   expectedReasoningAxes: string;
+  scenarioImageAssetId: string;
   sampleAnswerText: string;
 };
 
@@ -63,6 +64,33 @@ function serializeChoiceOpts(rows: ChoiceRow[]): string {
 
 const OPTION_KEYS = ['A', 'B', 'C', 'D'];
 
+function ScenarioImageInput({ form, setForm }: Props) {
+  const set = <K extends keyof SpeakingForm>(key: K, val: SpeakingForm[K]) =>
+    setForm(f => ({ ...f, [key]: val }));
+  const id = form.scenarioImageAssetId.trim();
+  return (
+    <div style={{ display: 'grid', gap: 6, padding: '10px 12px', border: '1px dashed var(--border-strong)', borderRadius: 10, background: 'var(--surface-alt)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={labelStyle}>Ảnh tình huống (1 ảnh, áp dụng cho mọi Úloha)</span>
+        <span style={{
+          fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+          background: id ? 'var(--accent-soft)' : 'var(--surface-alt)',
+          color: id ? 'var(--accent)' : 'var(--ink-3)',
+        }}>{id ? 'Đã đặt' : 'Trống'}</span>
+      </div>
+      <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.4 }}>
+        Upload ảnh trong mục <strong>Ảnh / tài nguyên</strong> bên dưới rồi dán <code>asset_id</code> vào đây. Ảnh sẽ hiển thị phía trên prompt cho learner.
+      </p>
+      <input
+        value={form.scenarioImageAssetId}
+        onChange={e => set('scenarioImageAssetId', e.target.value)}
+        placeholder="VD: 3f9b...-4a7e (để trống nếu không cần ảnh)"
+        style={{ ...inputStyle, fontFamily: 'monospace', fontSize: 12 }}
+      />
+    </div>
+  );
+}
+
 export function SpeakingFields({ form, setForm }: Props) {
   const set = <K extends keyof SpeakingForm>(key: K, val: SpeakingForm[K]) =>
     setForm(f => ({ ...f, [key]: val }));
@@ -71,16 +99,19 @@ export function SpeakingFields({ form, setForm }: Props) {
   if (form.exerciseType === 'uloha_1_topic_answers') {
     const items = form.questions.split('\n').filter(Boolean);
     return (
-      <ItemRepeater
-        label="Question prompts (3-4 câu)"
-        items={items.length ? items : ['']}
-        onChange={rows => set('questions', rows.join('\n'))}
-        placeholder="Prompt ngắn..."
-        maxItems={4}
-        minItems={3}
-        rows={1}
-        hint="3-4 câu hỏi ngắn cho learner trả lời."
-      />
+      <div style={{ display: 'grid', gap: 16 }}>
+        <ScenarioImageInput form={form} setForm={setForm} />
+        <ItemRepeater
+          label="Question prompts (3-4 câu)"
+          items={items.length ? items : ['']}
+          onChange={rows => set('questions', rows.join('\n'))}
+          placeholder="Prompt ngắn..."
+          maxItems={4}
+          minItems={3}
+          rows={1}
+          hint="3-4 câu hỏi ngắn cho learner trả lời."
+        />
+      </div>
     );
   }
 
@@ -89,6 +120,7 @@ export function SpeakingFields({ form, setForm }: Props) {
     const slots = parseSlots(form.requiredInfoSlots);
     return (
       <div style={{ display: 'grid', gap: 16 }}>
+        <ScenarioImageInput form={form} setForm={setForm} />
         <label style={{ display: 'grid', gap: 6 }}>
           <span style={labelStyle}>Scenario title</span>
           <input value={form.scenarioTitle} onChange={e => set('scenarioTitle', e.target.value)} style={inputStyle} placeholder="Tên tình huống..." />
@@ -135,6 +167,8 @@ export function SpeakingFields({ form, setForm }: Props) {
 
     return (
       <div style={{ display: 'grid', gap: 20 }}>
+
+        <ScenarioImageInput form={form} setForm={setForm} />
 
         {/* Story title */}
         <label style={{ display: 'grid', gap: 6 }}>
@@ -288,6 +322,7 @@ export function SpeakingFields({ form, setForm }: Props) {
   const nextKey = OPTION_KEYS[choiceRows.length] ?? String.fromCharCode(65 + choiceRows.length);
   return (
     <div style={{ display: 'grid', gap: 16 }}>
+      <ScenarioImageInput form={form} setForm={setForm} />
       <label style={{ display: 'grid', gap: 6 }}>
         <span style={labelStyle}>Scenario prompt</span>
         <textarea rows={4} value={form.choiceScenarioPrompt} onChange={e => set('choiceScenarioPrompt', e.target.value)} style={txStyle} placeholder="Mô tả tình huống chọn lựa..." />

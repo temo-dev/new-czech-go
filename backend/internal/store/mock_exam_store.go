@@ -9,8 +9,15 @@ import (
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 )
 
-// V39 default exam duration. 90 minutes ≈ real A2 total.
+// V39 fallback exam duration for template-less legacy sessions.
 const DefaultMockExamDurationSec = 5400
+
+func mockExamDurationSec(mt contracts.MockTest) int {
+	if mt.EstimatedDurationMinutes <= 0 {
+		return DefaultMockExamDurationSec
+	}
+	return mt.EstimatedDurationMinutes * 60
+}
 
 // assignDisplayOrder sorts sections by (max_points ASC, sequence_no ASC)
 // and writes DisplayOrder = rank+1 into each section, mutating the slice
@@ -97,6 +104,7 @@ func (s *memoryMockExamStore) CreateMockExam(learnerID, mockTestID string, mockT
 	var sections []contracts.MockExamSessionItem
 
 	threshold := 60
+	durationSec := DefaultMockExamDurationSec
 	if mockTestID != "" && mockTests != nil {
 		mt, ok := mockTests.MockTestByID(mockTestID)
 		if !ok {
@@ -105,15 +113,21 @@ func (s *memoryMockExamStore) CreateMockExam(learnerID, mockTestID string, mockT
 		if mt.PassThresholdPercent > 0 {
 			threshold = mt.PassThresholdPercent
 		}
+		durationSec = mockExamDurationSec(mt)
 		sections = make([]contracts.MockExamSessionItem, 0, len(mt.Sections))
 		for _, mts := range mt.Sections {
+			var title string
+			if ex, ok := s.exercises.Exercise(mts.ExerciseID); ok {
+				title = ex.Title
+			}
 			sections = append(sections, contracts.MockExamSessionItem{
-				SequenceNo:   mts.SequenceNo,
-				SkillKind:    mts.SkillKind,
-				ExerciseID:   mts.ExerciseID,
-				ExerciseType: mts.ExerciseType,
-				MaxPoints:    mts.MaxPoints,
-				Status:       "pending",
+				SequenceNo:    mts.SequenceNo,
+				SkillKind:     mts.SkillKind,
+				ExerciseID:    mts.ExerciseID,
+				ExerciseType:  mts.ExerciseType,
+				ExerciseTitle: title,
+				MaxPoints:     mts.MaxPoints,
+				Status:        "pending",
 			})
 		}
 	} else {
@@ -125,12 +139,13 @@ func (s *memoryMockExamStore) CreateMockExam(learnerID, mockTestID string, mockT
 				return contracts.MockExamSession{}, fmt.Errorf("no published exercise for %s", kind)
 			}
 			sections = append(sections, contracts.MockExamSessionItem{
-				SequenceNo:   i + 1,
-				SkillKind:    skillKindForExerciseType(ex.ExerciseType),
-				ExerciseID:   ex.ID,
-				ExerciseType: ex.ExerciseType,
-				MaxPoints:    defaultMaxPoints[kind],
-				Status:       "pending",
+				SequenceNo:    i + 1,
+				SkillKind:     skillKindForExerciseType(ex.ExerciseType),
+				ExerciseID:    ex.ID,
+				ExerciseType:  ex.ExerciseType,
+				ExerciseTitle: ex.Title,
+				MaxPoints:     defaultMaxPoints[kind],
+				Status:        "pending",
 			})
 		}
 	}
@@ -148,8 +163,8 @@ func (s *memoryMockExamStore) CreateMockExam(learnerID, mockTestID string, mockT
 		PassThresholdPercent: threshold,
 		Sections:             sections,
 		StartedAt:            now,
-		DurationSec:          DefaultMockExamDurationSec,
-		ExpiresAt:            now.Add(time.Duration(DefaultMockExamDurationSec) * time.Second),
+		DurationSec:          durationSec,
+		ExpiresAt:            now.Add(time.Duration(durationSec) * time.Second),
 	}
 	s.sessions[id] = session
 	return *session, nil

@@ -255,11 +255,13 @@ class MockTestSection {
   final int maxPoints;
 
   factory MockTestSection.fromJson(Map<String, dynamic> json) {
+    final exerciseType = json['exercise_type'] as String? ?? '';
+    final skillKind = json['skill_kind'] as String? ?? '';
     return MockTestSection(
       sequenceNo: (json['sequence_no'] as num).toInt(),
-      skillKind: json['skill_kind'] as String? ?? '',
+      skillKind: _knownSkillKindForExerciseType(exerciseType) ?? skillKind,
       exerciseId: json['exercise_id'] as String? ?? '',
-      exerciseType: json['exercise_type'] as String? ?? '',
+      exerciseType: exerciseType,
       maxPoints: (json['max_points'] as num?)?.toInt() ?? 0,
     );
   }
@@ -324,6 +326,7 @@ class MockExamSection {
     required this.skillKind,
     required this.exerciseId,
     required this.exerciseType,
+    this.exerciseTitle = '',
     required this.maxPoints,
     required this.attemptId,
     required this.sectionScore,
@@ -335,6 +338,11 @@ class MockExamSection {
   final String skillKind;
   final String exerciseId;
   final String exerciseType;
+
+  /// Server-provided exercise title (denormalized via JOIN on read). Empty
+  /// when the section's exercise has been deleted or pre-V39.x sessions
+  /// served without the title field.
+  final String exerciseTitle;
   final int maxPoints;
   final String attemptId;
   final int sectionScore;
@@ -355,11 +363,14 @@ class MockExamSection {
     final dispRaw = json['display_order'];
     final seq = (json['sequence_no'] as num).toInt();
     final disp = dispRaw is num ? dispRaw.toInt() : 0;
+    final exerciseType = json['exercise_type'] as String? ?? '';
+    final skillKind = json['skill_kind'] as String? ?? '';
     return MockExamSection(
       sequenceNo: seq,
-      skillKind: json['skill_kind'] as String? ?? '',
+      skillKind: _knownSkillKindForExerciseType(exerciseType) ?? skillKind,
       exerciseId: json['exercise_id'] as String? ?? '',
-      exerciseType: json['exercise_type'] as String? ?? '',
+      exerciseType: exerciseType,
+      exerciseTitle: json['exercise_title'] as String? ?? '',
       maxPoints: (json['max_points'] as num?)?.toInt() ?? 0,
       attemptId: json['attempt_id'] as String? ?? '',
       sectionScore: (json['section_score'] as num?)?.toInt() ?? 0,
@@ -503,14 +514,25 @@ class ExerciseSummary {
   final String skillKind;
 
   factory ExerciseSummary.fromJson(Map<String, dynamic> json) {
+    final exerciseType = json['exercise_type'] as String;
+    final skillKind = json['skill_kind'] as String? ?? '';
     return ExerciseSummary(
       id: json['id'] as String,
       title: json['title'] as String,
-      exerciseType: json['exercise_type'] as String,
+      exerciseType: exerciseType,
       shortInstruction: json['short_instruction'] as String? ?? '',
-      skillKind: json['skill_kind'] as String? ?? '',
+      skillKind: _knownSkillKindForExerciseType(exerciseType) ?? skillKind,
     );
   }
+}
+
+String? _knownSkillKindForExerciseType(String exerciseType) {
+  if (exerciseType.startsWith('uloha_')) return 'noi';
+  if (exerciseType.startsWith('poslech_')) return 'nghe';
+  if (exerciseType.startsWith('cteni_')) return 'doc';
+  if (exerciseType.startsWith('psani_')) return 'viet';
+  if (exerciseType.startsWith('interview_')) return 'interview';
+  return null;
 }
 
 class ExerciseDetail {
@@ -532,6 +554,7 @@ class ExerciseDetail {
     required this.choiceScenarioPrompt,
     required this.choiceOptions,
     required this.expectedReasoningAxes,
+    this.scenarioImageAssetId = '',
     this.writingQuestions = const [],
     this.writingMinWords = 10,
     this.emailPrompt = '',
@@ -602,6 +625,7 @@ class ExerciseDetail {
   final String choiceScenarioPrompt;
   final List<ChoiceOptionView> choiceOptions;
   final List<String> expectedReasoningAxes;
+  final String scenarioImageAssetId;
   final List<String> writingQuestions;
   final int writingMinWords;
   final String emailPrompt;
@@ -775,10 +799,19 @@ class ExerciseDetail {
       choiceScenarioPrompt: detail['scenario_prompt'] as String? ?? '',
       choiceOptions: choiceOptions,
       expectedReasoningAxes: expectedReasoningAxes,
+      scenarioImageAssetId:
+          (detail['scenario_image_asset_id'] as String?) ??
+          (prompt['scenario_image_asset_id'] as String? ?? ''),
       writingQuestions: writingQuestions,
       writingMinWords:
-          (detail['min_words'] as num?)?.toInt() ??
-          (json['exercise_type'] == 'psani_2_email' ? 35 : 10),
+          (() {
+            // Treat missing OR ≤0 as "use the per-type default" — guards against
+            // legacy seeds / DB hand-edits where min_words landed as 0 and would
+            // otherwise let learners submit empty answers.
+            final raw = (detail['min_words'] as num?)?.toInt() ?? 0;
+            if (raw > 0) return raw;
+            return json['exercise_type'] == 'psani_2_email' ? 35 : 10;
+          })(),
       emailPrompt: detail['prompt'] as String? ?? '',
       emailTopics: emailTopics,
       poslechItems:
@@ -794,21 +827,37 @@ class ExerciseDetail {
               .whereType<Map<String, dynamic>>()
               .map(FillQuestionView.fromJson)
               .toList(),
-      cteniText: detail['text'] as String? ?? '',
+      // cteni_2/5 ship the reading passage under `text`; cteni_4 ships it
+      // under `context` (omitempty, V24). Fall back so the passage renders
+      // for both.
+      cteniText:
+          (detail['text'] as String?) ?? (detail['context'] as String?) ?? '',
       cteniItems:
           detail['items'] as List<dynamic>? ??
           detail['texts'] as List<dynamic>? ??
           const [],
       cteniOptions:
           (() {
+            // cteni_3 ships `persons[*]` with {key, name, description?}; map
+            // name→text and description→label so the option list (and the
+            // persons legend) render the human-readable identifier instead
+            // of an empty box next to the letter.
             final opts = detail['options'] ?? detail['persons'];
             if (opts is List<dynamic>) {
-              return opts
-                  .map(
-                    (e) =>
-                        PoslechOptionView.fromJson(e as Map<String, dynamic>),
-                  )
-                  .toList();
+              return opts.whereType<Map<String, dynamic>>().map((e) {
+                final text =
+                    (e['text'] as String?) ?? (e['name'] as String? ?? '');
+                final label =
+                    (e['label'] as String?) ??
+                    (e['description'] as String? ?? '');
+                return PoslechOptionView(
+                  key: e['key'] as String? ?? '',
+                  text: text,
+                  label: label,
+                  assetId: e['asset_id'] as String? ?? '',
+                  imageAssetId: e['image_asset_id'] as String? ?? '',
+                );
+              }).toList();
             }
             return <PoslechOptionView>[];
           })(),

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter_app/core/api/api_client.dart';
 import 'package:flutter_app/core/api/level_api.dart';
+import 'package:flutter_app/core/level_utils.dart';
 import 'package:flutter_app/features/onboarding/placement_test_screen.dart';
 import 'package:flutter_app/l10n/generated/app_localizations.dart';
 
@@ -20,8 +21,7 @@ class _FakeLevelApi extends LevelApi {
 
   void stubStart(PlacementStartResult result) => _startResult = result;
   void stubStartError(Object error) => _startError = error;
-  void stubComplete(PlacementCompleteResult result) =>
-      _completeResult = result;
+  void stubComplete(PlacementCompleteResult result) => _completeResult = result;
 
   @override
   Future<PlacementStartResult> startPlacement({bool force = false}) async {
@@ -33,17 +33,19 @@ class _FakeLevelApi extends LevelApi {
   @override
   Future<PlacementCompleteResult> completePlacement(
     String fullSessionId,
-  ) async =>
-      _completeResult!;
+  ) async => _completeResult!;
 }
 
 class _FakeApiClient extends ApiClient {
   _FakeApiClient() : super(baseUrl: 'http://fake');
 
   Map<String, dynamic>? _mockExam;
+  Map<String, dynamic>? _completedMockExam;
   Object? _mockExamError;
 
   void stubGetMockExam(Map<String, dynamic> result) => _mockExam = result;
+  void stubCompleteMockExam(Map<String, dynamic> result) =>
+      _completedMockExam = result;
   void stubGetMockExamError(Object error) => _mockExamError = error;
 
   @override
@@ -52,6 +54,14 @@ class _FakeApiClient extends ApiClient {
     if (err != null) throw err;
     return _mockExam!;
   }
+
+  @override
+  Future<Map<String, dynamic>> completeMockExam(String id) async {
+    return _completedMockExam ?? _mockExam!;
+  }
+
+  @override
+  Future<List<dynamic>> getAttempts() async => const [];
 }
 
 // ─── shared fixtures ─────────────────────────────────────────────────────────
@@ -64,18 +74,36 @@ PlacementStartResult _startResult() => const PlacementStartResult(
   fullSessionId: _kSessionId,
 );
 
-
-Map<String, dynamic> _sessionJson({bool completed = false}) => {
+Map<String, dynamic> _sessionJson({
+  bool completed = false,
+  int? overallScore,
+}) => {
   'id': _kSessionId,
   'mock_test_id': _kMockTestId,
   'status': completed ? 'completed' : 'in_progress',
-  'overall_score': completed ? 60 : 0,
+  'overall_score': overallScore ?? (completed ? 60 : 0),
   'passed': false,
   'pass_threshold_percent': 0,
   'overall_readiness_level': '',
   'overall_summary': '',
   'sections': <dynamic>[],
 };
+
+PlacementCompleteResult _completeResult({
+  required CefrLevel level,
+  required double scorePct,
+}) => PlacementCompleteResult(
+  assignedLevel: level,
+  scorePct: scorePct,
+  currentLevel: level,
+  unlockedLevels:
+      CefrLevel.values
+          .where(
+            (candidate) => cefrLevelOrder(candidate) <= cefrLevelOrder(level),
+          )
+          .toSet(),
+  placementTakenAt: DateTime(2026, 5, 17, 8, 49),
+);
 
 // ─── widget helper ───────────────────────────────────────────────────────────
 
@@ -101,7 +129,9 @@ Widget _wrap({
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('shows loading indicator before session resolves', (tester) async {
+  testWidgets('shows loading indicator before session resolves', (
+    tester,
+  ) async {
     final api = _FakeLevelApi();
     // Never resolve — use a blocking stub
     bool started = false;
@@ -126,15 +156,17 @@ void main() {
     expect(find.byKey(const Key('placement_test_exam')), findsOneWidget);
   });
 
-  testWidgets('shows error + retry CTA when startPlacement throws', (tester) async {
-    final api = _FakeLevelApi()
-      ..stubStartError(
-        const LevelApiException(
-          statusCode: 503,
-          code: 'unavailable',
-          message: 'Service down',
-        ),
-      );
+  testWidgets('shows error + retry CTA when startPlacement throws', (
+    tester,
+  ) async {
+    final api =
+        _FakeLevelApi()..stubStartError(
+          const LevelApiException(
+            statusCode: 503,
+            code: 'unavailable',
+            message: 'Service down',
+          ),
+        );
     final client = _FakeApiClient();
 
     await tester.pumpWidget(_wrap(levelApi: api, client: client));
@@ -154,6 +186,99 @@ void main() {
     expect(find.byKey(const Key('placement_test_loading')), findsNothing);
     expect(find.byKey(const Key('placement_test_error')), findsNothing);
     expect(find.byKey(const Key('placement_test_exam')), findsOneWidget);
+  });
+
+  testWidgets('placement exam surfaces submit action directly', (tester) async {
+    final api = _FakeLevelApi()..stubStart(_startResult());
+    final client = _FakeApiClient()..stubGetMockExam(_sessionJson());
+
+    await tester.pumpWidget(_wrap(levelApi: api, client: client));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('mock_exam_prominent_submit')), findsOneWidget);
+    expect(find.byIcon(Icons.more_vert_rounded), findsNothing);
+  });
+
+  testWidgets('completed placement result CTA calls onFinished', (
+    tester,
+  ) async {
+    var finishedCalls = 0;
+    final api = _FakeLevelApi()..stubStart(_startResult());
+    final client =
+        _FakeApiClient()..stubGetMockExam(_sessionJson(completed: true));
+
+    await tester.pumpWidget(
+      _wrap(
+        levelApi: api,
+        client: client,
+        onFinished: () => finishedCalls += 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('Bắt đầu học'), 300);
+    await tester.tap(find.text('Bắt đầu học'));
+    await tester.pump();
+
+    expect(finishedCalls, 1);
+  });
+
+  testWidgets('placement completion shows pass popup with current level', (
+    tester,
+  ) async {
+    final api =
+        _FakeLevelApi()
+          ..stubStart(_startResult())
+          ..stubComplete(_completeResult(level: CefrLevel.a2, scorePct: 60));
+    final client =
+        _FakeApiClient()
+          ..stubGetMockExam(_sessionJson(completed: true, overallScore: 0))
+          ..stubCompleteMockExam(
+            _sessionJson(completed: true, overallScore: 60),
+          );
+
+    await tester.pumpWidget(_wrap(levelApi: api, client: client));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('placement_result_dialog')), findsOneWidget);
+    expect(
+      find.text('Chúc mừng, bạn đã vượt qua bài kiểm tra đầu vào!'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Cấp độ hiện tại của bạn là A2. Điểm phân loại: 60%.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Xem kết quả bài thi'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('placement_result_dialog')), findsNothing);
+  });
+
+  testWidgets('placement completion shows encouragement popup for A0', (
+    tester,
+  ) async {
+    final api =
+        _FakeLevelApi()
+          ..stubStart(_startResult())
+          ..stubComplete(_completeResult(level: CefrLevel.a0, scorePct: 7));
+    final client =
+        _FakeApiClient()
+          ..stubGetMockExam(_sessionJson(completed: true, overallScore: 0))
+          ..stubCompleteMockExam(
+            _sessionJson(completed: true, overallScore: 7),
+          );
+
+    await tester.pumpWidget(_wrap(levelApi: api, client: client));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('placement_result_dialog')), findsOneWidget);
+    expect(find.text('Cố gắng thêm một chút nhé'), findsOneWidget);
+    expect(
+      find.textContaining('Cấp độ hiện tại của bạn là A0. Điểm phân loại: 7%.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('retry CTA re-triggers startPlacement', (tester) async {

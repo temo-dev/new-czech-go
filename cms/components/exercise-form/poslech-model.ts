@@ -204,16 +204,33 @@ export function buildPoslechDetail(
   state: PoslechState,
   audioSource: 'text' | 'upload',
 ): Record<string, unknown> {
-  const seg = (text: string) =>
-    text
-      .split('\n')
-      .filter(Boolean)
-      .map((t) => {
-        const m = t.match(/^\[([^\]]+)\]:\s*(.+)/);
-        return m
-          ? { speaker: m[1].trim(), text: m[2].trim() }
-          : { text: t.trim() };
-      });
+  const seg = (text: string) => {
+    const out: Array<{ speaker?: string; text: string }> = [];
+    let currentSpeaker = '';
+    for (const raw of text.split('\n')) {
+      const t = raw.trim();
+      if (!t) {
+        currentSpeaker = '';
+        continue;
+      }
+      const m = t.match(/^\[([^\]]+)\]:\s*(.*)$/);
+      if (m) {
+        currentSpeaker = m[1].trim();
+        const spoken = m[2].trim();
+        if (spoken) out.push({ speaker: currentSpeaker, text: spoken });
+        continue;
+      }
+      const last = out[out.length - 1];
+      if (currentSpeaker && last?.speaker === currentSpeaker) {
+        last.text = `${last.text} ${t}`.trim();
+      } else if (currentSpeaker) {
+        out.push({ speaker: currentSpeaker, text: t });
+      } else {
+        out.push({ text: t });
+      }
+    }
+    return out;
+  };
 
   if (state.type === 'poslech_1' || state.type === 'poslech_2') {
     const correct: Record<string, string> = {};

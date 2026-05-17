@@ -256,6 +256,315 @@ func TestAdminGenerateAudio_Poslech1_PartialTranscripts_Rejected(t *testing.T) {
 	}
 }
 
+// ── V39: per-item dialog (poslech_1 multi-speaker) ────────────────────────────
+
+// recordingItemDialogGen records every call so tests can verify which items
+// took the flat path vs the dialog path. Both methods write a real stub file
+// (Dev impl) so the rollback/state assertions still work end-to-end.
+type recordingItemDialogGen struct {
+	flatCalls   []int
+	dialogCalls []dialogCall
+}
+
+type dialogCall struct {
+	itemNo   int
+	segments []contracts.AudioSegment
+}
+
+func (g *recordingItemDialogGen) GenerateAudio(_, _ string) (*contracts.ExerciseAudio, error) {
+	return nil, fmt.Errorf("not used in per-item tests")
+}
+
+func (g *recordingItemDialogGen) GenerateItemAudio(exerciseID string, itemNo int, _ string) (*contracts.ExerciseAudio, error) {
+	g.flatCalls = append(g.flatCalls, itemNo)
+	return processing.DevExerciseAudioGenerator{}.GenerateItemAudio(exerciseID, itemNo, "")
+}
+
+func (g *recordingItemDialogGen) GenerateItemDialogAudio(exerciseID string, itemNo int, segs []contracts.AudioSegment) (*contracts.ExerciseAudio, error) {
+	g.dialogCalls = append(g.dialogCalls, dialogCall{itemNo: itemNo, segments: segs})
+	return processing.DevExerciseAudioGenerator{}.GenerateItemAudio(exerciseID, itemNo, "")
+}
+
+// V39 — poslech_1 with a multi-speaker item must take the dialog path so the
+// generator can route [Žena]/[Muž] to distinct voices. Pre-V39 the per-item
+// route fed the joined transcript into a single Polly voice (always Žena).
+func TestAdminGenerateAudio_Poslech1_PerItem_MultiSpeaker_RoutesToDialog(t *testing.T) {
+	t.Setenv("LOCAL_ASSETS_DIR", t.TempDir())
+	repo := store.NewMemoryStore()
+	created := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "poslech_1",
+		SkillKind:    "nghe",
+		ModuleID:     "mod-nghe",
+		Pool:         "course",
+		Status:       "draft",
+		Detail: contracts.Poslech1Detail{
+			Items: []contracts.ListeningItem{
+				{QuestionNo: 1, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{
+					{Speaker: "Žena", Text: "Dobrý den, tady jazyková škola."},
+					{Speaker: "Muž", Text: "Dobrý den, ano, to jsem já."},
+				}}},
+				{QuestionNo: 2, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{
+					{Text: "Jak se jmenujete?"},
+				}}},
+			},
+		},
+	})
+
+	s := NewServerForTest(repo, nil)
+	rec := &recordingItemDialogGen{}
+	s.audioGenerator = rec
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+
+	resp := postGenerateAudio(t, srv, created.ID)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	if len(rec.dialogCalls) != 1 || rec.dialogCalls[0].itemNo != 1 {
+		t.Errorf("dialog calls = %+v, want exactly item 1", rec.dialogCalls)
+	}
+	if len(rec.flatCalls) != 1 || rec.flatCalls[0] != 2 {
+		t.Errorf("flat calls = %+v, want exactly item 2", rec.flatCalls)
+	}
+	if len(rec.dialogCalls) >= 1 {
+		got := rec.dialogCalls[0].segments
+		if len(got) != 2 || got[0].Speaker != "Žena" || got[1].Speaker != "Muž" {
+			t.Errorf("dialog segments = %+v, want [Žena, Muž]", got)
+		}
+	}
+}
+
+// V39 — a poslech_1 with no multi-speaker items must keep the flat per-item
+// path so the dialog generator is not exercised when it's not needed.
+func TestAdminGenerateAudio_Poslech1_PerItem_AllSingleVoice_NoDialog(t *testing.T) {
+	t.Setenv("LOCAL_ASSETS_DIR", t.TempDir())
+	repo := store.NewMemoryStore()
+	created := repo.CreateExercise(newPoslech1Exercise())
+
+	s := NewServerForTest(repo, nil)
+	rec := &recordingItemDialogGen{}
+	s.audioGenerator = rec
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+
+	resp := postGenerateAudio(t, srv, created.ID)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	if len(rec.dialogCalls) != 0 {
+		t.Errorf("dialog calls = %+v, want none (no multi-speaker items)", rec.dialogCalls)
+	}
+	if len(rec.flatCalls) != 5 {
+		t.Errorf("flat calls = %+v, want 5", rec.flatCalls)
+	}
+}
+
+// ── V39: P4 + P6 multi-speaker via dialog generator ──────────────────────────
+
+// recordingDialogGen records every dialog/single TTS call so tests can verify
+// which path was taken for non-P1 exercise types. Uses the dev stub audio
+// writer so the response body is still well-formed.
+type recordingDialogGen struct {
+	dialogCalls [][]contracts.AudioSegment
+	singleCalls []string
+}
+
+func (g *recordingDialogGen) GenerateAudio(exerciseID, text string) (*contracts.ExerciseAudio, error) {
+	g.singleCalls = append(g.singleCalls, text)
+	return processing.DevExerciseAudioGenerator{}.GenerateAudio(exerciseID, text)
+}
+
+func (g *recordingDialogGen) GenerateDialogAudio(exerciseID string, segments []contracts.AudioSegment) (*contracts.ExerciseAudio, error) {
+	cp := make([]contracts.AudioSegment, len(segments))
+	copy(cp, segments)
+	g.dialogCalls = append(g.dialogCalls, cp)
+	return processing.DevExerciseAudioGenerator{}.GenerateDialogAudio(exerciseID, segments)
+}
+
+func TestAdminGenerateAudio_Poslech4_MultiSpeaker_RoutesToDialogSegments(t *testing.T) {
+	t.Setenv("LOCAL_ASSETS_DIR", t.TempDir())
+	repo := store.NewMemoryStore()
+	created := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "poslech_4",
+		SkillKind:    "nghe",
+		ModuleID:     "mod-nghe",
+		Pool:         "course",
+		Status:       "draft",
+		Detail: contracts.Poslech4Detail{
+			Items: []contracts.DialogItem{
+				{QuestionNo: 1, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{
+					{Speaker: "Žena", Text: "Co byste si přál?"},
+					{Speaker: "Muž", Text: "Kávu prosím."},
+				}}},
+				{QuestionNo: 2, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{
+					{Speaker: "Muž", Text: "Kde je nádraží?"},
+					{Speaker: "Žena", Text: "Přímo za rohem."},
+				}}},
+			},
+			Options:        []contracts.ImageOption{{Key: "A"}, {Key: "B"}, {Key: "C"}, {Key: "D"}, {Key: "E"}, {Key: "F"}},
+			CorrectAnswers: map[string]string{"1": "A", "2": "B"},
+		},
+	})
+
+	s := NewServerForTest(repo, nil)
+	rec := &recordingDialogGen{}
+	s.audioGenerator = rec
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+
+	resp := postGenerateAudio(t, srv, created.ID)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	if len(rec.dialogCalls) != 1 {
+		t.Fatalf("dialog calls = %d, want 1 (merged audio with speakers)", len(rec.dialogCalls))
+	}
+	if len(rec.singleCalls) != 0 {
+		t.Errorf("single-voice calls = %d, want 0", len(rec.singleCalls))
+	}
+	segs := rec.dialogCalls[0]
+	if len(segs) != 4 {
+		t.Fatalf("segments = %d, want 4 (2 turns × 2 items)", len(segs))
+	}
+	wantSpeakers := []string{"Žena", "Muž", "Muž", "Žena"}
+	for i, want := range wantSpeakers {
+		if segs[i].Speaker != want {
+			t.Errorf("segment %d speaker = %q, want %q", i, segs[i].Speaker, want)
+		}
+	}
+}
+
+func TestAdminGenerateAudio_Poslech4_LegacySingleVoice_KeepsIndexAlternation(t *testing.T) {
+	t.Setenv("LOCAL_ASSETS_DIR", t.TempDir())
+	repo := store.NewMemoryStore()
+	created := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "poslech_4",
+		SkillKind:    "nghe",
+		ModuleID:     "mod-nghe",
+		Pool:         "course",
+		Status:       "draft",
+		Detail: contracts.Poslech4Detail{
+			Items: []contracts.DialogItem{
+				{QuestionNo: 1, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "Ahoj."}}}},
+				{QuestionNo: 2, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "Nazdar."}}}},
+			},
+			Options:        []contracts.ImageOption{{Key: "A"}, {Key: "B"}, {Key: "C"}, {Key: "D"}, {Key: "E"}, {Key: "F"}},
+			CorrectAnswers: map[string]string{"1": "A", "2": "B"},
+		},
+	})
+
+	s := NewServerForTest(repo, nil)
+	rec := &recordingDialogGen{}
+	s.audioGenerator = rec
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+
+	resp := postGenerateAudio(t, srv, created.ID)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	if len(rec.dialogCalls) != 1 {
+		t.Fatalf("dialog calls = %d, want 1 (per-item index alternation)", len(rec.dialogCalls))
+	}
+	segs := rec.dialogCalls[0]
+	if len(segs) != 2 {
+		t.Fatalf("segments = %d, want 2 (one per item)", len(segs))
+	}
+	for i, seg := range segs {
+		if seg.Speaker != "" {
+			t.Errorf("segment %d speaker = %q, want empty (legacy index-alternation)", i, seg.Speaker)
+		}
+	}
+}
+
+func TestAdminGenerateAudio_Poslech6_MultiSpeaker_RoutesToDialog(t *testing.T) {
+	t.Setenv("LOCAL_ASSETS_DIR", t.TempDir())
+	repo := store.NewMemoryStore()
+	created := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "poslech_6",
+		SkillKind:    "nghe",
+		ModuleID:     "mod-nghe",
+		Pool:         "course",
+		Status:       "draft",
+		Detail: contracts.AnoNeDetail{
+			Passage: "[Žena]: Dobrý den, tady úřad.\n[Muž]: Děkuji, na shledanou.",
+			Statements: []contracts.AnoNeStatement{
+				{QuestionNo: 1, Statement: "Úřad je otevřen."},
+			},
+			CorrectAnswers: map[string]string{"1": "ANO"},
+		},
+	})
+
+	s := NewServerForTest(repo, nil)
+	rec := &recordingDialogGen{}
+	s.audioGenerator = rec
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+
+	resp := postGenerateAudio(t, srv, created.ID)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	if len(rec.dialogCalls) != 1 {
+		t.Fatalf("dialog calls = %d, want 1", len(rec.dialogCalls))
+	}
+	segs := rec.dialogCalls[0]
+	if len(segs) != 2 || segs[0].Speaker != "Žena" || segs[1].Speaker != "Muž" {
+		t.Errorf("dialog segments = %+v", segs)
+	}
+	if segs[0].Text != "Dobrý den, tady úřad." {
+		t.Errorf("seg 0 text = %q", segs[0].Text)
+	}
+}
+
+func TestAdminGenerateAudio_Poslech6_PlainPassage_SingleVoice(t *testing.T) {
+	t.Setenv("LOCAL_ASSETS_DIR", t.TempDir())
+	repo := store.NewMemoryStore()
+	created := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "poslech_6",
+		SkillKind:    "nghe",
+		ModuleID:     "mod-nghe",
+		Pool:         "course",
+		Status:       "draft",
+		Detail: contracts.AnoNeDetail{
+			Passage: "Vlašim. Městský úřad je otevřen v pondělí.",
+			Statements: []contracts.AnoNeStatement{
+				{QuestionNo: 1, Statement: "Úřad je otevřen v pondělí."},
+			},
+			CorrectAnswers: map[string]string{"1": "ANO"},
+		},
+	})
+
+	s := NewServerForTest(repo, nil)
+	rec := &recordingDialogGen{}
+	s.audioGenerator = rec
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+
+	resp := postGenerateAudio(t, srv, created.ID)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	if len(rec.dialogCalls) != 0 {
+		t.Errorf("dialog calls = %d, want 0 (plain passage)", len(rec.dialogCalls))
+	}
+	if len(rec.singleCalls) != 1 || rec.singleCalls[0] == "" {
+		t.Errorf("single-voice calls = %+v, want 1 non-empty", rec.singleCalls)
+	}
+}
+
 func contains(s, sub string) bool {
 	return len(sub) <= len(s) && (s == sub || stringIndex(s, sub) >= 0)
 }

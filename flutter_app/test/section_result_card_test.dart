@@ -216,6 +216,35 @@ void main() {
       expect(find.text('Feedback'), findsNothing);
     });
 
+    testWidgets('poslech exerciseType wins over stale skillKind', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          SectionResultCard(
+            client: client,
+            result: _objectiveResult(
+              exerciseType: 'poslech_2',
+              breakdown: const [
+                QuestionResult(
+                  questionNo: 1,
+                  learnerAnswer: 'B',
+                  correctAnswer: 'B',
+                  isCorrect: true,
+                ),
+              ],
+            ),
+            skillKind: 'noi',
+            maxPoints: 5,
+            onRetry: () {},
+          ),
+        ),
+      );
+
+      expect(find.text('Question breakdown'), findsOneWidget);
+      expect(find.text('Feedback'), findsNothing);
+    });
+
     testWidgets('empty skillKind + exerciseType cteni_ → fallback doc', (
       tester,
     ) async {

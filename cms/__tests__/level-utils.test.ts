@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   CEFR_LEVELS,
   DEFAULT_COURSE_LEVEL,
+  cefrLevelRank,
+  nextCefrLevel,
+  canRaiseLevel,
   isCefrLevel,
   labelForLevel,
   isLowestLevel,
@@ -46,5 +49,27 @@ describe('CEFR level utilities', () => {
     expect(isLowestLevel('a1')).toBe(false);
     expect(isLowestLevel('a2')).toBe(false);
     expect(isLowestLevel('b1')).toBe(false);
+  });
+
+  it('ranks levels in progression order', () => {
+    expect(cefrLevelRank('a0')).toBe(0);
+    expect(cefrLevelRank('a1')).toBe(1);
+    expect(cefrLevelRank('a2')).toBe(2);
+    expect(cefrLevelRank('b1')).toBe(3);
+    expect(cefrLevelRank('unknown')).toBe(0);
+  });
+
+  it('returns the next manual promotion target', () => {
+    expect(nextCefrLevel('a0')).toBe('a1');
+    expect(nextCefrLevel('a1')).toBe('a2');
+    expect(nextCefrLevel('a2')).toBe('b1');
+    expect(nextCefrLevel('b1')).toBeNull();
+  });
+
+  it('allows manual level changes only upward or idempotently', () => {
+    expect(canRaiseLevel('a0', 'a1')).toBe(true);
+    expect(canRaiseLevel('a1', 'a1')).toBe(true);
+    expect(canRaiseLevel('a2', 'a1')).toBe(false);
+    expect(canRaiseLevel('a0', 'c1')).toBe(false);
   });
 });

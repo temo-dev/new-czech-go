@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_app/core/api/api_client.dart';
 import 'package:flutter_app/core/api/level_api.dart';
+import 'package:flutter_app/core/level_utils.dart';
 import 'package:flutter_app/core/theme/app_colors.dart';
 import 'package:flutter_app/core/theme/app_spacing.dart';
 import 'package:flutter_app/features/mock_exam/screens/mock_exam_screen.dart';
+import 'package:flutter_app/l10n/generated/app_localizations.dart';
 import 'package:flutter_app/models/models.dart';
-import 'placement_result_screen.dart';
 
 /// PlacementTestScreen is a thin wrapper around [MockExamScreen] for the
 /// V21.3 onboarding placement flow.
@@ -17,8 +18,9 @@ import 'placement_result_screen.dart';
 ///   3. Shows [MockExamScreen(initialSession, onCompleted)] — the runner
 ///      handles all section navigation without changes.
 ///   4. [MockExamScreen.onCompleted] fires → [LevelApi.completePlacement]
-///      → [PlacementResultScreen(assignedLevel, scorePct)]
-///   5. Learner taps "Bắt đầu học" → [onFinished] → CefrAuthGate
+///      → placement result dialog with the assigned/current level.
+///      Dismissing the dialog returns to MockExamScreen's built-in result view.
+///   5. Learner taps "Bắt đầu học" on that result view → [onFinished] → CefrAuthGate
 ///      refreshes, LearnerShell mounts.
 ///
 /// [LevelApi] and [ApiClient] are injected so tests can supply stubs
@@ -42,6 +44,7 @@ class PlacementTestScreen extends StatefulWidget {
 class _PlacementTestScreenState extends State<PlacementTestScreen> {
   _PlacementReady? _ready;
   String? _error;
+  bool _placementResultDialogShown = false;
 
   @override
   void initState() {
@@ -56,10 +59,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
       final session = MockExamSessionView.fromJson(raw);
       if (!mounted) return;
       setState(() {
-        _ready = _PlacementReady(
-          session: session,
-          fullSessionId: started.fullSessionId,
-        );
+        _ready = _PlacementReady(session: session);
       });
     } catch (e) {
       if (!mounted) return;
@@ -68,26 +68,92 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
   }
 
   Future<void> _onCompleted(String sessionId) async {
+    if (_placementResultDialogShown) return;
+    _placementResultDialogShown = true;
     try {
       final result = await widget.levelApi.completePlacement(sessionId);
       if (!mounted) return;
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder:
-              (_) => PlacementResultScreen(
-                assignedLevel: result.assignedLevel,
-                scorePct: result.scorePct,
-                onContinue: widget.onFinished,
-              ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      // Surface as a snackbar — the exam is done, don't block the user.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      await _showPlacementResultDialog(result);
+    } catch (_) {
+      _placementResultDialogShown = false;
+      rethrow;
     }
+  }
+
+  Future<void> _showPlacementResultDialog(PlacementCompleteResult result) {
+    final l = AppLocalizations.of(context);
+    final currentLevel = cefrLevelLabel(result.currentLevel);
+    final isPass =
+        cefrLevelOrder(result.assignedLevel) > cefrLevelOrder(CefrLevel.a0);
+    final score = result.scorePct.round();
+    final color = isPass ? AppColors.success : AppColors.warning;
+    final containerColor =
+        isPass ? AppColors.successContainer : AppColors.warningContainer;
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          key: const Key('placement_result_dialog'),
+          icon: Icon(
+            isPass ? Icons.celebration_outlined : Icons.school_outlined,
+            color: color,
+            size: 32,
+          ),
+          title: Text(
+            isPass
+                ? l.placementResultDialogPassTitle
+                : l.placementResultDialogEncourageTitle,
+            textAlign: TextAlign.center,
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  color: containerColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: color, width: 3),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  currentLevel,
+                  style: TextStyle(
+                    color:
+                        isPass
+                            ? AppColors.success
+                            : AppColors.onTertiaryContainer,
+                    fontSize: 40,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.x4),
+              Text(
+                isPass
+                    ? l.placementResultDialogPassBody(currentLevel, score)
+                    : l.placementResultDialogEncourageBody(currentLevel, score),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.onSurfaceVariant,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(l.placementResultDialogCta),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -134,9 +200,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
     if (ready == null) {
       return const Scaffold(
         body: Center(
-          child: CircularProgressIndicator(
-            key: Key('placement_test_loading'),
-          ),
+          child: CircularProgressIndicator(key: Key('placement_test_loading')),
         ),
       );
     }
@@ -147,14 +211,16 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
         client: widget.client,
         initialSession: ready.session,
         onCompleted: (sessionId) => _onCompleted(sessionId),
+        showResultAfterCompletionCallback: true,
+        resultCtaLabel: AppLocalizations.of(context).placementStartLearningCta,
+        onResultCta: widget.onFinished,
+        showProminentSubmitAction: true,
       ),
     );
   }
 }
 
 class _PlacementReady {
-  const _PlacementReady({required this.session, required this.fullSessionId});
+  const _PlacementReady({required this.session});
   final MockExamSessionView session;
-  final String fullSessionId;
 }
-

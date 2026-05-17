@@ -324,6 +324,31 @@ func TestAdminListUsers_PopulatesAttemptsToday(t *testing.T) {
 	}
 }
 
+func TestAdminListUsers_IncludesLevelState(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "level@example.com", "Level")
+	if _, err := env.levels.SetUserLevel(u.ID, "a1"); err != nil {
+		t.Fatalf("seed level: %v", err)
+	}
+
+	resp, body := adminGet(t, env, "/v1/admin/users?search=level@example.com")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d body=%v", resp.StatusCode, body)
+	}
+	data, _ := body["data"].([]any)
+	if len(data) != 1 {
+		t.Fatalf("want 1 user, got %d", len(data))
+	}
+	row, _ := data[0].(map[string]any)
+	if got := row["current_level"]; got != "a1" {
+		t.Errorf("current_level = %v, want a1", got)
+	}
+	unlocked, _ := row["unlocked_levels"].([]any)
+	if len(unlocked) != 2 || unlocked[0] != "a0" || unlocked[1] != "a1" {
+		t.Errorf("unlocked_levels = %v, want [a0 a1]", unlocked)
+	}
+}
+
 func TestAdminResetUsage_HappyPath_ZeroesAttemptsKeepsInterviews(t *testing.T) {
 	env := newAuthTestEnv(t)
 	u := seedLearner(t, env, "capped@example.com", "Capped")
@@ -364,6 +389,286 @@ func TestAdminResetUsage_RequiresAdmin(t *testing.T) {
 	u := seedLearner(t, env, "victim@example.com", "Victim")
 
 	resp, err := http.Post(env.srv.URL+"/v1/admin/users/"+u.ID+"/usage/reset", "application/json", nil)
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("want 401, got %d", resp.StatusCode)
+	}
+}
+
+// ── Admin row response helpers ───────────────────────────────────────────────
+
+func decodeAdminUserData(t *testing.T, resp *http.Response) map[string]any {
+	t.Helper()
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	data, ok := body["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("response missing data object: %v", body)
+	}
+	return data
+}
+
+// ── Manual level upgrade ────────────────────────────────────────────────────
+
+func TestAdminSetUserLevel_PromotesA0ToA1(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "a0@example.com", "A0")
+
+	resp := adminPostJSON(t, env, "/v1/admin/users/"+u.ID+"/level",
+		map[string]string{"current_level": "A1"})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d", resp.StatusCode)
+	}
+	data := decodeAdminUserData(t, resp)
+	if data["current_level"] != "a1" {
+		t.Errorf("response current_level = %v, want a1", data["current_level"])
+	}
+
+	stored, ok := env.levels.GetUserLevel(u.ID)
+	if !ok {
+		t.Fatal("level row should exist after manual upgrade")
+	}
+	if stored.CurrentLevel != "a1" {
+		t.Errorf("stored CurrentLevel = %q, want a1", stored.CurrentLevel)
+	}
+	if len(stored.UnlockedLevels) != 2 || stored.UnlockedLevels[0] != "a0" || stored.UnlockedLevels[1] != "a1" {
+		t.Errorf("stored UnlockedLevels = %v, want [a0 a1]", stored.UnlockedLevels)
+	}
+}
+
+func TestAdminSetUserLevel_InvalidLevel_Returns400(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "bad-level@example.com", "Bad")
+
+	resp := adminPostJSON(t, env, "/v1/admin/users/"+u.ID+"/level",
+		map[string]string{"current_level": "c1"})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("want 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminSetUserLevel_Downgrade_Returns400(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "a2@example.com", "A2")
+	if _, err := env.levels.SetUserLevel(u.ID, "a2"); err != nil {
+		t.Fatalf("seed level: %v", err)
+	}
+
+	resp := adminPostJSON(t, env, "/v1/admin/users/"+u.ID+"/level",
+		map[string]string{"current_level": "a1"})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("want 400, got %d", resp.StatusCode)
+	}
+	stored, _ := env.levels.GetUserLevel(u.ID)
+	if stored.CurrentLevel != "a2" {
+		t.Errorf("downgrade must not mutate level, got %q", stored.CurrentLevel)
+	}
+}
+
+func TestAdminSetUserLevel_AdminTarget_Forbidden(t *testing.T) {
+	env := newAuthTestEnv(t)
+	target, err := env.users.CreateUser(contracts.UserAccount{
+		Email:        "other-admin@example.com",
+		PasswordHash: "x",
+		Role:         "admin",
+	})
+	if err != nil {
+		t.Fatalf("seed admin: %v", err)
+	}
+	resp := adminPostJSON(t, env, "/v1/admin/users/"+target.ID+"/level",
+		map[string]string{"current_level": "a1"})
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("want 403, got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminSetUserLevel_RequiresAdmin(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "level-auth@example.com", "Auth")
+	resp, err := http.Post(env.srv.URL+"/v1/admin/users/"+u.ID+"/level", "application/json", nil)
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("want 401, got %d", resp.StatusCode)
+	}
+}
+
+// ── Pro grant / downgrade ────────────────────────────────────────────────────
+
+func TestAdminSetUserPro_GrantsProAndSetsExpiry(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "free@example.com", "Free")
+
+	before := time.Now().UTC()
+	resp := adminPostJSON(t, env, "/v1/admin/users/"+u.ID+"/pro",
+		map[string]int{"duration_days": 30})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d", resp.StatusCode)
+	}
+	data := decodeAdminUserData(t, resp)
+	if data["pro_tier"] != "pro" {
+		t.Errorf("want pro_tier=pro, got %v", data["pro_tier"])
+	}
+
+	updated, _ := env.users.UserAccountByID(u.ID)
+	if updated.ProTier != "pro" {
+		t.Errorf("want stored ProTier=pro, got %q", updated.ProTier)
+	}
+	if updated.ProExpiresAt == nil {
+		t.Fatal("ProExpiresAt should be set after grant")
+	}
+	want := before.Add(30 * 24 * time.Hour)
+	delta := updated.ProExpiresAt.Sub(want)
+	if delta < -time.Minute || delta > time.Minute {
+		t.Errorf("expiry off by %v (want ~%v, got %v)", delta, want, *updated.ProExpiresAt)
+	}
+}
+
+func TestAdminSetUserPro_ExtendsFromCurrentExpiry(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "pro@example.com", "Pro")
+
+	currentExpiry := time.Now().UTC().Add(20 * 24 * time.Hour)
+	if _, ok := env.users.UpdateUser(u.ID, func(acc *contracts.UserAccount) {
+		acc.ProTier = "pro"
+		acc.ProExpiresAt = &currentExpiry
+	}); !ok {
+		t.Fatal("seed pro user")
+	}
+
+	resp := adminPostJSON(t, env, "/v1/admin/users/"+u.ID+"/pro",
+		map[string]int{"duration_days": 30})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d", resp.StatusCode)
+	}
+
+	updated, _ := env.users.UserAccountByID(u.ID)
+	if updated.ProExpiresAt == nil {
+		t.Fatal("expiry nil after extend")
+	}
+	want := currentExpiry.Add(30 * 24 * time.Hour)
+	delta := updated.ProExpiresAt.Sub(want)
+	if delta < -time.Second || delta > time.Second {
+		t.Errorf("expiry should extend from old expiry; got %v want %v (delta %v)",
+			*updated.ProExpiresAt, want, delta)
+	}
+}
+
+func TestAdminSetUserPro_ExpiredProRebasesFromNow(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "expired@example.com", "Expired")
+
+	pastExpiry := time.Now().UTC().Add(-5 * 24 * time.Hour)
+	if _, ok := env.users.UpdateUser(u.ID, func(acc *contracts.UserAccount) {
+		acc.ProTier = "pro"
+		acc.ProExpiresAt = &pastExpiry
+	}); !ok {
+		t.Fatal("seed expired pro user")
+	}
+
+	before := time.Now().UTC()
+	resp := adminPostJSON(t, env, "/v1/admin/users/"+u.ID+"/pro",
+		map[string]int{"duration_days": 7})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d", resp.StatusCode)
+	}
+
+	updated, _ := env.users.UserAccountByID(u.ID)
+	if updated.ProExpiresAt == nil || !updated.ProExpiresAt.After(before.Add(6*24*time.Hour)) {
+		t.Errorf("expired Pro should rebase from now; got %v", updated.ProExpiresAt)
+	}
+}
+
+func TestAdminSetUserPro_ZeroDurationDowngrades(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "pro@example.com", "Pro")
+
+	exp := time.Now().UTC().Add(30 * 24 * time.Hour)
+	if _, ok := env.users.UpdateUser(u.ID, func(acc *contracts.UserAccount) {
+		acc.ProTier = "pro"
+		acc.ProExpiresAt = &exp
+	}); !ok {
+		t.Fatal("seed pro user")
+	}
+
+	resp := adminPostJSON(t, env, "/v1/admin/users/"+u.ID+"/pro",
+		map[string]int{"duration_days": 0})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d", resp.StatusCode)
+	}
+	data := decodeAdminUserData(t, resp)
+	if data["pro_tier"] != "free" {
+		t.Errorf("want pro_tier=free, got %v", data["pro_tier"])
+	}
+
+	updated, _ := env.users.UserAccountByID(u.ID)
+	if updated.ProTier != "free" {
+		t.Errorf("want stored ProTier=free, got %q", updated.ProTier)
+	}
+	if updated.ProExpiresAt != nil {
+		t.Errorf("expiry should be nil after downgrade, got %v", updated.ProExpiresAt)
+	}
+}
+
+func TestAdminSetUserPro_NegativeDuration_Returns400(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "u@example.com", "U")
+
+	resp := adminPostJSON(t, env, "/v1/admin/users/"+u.ID+"/pro",
+		map[string]int{"duration_days": -1})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("want 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminSetUserPro_HugeDuration_Returns400(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "u@example.com", "U")
+
+	resp := adminPostJSON(t, env, "/v1/admin/users/"+u.ID+"/pro",
+		map[string]int{"duration_days": 9999})
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("want 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminSetUserPro_AdminTarget_Forbidden(t *testing.T) {
+	env := newAuthTestEnv(t)
+	target, err := env.users.CreateUser(contracts.UserAccount{
+		Email:        "other-admin@example.com",
+		PasswordHash: "x",
+		Role:         "admin",
+	})
+	if err != nil {
+		t.Fatalf("seed admin: %v", err)
+	}
+	resp := adminPostJSON(t, env, "/v1/admin/users/"+target.ID+"/pro",
+		map[string]int{"duration_days": 30})
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("want 403, got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminSetUserPro_NotFound_Returns404(t *testing.T) {
+	env := newAuthTestEnv(t)
+	resp := adminPostJSON(t, env, "/v1/admin/users/u_nonexistent/pro",
+		map[string]int{"duration_days": 30})
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("want 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestAdminSetUserPro_RequiresAdmin(t *testing.T) {
+	env := newAuthTestEnv(t)
+	u := seedLearner(t, env, "u@example.com", "U")
+	resp, err := http.Post(env.srv.URL+"/v1/admin/users/"+u.ID+"/pro", "application/json", nil)
 	if err != nil {
 		t.Fatalf("post: %v", err)
 	}

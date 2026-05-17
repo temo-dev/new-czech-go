@@ -65,6 +65,20 @@ void main() {
       );
       expect(sectionSkillKind(section), 'interview');
     });
+
+    test('prefers exerciseType when skillKind contradicts', () {
+      const section = MockExamSection(
+        sequenceNo: 2,
+        skillKind: 'noi',
+        exerciseId: 'poslech-2',
+        exerciseType: 'poslech_2',
+        maxPoints: 5,
+        attemptId: '',
+        sectionScore: 0,
+        status: 'pending',
+      );
+      expect(sectionSkillKind(section), 'nghe');
+    });
   });
 
   group('skillLabel', () {

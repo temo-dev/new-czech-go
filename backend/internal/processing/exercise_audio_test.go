@@ -560,3 +560,331 @@ func TestDevExerciseAudioGenerator_GenerateItemAudio(t *testing.T) {
 		t.Fatal("expected non-empty stub item audio")
 	}
 }
+
+// ── V39: per-item dialog audio (poslech_1 multi-speaker) ─────────────────────
+
+func TestBuildExerciseItemDialogs_PreservesSpeakers(t *testing.T) {
+	exercise := contracts.Exercise{
+		ExerciseType: "poslech_1",
+		Detail: contracts.Poslech1Detail{
+			Items: []contracts.ListeningItem{
+				{
+					QuestionNo: 1,
+					AudioSource: contracts.ListeningAudioSource{
+						Segments: []contracts.AudioSegment{
+							{Speaker: "Žena", Text: "Dobrý den."},
+							{Speaker: "Muž", Text: "Dobrý den, ano."},
+							{Speaker: "Žena", Text: "Děkuju."},
+						},
+					},
+				},
+				{
+					QuestionNo: 2,
+					AudioSource: contracts.ListeningAudioSource{
+						Segments: []contracts.AudioSegment{{Text: "Jak se jmenujete?"}},
+					},
+				},
+			},
+		},
+	}
+	got := BuildExerciseItemDialogs(exercise)
+	if len(got) != 2 {
+		t.Fatalf("got %d dialogs, want 2", len(got))
+	}
+	if got[0].ItemNo != 1 || len(got[0].Segments) != 3 {
+		t.Fatalf("dialog 0 = %+v, want item 1 with 3 segments", got[0])
+	}
+	if got[0].Segments[0].Speaker != "Žena" || got[0].Segments[0].Text != "Dobrý den." {
+		t.Errorf("seg 0 = %+v", got[0].Segments[0])
+	}
+	if got[0].Segments[1].Speaker != "Muž" {
+		t.Errorf("seg 1 speaker = %q, want Muž", got[0].Segments[1].Speaker)
+	}
+	if got[1].ItemNo != 2 || got[1].Segments[0].Speaker != "" {
+		t.Errorf("dialog 1 = %+v, want item 2 single anonymous segment", got[1])
+	}
+}
+
+func TestBuildExerciseItemDialogs_SkipsUploadedAndEmpty(t *testing.T) {
+	exercise := contracts.Exercise{
+		ExerciseType: "poslech_1",
+		Detail: contracts.Poslech1Detail{
+			Items: []contracts.ListeningItem{
+				{QuestionNo: 1, AudioSource: contracts.ListeningAudioSource{AssetID: "uploaded"}},
+				{QuestionNo: 2, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "   "}}}},
+				{QuestionNo: 3, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Speaker: "A", Text: "Real"}}}},
+			},
+		},
+	}
+	got := BuildExerciseItemDialogs(exercise)
+	if len(got) != 1 || got[0].ItemNo != 3 {
+		t.Fatalf("got %+v, want only item 3", got)
+	}
+}
+
+func TestBuildExerciseItemDialogs_NonPoslech1_Nil(t *testing.T) {
+	exercise := contracts.Exercise{ExerciseType: "poslech_2"}
+	if got := BuildExerciseItemDialogs(exercise); got != nil {
+		t.Errorf("non-poslech_1 should return nil, got %+v", got)
+	}
+}
+
+func TestItemDialogHasMultipleSpeakers(t *testing.T) {
+	cases := []struct {
+		name string
+		segs []contracts.AudioSegment
+		want bool
+	}{
+		{"two distinct", []contracts.AudioSegment{{Speaker: "Žena", Text: "a"}, {Speaker: "Muž", Text: "b"}}, true},
+		{"same speaker twice", []contracts.AudioSegment{{Speaker: "Žena", Text: "a"}, {Speaker: "Žena", Text: "b"}}, false},
+		{"no speakers", []contracts.AudioSegment{{Text: "a"}, {Text: "b"}}, false},
+		{"one labeled one unlabeled", []contracts.AudioSegment{{Speaker: "Žena", Text: "a"}, {Text: "b"}}, false},
+		{"empty", nil, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ItemDialogHasMultipleSpeakers(tc.segs); got != tc.want {
+				t.Errorf("ItemDialogHasMultipleSpeakers = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPollyExerciseAudioGenerator_GenerateItemDialogAudio_SpeakerRouting(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LOCAL_ASSETS_DIR", dir)
+
+	primary := &fileWritingMockTTS{}   // voice A — Polly female (g.tts)
+	secondary := &fileWritingMockTTS{} // voice B — ElevenLabs male (g.ttsB)
+	gen := NewPollyExerciseAudioGenerator(primary).WithDialogVoice(secondary)
+
+	segments := []contracts.AudioSegment{
+		{Speaker: "Žena", Text: "Dobrý den."},
+		{Speaker: "Muž", Text: "Dobrý den, ano, to jsem já."},
+		{Speaker: "Žena", Text: "Teď se právě dívám."},
+		{Speaker: "Muž", Text: "Chci na ten kurz."},
+	}
+	audio, err := gen.GenerateItemDialogAudio("ex-99", 1, segments)
+	if err != nil {
+		t.Fatalf("GenerateItemDialogAudio error: %v", err)
+	}
+
+	wantKey := "exercise-audio/ex-99/item-1.mp3"
+	if audio.StorageKey != wantKey {
+		t.Errorf("StorageKey = %q, want %q", audio.StorageKey, wantKey)
+	}
+	if audio.SourceType != "polly" {
+		t.Errorf("SourceType = %q, want polly", audio.SourceType)
+	}
+
+	if len(primary.calls) != 2 {
+		t.Errorf("primary female voice calls = %d, want 2", len(primary.calls))
+	}
+	if len(secondary.calls) != 2 {
+		t.Errorf("secondary male voice calls = %d, want 2", len(secondary.calls))
+	}
+	if len(primary.calls) >= 1 && primary.calls[0].Text != "Dobrý den." {
+		t.Errorf("primary first call text = %q, want female opening", primary.calls[0].Text)
+	}
+	if len(secondary.calls) >= 1 && secondary.calls[0].Text != "Dobrý den, ano, to jsem já." {
+		t.Errorf("secondary first call text = %q, want male reply", secondary.calls[0].Text)
+	}
+
+	// Concatenated file should land at exercise-audio path.
+	if _, err := os.Stat(localExerciseAudioPath(wantKey)); err != nil {
+		t.Errorf("merged file missing: %v", err)
+	}
+}
+
+func TestPollyExerciseAudioGenerator_GenerateItemDialogAudio_NoTtsBFallsBackToTts(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LOCAL_ASSETS_DIR", dir)
+
+	primary := &fileWritingMockTTS{}
+	gen := NewPollyExerciseAudioGenerator(primary) // no WithDialogVoice — ttsB nil
+
+	segments := []contracts.AudioSegment{
+		{Speaker: "Žena", Text: "Ahoj."},
+		{Speaker: "Muž", Text: "Ahoj."},
+	}
+	_, err := gen.GenerateItemDialogAudio("ex-x", 2, segments)
+	if err != nil {
+		t.Fatalf("GenerateItemDialogAudio error: %v", err)
+	}
+	// Without ttsB the first-speaker slot maps to nil; both segments must
+	// fall through to the index-based fallback which always uses tts when
+	// ttsB is nil. So both calls land on the primary.
+	if len(primary.calls) != 2 {
+		t.Errorf("primary calls = %d, want 2 (ttsB nil → all on primary)", len(primary.calls))
+	}
+}
+
+func TestPollyExerciseAudioGenerator_GenerateItemDialogAudio_EmptySegments(t *testing.T) {
+	gen := NewPollyExerciseAudioGenerator(&fileWritingMockTTS{})
+	if _, err := gen.GenerateItemDialogAudio("ex", 1, nil); err == nil {
+		t.Fatal("expected error for empty segments")
+	}
+}
+
+func TestItemDialogAudioGenerator_InterfaceSatisfaction(t *testing.T) {
+	// Compile-time assertion: Polly satisfies the new dialog interface and
+	// Dev keeps the stub implementation so dev-mode admins can still test
+	// the per-item multi-speaker route.
+	var _ ItemDialogAudioGenerator = (*PollyExerciseAudioGenerator)(nil)
+	var _ ItemDialogAudioGenerator = DevExerciseAudioGenerator{}
+}
+
+// ── V39: poslech_4 multi-speaker routing ─────────────────────────────────────
+
+func TestHasMultipleSpeakers_Poslech4_DialogTurns(t *testing.T) {
+	exercise := contracts.Exercise{
+		ExerciseType: "poslech_4",
+		Detail: contracts.Poslech4Detail{
+			Items: []contracts.DialogItem{
+				{
+					QuestionNo: 1,
+					AudioSource: contracts.ListeningAudioSource{
+						Segments: []contracts.AudioSegment{
+							{Speaker: "Žena", Text: "Co byste si přál?"},
+							{Speaker: "Muž", Text: "Kávu prosím."},
+						},
+					},
+				},
+			},
+		},
+	}
+	if !HasMultipleSpeakers(exercise) {
+		t.Fatal("poslech_4 with Žena+Muž turns must report multi-speaker")
+	}
+	segs := BuildExerciseDialogSegments(exercise)
+	if len(segs) != 2 {
+		t.Fatalf("got %d segments, want 2", len(segs))
+	}
+	if segs[0].Speaker != "Žena" || segs[1].Speaker != "Muž" {
+		t.Errorf("segment speakers = %q,%q; want Žena,Muž", segs[0].Speaker, segs[1].Speaker)
+	}
+}
+
+func TestHasMultipleSpeakers_Poslech4_SingleVoicePerItem(t *testing.T) {
+	// Legacy P4 design — each item one anonymous segment. Should not be
+	// treated as multi-speaker; the server still routes through the
+	// per-item index-alternation path.
+	exercise := contracts.Exercise{
+		ExerciseType: "poslech_4",
+		Detail: contracts.Poslech4Detail{
+			Items: []contracts.DialogItem{
+				{QuestionNo: 1, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "Ahoj."}}}},
+				{QuestionNo: 2, AudioSource: contracts.ListeningAudioSource{Segments: []contracts.AudioSegment{{Text: "Nazdar."}}}},
+			},
+		},
+	}
+	if HasMultipleSpeakers(exercise) {
+		t.Error("anonymous segments should not count as multi-speaker")
+	}
+}
+
+// ── V39: poslech_6 passage speaker parsing ───────────────────────────────────
+
+func TestParseSpeakerPassage_MultiSpeaker(t *testing.T) {
+	passage := "[Žena]: Dobrý den, tady úřad.\n[Muž]: Děkuji, na shledanou."
+	got := parseSpeakerPassage(passage)
+	if len(got) != 2 {
+		t.Fatalf("got %d segments, want 2", len(got))
+	}
+	if got[0].Speaker != "Žena" || got[0].Text != "Dobrý den, tady úřad." {
+		t.Errorf("seg 0 = %+v", got[0])
+	}
+	if got[1].Speaker != "Muž" || got[1].Text != "Děkuji, na shledanou." {
+		t.Errorf("seg 1 = %+v", got[1])
+	}
+}
+
+func TestParseSpeakerPassage_NoMarkers(t *testing.T) {
+	passage := "Plain prose without speaker labels.\nSecond line."
+	got := parseSpeakerPassage(passage)
+	if len(got) != 2 {
+		t.Fatalf("got %d segments, want 2 anonymous lines", len(got))
+	}
+	for i, seg := range got {
+		if seg.Speaker != "" {
+			t.Errorf("seg %d unexpectedly has speaker %q", i, seg.Speaker)
+		}
+	}
+}
+
+func TestParseSpeakerPassage_SpeakerContinuationLines(t *testing.T) {
+	passage := "[Žena]: Dobrý den, tady jazyková škola Atlas. Vy jste poslal přihlášku\n" +
+		"do kurzu češtiny pro cizince?\n" +
+		"[Muž]: Ano, poslal jsem ji minulý týden."
+	got := parseSpeakerPassage(passage)
+	if len(got) != 2 {
+		t.Fatalf("got %d segments, want 2 merged speaker turns: %+v", len(got), got)
+	}
+	if got[0].Speaker != "Žena" {
+		t.Fatalf("first speaker = %q, want Žena", got[0].Speaker)
+	}
+	wantFirst := "Dobrý den, tady jazyková škola Atlas. Vy jste poslal přihlášku do kurzu češtiny pro cizince?"
+	if got[0].Text != wantFirst {
+		t.Errorf("first text = %q, want %q", got[0].Text, wantFirst)
+	}
+	if got[1].Speaker != "Muž" {
+		t.Errorf("second speaker = %q, want Muž", got[1].Speaker)
+	}
+}
+
+func TestParseSpeakerPassage_MixedAndEmptyLines(t *testing.T) {
+	passage := "[Žena]: Hello.\n\nPlain line.\n[Muž]: World.\n  \n[Žena]:   "
+	got := parseSpeakerPassage(passage)
+	// Empty / whitespace-only lines skipped; trailing empty speaker line skipped.
+	if len(got) != 3 {
+		t.Fatalf("got %d segments, want 3: %+v", len(got), got)
+	}
+	if got[0].Speaker != "Žena" || got[1].Speaker != "" || got[2].Speaker != "Muž" {
+		t.Errorf("speakers = %+v", got)
+	}
+}
+
+func TestHasMultipleSpeakers_Poslech6_Passage(t *testing.T) {
+	exercise := contracts.Exercise{
+		ExerciseType: "poslech_6",
+		Detail: contracts.AnoNeDetail{
+			Passage: "[Žena]: Dobrý den.\n[Muž]: Dobrý den, prosím vás.",
+		},
+	}
+	if !HasMultipleSpeakers(exercise) {
+		t.Fatal("poslech_6 passage with [Žena]+[Muž] markers must be multi-speaker")
+	}
+	segs := BuildExerciseDialogSegments(exercise)
+	if len(segs) != 2 || segs[0].Speaker != "Žena" || segs[1].Speaker != "Muž" {
+		t.Errorf("dialog segments = %+v", segs)
+	}
+}
+
+func TestHasMultipleSpeakers_Poslech6_PlainPassage(t *testing.T) {
+	exercise := contracts.Exercise{
+		ExerciseType: "poslech_6",
+		Detail: contracts.AnoNeDetail{
+			Passage: "Vlašim. Městský úřad je otevřen v pondělí.",
+		},
+	}
+	if HasMultipleSpeakers(exercise) {
+		t.Error("plain passage without speaker markers should not count as multi-speaker")
+	}
+}
+
+func TestBuildExerciseAudioText_Poslech6_StripsSpeakerMarkers(t *testing.T) {
+	// Single-speaker fallback: even when the passage has one [Žena]: marker,
+	// the flat text must drop the bracketed prefix so Polly doesn't read
+	// "Žena colon Hello" out loud.
+	exercise := contracts.Exercise{
+		ExerciseType: "poslech_6",
+		Detail: contracts.AnoNeDetail{
+			Passage: "[Žena]: Dobrý den, tady úřad.",
+		},
+	}
+	got := BuildExerciseAudioText(exercise)
+	want := "Dobrý den, tady úřad."
+	if got != want {
+		t.Errorf("BuildExerciseAudioText = %q, want %q", got, want)
+	}
+}

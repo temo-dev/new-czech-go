@@ -10,6 +10,431 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V42.7 — Psaní 1 Dynamic Form Questions — 2026-05-17
+
+CMS/backend hotfix for Psaní 1 authoring: the form-question list no longer
+caps at three rows. Admin can keep pressing `+ Thêm` after three questions,
+CMS validation accepts any non-empty question list, and backend
+`submit-text` accepts one answer per authored question as long as each answer
+meets the per-answer word-count rule.
+
+### Verification
+
+- CMS: `rtk npm test -- __tests__/writing-fields.test.ts
+  __tests__/exercise-form-validation.test.ts` green (15 passed).
+- CMS: `rtk npm test` green (331 passed).
+- CMS: `rtk make cms-lint` + `rtk make cms-build` green.
+- Backend: `rtk go test ./internal/processing -run
+  'TestValidateWritingSubmission_Psani1|TestWritingText'` green (10 passed).
+- Backend: direct `rtk go test ./...` green (966 passed). `rtk make
+  backend-test` hit an `rtk` wrapper "No tests found" issue, so the equivalent
+  direct command was used.
+
+---
+
+## V42.6 — Psaní 2 Dynamic Email Prompts — 2026-05-17
+
+CMS hotfix for Psaní 2 authoring: the email topic/image prompt list no
+longer requires exactly five rows. Admin can save one or more prompts and add
+extra rows freely; validation now only rejects an empty topic list. Follow-up
+fix: `WritingFields` preserves blank draft rows so the `+ Thêm` button visibly
+adds a new editable line instead of the row being filtered out on rerender.
+CMS guide copy and the stable content contract were updated to match.
+
+### Verification
+
+- CMS: `rtk npm test -- __tests__/writing-fields.test.ts
+  __tests__/exercise-form-validation.test.ts` green (13 passed).
+- CMS: `rtk npm test` green (329 passed).
+- CMS: `rtk make cms-lint` + `rtk make cms-build` green.
+
+---
+
+## V42.5 — Placement Level Popup — 2026-05-17
+
+Fixes the placement result UX gap where the backend returned
+`assigned_level` / `current_level`, but Flutter discarded the
+`PlacementCompleteResult` and only showed the exam score/result breakdown.
+
+### Flutter
+
+- `PlacementTestScreen` now awaits `completePlacement`, reads the returned
+  current level, and shows a modal result popup before the learner reviews the
+  detailed exam result.
+- Learners placed above A0 see a congratulatory popup with their current level
+  and placement score.
+- Learners still at A0 see an encouragement popup with their current level and
+  placement score, then can continue to review the exam result below.
+
+### Verification
+
+- Flutter: `rtk flutter test` green (447 passed).
+- `rtk flutter analyze` still reports the same 11 pre-existing issues noted in
+  V42.2/V42.4; no new analyzer issue from this slice.
+
+---
+
+## V42.4 — Placement Result UX + Auto Submit — 2026-05-17
+
+Finishes the learner-facing placement/test result loop after the score-rollup
+guard: expiring exams now submit from the Flutter runner, placement keeps the
+exam result visible after server completion, and learners can drill into each
+attempt for answers and feedback before starting lessons.
+
+### Flutter
+
+- `MockExamScreen` now auto-runs the submit path when the server-anchored
+  countdown reaches zero. It bypasses the manual confirm dialog, expires
+  remaining pending sections, then calls `/complete` so the result screen shows
+  the rolled-up score.
+- Completed mock/placement exams now show a per-skill summary block and a
+  section breakdown hint. Existing section cards remain tappable and open the
+  attempt detail screen with answers, transcript, and feedback.
+- `PlacementTestScreen` now uses `completePlacement` as a side-effect and keeps
+  the built-in exam result view on screen. Its CTA is localized as
+  “Bắt đầu học” and calls the existing `onFinished` path so the learner returns
+  to Home.
+
+### Verification
+
+- Flutter: `rtk flutter test` green (445 passed).
+- `rtk flutter analyze` still reports the 11 pre-existing issues already
+  noted in V42.2 (`promotion_result_screen.dart`, `main.dart`, and older
+  tests); no new analyzer issue from this slice.
+
+---
+
+## V42.3 — Placement Score Rollup Guard — 2026-05-17
+
+Fixes placement completion assigning A0 from a stale `overall_score` when
+section attempts were already attached but the mock-exam rollup had not run
+yet, or when speaking analysis was still pending.
+
+### Backend
+
+- `POST /v1/users/me/placement-test/complete` now forces
+  `CompleteMockExam` when the placement session has completed attempt-backed
+  sections, then maps the freshly rolled-up score to a CEFR level.
+- If linked attempts are not scored yet, the endpoint returns
+  `409 placement_score_not_ready` and does not write `placement_taken_at`.
+- If a placement session is still in progress with pending sections, the
+  endpoint returns `409 placement_not_finished` instead of assigning a level
+  from a stale zero score.
+
+### Verification
+
+- Backend: `rtk go test ./...` green (966 passed).
+
+---
+
+## V42.2 — Objective Answer-Key Guard — 2026-05-17
+
+Fixes the mock-exam Flutter failure where a `cteni_5` item missing
+`detail.correct_answers` reached scoring and surfaced as
+`HttpException: Scoring failed.`
+
+### Backend
+
+- Objective scorer now marks malformed objective content as
+  `ObjectiveContentError`.
+- `POST /v1/attempts/:id/submit-answers` maps that known content issue to
+  `422 content_invalid` instead of a generic 500.
+- Admin exercise publish validation now blocks `cteni_1..6` and
+  `poslech_1..6` objective exercises when any expected question lacks a
+  non-empty `correct_answers` entry.
+
+### CMS / Flutter
+
+- CMS reading-form validation now requires `correct_answers` coverage for
+  dynamic `cteni_1..5` rows.
+- Flutter reading/listening submit failures use localized friendly messages;
+  `content_invalid` renders “Bài này đang thiếu đáp án trong hệ thống…”
+  instead of the raw exception string.
+
+### Docs / Tests
+
+- `docs/reference/api-contracts.md` documents `422 content_invalid` for
+  `submit-answers`.
+- Added regression coverage across backend, CMS, and Flutter widget tests.
+
+### Verification
+
+- Backend: `rtk go build ./...` green; `rtk go test ./...` green
+  (964 passed).
+- CMS: `rtk npm run lint`, `rtk npm run build`, and `rtk npm test` green
+  (322 passed).
+- Flutter: `rtk flutter test` green (442 passed). `rtk flutter analyze`
+  still reports 11 pre-existing analyzer/lint issues outside this fix
+  (`promotion_result_screen.dart`, `main.dart`, and older tests).
+
+---
+
+## V42.1 — Mock Exam Duration Hotfix — 2026-05-16
+
+Fixes Flutter showing a 90-minute countdown for a mock/placement test whose
+CMS setup says 15 minutes.
+
+### Backend
+
+- `backend/internal/store/mock_exam_store.go`:
+  - `CreateMockExam` now sets `duration_sec` from the selected
+    `MockTest.EstimatedDurationMinutes * 60`.
+  - The old 5400-second value remains only as the fallback for template-less
+    legacy starts.
+- `backend/internal/store/postgres_mock_exams.go` applies the same duration
+  rule in Postgres-backed sessions.
+- `backend/internal/store/sprint_mocktest_test.go` pins the regression:
+  a 15-minute mock test now creates a 900-second session and matching
+  `expires_at`.
+
+### Docs
+
+- `docs/reference/api-contracts.md` and
+  `docs/reference/content-and-attempt-model.md` now state that session timers
+  copy the mock test template duration.
+- `SPEC.md` gains the V42.1 hotfix digest row.
+
+### Verification
+
+- Backend: `rtk go build ./...` green; `rtk go test ./...` green
+  (961 passed).
+
+---
+
+## V42 — Admin Manual Level Upgrade — 2026-05-16
+
+Adds a support/admin lever to manually raise a learner's CEFR level from the
+CMS Users desk. Primary case: learner is still `current_level=a0`, admin sets
+them to `a1` without requiring placement / promotion exam flow.
+
+### Backend
+
+- `backend/internal/httpapi/admin_users.go`:
+  - `GET /v1/admin/users` rows now include `current_level` +
+    `unlocked_levels` from `UserLevelStore` (defaulting to `a0` / `[a0]`
+    when the level store has no row yet).
+  - New `POST /v1/admin/users/:id/level` sub-resource accepts
+    `{ "current_level": "a1" }`, normalises case, validates against
+    `{a0,a1,a2,b1}`, refuses admin-role targets, and returns the updated
+    admin user row.
+  - Manual level changes are monotonic: same-level is idempotent, higher
+    levels call `UserLevelStore.SetUserLevel`, and downgrades return
+    `400 level_downgrade_forbidden`.
+- `backend/internal/httpapi/auth_handlers_test.go` wires an in-memory
+  `UserLevelStore` into the shared auth/admin test env.
+- `backend/internal/httpapi/admin_users_test.go` adds coverage for list
+  level state, A0→A1 promotion, invalid level, downgrade rejection,
+  admin-target rejection, and missing-admin auth.
+
+### CMS
+
+- `cms/components/users-dashboard.tsx`:
+  - Adds a `Level` column next to role.
+  - Adds row action `Nâng level`.
+  - New modal shows current level + unlocked levels, defaults to the next
+    promotion target (A0→A1, A1→A2, A2→B1), disables lower levels, and
+    reloads the table after success.
+- `cms/app/api/admin/users/[userId]/level/route.ts` proxies the admin token
+  to the backend endpoint.
+- `cms/lib/level.ts` adds `cefrLevelRank`, `nextCefrLevel`, and
+  `canRaiseLevel`; `cms/__tests__/level-utils.test.ts` covers the
+  progression helpers.
+
+### Docs
+
+- `docs/reference/api-contracts.md` documents the new admin level endpoint
+  and the new `current_level` / `unlocked_levels` fields on admin user rows.
+- `SPEC.md` gains the V42 digest row.
+
+### Decisions
+
+- **No downgrade from CMS.** The existing store appends to
+  `unlocked_levels`; allowing A2→A1 would leave A2 content unlocked anyway
+  while making `current_level` misleading.
+- **No promotion ledger row.** This is an explicit admin override, not a
+  learner promotion-attempt outcome.
+
+### Verification
+
+- Backend: `rtk go build ./...` green; `rtk go test ./...` green
+  (960 passed).
+- CMS: `npm run lint` clean; `npm run build` green; `npm test` green
+  (316 passed).
+
+---
+
+## V41 — AI Image Generation Hardening — 2026-05-12
+
+Hotfix triggered by a string of 504s on EC2 (`duration_ms=30002`, then
+`duration_ms=90007` after the first bump). Investigation showed every
+prediction on the `temo-dev` Replicate account stuck in `status="starting"`
+indefinitely (1h+ old predictions still `starting`, global flux-schnell
+health fine) — Replicate's behaviour when account credit / spend-cap is
+exhausted: predictions silently queue forever instead of 402.
+
+### Backend (`backend/internal/httpapi/ai_image.go`)
+
+1. **End-to-end timeout** `aiImageTimeout` 30s → 90s → **180s**, extracted to
+   a package var so tests override (no more long hangs in CI).
+2. **Per-poll observability** — `pollReplicatePrediction` now logs status on
+   every transition and every 20th poll. Happy path stays quiet (3 lines:
+   `starting` → `processing` → `succeeded`); pathological runs surface the
+   stuck state in EC2 logs.
+3. **Stuck-starting fast-fail** — new `aiImageStuckStartingTimeout = 20s`.
+   When a prediction stays in `"starting"` past that budget, the poll loop
+   returns a sentinel `errPredictionStuckStarting` and the handler maps it
+   to `503 provider_unavailable` with a message pointing operators at
+   <https://replicate.com/account/billing>. Admins find out in 20s instead
+   of waiting the full 180s.
+
+### Tests (`ai_image_test.go`)
+
+- `TestHandleGenerateImage_ReplicateTimeout` — refit to use the new
+  `aiImageTimeout` package var (2s override, 10s client).
+- `TestHandleGenerateImage_StuckStarting_FailsFastWith503` — mocks Replicate
+  returning `starting` forever; expects 503 + `provider_unavailable` code +
+  "billing" substring in message; asserts fast-fail under 5s.
+- All 8 image-gen cases green; backend suite green (807 PASS).
+
+### Investigation evidence
+
+- Direct `curl POST /v1/predictions` against the account: status `starting`
+  with `error: null`, `logs: ""`, no transition to `processing` after
+  60s `Prefer: wait=60`.
+- `GET /v1/predictions?limit=5` showed every recent prediction (going back
+  >1h) stuck in `starting`.
+- Same prompt against a different Replicate token transitions to
+  `processing` in ~1s. Confirms account-level, not code.
+
+### Operator action item
+
+Top up the `temo-dev` Replicate account or raise the spend cap. The new 503
+error message includes the billing URL so future occurrences self-explain.
+
+---
+
+## V40 — Admin Pro Grant — 2026-05-12
+
+Adds a manual admin lever to flip a learner between free and Pro from the
+CMS Users desk. Extends the V21.2 admin escape-hatch family (reset password,
+reset usage) without touching the Apple IAP flow — `ProPurchase` ledger stays
+exclusively driven by Apple receipts; admin grants only mutate the
+denormalized `users.pro_tier` + `users.pro_expires_at` columns.
+
+### Scope
+
+- Promo / comp / demo accounts where Apple IAP is not the source of the
+  entitlement (eg. internal QA, support comp after a billing issue, partner
+  trial accounts).
+- **Not** for refund handling on real IAP purchases — those still flow
+  through the IAP webhook path.
+
+### Backend
+
+- `backend/internal/httpapi/admin_users.go` — new sub-resource route case
+  `"pro"`. Handler `handleAdminSetUserPro`:
+  - Accepts `{ "duration_days": int }`. `>0` grants/extends Pro;
+    `=0` downgrades to free.
+  - Extend semantics: if user is currently Pro **with future expiry**,
+    new expiry = `current_expiry + duration_days*24h` (cộng dồn).
+    Otherwise rebases from `now`. Expired Pro is treated as free.
+  - Refuses admin-role targets (`403 admin_pro_forbidden`) consistent
+    with the reset-password rule.
+  - Caps a single grant at 3650 days (~10 years) so admin typos don't
+    silently mint decade-long Pro.
+  - Returns the updated `adminUserView` so the CMS table can refresh
+    in place without a second round-trip.
+
+### CMS
+
+- `cms/components/users-dashboard.tsx`:
+  - New row action button "Nâng cấp Pro" / "Quản lý Pro" (label flips by
+    current tier).
+  - `ProDialog` modal shows current Pro status + expiry, three preset
+    buttons (30 / 90 / 365 ngày), a custom-days input (1–3650), and —
+    for already-Pro accounts — a guarded "Hạ về free" action behind a
+    two-step confirm.
+  - After success the table reloads so the Pro badge + expiry update.
+  - `AdminUser` type gains `pro_expires_at?: string` (already returned
+    by `GET /v1/admin/users`).
+- `cms/app/api/admin/users/[userId]/pro/route.ts` — pass-through proxy
+  that forwards the admin Bearer token to the backend.
+
+### Docs
+
+- `docs/reference/api-contracts.md` — folds `POST
+  /v1/admin/users/:id/pro` next to the existing admin user sub-resources.
+
+### Decisions
+
+- **Cộng dồn vs. replace from now**: chose additive (extend) so a learner
+  who already has Pro doesn't silently lose remaining days when an admin
+  re-grants. Replace-from-now would also conflict with the "no purchase
+  ledger" rule — there's no transaction record to attribute the lost
+  days to.
+- **No purchase-ledger entry**: admin grant ≠ Apple receipt. Keeping
+  `ProPurchase` strictly Apple-driven preserves the IAP ledger's audit
+  guarantee. `users.updated_at` is the audit signal for admin grants.
+- **Hard cap 3650 days**: protects against typo-driven decade-long grants
+  while still allowing plausible long-tail comps (5+ years).
+
+### Verification
+
+- `go test ./...` — 807 PASS (httpapi 31.6s; +9 new Pro-grant tests
+  covering grant, extend, expired-rebase, downgrade, negative/huge/admin/
+  not-found/anon rejections).
+- `cms` — `npm run lint` clean, `npm run build` green, `npm test` 311 PASS.
+
+---
+
+## V39.1 — Mock Exam Process Flow Hotfix — 2026-05-12
+
+Post-ship UX check on the V39 intro screen: tapping "Bắt đầu thi"
+must feel like entering a real exam, not like opening another section
+menu.
+
+### Flutter
+
+- `flutter_app/lib/core/api/api_client.dart` — `getExercise` accepts
+  optional `mockExamSessionId` and encodes it as
+  `?mock_exam_session_id=...`.
+- `flutter_app/lib/features/mock_exam/screens/mock_exam_screen.dart` —
+  existing runner now treats the section overview as fallback only:
+  it auto-opens the first pending section after intro, then auto-opens
+  the next pending section after a successful submit or skip. Exercise
+  detail loads include the session id so course-level gates do not
+  bounce legitimate exam sections back to the overview. If the learner
+  backs out or a submit fails, the overview remains available.
+- `_advanceSection` now reports success/failure so per-skill callbacks
+  only continue the chain after the server links the attempt.
+- `autoStartFirstSection` defaults to true; widget tests that inspect
+  the fallback overview disable it explicitly.
+
+### Backend
+
+- `backend/internal/httpapi/server.go` — `GET /v1/exercises/:id` now
+  accepts `mock_exam_session_id` as a narrow V39 playback context. The
+  V21 course gate is bypassed only when the authenticated learner owns
+  that mock exam session and the requested exercise is one of its
+  sections. Borrowed sessions still return `403 level_locked`.
+
+### Docs + Tests
+
+- `docs/specs/v39-exam-flat-sort-player.md` now records the
+  2026-05-12 process-flow + level-gate amendments.
+- `docs/reference/api-contracts.md` documents `mock_exam_session_id`.
+- `backend/internal/httpapi/courses_level_test.go` adds owned-session
+  allow + borrowed-session reject coverage.
+- `flutter_app/test/mock_exam_screen_test.dart` adds a regression that
+  starts at question 1, sends `mock_exam_session_id`, and chains to
+  question 2 after submit.
+
+Verification: `go test ./...` 917 green; `flutter test` 435 green;
+`flutter analyze` still reports 11 pre-existing warning/info items
+outside the mock-exam flow.
+
+---
+
 ## V39 — Exam Flat-Sort Player — 2026-05-12
 
 End-to-end overhaul of the mock-exam runner. Sections now flat-sort

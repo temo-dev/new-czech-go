@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -59,6 +60,27 @@ func (rl *aiImageRateLimiter) allow(email string) bool {
 // replicateBaseURL is the base URL for Replicate API calls. Overrideable in tests.
 var replicateBaseURL = "https://api.replicate.com"
 
+// aiImageTimeout caps the end-to-end image-generation request (create + poll +
+// download). Flux-schnell typically returns in 5–15s but cold-start or queue
+// pressure can push past 90s. Tests override this to keep hang scenarios fast.
+var aiImageTimeout = 180 * time.Second
+
+// aiImageStuckStartingTimeout is the budget for a prediction to leave the
+// Replicate "starting" state and enter "processing". Flux-schnell normally
+// transitions within 1–3s. When every prediction on an account stays in
+// "starting" indefinitely it usually means Replicate credit/spend-cap is
+// exhausted — Replicate's API does not 402 in that case, it just silently
+// queues, so we have to detect it client-side. 20s gives even sluggish
+// cold-pool kicks plenty of headroom while still failing fast versus the
+// full 180s end-to-end budget.
+var aiImageStuckStartingTimeout = 20 * time.Second
+
+// errPredictionStuckStarting is returned by pollReplicatePrediction when a
+// prediction never leaves the "starting" state within aiImageStuckStartingTimeout.
+// The handler maps this to a 503 with a billing-hint message so admins know
+// to check Replicate quota instead of retrying.
+var errPredictionStuckStarting = errors.New("prediction stuck in starting state — Replicate account billing or quota likely exhausted")
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 // handleAdminGenerateImage serves POST /v1/admin/ai/generate-image.
@@ -99,7 +121,7 @@ func (s *Server) handleAdminGenerateImage(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), aiImageTimeout)
 	defer cancel()
 
 	predictionID, err := createReplicatePrediction(ctx, s.replicateAPIKey, prompt)
@@ -112,8 +134,15 @@ func (s *Server) handleAdminGenerateImage(w http.ResponseWriter, r *http.Request
 	outputURL, err := pollReplicatePrediction(ctx, s.replicateAPIKey, predictionID)
 	if err != nil {
 		log.Printf("ai/generate-image: poll prediction %s: %v", predictionID, err)
+		if errors.Is(err, errPredictionStuckStarting) {
+			writeError(w, http.StatusServiceUnavailable, "provider_unavailable",
+				"Replicate did not start the prediction. Account billing / spend cap may be exhausted — check https://replicate.com/account/billing.",
+				true)
+			return
+		}
 		if ctx.Err() != nil {
-			writeError(w, http.StatusGatewayTimeout, "generation_timeout", "Image generation timed out after 30s.", true)
+			writeError(w, http.StatusGatewayTimeout, "generation_timeout",
+				fmt.Sprintf("Image generation timed out after %s.", aiImageTimeout), true)
 			return
 		}
 		writeError(w, http.StatusServiceUnavailable, "replicate_error", "Image generation failed: "+err.Error(), true)
@@ -271,9 +300,14 @@ func createReplicatePrediction(ctx context.Context, apiKey, prompt string) (stri
 
 func pollReplicatePrediction(ctx context.Context, apiKey, predictionID string) (string, error) {
 	url := replicateBaseURL + "/v1/predictions/" + predictionID
+	start := time.Now()
+	lastStatus := ""
+	pollCount := 0
 	for {
 		select {
 		case <-ctx.Done():
+			log.Printf("ai/generate-image: poll prediction %s timed out after %d polls (last status %q, elapsed %v)",
+				predictionID, pollCount, lastStatus, time.Since(start).Round(time.Millisecond))
 			return "", ctx.Err()
 		default:
 		}
@@ -291,8 +325,19 @@ func pollReplicatePrediction(ctx context.Context, apiKey, predictionID string) (
 		var pr replicatePredictionResponse
 		err = json.NewDecoder(resp.Body).Decode(&pr)
 		resp.Body.Close()
+		pollCount++
 		if err != nil {
 			return "", fmt.Errorf("decode poll response: %w", err)
+		}
+
+		// Log when the Replicate-side status transitions or every 20 polls so
+		// stuck-in-starting / stuck-in-processing pathologies are visible from
+		// the EC2 log without spamming the line on the happy path (a typical
+		// 5–15s run logs starting → processing → succeeded, 3 lines).
+		if pr.Status != lastStatus || pollCount%20 == 0 {
+			log.Printf("ai/generate-image: poll prediction %s status=%q poll=%d elapsed=%v",
+				predictionID, pr.Status, pollCount, time.Since(start).Round(time.Millisecond))
+			lastStatus = pr.Status
 		}
 
 		switch pr.Status {
@@ -307,10 +352,18 @@ func pollReplicatePrediction(ctx context.Context, apiKey, predictionID string) (
 				msg = pr.Status
 			}
 			return "", fmt.Errorf("prediction %s: %s", pr.Status, msg)
+		case "starting":
+			if time.Since(start) > aiImageStuckStartingTimeout {
+				log.Printf("ai/generate-image: prediction %s stuck in starting after %v (polls=%d) — failing fast",
+					predictionID, time.Since(start).Round(time.Millisecond), pollCount)
+				return "", errPredictionStuckStarting
+			}
 		}
-		// still processing — wait before next poll
+		// still processing or starting within budget — wait before next poll
 		select {
 		case <-ctx.Done():
+			log.Printf("ai/generate-image: poll prediction %s timed out after %d polls (last status %q, elapsed %v)",
+				predictionID, pollCount, lastStatus, time.Since(start).Round(time.Millisecond))
 			return "", ctx.Err()
 		case <-time.After(500 * time.Millisecond):
 		}

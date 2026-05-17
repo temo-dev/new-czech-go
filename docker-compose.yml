@@ -100,7 +100,11 @@ services:
       backend:
         condition: service_healthy
     environment:
-      API_BASE_URL: ${API_BASE_URL:-http://backend:8080}
+      # Compose-internal CMS always reaches the backend container by service
+      # name. Do not parameterise: a shell-level API_BASE_URL (e.g. exported
+      # in .env.local for host-side `make dev-cms`) would otherwise leak into
+      # the container and point CMS at its own localhost.
+      API_BASE_URL: http://backend:8080
       CMS_ADMIN_TOKEN: ${CMS_ADMIN_TOKEN:-dev-admin-token}
       CMS_BASIC_AUTH_USER: ${CMS_BASIC_AUTH_USER:-}
       CMS_BASIC_AUTH_PASSWORD: ${CMS_BASIC_AUTH_PASSWORD:-}

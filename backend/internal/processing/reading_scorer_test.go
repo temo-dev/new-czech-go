@@ -1,6 +1,7 @@
 package processing
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
@@ -52,12 +53,32 @@ func TestExtractCorrectAnswers_Cteni5_FillIn(t *testing.T) {
 
 	// Verify fill-in matching works for cteni_5 answers
 	learner := map[string]string{
-		"21": "salát",         // substring → correct
-		"22": "cibuli",        // substring → correct
+		"21": "salát",  // substring → correct
+		"22": "cibuli", // substring → correct
 	}
 	result := ScoreObjectiveAnswers(learner, correct, nil, nil)
 	if result.Score != 2 {
 		t.Errorf("Score = %d, want 2 (both substring matches)", result.Score)
+	}
+}
+
+func TestExtractCorrectAnswers_MissingAnswersIsContentError(t *testing.T) {
+	ex := contracts.Exercise{
+		ExerciseType: "cteni_5",
+		Detail: contracts.Cteni5Detail{
+			Text: "Hledám podnájemníka do pokoje v Praze 4.",
+			Questions: []contracts.FillQuestion{
+				{QuestionNo: 21, Prompt: "Kdy je pokoj volný?"},
+			},
+		},
+	}
+	_, err := extractCorrectAnswers(ex)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	var contentErr ObjectiveContentError
+	if !errors.As(err, &contentErr) {
+		t.Fatalf("expected ObjectiveContentError, got %T: %v", err, err)
 	}
 }
 

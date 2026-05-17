@@ -28,11 +28,11 @@ import (
 type EmailSender = email.Sender
 
 type Server struct {
-	repo             *store.MemoryStore
-	processor        *processing.Processor
-	uploadProvider   UploadTargetProvider
-	audioURLProvider AudioURLProvider
-	audioSignSecret  []byte
+	repo                  *store.MemoryStore
+	processor             *processing.Processor
+	uploadProvider        UploadTargetProvider
+	audioURLProvider      AudioURLProvider
+	audioSignSecret       []byte
 	audioGenerator        processing.ExerciseAudioGenerator
 	contentGenerator      processing.ContentGenerator
 	readingDraftGenerator processing.ReadingDraftGenerator // V24
@@ -134,10 +134,10 @@ func assembleServer(repo *store.MemoryStore, processor *processing.Processor, up
 	if ttsProvider := processor.TTSProvider(); ttsProvider != nil {
 		pollyGen := processing.NewPollyExerciseAudioGenerator(ttsProvider)
 		// Wire second voice: prefer ElevenLabs (ELEVENLABS_API_KEY + ELEVENLABS_VOICE_ID_B),
-		// fall back to Polly (POLLY_VOICE_ID_2). Skip if neither is configured.
+		// fall back to Polly Tomas (overridable via POLLY_VOICE_ID_2).
 		var ttsB processing.TTSProvider = processing.NewElevenLabsVoiceBProvider()
 		if ttsB == nil {
-			ttsB = processing.NewAmazonPollyTTSProviderWithVoice("")
+			ttsB = processing.NewAmazonPollyTTSProviderWithVoice("Tomas")
 		}
 		if ttsB != nil {
 			pollyGen = pollyGen.WithDialogVoice(ttsB)
@@ -152,25 +152,25 @@ func assembleServer(repo *store.MemoryStore, processor *processing.Processor, up
 		ocrProvider = processing.NoopOCR{}
 	}
 	s := &Server{
-		repo:               repo,
-		processor:          processor,
-		uploadProvider:     uploadProvider,
-		audioURLProvider:   audioURLProvider,
-		audioSignSecret:    audioSignSecret,
-		audioGenerator:     audioGen,
+		repo:                  repo,
+		processor:             processor,
+		uploadProvider:        uploadProvider,
+		audioURLProvider:      audioURLProvider,
+		audioSignSecret:       audioSignSecret,
+		audioGenerator:        audioGen,
 		contentGenerator:      contentGen,
 		readingDraftGenerator: readingDraftGen,
 		readingDraftRL:        newReadingDraftRateLimiter(),
-		voiceRegistry:      voiceRegistry,
-		elevenLabsAPIKey:   strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")),
-		elevenLabsAgentID:  strings.TrimSpace(os.Getenv("ELEVENLABS_AGENT_ID")),
-		elevenLabsVoiceIDC: strings.TrimSpace(os.Getenv("ELEVENLABS_VOICE_ID_C")),
-		replicateAPIKey:    strings.TrimSpace(os.Getenv("REPLICATE_API_KEY")),
-		aiImageRL:          newAiImageRateLimiter(),
-		interviewPreviewRL: newInterviewPreviewLimiter(),
-		ocrProvider:        ocrProvider,
-		dictationOCRRL:     newDictationOCRRateLimiter(),
-		mux:                http.NewServeMux(),
+		voiceRegistry:         voiceRegistry,
+		elevenLabsAPIKey:      strings.TrimSpace(os.Getenv("ELEVENLABS_API_KEY")),
+		elevenLabsAgentID:     strings.TrimSpace(os.Getenv("ELEVENLABS_AGENT_ID")),
+		elevenLabsVoiceIDC:    strings.TrimSpace(os.Getenv("ELEVENLABS_VOICE_ID_C")),
+		replicateAPIKey:       strings.TrimSpace(os.Getenv("REPLICATE_API_KEY")),
+		aiImageRL:             newAiImageRateLimiter(),
+		interviewPreviewRL:    newInterviewPreviewLimiter(),
+		ocrProvider:           ocrProvider,
+		dictationOCRRL:        newDictationOCRRateLimiter(),
+		mux:                   http.NewServeMux(),
 	}
 	if authDeps != nil {
 		authDeps.applyTo(s)
@@ -569,7 +569,8 @@ func (s *Server) handleExercise(w http.ResponseWriter, r *http.Request, user con
 	}
 	// V21 level gate. Only enforced when the level service is wired so
 	// pre-V21 dev fixture builds keep their existing exercise reads.
-	if !s.exerciseAccessibleForUser(user.ID, exercise) {
+	if !s.exerciseAccessibleForUser(user.ID, exercise) &&
+		!s.exerciseAccessibleViaMockExam(user.ID, exercise.ID, r.URL.Query().Get("mock_exam_session_id")) {
 		writeError(w, http.StatusForbidden, "level_locked",
 			"This exercise is part of a course you have not unlocked yet.", false)
 		return
@@ -590,6 +591,7 @@ func (s *Server) handleExercise(w http.ResponseWriter, r *http.Request, user con
 //   - the exercise has no module/course (e.g. exam-pool standalone reads)
 //   - the parent course's level is in the user's unlocked_levels
 //   - the exercise is the parent course's designated demo exercise
+//
 // Returns false otherwise — caller renders 403 level_locked.
 func (s *Server) exerciseAccessibleForUser(userID string, ex contracts.Exercise) bool {
 	if s.levelService == nil {
@@ -611,6 +613,22 @@ func (s *Server) exerciseAccessibleForUser(userID string, ex contracts.Exercise)
 		return true
 	}
 	return state == "demo" && course.DemoExerciseID == ex.ID
+}
+
+func (s *Server) exerciseAccessibleViaMockExam(userID, exerciseID, sessionID string) bool {
+	if strings.TrimSpace(sessionID) == "" {
+		return false
+	}
+	session, ok := s.repo.MockExamByID(sessionID)
+	if !ok || session.LearnerID != userID {
+		return false
+	}
+	for _, section := range session.Sections {
+		if section.ExerciseID == exerciseID {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) handleAttempts(w http.ResponseWriter, r *http.Request, user contracts.User) {
@@ -1356,22 +1374,34 @@ func (s *Server) handleAdminGenerateAudio(w http.ResponseWriter, r *http.Request
 			}
 			items := processing.BuildExerciseItemTexts(exercise)
 			if len(items) > 0 {
-				if s.generatePoslech1ItemAudio(w, exerciseID, exercise, itemGen, items) {
+				// V39 — pair flat texts with dialog segments so the per-item
+				// path can fork on multi-speaker items (e.g. [Žena]/[Muž]).
+				dialogs := processing.BuildExerciseItemDialogs(exercise)
+				dialogByItem := make(map[int][]contracts.AudioSegment, len(dialogs))
+				for _, d := range dialogs {
+					dialogByItem[d.ItemNo] = d.Segments
+				}
+				dialogGen, _ := s.audioGenerator.(processing.ItemDialogAudioGenerator)
+				if s.generatePoslech1ItemAudio(w, exerciseID, exercise, itemGen, dialogGen, items, dialogByItem) {
 					return
 				}
 			}
 		}
 	}
 	// Use 2-voice dialog generation when:
-	// - exercise is poslech_4 (per-item dialogs), OR
-	// - any poslech_* has segments with ≥2 distinct speaker labels (e.g. [Muž]/[Žena]).
+	// - any poslech_* has segments with ≥2 distinct speaker labels
+	//   (e.g. [Muž]/[Žena]) — V39 also covers poslech_4 dialogs that
+	//   carry speaker labels per turn and poslech_6 passages with
+	//   embedded `[Speaker]:` markers, OR
+	// - exercise is poslech_4 without speaker labels (legacy single-voice
+	//   per-item with index alternation across items).
 	var audio *contracts.ExerciseAudio
 	if dialogGen, ok := s.audioGenerator.(processing.DialogExerciseAudioGenerator); ok {
 		var segs []contracts.AudioSegment
-		if exercise.ExerciseType == "poslech_4" {
-			segs = processing.BuildExerciseDialogTexts(exercise)
-		} else if processing.HasMultipleSpeakers(exercise) {
+		if processing.HasMultipleSpeakers(exercise) {
 			segs = processing.BuildExerciseDialogSegments(exercise)
+		} else if exercise.ExerciseType == "poslech_4" {
+			segs = processing.BuildExerciseDialogTexts(exercise)
 		}
 		if len(segs) > 0 {
 			var err error
@@ -1445,7 +1475,9 @@ func (s *Server) generatePoslech1ItemAudio(
 	exerciseID string,
 	exercise contracts.Exercise,
 	gen processing.ItemAudioGenerator,
+	dialogGen processing.ItemDialogAudioGenerator,
 	items []processing.ItemText,
+	dialogByItem map[int][]contracts.AudioSegment,
 ) bool {
 	// Decode current detail so we can mutate Items[i].AudioSource.AssetID.
 	detail, ok := decodePoslech1Detail(exercise.Detail)
@@ -1465,9 +1497,22 @@ func (s *Server) generatePoslech1ItemAudio(
 
 	var lastAudio *contracts.ExerciseAudio
 	for _, item := range items {
-		a, err := gen.GenerateItemAudio(exerciseID, item.ItemNo, item.Text)
+		// V39 — items with ≥2 distinct speakers (e.g. [Žena]/[Muž]) go through
+		// the dialog path so each turn lands on the correct voice. Items with
+		// no speaker labels (or only one) keep the flat single-voice path.
+		segs := dialogByItem[item.ItemNo]
+		useDialog := dialogGen != nil && processing.ItemDialogHasMultipleSpeakers(segs)
+		var (
+			a   *contracts.ExerciseAudio
+			err error
+		)
+		if useDialog {
+			a, err = dialogGen.GenerateItemDialogAudio(exerciseID, item.ItemNo, segs)
+		} else {
+			a, err = gen.GenerateItemAudio(exerciseID, item.ItemNo, item.Text)
+		}
 		if err != nil {
-			log.Printf("generate-audio exercise %s item %d: %v", exerciseID, item.ItemNo, err)
+			log.Printf("generate-audio exercise %s item %d (dialog=%v): %v", exerciseID, item.ItemNo, useDialog, err)
 			rollback()
 			writeError(w, http.StatusInternalServerError, "internal_error", "Item audio generation failed.", true)
 			return true
@@ -1659,6 +1704,11 @@ func (s *Server) handleSubmitAnswers(w http.ResponseWriter, r *http.Request, use
 	completed, err := s.processor.ProcessObjectiveAttempt(attemptID, sub)
 	if err != nil {
 		log.Printf("objective attempt %s scoring error: %v", attemptID, err)
+		var contentErr processing.ObjectiveContentError
+		if errors.As(err, &contentErr) {
+			writeError(w, http.StatusUnprocessableEntity, "content_invalid", "Exercise is missing correct answers.", false)
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "internal_error", "Scoring failed.", true)
 		return
 	}
@@ -1958,9 +2008,9 @@ func (s *Server) checkPromotionUniqueness(t contracts.MockTest, excludeID string
 	}
 	return map[string]any{
 		"error": map[string]any{
-			"code":    "promotion_exam_already_published",
-			"message": "Đã có promotion exam published cho level này.",
-			"level":   t.TargetLevel,
+			"code":           "promotion_exam_already_published",
+			"message":        "Đã có promotion exam published cho level này.",
+			"level":          t.TargetLevel,
 			"existing_id":    existing.ID,
 			"existing_title": existing.Title,
 			"hint":           "Hủy Published ở đề đang published trước khi đổi đề khác.",
@@ -2263,7 +2313,16 @@ func parseExerciseDetail(exerciseType, title string, questions []string, raw jso
 		if len(questions) == 0 {
 			return nil, errors.New("Question prompts are required for Uloha 1.")
 		}
-		return contracts.Uloha1Prompt{TopicLabel: title, QuestionPrompts: questions}, nil
+		out := contracts.Uloha1Prompt{TopicLabel: title, QuestionPrompts: questions}
+		if len(raw) > 0 && string(raw) != "null" {
+			var aux struct {
+				ScenarioImageAssetID string `json:"scenario_image_asset_id"`
+			}
+			if err := json.Unmarshal(raw, &aux); err == nil {
+				out.ScenarioImageAssetID = strings.TrimSpace(aux.ScenarioImageAssetID)
+			}
+		}
+		return out, nil
 	case "uloha_2_dialogue_questions":
 		d, err := parseDetailJSON[contracts.Uloha2Detail](raw, "Scenario detail is required for Uloha 2.", "Invalid Uloha 2 detail payload.")
 		if err != nil {
@@ -2409,6 +2468,10 @@ func (s *Server) handleAdminExercises(w http.ResponseWriter, r *http.Request, _ 
 			writeError(w, http.StatusBadRequest, "validation_error", err.Error(), false)
 			return
 		}
+		if err := s.validateObjectivePublish(exercise); err != nil {
+			writeError(w, http.StatusBadRequest, "validation_error", err.Error(), false)
+			return
+		}
 		created := s.repo.CreateExercise(exercise)
 		writeJSON(w, http.StatusCreated, map[string]any{"data": created, "meta": map[string]any{}})
 	default:
@@ -2498,6 +2561,10 @@ func (s *Server) handleAdminExerciseByID(w http.ResponseWriter, r *http.Request,
 				candidate.Detail = req.Detail
 			}
 			if err := s.validateDictationPublish(id, candidate); err != nil {
+				writeError(w, http.StatusBadRequest, "validation_error", err.Error(), false)
+				return
+			}
+			if err := s.validateObjectivePublish(candidate); err != nil {
 				writeError(w, http.StatusBadRequest, "validation_error", err.Error(), false)
 				return
 			}

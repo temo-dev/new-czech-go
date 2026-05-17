@@ -536,8 +536,9 @@ func TestMockExamSessionHasTimerFieldsPopulated(t *testing.T) {
 		ExerciseType: "uloha_1_topic_answers", Status: "published", Pool: "exam",
 	})
 	mt, _ := repo.CreateMockTest(contracts.MockTest{
-		Title:  "Timer fields",
-		Status: "published",
+		Title:                    "Timer fields",
+		Status:                   "published",
+		EstimatedDurationMinutes: 15,
 		Sections: []contracts.MockTestSection{
 			{SequenceNo: 1, ExerciseID: ex.ID, ExerciseType: ex.ExerciseType, MaxPoints: 5},
 		},
@@ -546,13 +547,13 @@ func TestMockExamSessionHasTimerFieldsPopulated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateMockExam: %v", err)
 	}
-	if session.DurationSec != DefaultMockExamDurationSec {
-		t.Errorf("DurationSec = %d, want %d", session.DurationSec, DefaultMockExamDurationSec)
+	if session.DurationSec != 15*60 {
+		t.Errorf("DurationSec = %d, want %d", session.DurationSec, 15*60)
 	}
 	if session.StartedAt.IsZero() {
 		t.Error("StartedAt is zero")
 	}
-	wantExpires := session.StartedAt.Add(time.Duration(DefaultMockExamDurationSec) * time.Second)
+	wantExpires := session.StartedAt.Add(15 * time.Minute)
 	if !session.ExpiresAt.Equal(wantExpires) {
 		t.Errorf("ExpiresAt = %v, want %v", session.ExpiresAt, wantExpires)
 	}

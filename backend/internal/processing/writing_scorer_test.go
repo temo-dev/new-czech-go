@@ -38,17 +38,19 @@ func TestValidateWritingSubmission_Psani1(t *testing.T) {
 		}
 	})
 
+	t.Run("ok with more than three answers", func(t *testing.T) {
+		sub := contracts.WritingSubmission{
+			Answers: []string{enough, enough, enough, enough, enough},
+		}
+		if err := ValidateWritingSubmission("psani_1_formular", sub); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
 	t.Run("error when answers field missing", func(t *testing.T) {
 		sub := contracts.WritingSubmission{}
 		if err := ValidateWritingSubmission("psani_1_formular", sub); err == nil {
 			t.Error("expected error for empty answers")
-		}
-	})
-
-	t.Run("error when wrong answer count", func(t *testing.T) {
-		sub := contracts.WritingSubmission{Answers: []string{enough, enough}}
-		if err := ValidateWritingSubmission("psani_1_formular", sub); err == nil {
-			t.Error("expected error for 2 answers (need 3)")
 		}
 	})
 

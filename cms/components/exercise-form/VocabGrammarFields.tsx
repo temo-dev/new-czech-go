@@ -349,11 +349,21 @@ export function VocabGrammarFields({ exerciseType, initialData, onChange }: Prop
         <button
           type="button"
           onClick={() => {
-            const i = state.pairs.length;
+            // Use max+1 for left_id and the next unused right_id letter so a
+            // delete-then-add cycle does not silently produce duplicate IDs.
+            // Duplicates would collide in correct_answers and break the
+            // matching scorer on the backend.
+            const usedLeft = state.pairs
+              .map((p) => Number(p.left_id))
+              .filter((n) => Number.isFinite(n) && n > 0);
+            const nextLeftId = usedLeft.length > 0 ? Math.max(...usedLeft) + 1 : 1;
+            const usedRight = new Set(state.pairs.map((p) => p.right_id));
+            const fallbackRight = RIGHT_KEYS.find((k) => !usedRight.has(k))
+              ?? String.fromCharCode(65 + state.pairs.length);
             const newPair: MatchPair = {
-              left_id: String(i + 1),
+              left_id: String(nextLeftId),
               left: '',
-              right_id: RIGHT_KEYS[i] ?? String.fromCharCode(65 + i),
+              right_id: fallbackRight,
               right: '',
             };
             update({ ...state, pairs: [...state.pairs, newPair] });

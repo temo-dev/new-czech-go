@@ -102,7 +102,19 @@ export function InterviewChoiceExplainFields({ initialData, onChange, editingId 
 
   function addOption() {
     if (state.options.length >= MAX_OPTIONS) return;
-    emit({ ...state, options: [...state.options, emptyOption(state.options.length)] });
+    // Pick the next unused numeric id so a delete-then-add cycle does not
+    // produce duplicate ids that would collide in Flutter's option matching
+    // (interview_session_screen compares `option.id` when echoing selection).
+    const usedIds = new Set(state.options.map((o) => o.id));
+    let nextId = state.options.length + 1;
+    while (usedIds.has(String(nextId))) nextId += 1;
+    emit({
+      ...state,
+      options: [
+        ...state.options,
+        { id: String(nextId), label: '', imageAssetId: '', tips: [] },
+      ],
+    });
   }
 
   function removeOption(i: number) {

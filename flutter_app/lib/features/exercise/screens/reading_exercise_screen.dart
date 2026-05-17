@@ -8,6 +8,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../objective_submit_error.dart';
 import '../widgets/ano_ne_widget.dart';
 import '../widgets/exercise_context_image.dart';
 import '../widgets/fill_in_widget.dart';
@@ -89,7 +90,11 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
       }
       setState(() => _result = AttemptResult.fromJson(raw));
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) {
+        setState(() {
+          _error = objectiveSubmitErrorMessage(AppLocalizations.of(context), e);
+        });
+      }
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -129,7 +134,9 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         title: Text(
-          d.exerciseType.replaceAll('_', ' ').toUpperCase(),
+          d.title.isNotEmpty
+              ? d.title
+              : d.exerciseType.replaceAll('_', ' ').toUpperCase(),
           style: AppTypography.titleMedium,
         ),
       ),
@@ -168,8 +175,15 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
             // cteni_1: combined item+answer layout (image/text per item + A-H select)
             else if (d.exerciseType == 'cteni_1') ...[
               ..._buildCteni1Layout(d),
-            ]
-            else ...[
+            ] else ...[
+              // cteni_3: persons legend (A-E names + descriptions) so the
+              // learner knows what each option letter stands for before
+              // picking on each text item below.
+              if (d.exerciseType == 'cteni_3' && d.cteniOptions.isNotEmpty) ...[
+                _buildPersonsLegend(d.cteniOptions),
+                const SizedBox(height: AppSpacing.x4),
+              ],
+
               // Items display (cteni_3: text blocks)
               if (d.cteniItems.isNotEmpty && d.cteniText.isEmpty) ...[
                 ..._buildItems(d),
@@ -248,11 +262,12 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
       ],
       AnoNeWidget(
         statements: d.anoNeStatements,
-        onAnswersChanged: (a) => setState(() {
-          _answers
-            ..clear()
-            ..addAll(a);
-        }),
+        onAnswersChanged:
+            (a) => setState(() {
+              _answers
+                ..clear()
+                ..addAll(a);
+            }),
         result: _result?.feedback?.objectiveResult,
         enabled: _result == null,
       ),
@@ -262,7 +277,8 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
   /// cteni_1 combined layout: each item shows its content (image or text) with
   /// an inline A-H selection directly below. Items are rendered top-to-bottom.
   List<Widget> _buildCteni1Layout(ExerciseDetail d) {
-    final opts = d.cteniOptions.isNotEmpty ? d.cteniOptions : <PoslechOptionView>[];
+    final opts =
+        d.cteniOptions.isNotEmpty ? d.cteniOptions : <PoslechOptionView>[];
     final items = d.cteniItems;
     if (items.isEmpty) return [];
 
@@ -281,30 +297,45 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: opts.map((opt) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 24, height: 24,
-                    decoration: BoxDecoration(
-                      color: AppColors.secondary.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(opt.key,
-                          style: AppTypography.labelMedium.copyWith(
-                              color: AppColors.secondary, fontWeight: FontWeight.w700)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(opt.text, style: AppTypography.bodyMedium),
-                  ),
-                ],
-              ),
-            )).toList(),
+            children:
+                opts
+                    .map(
+                      (opt) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: AppColors.secondary.withValues(
+                                  alpha: 0.15,
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  opt.key,
+                                  style: AppTypography.labelMedium.copyWith(
+                                    color: AppColors.secondary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                opt.text,
+                                style: AppTypography.bodyMedium,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
           ),
         ),
       );
@@ -325,10 +356,19 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: currentAnswer != null ? AppColors.primary : AppColors.outlineVariant,
+                color:
+                    currentAnswer != null
+                        ? AppColors.primary
+                        : AppColors.outlineVariant,
                 width: currentAnswer != null ? 2 : 1,
               ),
-              boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2))],
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0A000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -339,26 +379,43 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
                   child: Row(
                     children: [
                       Container(
-                        width: 28, height: 28,
+                        width: 28,
+                        height: 28,
                         decoration: BoxDecoration(
-                          color: currentAnswer != null ? AppColors.primary : AppColors.secondary,
+                          color:
+                              currentAnswer != null
+                                  ? AppColors.primary
+                                  : AppColors.secondary,
                           shape: BoxShape.circle,
                         ),
                         child: Center(
-                          child: Text('$no', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          child: Text(
+                            '$no',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
                       if (currentAnswer != null) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             currentAnswer,
-                            style: AppTypography.labelLarge.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
+                            style: AppTypography.labelLarge.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],
@@ -377,14 +434,27 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
                       height: 160,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        height: 80,
-                        color: const Color(0xFFF5F0EA),
-                        child: Center(child: Text('$no', style: AppTypography.titleLarge.copyWith(color: AppColors.onSurfaceVariant))),
-                      ),
-                      loadingBuilder: (_, child, progress) => progress == null
-                          ? child
-                          : Container(height: 160, color: const Color(0xFFF5F0EA)),
+                      errorBuilder:
+                          (_, __, ___) => Container(
+                            height: 80,
+                            color: const Color(0xFFF5F0EA),
+                            child: Center(
+                              child: Text(
+                                '$no',
+                                style: AppTypography.titleLarge.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ),
+                      loadingBuilder:
+                          (_, child, progress) =>
+                              progress == null
+                                  ? child
+                                  : Container(
+                                    height: 160,
+                                    color: const Color(0xFFF5F0EA),
+                                  ),
                     ),
                   ),
                 ] else if (text.isNotEmpty) ...[
@@ -396,7 +466,12 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
                         color: const Color(0xFFF5F0EA),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Text(text, style: AppTypography.bodyMedium.copyWith(fontStyle: FontStyle.italic)),
+                      child: Text(
+                        text,
+                        style: AppTypography.bodyMedium.copyWith(
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
                     ),
                   ),
                 ] else ...[
@@ -419,31 +494,45 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
                   child: Wrap(
                     spacing: 6,
                     runSpacing: 6,
-                    children: opts.map((opt) {
-                      final selected = currentAnswer == opt.key;
-                      return GestureDetector(
-                        onTap: () => setState(() => _answers[no.toString()] = opt.key),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 120),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: selected ? AppColors.primary : Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: selected ? AppColors.primary : AppColors.outlineVariant,
-                              width: selected ? 2 : 1,
+                    children:
+                        opts.map((opt) {
+                          final selected = currentAnswer == opt.key;
+                          return GestureDetector(
+                            onTap:
+                                () => setState(
+                                  () => _answers[no.toString()] = opt.key,
+                                ),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 120),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    selected ? AppColors.primary : Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color:
+                                      selected
+                                          ? AppColors.primary
+                                          : AppColors.outlineVariant,
+                                  width: selected ? 2 : 1,
+                                ),
+                              ),
+                              child: Text(
+                                opt.key,
+                                style: AppTypography.labelLarge.copyWith(
+                                  color:
+                                      selected
+                                          ? Colors.white
+                                          : AppColors.onSurface,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            opt.key,
-                            style: AppTypography.labelLarge.copyWith(
-                              color: selected ? Colors.white : AppColors.onSurface,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                          );
+                        }).toList(),
                   ),
                 ),
               ],
@@ -454,6 +543,70 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
     }
 
     return widgets;
+  }
+
+  Widget _buildPersonsLegend(List<PoslechOptionView> persons) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.x3),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children:
+            persons.map((p) {
+              final name = p.text;
+              final desc = p.label;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          p.key,
+                          style: AppTypography.labelMedium.copyWith(
+                            color: AppColors.secondary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (name.isNotEmpty)
+                            Text(name, style: AppTypography.bodyMedium),
+                          if (desc.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                desc,
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+      ),
+    );
   }
 
   List<Widget> _buildItems(ExerciseDetail d) {
@@ -511,10 +664,12 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
         // cteni_4). Backend extractCorrectAnswers compares learner[qno] to
         // correct_answers keyed by question_no — using a 1-based loop index
         // would mismatch every answer.
-        final keyStr = q.questionNo > 0 ? q.questionNo.toString() : (i + 1).toString();
-        final perQuestionOpts = q.options.isNotEmpty
-            ? q.options
-            : (d.cteniOptions.isNotEmpty ? d.cteniOptions : _defaultABCD());
+        final keyStr =
+            q.questionNo > 0 ? q.questionNo.toString() : (i + 1).toString();
+        final perQuestionOpts =
+            q.options.isNotEmpty
+                ? q.options
+                : (d.cteniOptions.isNotEmpty ? d.cteniOptions : _defaultABCD());
         final hasPrompt = q.prompt.isNotEmpty;
         final displayNo = q.questionNo > 0 ? q.questionNo : (i + 1);
         return Padding(
@@ -523,7 +678,10 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (hasPrompt) ...[
-                Text('$displayNo. ${q.prompt}', style: AppTypography.labelMedium),
+                Text(
+                  '$displayNo. ${q.prompt}',
+                  style: AppTypography.labelMedium,
+                ),
                 const SizedBox(height: 4),
               ],
               MultipleChoiceWidget(

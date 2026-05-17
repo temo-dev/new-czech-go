@@ -243,3 +243,95 @@ func TestExercise_DemoExercise_Allowed(t *testing.T) {
 		t.Errorf("response id = %v, want %s", data["id"], demoID)
 	}
 }
+
+func TestExercise_InLockedCourse_AllowedForOwnedMockExamSession(t *testing.T) {
+	srv, repo, userLevels := newCoursesLevelTestServer(t)
+	defer srv.Close()
+	_, b1ID, demoID := seedCoursesByLevel(t, repo)
+
+	if _, err := userLevels.SetUserLevel("user-learner-1", "a2"); err != nil {
+		t.Fatalf("seed user level: %v", err)
+	}
+
+	gated := findGatedExerciseForCourse(t, repo, b1ID, demoID)
+	mockTest, err := repo.CreateMockTest(contracts.MockTest{
+		Title:  "B1 mock",
+		Status: "published",
+		Sections: []contracts.MockTestSection{{
+			SequenceNo:   1,
+			SkillKind:    gated.SkillKind,
+			ExerciseID:   gated.ID,
+			ExerciseType: gated.ExerciseType,
+			MaxPoints:    5,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("create mock test: %v", err)
+	}
+	session, err := repo.CreateMockExam("user-learner-1", mockTest.ID)
+	if err != nil {
+		t.Fatalf("create mock exam: %v", err)
+	}
+
+	status, body := get(t, srv, "/v1/exercises/"+gated.ID+"?mock_exam_session_id="+session.ID, "dev-learner-token")
+	if status != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%v", status, body)
+	}
+	data := body["data"].(map[string]any)
+	if data["id"].(string) != gated.ID {
+		t.Errorf("response id = %v, want %s", data["id"], gated.ID)
+	}
+}
+
+func TestExercise_InLockedCourse_RejectsBorrowedMockExamSession(t *testing.T) {
+	srv, repo, userLevels := newCoursesLevelTestServer(t)
+	defer srv.Close()
+	_, b1ID, demoID := seedCoursesByLevel(t, repo)
+
+	if _, err := userLevels.SetUserLevel("user-learner-1", "a2"); err != nil {
+		t.Fatalf("seed user level: %v", err)
+	}
+
+	gated := findGatedExerciseForCourse(t, repo, b1ID, demoID)
+	mockTest, err := repo.CreateMockTest(contracts.MockTest{
+		Title:  "B1 mock",
+		Status: "published",
+		Sections: []contracts.MockTestSection{{
+			SequenceNo:   1,
+			SkillKind:    gated.SkillKind,
+			ExerciseID:   gated.ID,
+			ExerciseType: gated.ExerciseType,
+			MaxPoints:    5,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("create mock test: %v", err)
+	}
+	session, err := repo.CreateMockExam("user-someone-else", mockTest.ID)
+	if err != nil {
+		t.Fatalf("create mock exam: %v", err)
+	}
+
+	status, body := get(t, srv, "/v1/exercises/"+gated.ID+"?mock_exam_session_id="+session.ID, "dev-learner-token")
+	if status != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403; body=%v", status, body)
+	}
+	if code := errCode(body); code != "level_locked" {
+		t.Errorf("error.code = %q, want level_locked", code)
+	}
+}
+
+func findGatedExerciseForCourse(t *testing.T, repo *store.MemoryStore, courseID, demoID string) contracts.Exercise {
+	t.Helper()
+	mods := repo.ListModules("", courseID)
+	if len(mods) == 0 {
+		t.Fatalf("no modules under course %s", courseID)
+	}
+	for _, ex := range repo.ListExercises("") {
+		if ex.ModuleID == mods[0].ID && ex.ID != demoID {
+			return ex
+		}
+	}
+	t.Fatalf("could not locate gated exercise")
+	return contracts.Exercise{}
+}

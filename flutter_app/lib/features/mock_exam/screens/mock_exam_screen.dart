@@ -11,6 +11,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
 import '../../../shared/widgets/info_pill.dart';
+import '../../exercise/screens/dictation_exercise_screen.dart';
 import '../../exercise/screens/exercise_screen.dart' as exercise_feature;
 import '../../exercise/screens/listening_exercise_screen.dart';
 import '../../exercise/screens/reading_exercise_screen.dart';
@@ -65,8 +66,8 @@ String _exerciseTypeLabel(AppLocalizations l, String exerciseType) {
   return exerciseType.replaceAll('_', ' ');
 }
 
-/// Sequential sprint mock exam. Speaking sections are recorded first and then
-/// analysed together; objective/text sections score inside their own screens.
+/// V39 mock exam runner. Sections open in `display_order`; speaking attempts
+/// are queued for bulk analysis after the last pending section resolves.
 class MockExamScreen extends StatefulWidget {
   const MockExamScreen({
     super.key,
@@ -74,6 +75,11 @@ class MockExamScreen extends StatefulWidget {
     this.initialSession,
     this.mockTest,
     this.onCompleted,
+    this.showResultAfterCompletionCallback = false,
+    this.resultCtaLabel,
+    this.onResultCta,
+    this.autoStartFirstSection = true,
+    this.showProminentSubmitAction = false,
   });
 
   final ApiClient client;
@@ -87,9 +93,24 @@ class MockExamScreen extends StatefulWidget {
   /// Optional hook fired once after the session transitions to completed.
   /// When provided, the caller is responsible for rendering the result screen
   /// (e.g. PlacementTestScreen → PlacementResultScreen, PreExamScreen →
-  /// PromotionResultScreen). When null the built-in [_MockExamResultView]
-  /// renders as before.
-  final void Function(String sessionId)? onCompleted;
+  /// PromotionResultScreen). Set [showResultAfterCompletionCallback] when the
+  /// caller only needs a completion side-effect and this screen should still
+  /// render the built-in [_MockExamResultView].
+  final FutureOr<void> Function(String sessionId)? onCompleted;
+
+  final bool showResultAfterCompletionCallback;
+  final String? resultCtaLabel;
+  final VoidCallback? onResultCta;
+
+  /// V39 process-mode: start at the first question instead of landing on
+  /// the fallback section overview. Tests that inspect the overview can
+  /// disable this without changing production navigation.
+  final bool autoStartFirstSection;
+
+  /// Shows the final submit action directly in the AppBar instead of hiding it
+  /// inside the overflow menu. Used by placement where early submit must be
+  /// easy to discover.
+  final bool showProminentSubmitAction;
 
   @override
   State<MockExamScreen> createState() => _MockExamScreenState();
@@ -113,14 +134,15 @@ class _MockExamScreenState extends State<MockExamScreen> {
 
   /// V39 — auto-launch the first pending section once after the session
   /// loads so the learner lands directly inside the exam (no section-list
-  /// landing). Guarded by a one-shot flag so returning from per-section
-  /// screens drops the learner back onto the section overview (which now
-  /// acts as a fallback navigation surface alongside the answer sheet).
+  /// landing). Returning from a completed per-section screen continues to
+  /// the next pending section; the overview is only a fallback if the
+  /// learner backs out or an error interrupts the process.
   bool _autoLaunchedFirst = false;
 
   /// V39 — 1-second ticker driving the AppBar countdown. Active only while
   /// the session has a server-anchored timer (`duration_sec > 0`).
   Timer? _timerTicker;
+  bool _timerAutoSubmitting = false;
 
   @override
   void initState() {
@@ -142,30 +164,54 @@ class _MockExamScreenState extends State<MockExamScreen> {
     if (session == null || !session.hasTimer) return;
     _timerTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
+      final current = _session;
+      if (current != null &&
+          current.hasTimer &&
+          !current.isCompleted &&
+          current.remainingAt(DateTime.now()) == Duration.zero &&
+          !_timerAutoSubmitting) {
+        _timerAutoSubmitting = true;
+        _submitNow(auto: true);
+        return;
+      }
       setState(() {}); // re-render the timer chip
     });
   }
 
   // V39 — auto-launch the first pending section once after the session
-  // loads. Subsequent returns from per-section screens land on the
-  // section overview (acts as fallback navigation when the answer sheet
-  // is closed).
+  // loads. Completed sections continue to the next pending section; the
+  // overview stays available only when the learner backs out or an error
+  // interrupts the flow.
   Future<void> _autoLaunchFirstPendingIfNeeded() async {
+    if (!widget.autoStartFirstSection) return;
     if (_autoLaunchedFirst) return;
     final session = _session;
     if (session == null || session.isCompleted) return;
-    MockExamSection? first;
-    final sorted = [...session.sections]
-      ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
-    for (final s in sorted) {
-      if (s.isPending) {
-        first = s;
-        break;
-      }
-    }
+    final first = _firstPendingSection();
     if (first == null) return;
     _autoLaunchedFirst = true;
     await _runSection(first);
+  }
+
+  List<MockExamSection> _sectionsByDisplayOrder() {
+    final session = _session;
+    if (session == null) return const [];
+    return [...session.sections]
+      ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+  }
+
+  MockExamSection? _firstPendingSection() {
+    for (final s in _sectionsByDisplayOrder()) {
+      if (s.isPending) return s;
+    }
+    return null;
+  }
+
+  MockExamSection? _nextPendingAfter(int displayOrder) {
+    for (final s in _sectionsByDisplayOrder()) {
+      if (s.displayOrder > displayOrder && s.isPending) return s;
+    }
+    return null;
   }
 
   Future<void> _bootstrap() async {
@@ -181,7 +227,17 @@ class _MockExamScreenState extends State<MockExamScreen> {
       // Navigator.push from initState-driven async path runs after the
       // widget tree settles.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _autoLaunchFirstPendingIfNeeded();
+        if (!mounted) return;
+        unawaited(_autoLaunchFirstPendingIfNeeded());
+        // Server-side timer sweeper can flip a session to 'completed'
+        // without running scoring (ExpireMockExam by design skips the
+        // rollup). When the learner returns and we load such a session,
+        // run /complete to score it and let onCompleted fire.
+        if (initial.isCompleted &&
+            initial.overallScore == 0 &&
+            !initial.passed) {
+          unawaited(_finalize());
+        }
       });
       return;
     }
@@ -220,7 +276,7 @@ class _MockExamScreenState extends State<MockExamScreen> {
     }
   }
 
-  Future<void> _advanceSection(String attemptId) async {
+  Future<bool> _advanceSection(String attemptId) async {
     try {
       final target = _jumpTarget;
       final payload = await widget.client.advanceMockExam(
@@ -228,28 +284,53 @@ class _MockExamScreenState extends State<MockExamScreen> {
         attemptId: attemptId,
         targetDisplayOrder: target,
       );
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() {
         _session = MockExamSessionView.fromJson(payload);
         _error = null;
         _jumpTarget = null; // consume the jump target on first advance.
       });
+      return true;
     } catch (err) {
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() => _error = err.toString());
+      return false;
     }
+  }
+
+  Future<void> _continueAfterResolvedSection(int displayOrder) async {
+    if (!mounted) return;
+    final next = _nextPendingAfter(displayOrder) ?? _firstPendingSection();
+    if (next != null) {
+      await _runSection(next);
+      return;
+    }
+    await _bulkAnalyze();
+  }
+
+  void _returnToExamRouteIfNeeded() {
+    final route = ModalRoute.of(context);
+    if (route == null || route.isCurrent) return;
+    Navigator.of(context).popUntil((candidate) => identical(candidate, route));
   }
 
   // V39 S9 — "Nộp bài ngay": if any section is still pending, show a
   // destructive confirm with the pending count; otherwise submit directly.
   // Server marks remaining pending sections as 'skipped' and flips the
   // session to 'completed' in one call.
-  Future<void> _submitNow() async {
+  Future<void> _submitNow({bool auto = false}) async {
     final session = _session;
     if (session == null) return;
+    if (auto) {
+      _returnToExamRouteIfNeeded();
+      setState(() {
+        _analyzing = true;
+        _error = null;
+      });
+    }
     final pending = session.sections.where((s) => s.isPending).length;
     final total = session.sections.length;
-    if (pending > 0) {
+    if (!auto && pending > 0) {
       final ok = await SubmitNowConfirmDialog.show(
         context,
         unansweredCount: pending,
@@ -258,22 +339,57 @@ class _MockExamScreenState extends State<MockExamScreen> {
       if (!mounted || !ok) return;
     }
     try {
+      // Speaking sections record locally and bulk-analyze later. If the
+      // learner taps "Nộp bài ngay" before the bulk path runs, the speaking
+      // attempts are still 'draft' (no audio uploaded). Upload them first
+      // (without finalizing — pending sections still need to be skipped via
+      // /expire before /complete can score).
+      if (_pendingAnalyses.isNotEmpty) {
+        setState(() {
+          _analyzing = true;
+          _analyzeProgress = 0;
+        });
+        final total = _pendingAnalyses.length;
+        for (var i = 0; i < total; i++) {
+          final pending = _pendingAnalyses[i];
+          if (!mounted) return;
+          setState(() => _analyzeProgress = i + 1);
+          final voiceId = await VoicePreferenceService.readCurrent();
+          await widget.client.submitRecordedAudio(
+            pending.attemptId,
+            audioPath: pending.audioPath,
+            mimeType: 'audio/m4a',
+            fileSizeBytes: pending.fileSizeBytes,
+            durationMs: pending.durationMs,
+            preferredVoiceId: voiceId.isNotEmpty ? voiceId : null,
+          );
+          await _pollUntilDone(pending.attemptId);
+        }
+        _pendingAnalyses.clear();
+        if (!mounted) return;
+      }
       final payload = await widget.client.expireMockExam(session.id);
       if (!mounted) return;
       setState(() {
         _session = MockExamSessionView.fromJson(payload);
         _error = null;
       });
+      // /expire only flips pending→skipped + session.status='completed' —
+      // it deliberately skips scoring rollup. Fire /complete next so the
+      // attempted sections get scored and the result view has an overall
+      // score (otherwise learner sees a finished exam with 0/0).
+      await _finalize();
     } catch (err) {
       if (!mounted) return;
-      setState(() => _error = err.toString());
+      setState(() {
+        _analyzing = false;
+        _error = err.toString();
+      });
     }
   }
 
   // V39 — mark a pending section as 'skipped' so the learner can move past it.
-  // Once S7 ships jump-back, the same display_order is re-enterable via the
-  // answer sheet. For now the tile shows the new "đã bỏ qua" state and the
-  // learner advances to the next pending section.
+  // The same display_order remains re-enterable via the answer sheet.
   Future<void> _skipSection(MockExamSection section) async {
     try {
       final payload = await widget.client.skipMockExamSection(
@@ -285,6 +401,7 @@ class _MockExamScreenState extends State<MockExamScreen> {
         _session = MockExamSessionView.fromJson(payload);
         _error = null;
       });
+      await _continueAfterResolvedSection(section.displayOrder);
     } catch (err) {
       if (!mounted) return;
       setState(() => _error = err.toString());
@@ -293,9 +410,14 @@ class _MockExamScreenState extends State<MockExamScreen> {
 
   Future<void> _runSection(MockExamSection section) async {
     final navigator = Navigator.of(context);
+    final resolvedDisplayOrder = section.displayOrder;
+    var sectionResolved = false;
     try {
       final detail = ExerciseDetail.fromJson(
-        await widget.client.getExercise(section.exerciseId),
+        await widget.client.getExercise(
+          section.exerciseId,
+          mockExamSessionId: _session?.id,
+        ),
       );
       if (!mounted) return;
 
@@ -331,16 +453,10 @@ class _MockExamScreenState extends State<MockExamScreen> {
         final rec = recorded;
         if (rec == null) return; // user backed out
 
-        final payload = await widget.client.advanceMockExam(
-          _session!.id,
-          attemptId: rec.attemptId,
-        );
-        if (!mounted) return;
-        setState(() {
-          _session = MockExamSessionView.fromJson(payload);
-          _pendingAnalyses.add(rec);
-          _error = null;
-        });
+        final advanced = await _advanceSection(rec.attemptId);
+        if (!advanced || !mounted) return;
+        setState(() => _pendingAnalyses.add(rec));
+        sectionResolved = true;
       } else if (kind == 'interview') {
         // V36 — interview attempts are created up-front (mirrors course
         // intro flow) and the session screen fires onSessionEnded after
@@ -350,15 +466,16 @@ class _MockExamScreenState extends State<MockExamScreen> {
         if (!mounted) return;
         await navigator.push(
           MaterialPageRoute(
-            builder: (_) => InterviewSessionScreen(
-              client: widget.client,
-              exerciseId: detail.id,
-              attemptId: attemptId,
-              detail: detail,
-              onSessionEnded: (id) async {
-                await _advanceSection(id);
-              },
-            ),
+            builder:
+                (_) => InterviewSessionScreen(
+                  client: widget.client,
+                  exerciseId: detail.id,
+                  attemptId: attemptId,
+                  detail: detail,
+                  onSessionEnded: (id) async {
+                    sectionResolved = await _advanceSection(id);
+                  },
+                ),
           ),
         );
         if (!mounted) return;
@@ -373,7 +490,7 @@ class _MockExamScreenState extends State<MockExamScreen> {
                   detail: detail,
                   showResultOnCompletion: false,
                   onAttemptCompleted: (id) async {
-                    await _advanceSection(id);
+                    sectionResolved = await _advanceSection(id);
                   },
                 );
               } else if (kind == 'doc') {
@@ -382,7 +499,20 @@ class _MockExamScreenState extends State<MockExamScreen> {
                   detail: detail,
                   showResultOnCompletion: false,
                   onAttemptCompleted: (id) async {
-                    await _advanceSection(id);
+                    sectionResolved = await _advanceSection(id);
+                  },
+                );
+              } else if (detail.isPsani3) {
+                // V38.x — psani_3_dictation uses the dedicated stepper screen
+                // (course flow routes the same way). Without this, the writing
+                // screen renders an empty body in exam mode because its
+                // builders only handle psani_1/psani_2.
+                return DictationExerciseScreen(
+                  client: widget.client,
+                  detail: detail,
+                  showResultOnCompletion: false,
+                  onAttemptCompleted: (id) async {
+                    sectionResolved = await _advanceSection(id);
                   },
                 );
               } else {
@@ -391,7 +521,7 @@ class _MockExamScreenState extends State<MockExamScreen> {
                   detail: detail,
                   showResultOnCompletion: false,
                   onAttemptCompleted: (id) async {
-                    await _advanceSection(id);
+                    sectionResolved = await _advanceSection(id);
                   },
                 );
               }
@@ -402,8 +532,8 @@ class _MockExamScreenState extends State<MockExamScreen> {
         // If user backed out without completing, _session remains unchanged (nextPending != null).
       }
 
-      if (_session!.nextPending == null) {
-        await _bulkAnalyze();
+      if (sectionResolved) {
+        await _continueAfterResolvedSection(resolvedDisplayOrder);
       }
     } catch (err) {
       if (!mounted) return;
@@ -479,17 +609,22 @@ class _MockExamScreenState extends State<MockExamScreen> {
         }
       }
       if (!mounted) return;
+      final onCompleted = widget.onCompleted;
+      if (onCompleted != null && completed.isCompleted) {
+        if (widget.showResultAfterCompletionCallback) {
+          await onCompleted(completed.id);
+          if (!mounted) return;
+        } else {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            unawaited(Future.sync(() => onCompleted(completed.id)));
+          });
+        }
+      }
       setState(() {
         _session = completed;
         _sectionReadiness = readiness;
         _analyzing = false;
       });
-      final onCompleted = widget.onCompleted;
-      if (onCompleted != null && completed.isCompleted) {
-        WidgetsBinding.instance.addPostFrameCallback(
-          (_) => onCompleted(completed.id),
-        );
-      }
     } catch (err) {
       if (!mounted) return;
       setState(() {
@@ -499,16 +634,16 @@ class _MockExamScreenState extends State<MockExamScreen> {
     }
   }
 
-  @override
   // V39 — server-anchored countdown rendered in AppBar.title row. Falls
   // back to the plain title when the session hasn't loaded a timer yet
   // (pre-V39 sessions or the loading state).
   Widget _buildAppBarTitle(String mockTitle, AppLocalizations l) {
     final session = _session;
     final title = mockTitle.isNotEmpty ? mockTitle : l.mockExamTitle;
-    final remaining = session != null && session.hasTimer
-        ? session.remainingAt(DateTime.now())
-        : null;
+    final remaining =
+        session != null && session.hasTimer
+            ? session.remainingAt(DateTime.now())
+            : null;
     if (remaining == null) {
       return Text(title);
     }
@@ -547,6 +682,7 @@ class _MockExamScreenState extends State<MockExamScreen> {
     final l = AppLocalizations.of(context);
     final mockTitle = widget.mockTest?.title.trim() ?? '';
     final session = _session;
+    final canSubmit = session != null && !session.isCompleted;
     return Scaffold(
       appBar: AppBar(
         title: _buildAppBarTitle(mockTitle, l),
@@ -557,62 +693,67 @@ class _MockExamScreenState extends State<MockExamScreen> {
           IconButton(
             icon: const Icon(Icons.grid_view_rounded),
             tooltip: 'Danh sách câu',
-            onPressed: session == null
-                ? null
-                : () async {
-                    final picked = await Navigator.of(context).push<int>(
-                      MaterialPageRoute(
-                        fullscreenDialog: true,
-                        builder: (_) => AnswerSheetScreen(session: session),
-                      ),
-                    );
-                    if (!mounted || picked == null) return;
-                    MockExamSection? target;
-                    for (final s in _session!.sections) {
-                      if (s.displayOrder == picked) {
-                        target = s;
-                        break;
+            onPressed:
+                session == null
+                    ? null
+                    : () async {
+                      final picked = await Navigator.of(context).push<int>(
+                        MaterialPageRoute(
+                          fullscreenDialog: true,
+                          builder: (_) => AnswerSheetScreen(session: session),
+                        ),
+                      );
+                      if (!context.mounted || picked == null) return;
+                      MockExamSection? target;
+                      for (final s in _session!.sections) {
+                        if (s.displayOrder == picked) {
+                          target = s;
+                          break;
+                        }
                       }
-                    }
-                    if (target == null) return;
-                    // V39 S8 — speaking sections with an existing attempt
-                    // require a destructive confirm before re-record. Old
-                    // attempt audio becomes inert (new attempt linked via
-                    // target_display_order from S7). Interview sections use
-                    // a different lifecycle and skip the dialog.
-                    final kind = sectionSkillKind(target);
-                    final needsConfirm = kind == 'noi' &&
-                        target.attemptId.isNotEmpty;
-                    if (needsConfirm) {
-                      final ok = await RerecordConfirmDialog.show(context);
-                      if (!mounted || !ok) return;
-                    }
-                    setState(() => _jumpTarget = picked);
-                    await _runSection(target);
-                  },
+                      if (target == null) return;
+                      // V39 S8 — speaking sections with an existing attempt
+                      // require a destructive confirm before re-record. Old
+                      // attempt audio becomes inert (new attempt linked via
+                      // target_display_order from S7). Interview sections use
+                      // a different lifecycle and skip the dialog.
+                      final kind = sectionSkillKind(target);
+                      final needsConfirm =
+                          kind == 'noi' && target.attemptId.isNotEmpty;
+                      if (needsConfirm) {
+                        final ok = await RerecordConfirmDialog.show(context);
+                        if (!context.mounted || !ok) return;
+                      }
+                      setState(() => _jumpTarget = picked);
+                      await _runSection(target);
+                    },
           ),
-          // V39 S9 — overflow ⋮ "Nộp bài ngay". Disabled while loading or
-          // after the session has already completed.
-          PopupMenuButton<String>(
-            tooltip: 'Tuỳ chọn',
-            icon: const Icon(Icons.more_vert_rounded),
-            enabled: session != null && !session.isCompleted,
-            onSelected: (key) {
-              if (key == 'submit-now') {
-                _submitNow();
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: 'submit-now',
-                child: ListTile(
-                  leading: Icon(Icons.flag_rounded),
-                  title: Text('Nộp bài ngay'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
-          ),
+          if (widget.showProminentSubmitAction && canSubmit)
+            _ProminentSubmitAction(onPressed: () => _submitNow())
+          else
+            // V39 S9 — overflow ⋮ "Nộp bài ngay". Disabled while loading or
+            // after the session has already completed.
+            PopupMenuButton<String>(
+              tooltip: 'Tuỳ chọn',
+              icon: const Icon(Icons.more_vert_rounded),
+              enabled: canSubmit,
+              onSelected: (key) {
+                if (key == 'submit-now') {
+                  _submitNow();
+                }
+              },
+              itemBuilder:
+                  (_) => const [
+                    PopupMenuItem(
+                      value: 'submit-now',
+                      child: ListTile(
+                        leading: Icon(Icons.flag_rounded),
+                        title: Text('Nộp bài ngay'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+            ),
         ],
       ),
       body: SafeArea(child: _buildBody(l)),
@@ -647,7 +788,8 @@ class _MockExamScreenState extends State<MockExamScreen> {
       (s) => sectionSkillKind(s) == 'noi',
     );
     if (session.isCompleted) {
-      if (widget.onCompleted != null) {
+      if (widget.onCompleted != null &&
+          !widget.showResultAfterCompletionCallback) {
         // Caller handles the result screen; show a brief spinner while the
         // postFrameCallback fires and the route transition completes.
         return const Center(child: CircularProgressIndicator());
@@ -656,6 +798,8 @@ class _MockExamScreenState extends State<MockExamScreen> {
         client: widget.client,
         session: session,
         sectionReadiness: _sectionReadiness,
+        ctaLabel: widget.resultCtaLabel,
+        onCta: widget.onResultCta,
       );
     }
     return ListView(
@@ -715,8 +859,9 @@ class _MockExamScreenState extends State<MockExamScreen> {
                   value: _analyzeProgress / total,
                   minHeight: 6,
                   backgroundColor: AppColors.outlineVariant,
-                  valueColor:
-                      const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.primary,
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.x4),
@@ -724,7 +869,8 @@ class _MockExamScreenState extends State<MockExamScreen> {
                 // _analyzeProgress = k means section k-1 is currently processing.
                 // Sections 0..k-2 are done; section k-1 is active; k..end are pending.
                 final done = _analyzeProgress > 1 && i < _analyzeProgress - 1;
-                final active = _analyzeProgress > 0 && i == _analyzeProgress - 1;
+                final active =
+                    _analyzeProgress > 0 && i == _analyzeProgress - 1;
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.x1),
                   child: Row(
@@ -733,34 +879,36 @@ class _MockExamScreenState extends State<MockExamScreen> {
                       SizedBox(
                         width: 20,
                         height: 20,
-                        child: done
-                            ? const Icon(
-                                Icons.check_circle_rounded,
-                                size: 20,
-                                color: AppColors.success,
-                              )
-                            : active
+                        child:
+                            done
+                                ? const Icon(
+                                  Icons.check_circle_rounded,
+                                  size: 20,
+                                  color: AppColors.success,
+                                )
+                                : active
                                 ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.primary,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.radio_button_unchecked,
-                                    size: 20,
-                                    color: AppColors.outline,
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.primary,
                                   ),
+                                )
+                                : const Icon(
+                                  Icons.radio_button_unchecked,
+                                  size: 20,
+                                  color: AppColors.outline,
+                                ),
                       ),
                       const SizedBox(width: AppSpacing.x2),
                       Text(
                         l.mockExamSectionLabel(i + 1),
                         style: AppTypography.bodySmall.copyWith(
-                          color: done
-                              ? AppColors.success
-                              : active
+                          color:
+                              done
+                                  ? AppColors.success
+                                  : active
                                   ? AppColors.onSurface
                                   : AppColors.onSurfaceVariant,
                         ),
@@ -771,6 +919,30 @@ class _MockExamScreenState extends State<MockExamScreen> {
               }),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProminentSubmitAction extends StatelessWidget {
+  const _ProminentSubmitAction({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(end: AppSpacing.x2),
+      child: FilledButton.icon(
+        key: const Key('mock_exam_prominent_submit'),
+        onPressed: onPressed,
+        icon: const Icon(Icons.flag_rounded, size: 18),
+        label: const Text('Nộp bài'),
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 38),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
       ),
     );
@@ -795,7 +967,9 @@ class _SectionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final skill = skillLabel(l, sectionSkillKind(section));
-    final exercise = _exerciseTypeLabel(l, section.exerciseType);
+    final exerciseType = _exerciseTypeLabel(l, section.exerciseType);
+    final exercise =
+        section.exerciseTitle.isNotEmpty ? section.exerciseTitle : exerciseType;
     final PillTone tone;
     final String label;
     if (section.isCompleted) {
@@ -811,14 +985,14 @@ class _SectionTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.x4),
       decoration: BoxDecoration(
-        color: section.isSkipped
-            ? AppColors.surfaceContainer
-            : AppColors.surfaceContainerLowest,
+        color:
+            section.isSkipped
+                ? AppColors.surfaceContainer
+                : AppColors.surfaceContainerLowest,
         borderRadius: AppRadius.lgAll,
         border: Border.all(
-          color: section.isSkipped
-              ? AppColors.outline
-              : AppColors.outlineVariant,
+          color:
+              section.isSkipped ? AppColors.outline : AppColors.outlineVariant,
         ),
       ),
       child: Row(
@@ -829,19 +1003,16 @@ class _SectionTile extends StatelessWidget {
               children: [
                 InfoPill(label: label, tone: tone),
                 const SizedBox(height: AppSpacing.x2),
-                Text(
-                  l.mockExamSectionLabel(section.sequenceNo),
-                  style: AppTypography.titleSmall,
-                ),
+                Text(exercise, style: AppTypography.titleSmall),
                 const SizedBox(height: AppSpacing.x1),
                 Text(
                   section.maxPoints > 0
                       ? l.mockExamSectionMeta(
-                          skill,
-                          exercise,
-                          section.maxPoints,
-                        )
-                      : '$skill · $exercise',
+                        l.mockExamSectionLabel(section.sequenceNo),
+                        skill,
+                        section.maxPoints,
+                      )
+                      : '${l.mockExamSectionLabel(section.sequenceNo)} · $skill',
                   style: AppTypography.bodySmall.copyWith(
                     color: AppColors.onSurfaceVariant,
                   ),
@@ -859,8 +1030,8 @@ class _SectionTile extends StatelessWidget {
                   section.isCompleted
                       ? l.mockExamActionDone
                       : section.isSkipped
-                          ? 'Đã bỏ qua'
-                          : l.mockExamActionStart,
+                      ? 'Đã bỏ qua'
+                      : l.mockExamActionStart,
                 ),
               ),
               if (onSkip != null) ...[
@@ -886,16 +1057,126 @@ class _SectionTile extends StatelessWidget {
   }
 }
 
+class _SkillResultBucket {
+  int score = 0;
+  int max = 0;
+  int completed = 0;
+  int skipped = 0;
+
+  double get fraction => max > 0 ? score / max : 0;
+}
+
+class _SkillResultSummary {
+  const _SkillResultSummary({
+    required this.skillKind,
+    required this.label,
+    required this.score,
+    required this.max,
+    required this.completed,
+    required this.skipped,
+    required this.comment,
+  });
+
+  final String skillKind;
+  final String label;
+  final int score;
+  final int max;
+  final int completed;
+  final int skipped;
+  final String comment;
+
+  double get fraction => max > 0 ? score / max : 0;
+}
+
+class _SkillSummaryTile extends StatelessWidget {
+  const _SkillSummaryTile({required this.summary});
+
+  final _SkillResultSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = summary.fraction.clamp(0.0, 1.0);
+    final color =
+        pct >= 0.8
+            ? AppColors.success
+            : pct >= 0.55
+            ? AppColors.warning
+            : AppColors.error;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.x4),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: AppRadius.lgAll,
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(_skillIcon(summary.skillKind), color: color, size: 20),
+              const SizedBox(width: AppSpacing.x2),
+              Expanded(
+                child: Text(summary.label, style: AppTypography.titleSmall),
+              ),
+              if (summary.max > 0)
+                Text(
+                  '${summary.score}/${summary.max}',
+                  style: AppTypography.titleSmall.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+            ],
+          ),
+          if (summary.max > 0) ...[
+            const SizedBox(height: AppSpacing.x2),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.full),
+              child: LinearProgressIndicator(
+                value: pct,
+                minHeight: 6,
+                backgroundColor: AppColors.outlineVariant,
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.x2),
+          Text(
+            summary.comment,
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _skillIcon(String kind) => switch (kind) {
+  'noi' => Icons.mic_outlined,
+  'nghe' => Icons.headphones_outlined,
+  'doc' => Icons.menu_book_outlined,
+  'viet' => Icons.edit_outlined,
+  'interview' => Icons.forum_outlined,
+  _ => Icons.quiz_outlined,
+};
+
 class _MockExamResultView extends StatelessWidget {
   const _MockExamResultView({
     required this.client,
     required this.session,
     required this.sectionReadiness,
+    this.ctaLabel,
+    this.onCta,
   });
 
   final ApiClient client;
   final MockExamSessionView session;
   final Map<String, String> sectionReadiness;
+  final String? ctaLabel;
+  final VoidCallback? onCta;
 
   // Helper so Builder callbacks inside build() can access client.
   ApiClient _client(BuildContext context) => client;
@@ -922,14 +1203,60 @@ class _MockExamResultView extends StatelessWidget {
     _ => AppColors.surfaceContainerHigh,
   };
 
+  List<_SkillResultSummary> _skillSummaries(AppLocalizations l) {
+    final bySkill = <String, _SkillResultBucket>{};
+    for (final section in session.sections) {
+      final skill = sectionSkillKind(section);
+      final bucket = bySkill.putIfAbsent(skill, () => _SkillResultBucket());
+      bucket.score += section.sectionScore;
+      bucket.max += section.maxPoints;
+      if (section.isCompleted) bucket.completed += 1;
+      if (section.isSkipped) bucket.skipped += 1;
+    }
+    const order = ['noi', 'nghe', 'doc', 'viet', 'interview'];
+    final skills =
+        bySkill.keys.toList()..sort((a, b) {
+          final ia = order.indexOf(a);
+          final ib = order.indexOf(b);
+          final ra = ia < 0 ? order.length : ia;
+          final rb = ib < 0 ? order.length : ib;
+          return ra == rb ? a.compareTo(b) : ra.compareTo(rb);
+        });
+    return [
+      for (final skill in skills)
+        _SkillResultSummary(
+          skillKind: skill,
+          label: skillLabel(l, skill),
+          score: bySkill[skill]!.score,
+          max: bySkill[skill]!.max,
+          completed: bySkill[skill]!.completed,
+          skipped: bySkill[skill]!.skipped,
+          comment: _skillComment(l, skill, bySkill[skill]!.fraction),
+        ),
+    ];
+  }
+
+  String _skillComment(AppLocalizations l, String skillKind, double fraction) {
+    final label = skillLabel(l, skillKind);
+    if (fraction >= 0.8) {
+      return l.mockExamSkillCommentStrong(label);
+    }
+    if (fraction >= 0.55) {
+      return l.mockExamSkillCommentOk(label);
+    }
+    return l.mockExamSkillCommentNeedsWork(label);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final totalMax = session.totalScoreMax > 0 ? session.totalScoreMax : 40;
-    final hasScore = session.overallScore > 0 || session.passed;
+    final hasScore =
+        session.isCompleted || session.overallScore > 0 || session.passed;
     final passColor = session.passed ? AppColors.success : AppColors.error;
     final passContainerColor =
         session.passed ? AppColors.successContainer : AppColors.errorContainer;
+    final skillSummaries = _skillSummaries(l);
 
     return ListView(
       padding: EdgeInsets.symmetric(
@@ -1041,7 +1368,27 @@ class _MockExamResultView extends StatelessWidget {
           const SizedBox(height: AppSpacing.x5),
         ],
 
+        if (skillSummaries.isNotEmpty) ...[
+          Text(l.mockExamSkillSummaryTitle, style: AppTypography.titleMedium),
+          const SizedBox(height: AppSpacing.x2),
+          for (final summary in skillSummaries)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.x2),
+              child: _SkillSummaryTile(summary: summary),
+            ),
+          const SizedBox(height: AppSpacing.x3),
+        ],
+
         // ── Section breakdown ─────────────────────────────────────────────────
+        Text(l.mockExamSectionBreakdownTitle, style: AppTypography.titleMedium),
+        const SizedBox(height: AppSpacing.x1),
+        Text(
+          l.mockExamTapSectionHint,
+          style: AppTypography.bodySmall.copyWith(
+            color: AppColors.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.x3),
         for (final section in session.sections)
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.x3),
@@ -1206,9 +1553,10 @@ class _MockExamResultView extends StatelessWidget {
         // ── CTA ───────────────────────────────────────────────────────────────
         FilledButton.icon(
           onPressed:
+              onCta ??
               () => Navigator.of(context).popUntil((route) => route.isFirst),
           icon: const Icon(Icons.home_outlined, size: 18),
-          label: Text(l.mockExamBackHome),
+          label: Text(ctaLabel ?? l.mockExamBackHome),
           style: FilledButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 14),
           ),
