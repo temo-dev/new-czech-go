@@ -64,8 +64,8 @@ Widget _wrap({
     supportedLocales: AppLocalizations.supportedLocales,
     home: CefrAuthGate(
       levelApi: api,
-      child: child,
       welcomeScreen: welcomeScreen,
+      child: child,
     ),
   );
 }
@@ -73,15 +73,18 @@ Widget _wrap({
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('shows loading spinner while fetchLevelProgress is in flight',
-      (tester) async {
+  testWidgets('shows loading spinner while fetchLevelProgress is in flight', (
+    tester,
+  ) async {
     final api = _BlockingProgressApi();
 
-    await tester.pumpWidget(_wrap(
-      api: api,
-      child: const Scaffold(key: _childKey),
-      welcomeScreen: const Scaffold(key: _welcomeKey),
-    ));
+    await tester.pumpWidget(
+      _wrap(
+        api: api,
+        child: const Scaffold(key: _childKey),
+        welcomeScreen: const Scaffold(key: _welcomeKey),
+      ),
+    );
     await tester.pump(); // let initState fire, future pending
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
@@ -94,31 +97,63 @@ void main() {
     expect(find.byKey(_childKey), findsOneWidget);
   });
 
-  testWidgets('already-onboarded user (placementTaken) sees child directly',
-      (tester) async {
-    final api = _FakeLevelApi()
-      ..stubProgress(_progress(level: CefrLevel.a2, placementTaken: true));
+  testWidgets('already-onboarded user (placementTaken) sees child directly', (
+    tester,
+  ) async {
+    final api =
+        _FakeLevelApi()
+          ..stubProgress(_progress(level: CefrLevel.a2, placementTaken: true));
 
-    await tester.pumpWidget(_wrap(
-      api: api,
-      child: const Scaffold(key: _childKey),
-      welcomeScreen: const Scaffold(key: _welcomeKey),
-    ));
+    await tester.pumpWidget(
+      _wrap(
+        api: api,
+        child: const Scaffold(key: _childKey),
+        welcomeScreen: const Scaffold(key: _welcomeKey),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byKey(_childKey), findsOneWidget);
     expect(find.byKey(_welcomeKey), findsNothing);
   });
 
-  testWidgets('fresh A0 user (no placement) sees WelcomeScreen', (tester) async {
-    final api = _FakeLevelApi()
-      ..stubProgress(_progress(level: CefrLevel.a0, placementTaken: false));
+  testWidgets('fresh A0 user (no placement) sees WelcomeScreen', (
+    tester,
+  ) async {
+    final api =
+        _FakeLevelApi()
+          ..stubProgress(_progress(level: CefrLevel.a0, placementTaken: false));
 
-    await tester.pumpWidget(_wrap(
-      api: api,
-      child: const Scaffold(key: _childKey),
-      welcomeScreen: const Scaffold(key: _welcomeKey),
-    ));
+    await tester.pumpWidget(
+      _wrap(
+        api: api,
+        child: const Scaffold(key: _childKey),
+        welcomeScreen: const Scaffold(key: _welcomeKey),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(_welcomeKey), findsOneWidget);
+    expect(find.byKey(_childKey), findsNothing);
+  });
+
+  testWidgets('fresh A0 user ignores legacy existing-prompt flag', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'cefr_existing_prompt_shown': true,
+    });
+    final api =
+        _FakeLevelApi()
+          ..stubProgress(_progress(level: CefrLevel.a0, placementTaken: false));
+
+    await tester.pumpWidget(
+      _wrap(
+        api: api,
+        child: const Scaffold(key: _childKey),
+        welcomeScreen: const Scaffold(key: _welcomeKey),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byKey(_welcomeKey), findsOneWidget);
@@ -127,21 +162,24 @@ void main() {
 
   testWidgets('gate re-evaluates after refresh() call', (tester) async {
     // Start as fresh A0 (no placement).
-    final api = _FakeLevelApi()
-      ..stubProgress(_progress(level: CefrLevel.a0, placementTaken: false));
+    final api =
+        _FakeLevelApi()
+          ..stubProgress(_progress(level: CefrLevel.a0, placementTaken: false));
 
     final gateKey = GlobalKey<CefrAuthGateState>();
-    await tester.pumpWidget(MaterialApp(
-      locale: const Locale('vi'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: CefrAuthGate(
-        key: gateKey,
-        levelApi: api,
-        child: const Scaffold(key: _childKey),
-        welcomeScreen: const Scaffold(key: _welcomeKey),
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: CefrAuthGate(
+          key: gateKey,
+          levelApi: api,
+          welcomeScreen: const Scaffold(key: _welcomeKey),
+          child: const Scaffold(key: _childKey),
+        ),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
     expect(find.byKey(_welcomeKey), findsOneWidget);
 
@@ -155,18 +193,22 @@ void main() {
   });
 
   testWidgets('error during fetch shows error view with retry', (tester) async {
-    final api = _FakeLevelApi()
-      ..stubError(const LevelApiException(
-        statusCode: 500,
-        code: 'server_error',
-        message: 'Oops',
-      ));
+    final api =
+        _FakeLevelApi()..stubError(
+          const LevelApiException(
+            statusCode: 500,
+            code: 'server_error',
+            message: 'Oops',
+          ),
+        );
 
-    await tester.pumpWidget(_wrap(
-      api: api,
-      child: const Scaffold(key: _childKey),
-      welcomeScreen: const Scaffold(key: _welcomeKey),
-    ));
+    await tester.pumpWidget(
+      _wrap(
+        api: api,
+        child: const Scaffold(key: _childKey),
+        welcomeScreen: const Scaffold(key: _welcomeKey),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('cefr_gate_error')), findsOneWidget);
@@ -174,26 +216,53 @@ void main() {
     expect(find.byKey(_childKey), findsNothing);
   });
 
-  testWidgets('prefs key cefr_existing_prompt_shown read on gate build',
-      (tester) async {
+  testWidgets('scoped existing-prompt key is read on gate build', (
+    tester,
+  ) async {
     // A2 user with placement null but prompt already shown → show child
     // (this is the "existing user confirmed" state; Phase C dialog won't
     // re-fire because CefrPrefs.isExistingPromptShown is true).
     SharedPreferences.setMockInitialValues({
-      'cefr_existing_prompt_shown': true,
+      'cefr_existing_prompt_shown_u1_a2': true,
     });
-    final api = _FakeLevelApi()
-      ..stubProgress(_progress(level: CefrLevel.a2, placementTaken: false));
+    final api =
+        _FakeLevelApi()
+          ..stubProgress(_progress(level: CefrLevel.a2, placementTaken: false));
 
-    await tester.pumpWidget(_wrap(
-      api: api,
-      child: const Scaffold(key: _childKey),
-      welcomeScreen: const Scaffold(key: _welcomeKey),
-    ));
+    await tester.pumpWidget(
+      _wrap(
+        api: api,
+        child: const Scaffold(key: _childKey),
+        welcomeScreen: const Scaffold(key: _welcomeKey),
+      ),
+    );
     await tester.pumpAndSettle();
 
     // prompt shown → treat as onboarded → child visible
     expect(find.byKey(_childKey), findsOneWidget);
+  });
+
+  testWidgets('legacy global existing-prompt key does not suppress A2 dialog', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'cefr_existing_prompt_shown': true,
+    });
+    final api =
+        _FakeLevelApi()
+          ..stubProgress(_progress(level: CefrLevel.a2, placementTaken: false));
+
+    await tester.pumpWidget(
+      _wrap(
+        api: api,
+        child: const Scaffold(key: _childKey),
+        welcomeScreen: const Scaffold(key: _welcomeKey),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(_childKey), findsOneWidget);
+    expect(find.byKey(const Key('existing_prompt_confirm')), findsOneWidget);
   });
 }
 

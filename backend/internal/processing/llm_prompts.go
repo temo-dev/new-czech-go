@@ -170,18 +170,47 @@ func InterviewSystemPrompt(locale string) string {
 
 // ── Vocabulary Exercise Generation ────────────────────────────────────────────
 
-// VocabGenerationPrompt returns the user prompt for generating vocabulary exercises.
-// Sent to ClaudeContentGenerator with tool_use to enforce JSON output.
+// VocabSystemPrompt is the invariant persona + cross-type rules for vocab
+// generation. Sent in the Anthropic `system` field with cache_control so
+// repeated calls hit prompt-cache (cost ≈ 10% of fresh input tokens).
+//
+// All per-type structural rules live in VocabGenerationPrompt (user message)
+// so we can filter them by the requested ExerciseTypes and keep the system
+// block byte-identical across calls.
+const VocabSystemPrompt = `You are a Czech language content creator for Vietnamese learners preparing for the trvalý pobyt A2 / B1 exam.
+
+Output contract:
+- Return results via the save_exercises tool only. No prose, no markdown.
+- Czech fields (front_text, back_text when Czech, sentence, options, correct_answer) must be pure, natural Czech — no English or Vietnamese leakage.
+- Each explanation: ≤120 characters, state WHICH word/answer and WHY it fits the context. Written entirely in the requested explanation language.
+
+Content rules (apply to every exercise):
+- The input vocabulary list is mandatory source material. Do NOT collapse onto a single word when several are provided.
+- Cover distinct source words before repeating any word.
+- Czech sentences must match the requested CEFR level (A1 = present tense + ~500 common words; A2 = past/future + ~1500 words; B1 = subjunctive + ~2500 words).
+- Distractors must share the correct answer's part of speech and semantic field, be roughly the same length, and MUST NOT be synonyms of the correct answer.`
+
+// VocabGenerationPrompt returns the user prompt for generating vocabulary
+// exercises. Persona + invariant rules live in VocabSystemPrompt (cached);
+// this builder emits only the per-call data (items, counts, language) plus
+// the per-type structural rules filtered to the requested ExerciseTypes.
 func VocabGenerationPrompt(input VocabularyGenerationInput) string {
-	items := make([]string, len(input.Items))
-	for i, item := range input.Items {
-		items[i] = fmt.Sprintf("%s = %s", item.Term, item.Meaning)
+	items := make([]string, 0, len(input.Items))
+	for _, item := range input.Items {
+		line := fmt.Sprintf("- %s — %s", item.Term, item.Meaning)
 		if item.PartOfSpeech != "" {
-			items[i] += fmt.Sprintf(" (%s)", item.PartOfSpeech)
+			line += fmt.Sprintf(" (%s)", item.PartOfSpeech)
 		}
+		if strings.TrimSpace(item.ExampleSentence) != "" {
+			line += fmt.Sprintf(" | example: %s", strings.TrimSpace(item.ExampleSentence))
+			if strings.TrimSpace(item.ExampleTranslation) != "" {
+				line += fmt.Sprintf(" → %s", strings.TrimSpace(item.ExampleTranslation))
+			}
+		}
+		items = append(items, line)
 	}
 
-	typeCounts := make([]string, 0)
+	typeCounts := make([]string, 0, len(input.ExerciseTypes))
 	for _, t := range input.ExerciseTypes {
 		if n := input.NumPerType[t]; n > 0 {
 			typeCounts = append(typeCounts, fmt.Sprintf("%d %s", n, t))
@@ -193,32 +222,61 @@ func VocabGenerationPrompt(input VocabularyGenerationInput) string {
 		lang = "Vietnamese"
 	}
 
-	return fmt.Sprintf(`You are a Czech language content creator for Vietnamese learners.
-Create exercises for these Czech vocabulary words at level %s:
+	perTypeRules := vocabPerTypeRules(input.ExerciseTypes, len(input.Items), lang)
+	rulesBlock := ""
+	if len(perTypeRules) > 0 {
+		rulesBlock = "\n\nPer-type structural rules:\n" + strings.Join(perTypeRules, "\n")
+	}
+
+	return fmt.Sprintf(`Level: %s
+Explanation language: %s
+
+Source vocabulary:
 %s
 
-Generate %s.
-Rules:
-- Treat the input vocabulary list as mandatory source material; do not focus on only one word when several are provided
-- If quizcard_basic is requested: create exactly %d quizcard_basic exercises, one for each input word; front_text must exactly match the Czech term and back_text must exactly match its meaning
-- For fill_blank and choice_word: cover distinct input words before repeating any word
-- For matching: if the source list has 2-6 words, include every source word as a pair in each matching exercise
-- Use simple, natural Czech sentences appropriate for level %s
-- All explanations must be in %s
-- For matching exercises: provide 4-6 pairs (left=Czech term, right=Vietnamese meaning)
-- For fill_blank: sentence must contain exactly ___ (three underscores)
-- For choice_word: provide exactly 4 options; correct_answer must equal the full text of the correct option
-- For quizcard_basic: front_text=Czech term, back_text=%s meaning
-- Distractors must come from the same semantic field
-- Each exercise must have a clear explanation of why the answer is correct`,
+Generate %s.%s
+
+When an example sentence is provided above, prefer adapting it over inventing a new context.`,
 		input.Level,
+		lang,
 		strings.Join(items, "\n"),
 		strings.Join(typeCounts, ", "),
-		len(input.Items),
-		input.Level,
-		lang,
-		lang,
+		rulesBlock,
 	)
+}
+
+// vocabPerTypeRules returns only the structural rules for exercise types that
+// were actually requested. Sending unused rules wastes tokens and gives the
+// model irrelevant constraints to satisfy.
+func vocabPerTypeRules(exerciseTypes []string, sourceCount int, explanationLang string) []string {
+	rules := make([]string, 0, len(exerciseTypes))
+	for _, t := range exerciseTypes {
+		switch t {
+		case "quizcard_basic":
+			rules = append(rules, fmt.Sprintf(
+				"- quizcard_basic: create exactly %d cards, one per source word; front_text = exact Czech term, back_text = exact %s meaning.",
+				sourceCount, explanationLang,
+			))
+		case "matching":
+			extra := ""
+			if sourceCount >= 2 && sourceCount <= 6 {
+				extra = " Include every source word as a pair in each matching exercise."
+			}
+			rules = append(rules, fmt.Sprintf(
+				"- matching: 4-6 pairs per exercise; left = Czech term, right = %s meaning.%s",
+				explanationLang, extra,
+			))
+		case "fill_blank":
+			rules = append(rules,
+				"- fill_blank: each sentence must contain exactly ___ (three underscores) where the target word goes; correct_answer = the single Czech word that fills the blank.",
+			)
+		case "choice_word":
+			rules = append(rules,
+				"- choice_word: provide exactly 4 options; correct_answer must equal the FULL TEXT of the correct option.",
+			)
+		}
+	}
+	return rules
 }
 
 // ── Grammar Exercise Generation ───────────────────────────────────────────────

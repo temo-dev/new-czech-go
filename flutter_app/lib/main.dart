@@ -231,6 +231,19 @@ class _CefrOnboardingState extends State<_CefrOnboarding> {
 
   void _refreshGate() => _gateKey.currentState?.refresh();
 
+  void _openPlacementTest() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder:
+            (_) => PlacementTestScreen(
+              levelApi: _levelApi,
+              client: _client,
+              onFinished: _refreshGate,
+            ),
+      ),
+    );
+  }
+
   Future<void> _handleSkip() async {
     try {
       await _levelApi.skipPlacement();
@@ -246,20 +259,12 @@ class _CefrOnboardingState extends State<_CefrOnboarding> {
     return CefrAuthGate(
       key: _gateKey,
       levelApi: _levelApi,
-      child: const LearnerShell(),
+      onExistingRetest: _openPlacementTest,
       welcomeScreen: onboarding_welcome.WelcomeScreen(
-        onStart: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder:
-                (_) => PlacementTestScreen(
-                  levelApi: _levelApi,
-                  client: _client,
-                  onFinished: _refreshGate,
-                ),
-          ),
-        ),
+        onStart: _openPlacementTest,
         onSkip: _handleSkip,
       ),
+      child: const LearnerShell(),
     );
   }
 }

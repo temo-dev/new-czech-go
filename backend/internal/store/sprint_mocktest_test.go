@@ -830,3 +830,79 @@ func TestCompleteMockExamRejectsUnanalysedAttempt(t *testing.T) {
 		t.Fatal("CompleteMockExam should reject attempts that have not been analysed")
 	}
 }
+
+// V39.x: failed attempts (audio unusable, transcription_failed, scoring_failed)
+// must not block CompleteMockExam. They are treated like skipped sections:
+// section_score stays 0 and the readiness rollup ignores them. Regression
+// guard for the iPhone 17 Pro Max test where a 1-second speaking recording
+// got marked transcription_unusable → FailAttempt → CompleteMockExam 400.
+func TestCompleteMockExamTreatsFailedAttemptAsSkipped(t *testing.T) {
+	repo := NewMemoryStore()
+	reading := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "cteni_1", Status: "published", Pool: "exam",
+	})
+	speaking := repo.CreateExercise(contracts.Exercise{
+		ExerciseType: "uloha_1_topic_answers", Status: "published", Pool: "exam",
+	})
+	mt, _ := repo.CreateMockTest(contracts.MockTest{
+		Title:                "Mixed failed + complete",
+		Status:               "published",
+		PassThresholdPercent: 60,
+		Sections: []contracts.MockTestSection{
+			{SequenceNo: 1, SkillKind: "doc", ExerciseID: reading.ID, ExerciseType: reading.ExerciseType, MaxPoints: 5},
+			{SequenceNo: 2, SkillKind: "noi", ExerciseID: speaking.ID, ExerciseType: speaking.ExerciseType, MaxPoints: 8},
+		},
+	})
+	session, err := repo.CreateMockExam("learner-1", mt.ID)
+	if err != nil {
+		t.Fatalf("CreateMockExam: %v", err)
+	}
+	// Reading section completes normally (full marks).
+	readAtt, err := repo.CreateAttempt("learner-1", reading.ID, "ios", "1.0", "vi")
+	if err != nil {
+		t.Fatalf("CreateAttempt reading: %v", err)
+	}
+	repo.CompleteAttempt(readAtt.ID,
+		contracts.Transcript{FullText: "ok"},
+		contracts.AttemptFeedback{ReadinessLevel: "ready"},
+	)
+	if _, err := repo.AdvanceMockExam(session.ID, readAtt.ID); err != nil {
+		t.Fatalf("AdvanceMockExam reading: %v", err)
+	}
+	// Speaking section attaches an attempt that later fails analysis
+	// (e.g. audio_invalid / transcription_failed).
+	speakAtt, err := repo.CreateAttempt("learner-1", speaking.ID, "ios", "1.0", "vi")
+	if err != nil {
+		t.Fatalf("CreateAttempt speaking: %v", err)
+	}
+	if _, err := repo.AdvanceMockExam(session.ID, speakAtt.ID); err != nil {
+		t.Fatalf("AdvanceMockExam speaking: %v", err)
+	}
+	repo.FailAttempt(speakAtt.ID, "transcription_failed")
+
+	completed, err := repo.CompleteMockExam(session.ID)
+	if err != nil {
+		t.Fatalf("CompleteMockExam: %v (failed attempts must not block)", err)
+	}
+	if completed.Status != "completed" {
+		t.Errorf("Status = %q, want completed", completed.Status)
+	}
+	var failedSec, readingSec contracts.MockExamSessionItem
+	for _, sec := range completed.Sections {
+		if sec.ExerciseID == speaking.ID {
+			failedSec = sec
+		}
+		if sec.ExerciseID == reading.ID {
+			readingSec = sec
+		}
+	}
+	if failedSec.SectionScore != 0 {
+		t.Errorf("failed section score = %d, want 0", failedSec.SectionScore)
+	}
+	if readingSec.SectionScore != 5 {
+		t.Errorf("reading section score = %d, want 5 (ready=full marks)", readingSec.SectionScore)
+	}
+	if completed.OverallScore != 5 {
+		t.Errorf("overall = %d, want 5 (reading only)", completed.OverallScore)
+	}
+}

@@ -518,6 +518,13 @@ func (s *postgresMockExamStore) CompleteMockExam(id string) (contracts.MockExamS
 		if m.feedback == nil && m.readiness != "" {
 			m.feedback = &contracts.AttemptFeedback{ReadinessLevel: m.readiness}
 		}
+		// Failed attempts (audio unusable, transcription_failed, scoring_failed)
+		// are treated like skipped sections: section_score stays at the column
+		// default of 0 (postgres_mock_exams.go:58) and they do not contribute
+		// to the readiness rollup.
+		if m.attemptStatus == "failed" {
+			continue
+		}
 		if m.attemptStatus != "completed" || m.feedback == nil {
 			srows.Close()
 			return contracts.MockExamSession{}, fmt.Errorf("attempt %s is not completed", m.attemptID)

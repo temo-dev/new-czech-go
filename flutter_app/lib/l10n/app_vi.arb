@@ -36,6 +36,15 @@
     },
     "mockExamProgressIntroBodyWithSpeaking": "Làm từng phần theo thứ tự. Điểm bài thi chỉ được tính sau phần cuối; phần nói sẽ được phân tích cùng nhau ở cuối.",
     "mockExamProgressIntroBodyNoSpeaking": "Làm từng phần theo thứ tự. Kết quả sẽ được tính sau phần cuối cùng.",
+    "mockExamSubmitNowCta": "Nộp bài",
+    "mockExamSubmitNowPendingHint": "Còn {pending}/{total} phần chưa làm. Phần chưa làm sẽ tính 0 điểm.",
+    "@mockExamSubmitNowPendingHint": {
+        "placeholders": {
+            "pending": { "type": "int" },
+            "total": { "type": "int" }
+        }
+    },
+    "mockExamSubmitNowReadyHint": "Tất cả phần đã xử lý. Nộp để xem kết quả.",
     "mockExamSectionLabel": "Phần {index}",
     "@mockExamSectionLabel": {
         "placeholders": { "index": { "type": "int" } }

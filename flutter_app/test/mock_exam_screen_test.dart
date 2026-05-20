@@ -544,6 +544,7 @@ void main() {
     );
 
     expect(find.byKey(const Key('mock_exam_prominent_submit')), findsOneWidget);
+    expect(find.byKey(const Key('mock_exam_bottom_submit')), findsNothing);
     expect(find.byIcon(Icons.more_vert_rounded), findsNothing);
 
     await tester.tap(find.byKey(const Key('mock_exam_prominent_submit')));
@@ -552,6 +553,73 @@ void main() {
     expect(find.text('Nộp bài ngay?'), findsOneWidget);
     expect(
       find.text('Còn 1/1 câu chưa làm. Các câu đó sẽ tính 0 điểm.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('MockExamScreen keeps submit action visible at the bottom', (
+    tester,
+  ) async {
+    final session = MockExamSessionView(
+      id: 'session-1',
+      status: 'in_progress',
+      mockTestId: 'mt-1',
+      overallScore: 0,
+      passed: false,
+      passThresholdPercent: 60,
+      overallReadinessLevel: '',
+      overallSummary: '',
+      sections: const [
+        MockExamSection(
+          sequenceNo: 1,
+          skillKind: 'doc',
+          exerciseId: 'ex-1',
+          exerciseType: 'cteni_1',
+          maxPoints: 5,
+          attemptId: 'attempt-1',
+          sectionScore: 5,
+          status: 'completed',
+          displayOrder: 1,
+        ),
+        MockExamSection(
+          sequenceNo: 2,
+          skillKind: 'nghe',
+          exerciseId: 'ex-2',
+          exerciseType: 'poslech_2',
+          maxPoints: 5,
+          attemptId: '',
+          sectionScore: 0,
+          status: 'pending',
+          displayOrder: 2,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: MockExamScreen(
+          client: ApiClient(),
+          initialSession: session,
+          autoStartFirstSection: false,
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('mock_exam_bottom_submit')), findsOneWidget);
+    expect(
+      find.text('Còn 1/2 phần chưa làm. Phần chưa làm sẽ tính 0 điểm.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('mock_exam_bottom_submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nộp bài ngay?'), findsOneWidget);
+    expect(
+      find.text('Còn 1/2 câu chưa làm. Các câu đó sẽ tính 0 điểm.'),
       findsOneWidget,
     );
   });

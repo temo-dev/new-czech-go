@@ -27,6 +27,15 @@
     },
     "mockExamProgressIntroBodyWithSpeaking": "Complete each section in order. The exam score is calculated after the final section; speaking recordings are analysed together at the end.",
     "mockExamProgressIntroBodyNoSpeaking": "Complete each section in order. Your result is calculated after the final section.",
+    "mockExamSubmitNowCta": "Submit exam",
+    "mockExamSubmitNowPendingHint": "{pending}/{total} sections still pending. Unfinished sections will count as 0 points.",
+    "@mockExamSubmitNowPendingHint": {
+        "placeholders": {
+            "pending": { "type": "int" },
+            "total": { "type": "int" }
+        }
+    },
+    "mockExamSubmitNowReadyHint": "All sections are handled. Submit to view your result.",
     "mockExamSectionLabel": "Section {index}",
     "mockExamStatusDone": "DONE",
     "mockExamStatusPending": "PENDING",

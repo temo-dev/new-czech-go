@@ -75,11 +75,11 @@ func NewClaudeContentGenerator(apiKey string) *ClaudeContentGenerator {
 }
 
 func (g *ClaudeContentGenerator) GenerateVocabulary(ctx context.Context, input VocabularyGenerationInput) (*contracts.GeneratedPayload, error) {
-	return g.callClaude(ctx, VocabGenerationPrompt(input), input.ExerciseTypes)
+	return g.callClaude(ctx, VocabSystemPrompt, VocabGenerationPrompt(input), input.ExerciseTypes)
 }
 
 func (g *ClaudeContentGenerator) GenerateGrammar(ctx context.Context, input GrammarGenerationInput) (*contracts.GeneratedPayload, error) {
-	return g.callClaude(ctx, GrammarGenerationPrompt(input), input.ExerciseTypes)
+	return g.callClaude(ctx, "", GrammarGenerationPrompt(input), input.ExerciseTypes)
 }
 
 // EnsureVocabularyQuizcards makes quizcard generation lossless for a
@@ -158,7 +158,7 @@ func EnsureGrammarExercises(payload *contracts.GeneratedPayload, input GrammarGe
 	return payload
 }
 
-func (g *ClaudeContentGenerator) callClaude(ctx context.Context, prompt string, exerciseTypes []string) (*contracts.GeneratedPayload, error) {
+func (g *ClaudeContentGenerator) callClaude(ctx context.Context, systemPrompt, userPrompt string, exerciseTypes []string) (*contracts.GeneratedPayload, error) {
 	reqBody := map[string]any{
 		"model":      LoadLLMModels().Content,
 		"max_tokens": 8192,
@@ -170,7 +170,16 @@ func (g *ClaudeContentGenerator) callClaude(ctx context.Context, prompt string, 
 			},
 		},
 		"tool_choice": map[string]string{"type": "tool", "name": "save_exercises"},
-		"messages":    []map[string]any{{"role": "user", "content": prompt}},
+		"messages":    []map[string]any{{"role": "user", "content": userPrompt}},
+	}
+	if systemPrompt != "" {
+		reqBody["system"] = []map[string]any{
+			{
+				"type":          "text",
+				"text":          systemPrompt,
+				"cache_control": map[string]string{"type": "ephemeral"},
+			},
+		}
 	}
 
 	payload, err := json.Marshal(reqBody)

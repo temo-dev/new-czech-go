@@ -10,21 +10,35 @@ void main() {
 
       final prefs = await CefrPrefs.create();
 
-      expect(prefs.isExistingPromptShown, isFalse);
+      expect(
+        prefs.isExistingPromptShownFor(userID: 'u1', level: 'a2'),
+        isFalse,
+      );
       expect(prefs.isBannerDismissedFor('a2'), isFalse);
       expect(prefs.isBannerDismissedFor('b1'), isFalse);
     });
 
-    test('markExistingPromptShown persists across instances', () async {
+    test('markExistingPromptShownFor persists per user and level', () async {
       SharedPreferences.setMockInitialValues({});
       final first = await CefrPrefs.create();
 
-      await first.markExistingPromptShown();
+      await first.markExistingPromptShownFor(userID: 'u1', level: 'a2');
 
-      expect(first.isExistingPromptShown, isTrue);
+      expect(first.isExistingPromptShownFor(userID: 'u1', level: 'a2'), isTrue);
+      expect(
+        first.isExistingPromptShownFor(userID: 'u2', level: 'a2'),
+        isFalse,
+      );
+      expect(
+        first.isExistingPromptShownFor(userID: 'u1', level: 'b1'),
+        isFalse,
+      );
 
       final second = await CefrPrefs.create();
-      expect(second.isExistingPromptShown, isTrue);
+      expect(
+        second.isExistingPromptShownFor(userID: 'u1', level: 'a2'),
+        isTrue,
+      );
     });
 
     test('dismissBannerFor isolates per level', () async {
@@ -45,21 +59,30 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final prefs = await CefrPrefs.create();
 
-      await prefs.markExistingPromptShown();
+      await prefs.markExistingPromptShownFor(userID: 'u1', level: 'a2');
       await prefs.dismissBannerFor('a2');
 
       final raw = await SharedPreferences.getInstance();
-      expect(raw.getBool('cefr_existing_prompt_shown'), isTrue);
+      expect(raw.getBool('cefr_existing_prompt_shown_u1_a2'), isTrue);
+      expect(raw.getBool('cefr_existing_prompt_shown'), isNull);
       expect(raw.getBool('promo_banner_dismissed_for_a2'), isTrue);
       expect(raw.getBool('promo_banner_dismissed_for_b1'), isNull);
     });
 
-    test('rejects empty level when dismissing banner', () async {
+    test('rejects empty keys', () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await CefrPrefs.create();
 
       expect(() => prefs.dismissBannerFor(''), throwsArgumentError);
       expect(() => prefs.isBannerDismissedFor(''), throwsArgumentError);
+      expect(
+        () => prefs.markExistingPromptShownFor(userID: '', level: 'a2'),
+        throwsArgumentError,
+      );
+      expect(
+        () => prefs.isExistingPromptShownFor(userID: 'u1', level: ''),
+        throwsArgumentError,
+      );
     });
   });
 }

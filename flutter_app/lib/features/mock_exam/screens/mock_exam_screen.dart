@@ -757,6 +757,29 @@ class _MockExamScreenState extends State<MockExamScreen> {
         ],
       ),
       body: SafeArea(child: _buildBody(l)),
+      bottomNavigationBar: _buildBottomSubmitBar(l),
+    );
+  }
+
+  Widget? _buildBottomSubmitBar(AppLocalizations l) {
+    final session = _session;
+    if (widget.showProminentSubmitAction ||
+        _loading ||
+        _analyzing ||
+        session == null ||
+        session.isCompleted) {
+      return null;
+    }
+    final pending = session.sections.where((s) => s.isPending).length;
+    final total = session.sections.length;
+    final hint =
+        pending > 0
+            ? l.mockExamSubmitNowPendingHint(pending, total)
+            : l.mockExamSubmitNowReadyHint;
+    return _BottomSubmitBar(
+      hint: hint,
+      ctaLabel: l.mockExamSubmitNowCta,
+      onPressed: () => _submitNow(),
     );
   }
 
@@ -938,11 +961,86 @@ class _ProminentSubmitAction extends StatelessWidget {
         key: const Key('mock_exam_prominent_submit'),
         onPressed: onPressed,
         icon: const Icon(Icons.flag_rounded, size: 18),
-        label: const Text('Nộp bài'),
+        label: Text(AppLocalizations.of(context).mockExamSubmitNowCta),
         style: FilledButton.styleFrom(
           minimumSize: const Size(0, 38),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.x3),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomSubmitBar extends StatelessWidget {
+  const _BottomSubmitBar({
+    required this.hint,
+    required this.ctaLabel,
+    required this.onPressed,
+  });
+
+  final String hint;
+  final String ctaLabel;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final horizontal = AppSpacing.pagePaddingH(context);
+    return Material(
+      color: AppColors.surfaceContainerLowest,
+      elevation: 10,
+      shadowColor: Colors.black.withValues(alpha: 0.12),
+      child: SafeArea(
+        top: false,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: AppColors.outlineVariant, width: 0.8),
+            ),
+          ),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              horizontal,
+              AppSpacing.x3,
+              horizontal,
+              AppSpacing.x3,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      size: 18,
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: AppSpacing.x2),
+                    Expanded(
+                      child: Text(
+                        hint,
+                        style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.x2),
+                FilledButton.icon(
+                  key: const Key('mock_exam_bottom_submit'),
+                  onPressed: onPressed,
+                  icon: const Icon(Icons.flag_rounded, size: 20),
+                  label: Text(ctaLabel),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

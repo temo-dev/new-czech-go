@@ -215,6 +215,24 @@ abstract class AppLocalizations {
   /// **'Làm từng phần theo thứ tự. Kết quả sẽ được tính sau phần cuối cùng.'**
   String get mockExamProgressIntroBodyNoSpeaking;
 
+  /// No description provided for @mockExamSubmitNowCta.
+  ///
+  /// In vi, this message translates to:
+  /// **'Nộp bài'**
+  String get mockExamSubmitNowCta;
+
+  /// No description provided for @mockExamSubmitNowPendingHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Còn {pending}/{total} phần chưa làm. Phần chưa làm sẽ tính 0 điểm.'**
+  String mockExamSubmitNowPendingHint(int pending, int total);
+
+  /// No description provided for @mockExamSubmitNowReadyHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tất cả phần đã xử lý. Nộp để xem kết quả.'**
+  String get mockExamSubmitNowReadyHint;
+
   /// No description provided for @mockExamSectionLabel.
   ///
   /// In vi, this message translates to:

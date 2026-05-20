@@ -369,16 +369,26 @@ func (s *memoryMockExamStore) CompleteMockExam(id string) (contracts.MockExamSes
 
 	levels := make([]string, 0, len(attemptIDs))
 	inputs := make([]mockExamScoringInput, 0, len(attemptIDs))
+	// Failed attempts (audio unusable, transcription_failed, scoring_failed)
+	// are treated like skipped sections: section_score stays 0 and they do
+	// not contribute to the readiness rollup. analyzedPositions tracks which
+	// original section indices got an analyzed attempt so we can splice the
+	// computed scores back into their original positions.
+	analyzedPositions := make([]int, 0, len(attemptIDs))
 	for i, aid := range attemptIDs {
 		attempt, ok := s.attempts.Attempt(aid)
 		if !ok {
 			return contracts.MockExamSession{}, fmt.Errorf("attempt %s not found", aid)
+		}
+		if attempt.Status == "failed" {
+			continue
 		}
 		if attempt.Status != "completed" || attempt.Feedback == nil {
 			return contracts.MockExamSession{}, fmt.Errorf("attempt %s is not completed", aid)
 		}
 		levels = append(levels, attempt.Feedback.ReadinessLevel)
 		inputs = append(inputs, mockExamScoringInputFromFeedback(attempt.Feedback, scoreableMaxPoints[i]))
+		analyzedPositions = append(analyzedPositions, scoreablePositions[i])
 	}
 	level, summary := rollupReadiness(levels)
 	scoreableScores, _, overallScore, passed := computeScoring(inputs, session.PassThresholdPercent, shouldApplyPronunciationBonus(session.Sections))
@@ -391,9 +401,9 @@ func (s *memoryMockExamStore) CompleteMockExam(id string) (contracts.MockExamSes
 	session.OverallSummary = summary
 	session.OverallScore = overallScore
 	session.Passed = passed
-	// Splice scoreable scores back into their original section positions;
-	// skipped sections stay at section_score=0.
-	for k, pos := range scoreablePositions {
+	// Splice analyzed scores back into their original section positions;
+	// skipped and failed sections stay at section_score=0.
+	for k, pos := range analyzedPositions {
 		if k < len(scoreableScores) && pos < len(session.Sections) {
 			session.Sections[pos].SectionScore = scoreableScores[k]
 		}

@@ -20,8 +20,8 @@ import 'package:flutter_app/models/models.dart';
 ///   4. [MockExamScreen.onCompleted] fires → [LevelApi.completePlacement]
 ///      → placement result dialog with the assigned/current level.
 ///      Dismissing the dialog returns to MockExamScreen's built-in result view.
-///   5. Learner taps "Bắt đầu học" on that result view → [onFinished] → CefrAuthGate
-///      refreshes, LearnerShell mounts.
+///   5. Learner taps "Bắt đầu học" on that result view → [onFinished] →
+///      close this route → CefrAuthGate refreshes, LearnerShell mounts.
 ///
 /// [LevelApi] and [ApiClient] are injected so tests can supply stubs
 /// without a live server.
@@ -156,6 +156,15 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
     );
   }
 
+  void _finishPlacementFlow() {
+    final navigator = Navigator.of(context);
+    final route = ModalRoute.of(context);
+    widget.onFinished();
+    if (route?.isCurrent == true && navigator.canPop()) {
+      navigator.pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final error = _error;
@@ -213,7 +222,7 @@ class _PlacementTestScreenState extends State<PlacementTestScreen> {
         onCompleted: (sessionId) => _onCompleted(sessionId),
         showResultAfterCompletionCallback: true,
         resultCtaLabel: AppLocalizations.of(context).placementStartLearningCta,
-        onResultCta: widget.onFinished,
+        onResultCta: _finishPlacementFlow,
         showProminentSubmitAction: true,
       ),
     );

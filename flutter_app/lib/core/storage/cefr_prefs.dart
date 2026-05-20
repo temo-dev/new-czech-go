@@ -2,9 +2,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Owns the V21.3 CEFR-related SharedPreferences keys.
 ///
-/// Two flags live here:
-///   - `cefr_existing_prompt_shown` — flipped after an existing-A2
-///     learner has answered the one-time confirm dialog.
+/// Two flag families live here:
+///   - `cefr_existing_prompt_shown_<user>_<level>` — flipped after an
+///     existing-level learner has answered the one-time confirm dialog.
 ///   - `promo_banner_dismissed_for_<level>` — flipped after the
 ///     learner has passed the promotion exam for that target level
 ///     so the banner does not return for the same target.
@@ -25,10 +25,18 @@ class CefrPrefs {
     return CefrPrefs._(prefs);
   }
 
-  bool get isExistingPromptShown => _prefs.getBool(_existingPromptKey) ?? false;
+  bool isExistingPromptShownFor({
+    required String userID,
+    required String level,
+  }) {
+    return _prefs.getBool(_existingPromptKeyFor(userID, level)) ?? false;
+  }
 
-  Future<void> markExistingPromptShown() {
-    return _prefs.setBool(_existingPromptKey, true);
+  Future<void> markExistingPromptShownFor({
+    required String userID,
+    required String level,
+  }) {
+    return _prefs.setBool(_existingPromptKeyFor(userID, level), true);
   }
 
   bool isBannerDismissedFor(String level) {
@@ -43,7 +51,25 @@ class CefrPrefs {
 
   static void _requireLevel(String level) {
     if (level.isEmpty) {
-      throw ArgumentError.value(level, 'level', 'must be a non-empty CEFR level');
+      throw ArgumentError.value(
+        level,
+        'level',
+        'must be a non-empty CEFR level',
+      );
     }
+  }
+
+  static String _existingPromptKeyFor(String userID, String level) {
+    final trimmedUserID = userID.trim();
+    final trimmedLevel = level.trim();
+    if (trimmedUserID.isEmpty) {
+      throw ArgumentError.value(userID, 'userID', 'must be non-empty');
+    }
+    _requireLevel(trimmedLevel);
+    return '${_existingPromptKey}_${_safeKeyPart(trimmedUserID)}_${_safeKeyPart(trimmedLevel)}';
+  }
+
+  static String _safeKeyPart(String value) {
+    return value.replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
   }
 }

@@ -77,6 +77,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mockExamProgressIntroBodyNoSpeaking => 'Complete each section in order. Your result is calculated after the final section.';
 
   @override
+  String get mockExamSubmitNowCta => 'Submit exam';
+
+  @override
+  String mockExamSubmitNowPendingHint(int pending, int total) {
+    return '$pending/$total sections still pending. Unfinished sections will count as 0 points.';
+  }
+
+  @override
+  String get mockExamSubmitNowReadyHint => 'All sections are handled. Submit to view your result.';
+
+  @override
   String mockExamSectionLabel(int index) {
     return 'Section $index';
   }

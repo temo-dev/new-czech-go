@@ -77,6 +77,17 @@ class AppLocalizationsVi extends AppLocalizations {
   String get mockExamProgressIntroBodyNoSpeaking => 'Làm từng phần theo thứ tự. Kết quả sẽ được tính sau phần cuối cùng.';
 
   @override
+  String get mockExamSubmitNowCta => 'Nộp bài';
+
+  @override
+  String mockExamSubmitNowPendingHint(int pending, int total) {
+    return 'Còn $pending/$total phần chưa làm. Phần chưa làm sẽ tính 0 điểm.';
+  }
+
+  @override
+  String get mockExamSubmitNowReadyHint => 'Tất cả phần đã xử lý. Nộp để xem kết quả.';
+
+  @override
   String mockExamSectionLabel(int index) {
     return 'Phần $index';
   }

@@ -12,12 +12,12 @@ import 'existing_level_confirm_dialog.dart';
 /// [LearnerShell]. Fetches [LevelProgressResponse] and routes the learner to
 /// the right first screen:
 ///
-/// | placementTakenAt | currentLevel | promptShown | Outcome |
-/// |------------------|--------------|-------------|---------|
-/// | non-null         | any          | any         | child (LearnerShell) |
-/// | null             | a0           | —           | welcomeScreen (placement intro) |
-/// | null             | non-a0       | true        | child (treat as onboarded) |
-/// | null             | non-a0       | false       | child + existing-level dialog |
+/// | placementTakenAt | currentLevel | scopedPromptShown | Outcome |
+/// |------------------|--------------|-------------------|---------|
+/// | non-null         | any          | any               | child (LearnerShell) |
+/// | null             | a0           | any               | welcomeScreen (placement intro) |
+/// | null             | non-a0       | true              | child (treat as onboarded) |
+/// | null             | non-a0       | false             | child + existing-level dialog |
 ///
 /// [refresh] forces a re-fetch so the gate re-evaluates after placement is
 /// completed, skipped, or the existing-level prompt is confirmed.
@@ -103,7 +103,7 @@ class CefrAuthGateState extends State<CefrAuthGate> {
     } catch (_) {
       // Best-effort: 409 means placement already recorded, which is fine.
     }
-    await decision.prefs.markExistingPromptShown();
+    await _markExistingPromptShown(decision);
     if (mounted) refresh();
   }
 
@@ -113,7 +113,7 @@ class CefrAuthGateState extends State<CefrAuthGate> {
   }
 
   Future<void> _handleRetest(_GateDecision decision) async {
-    await decision.prefs.markExistingPromptShown();
+    await _markExistingPromptShown(decision);
     if (!mounted) return;
     final cb = widget.onExistingRetest;
     if (cb != null) {
@@ -121,6 +121,25 @@ class CefrAuthGateState extends State<CefrAuthGate> {
     } else {
       refresh();
     }
+  }
+
+  Future<void> _markExistingPromptShown(_GateDecision decision) {
+    return decision.prefs.markExistingPromptShownFor(
+      userID: _existingPromptUserID(decision.progress),
+      level: cefrLevelCode(decision.progress.currentLevel),
+    );
+  }
+
+  bool _isExistingPromptShown(_GateDecision decision) {
+    return decision.prefs.isExistingPromptShownFor(
+      userID: _existingPromptUserID(decision.progress),
+      level: cefrLevelCode(decision.progress.currentLevel),
+    );
+  }
+
+  String _existingPromptUserID(LevelProgressResponse progress) {
+    final userID = progress.userID.trim();
+    return userID.isEmpty ? 'unknown' : userID;
   }
 
   @override
@@ -164,19 +183,20 @@ class CefrAuthGateState extends State<CefrAuthGate> {
 
         final decision = snap.data!;
         final progress = decision.progress;
-        final prefs = decision.prefs;
 
-        // Already onboarded: placement taken OR prompt already recorded.
-        final alreadyOnboarded =
-            progress.placementTakenAt != null || prefs.isExistingPromptShown;
-
-        if (alreadyOnboarded) {
+        if (progress.placementTakenAt != null) {
           return widget.child;
         }
 
-        // Fresh A0 — placement not yet taken.
+        // Fresh A0 — placement not yet taken. This check intentionally
+        // ignores legacy/global existing-prompt prefs so a new account on the
+        // same device cannot accidentally bypass placement.
         if (progress.currentLevel == CefrLevel.a0) {
           return widget.welcomeScreen;
+        }
+
+        if (_isExistingPromptShown(decision)) {
+          return widget.child;
         }
 
         // Existing non-A0 user: show child underneath + dialog on top.

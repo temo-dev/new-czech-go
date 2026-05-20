@@ -223,6 +223,60 @@ void main() {
     expect(finishedCalls, 1);
   });
 
+  testWidgets('completed placement result CTA closes placement route', (
+    tester,
+  ) async {
+    var finishedCalls = 0;
+    const hostKey = Key('placement_host_screen');
+    const openKey = Key('open_placement_test');
+    final api = _FakeLevelApi()..stubStart(_startResult());
+    final client =
+        _FakeApiClient()..stubGetMockExam(_sessionJson(completed: true));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder:
+              (context) => Scaffold(
+                key: hostKey,
+                body: FilledButton(
+                  key: openKey,
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder:
+                            (_) => PlacementTestScreen(
+                              levelApi: api,
+                              client: client,
+                              onFinished: () => finishedCalls += 1,
+                            ),
+                      ),
+                    );
+                  },
+                  child: const Text('Open placement'),
+                ),
+              ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(openKey));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('placement_test_exam')), findsOneWidget);
+    expect(find.byKey(hostKey), findsNothing);
+
+    await tester.scrollUntilVisible(find.text('Bắt đầu học'), 300);
+    await tester.tap(find.text('Bắt đầu học'));
+    await tester.pumpAndSettle();
+
+    expect(finishedCalls, 1);
+    expect(find.byKey(hostKey), findsOneWidget);
+    expect(find.byKey(const Key('placement_test_exam')), findsNothing);
+  });
+
   testWidgets('placement completion shows pass popup with current level', (
     tester,
   ) async {
