@@ -357,9 +357,9 @@ func (s *Server) handlePublishGenJob(w http.ResponseWriter, jobID string) {
 
 	// Validate all exercises first (all-or-nothing)
 	type validationError struct {
-		Index   int      `json:"index"`
-		Type    string   `json:"exercise_type"`
-		Errors  []string `json:"errors"`
+		Index  int      `json:"index"`
+		Type   string   `json:"exercise_type"`
+		Errors []string `json:"errors"`
 	}
 	var valErrs []validationError
 	for i, ex := range gp.Exercises {
@@ -464,13 +464,21 @@ func (s *Server) runGenerationJob(jobID string, req contracts.GenerationJobInput
 			return
 		}
 		items := s.repo.ListVocabularyItems(req.SourceID)
+		numPerType := cloneNumPerType(req.NumPerType)
+		wantsQuizcards := includesExerciseType(req.ExerciseTypes, "quizcard_basic")
+		if wantsQuizcards && len(items) > 0 {
+			numPerType["quizcard_basic"] = len(items)
+		}
 		payload, genErr = s.contentGenerator.GenerateVocabulary(ctx, processing.VocabularyGenerationInput{
 			Items:           items,
 			Level:           set.Level,
 			ExplanationLang: set.ExplanationLang,
 			ExerciseTypes:   req.ExerciseTypes,
-			NumPerType:      req.NumPerType,
+			NumPerType:      numPerType,
 		})
+		if genErr == nil && wantsQuizcards {
+			payload = processing.EnsureVocabularyQuizcards(payload, items, set.ExplanationLang)
+		}
 
 	case "grammar_rule":
 		rule, ok := s.repo.GetGrammarRule(req.SourceID)
@@ -478,15 +486,25 @@ func (s *Server) runGenerationJob(jobID string, req contracts.GenerationJobInput
 			s.repo.UpdateGenerationJobFailed(jobID, "grammar_rule not found: "+req.SourceID)
 			return
 		}
-		payload, genErr = s.contentGenerator.GenerateGrammar(ctx, processing.GrammarGenerationInput{
+		numPerType := cloneNumPerType(req.NumPerType)
+		for _, exerciseType := range []string{"fill_blank", "choice_word"} {
+			if includesExerciseType(req.ExerciseTypes, exerciseType) && numPerType[exerciseType] < len(rule.RuleTable) {
+				numPerType[exerciseType] = len(rule.RuleTable)
+			}
+		}
+		input := processing.GrammarGenerationInput{
 			Title:         rule.Title,
 			Level:         rule.Level,
 			ExplanationVI: rule.ExplanationVI,
 			Forms:         rule.RuleTable,
 			Constraints:   rule.ConstraintsText,
 			ExerciseTypes: req.ExerciseTypes,
-			NumPerType:    req.NumPerType,
-		})
+			NumPerType:    numPerType,
+		}
+		payload, genErr = s.contentGenerator.GenerateGrammar(ctx, input)
+		if genErr == nil {
+			payload = processing.EnsureGrammarExercises(payload, input)
+		}
 
 	default:
 		s.repo.UpdateGenerationJobFailed(jobID, "unknown source_type: "+req.SourceType)
@@ -520,4 +538,21 @@ func skillKindFromSourceType(sourceType string) string {
 		return "ngu_phap"
 	}
 	return ""
+}
+
+func includesExerciseType(types []string, target string) bool {
+	for _, t := range types {
+		if t == target {
+			return true
+		}
+	}
+	return false
+}
+
+func cloneNumPerType(in map[string]int) map[string]int {
+	out := make(map[string]int, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }

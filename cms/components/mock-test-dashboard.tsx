@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useS } from '../lib/i18n';
 import AiImageButton from './AiImageButton';
 import { LEVEL_LABELS_VI, type CefrLevel } from '../lib/level';
@@ -31,6 +31,7 @@ type Exercise = {
   title: string;
   exercise_type: string;
   status?: string;
+  pool?: string;
 };
 
 type MockTestSection = {
@@ -96,6 +97,7 @@ export function MockTestDashboard() {
   const bannerInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const visibleTests = tests.filter(t => matchesKindFilter(t, kindFilter));
+  const exerciseById = useMemo(() => new Map(exercises.map(e => [e.id, e])), [exercises]);
 
   // Promotion uniqueness pre-check. Recomputes on every render against
   // the in-memory `tests` array; cheap (linear scan over ≤200 rows) and
@@ -149,7 +151,7 @@ export function MockTestDashboard() {
     try {
       const res = await fetch(EXERCISES_API + '?pool=exam');
       const json = await res.json();
-      setExercises((json.data ?? []).filter((e: Exercise) => e.status === 'published' && (e as {pool?: string}).pool === 'exam'));
+      setExercises((json.data ?? []).filter((e: Exercise) => e.pool === 'exam'));
     } catch {
       // non-fatal
     }
@@ -403,17 +405,40 @@ export function MockTestDashboard() {
                 />
               </div>
               {t.sections && t.sections.length > 0 && (
-                <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {SKILL_GROUPS.map(g => {
-                    const gs = t.sections.filter(s => s.skill_kind === g.kind);
-                    if (gs.length === 0) return null;
-                    return (
-                      <span key={g.kind} style={{ ...sectionPillStyle, borderColor: g.color + '80', color: g.color, fontWeight: 600 }}>
-                        {g.label.split(' ')[0]}: {gs.length} bài · {gs.reduce((sum, s) => sum + s.max_points, 0)}pts
-                      </span>
-                    );
-                  })}
-                </div>
+                <>
+                  <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {SKILL_GROUPS.map(g => {
+                      const gs = t.sections.filter(s => s.skill_kind === g.kind);
+                      if (gs.length === 0) return null;
+                      return (
+                        <span key={g.kind} style={{ ...sectionPillStyle, borderColor: g.color + '80', color: g.color, fontWeight: 600 }}>
+                          {g.label.split(' ')[0]}: {gs.length} bài · {gs.reduce((sum, s) => sum + s.max_points, 0)}pts
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div style={sectionListStyle}>
+                    {[...t.sections]
+                      .sort((a, b) => (a.sequence_no || 0) - (b.sequence_no || 0))
+                      .map((sec, idx) => {
+                        const ex = exerciseById.get(sec.exercise_id);
+                        const group = SKILL_GROUPS.find(g => g.kind === sec.skill_kind);
+                        return (
+                          <div key={`${sec.sequence_no || idx}-${sec.exercise_id}`} style={sectionRowStyle}>
+                            <span style={{ color: group?.color ?? '#6b7280', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                              {sec.sequence_no || idx + 1}. {group?.label.split(' ')[0] ?? sec.skill_kind}
+                            </span>
+                            <strong title={ex?.title ?? sec.exercise_id} style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>
+                              {ex?.title ?? sec.exercise_id}
+                            </strong>
+                            <span style={{ color: '#9ca3af', fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {EXERCISE_TYPE_LABEL[sec.exercise_type] ?? sec.exercise_type} · {sec.max_points}pts
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </>
               )}
             </div>
           ))}
@@ -568,7 +593,7 @@ export function MockTestDashboard() {
 
             {SKILL_GROUPS.map(group => {
               const groupSections = form.sections.filter(s => s.skill_kind === group.kind);
-              const groupExercises = exercises.filter(ex => ex.exercise_type.startsWith(group.prefix));
+              const groupExercises = exercises.filter(ex => ex.status === 'published' && ex.exercise_type.startsWith(group.prefix));
               return (
                 <div key={group.kind} style={{ marginBottom: 12, border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
                   {/* Group header */}
@@ -701,6 +726,21 @@ const sectionPillStyle: React.CSSProperties = {
   padding: '2px 8px',
   fontSize: 12,
   color: '#374151',
+};
+
+const sectionListStyle: React.CSSProperties = {
+  marginTop: 10,
+  borderTop: '1px solid #f3f4f6',
+  display: 'grid',
+};
+
+const sectionRowStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '92px minmax(0, 1fr) minmax(130px, 220px)',
+  gap: 10,
+  alignItems: 'center',
+  padding: '8px 0',
+  borderBottom: '1px solid #f9fafb',
 };
 
 const labelStyle: React.CSSProperties = {

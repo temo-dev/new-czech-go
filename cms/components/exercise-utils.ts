@@ -12,7 +12,19 @@ export type PromptAsset = {
 
 export type CmsCourse = { id: string; title: string };
 export type CmsModule = { id: string; title: string; course_id: string; sequence_no?: number };
-export type CmsMockTest = { id: string; title: string; sections: Array<{ exercise_id: string }> };
+export type CmsMockTestSection = {
+  exercise_id: string;
+  sequence_no?: number;
+  skill_kind?: string;
+  exercise_type?: string;
+  max_points?: number;
+};
+export type CmsMockTest = {
+  id: string;
+  title: string;
+  status?: string;
+  sections: CmsMockTestSection[];
+};
 
 export type Exercise = {
   id: string;

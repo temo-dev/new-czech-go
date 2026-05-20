@@ -336,10 +336,22 @@ export function ExerciseDashboard() {
           marginBottom: -1,
         }}
       >
-        <button style={tabStyle(activeTab === 'course')} onClick={() => setActiveTab('course')}>
+        <button
+          style={tabStyle(activeTab === 'course')}
+          onClick={() => {
+            setActiveTab('course');
+            patchFilters({ mockTestId: '' });
+          }}
+        >
           Khoá học
         </button>
-        <button style={tabStyle(activeTab === 'exam')} onClick={() => setActiveTab('exam')}>
+        <button
+          style={tabStyle(activeTab === 'exam')}
+          onClick={() => {
+            setActiveTab('exam');
+            patchFilters({ courseId: '', moduleId: '', skillKind: '' });
+          }}
+        >
           Exam Pool
           {examItems.length > 0 && (
             <span style={{ marginLeft: 6, fontSize: 11, background: 'var(--surface-alt)', color: 'var(--ink-3)', padding: '1px 6px', borderRadius: 99, fontWeight: 600 }}>
@@ -408,15 +420,26 @@ export function ExerciseDashboard() {
             items={examFiltered}
             modules={availableModules}
             courses={courses}
-            mockTests={[]}
+            mockTests={mockTests}
             loading={loading}
             error={null}
-            filters={{ courseId: '', moduleId: '', skillKind: '', mockTestId: '', text: listFilters.text }}
-            onFilterChange={(patch) => patchFilters({ text: patch.text ?? listFilters.text })}
+            filters={{
+              courseId: '',
+              moduleId: '',
+              skillKind: listFilters.skillKind,
+              mockTestId: listFilters.mockTestId,
+              text: listFilters.text,
+            }}
+            onFilterChange={(patch) => patchFilters({
+              skillKind: patch.skillKind ?? listFilters.skillKind,
+              mockTestId: patch.mockTestId ?? listFilters.mockTestId,
+              text: patch.text ?? listFilters.text,
+            })}
             onEdit={startEditing}
             onDelete={handleDelete}
             onReload={loadExercises}
             onOpenCreate={() => openCreate({ pool: 'exam' })}
+            showExamMembership
           />
         </div>
       )}

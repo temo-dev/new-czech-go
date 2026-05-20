@@ -10,6 +10,51 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V42.9 — CMS Exam Exercise Visibility — 2026-05-19
+
+CMS usability upgrade for exam-pool content management. The Exercise dashboard
+Exam Pool tab now shows which Mock Test each exam exercise belongs to, supports
+filtering exam exercises by Mock Test, and marks unassigned exam-pool rows as
+`Chưa gắn đề`. The Mock Tests list now expands each card with the concrete
+section exercise titles so admins can inspect membership without opening edit.
+
+### Verification
+
+- CMS: `rtk npm test -- __tests__/exam-exercise-membership.test.ts` green
+  (3 passed).
+- CMS: `rtk npm test` green (334 passed).
+- CMS: `rtk make cms-lint` green.
+- CMS: `rtk make cms-build` green.
+
+---
+
+## V42.8 — AI Content Generation Coverage Hotfix — 2026-05-19
+
+Backend hotfix for AI-assisted vocabulary and grammar generation. When an admin
+enters a multi-word vocabulary set, `quizcard_basic` generation now stays
+lossless. When an admin enters a multi-form grammar rule, `fill_blank` and
+`choice_word` now cover every saved rule-table form before repeating, and
+`matching` backfills a full-form exercise when Claude omits rows.
+
+Claude prompts now treat each input word/form as mandatory source material, the
+generation job raises deterministic per-type counts when needed, and the backend
+backfills missing deterministic exercises before storing the generated payload.
+
+### Verification
+
+- Backend: regression test `TestV6_GenerationJobBackfillsQuizcardForEveryVocabularyItem`
+  failed before the fix and now passes.
+- Backend: regression test `TestV6_GenerationJobBackfillsGrammarExercisesForEveryRuleForm`
+  failed before the fix and now passes.
+- Backend: `rtk go test ./internal/httpapi -run TestV6` green (16 passed).
+- Backend: direct `rtk go build ./...` green.
+- Backend: direct `rtk go test ./...` green (968 passed). `rtk make
+  backend-build` reported `Go build: Success` but exited 2, and `rtk make
+  backend-test` hit the existing wrapper "No tests found" issue, so the direct
+  equivalent commands were used.
+
+---
+
 ## V42.7 — Psaní 1 Dynamic Form Questions — 2026-05-17
 
 CMS/backend hotfix for Psaní 1 authoring: the form-question list no longer

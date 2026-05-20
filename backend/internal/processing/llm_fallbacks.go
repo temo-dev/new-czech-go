@@ -6,6 +6,28 @@ package processing
 
 import "github.com/danieldev/czech-go-system/backend/internal/contracts"
 
+func vocabularyQuizcardFallbackExplanation(term, meaning, lang string) string {
+	switch lang {
+	case "en":
+		return term + " means " + meaning + "."
+	case "cs":
+		return term + " znamená " + meaning + "."
+	default:
+		return term + " nghĩa là " + meaning + "."
+	}
+}
+
+func grammarFormFallbackExplanation(cue, form string) string {
+	return "Dạng đúng cho " + cue + " là " + form + "."
+}
+
+func grammarMatchingFallbackExplanation(title string) string {
+	if title == "" {
+		return "Ghép từng ngữ cảnh với dạng ngữ pháp đúng."
+	}
+	return "Ghép từng ngữ cảnh với dạng đúng của quy tắc " + title + "."
+}
+
 // writingFallbackFeedback returns minimal rule-based feedback for writing
 // attempts when the LLM is unavailable.
 func writingFallbackFeedback() contracts.AttemptFeedback {

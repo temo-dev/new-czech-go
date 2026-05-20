@@ -2,6 +2,10 @@
 
 import { useMemo, useState } from 'react';
 import { useS } from '../lib/i18n';
+import {
+  buildExamExerciseMembershipIndex,
+  examMembershipLabel,
+} from './exam-exercise-membership';
 import { hasAnyIssue } from './validation-badges';
 import { ValidationBadgeCluster } from './validation-badge-cluster';
 import {
@@ -36,6 +40,7 @@ type Props = {
   onRowClick?: (item: Exercise) => void;
   onReload: () => void;
   onOpenCreate: () => void;
+  showExamMembership?: boolean;
 };
 
 export function ExerciseList({
@@ -53,11 +58,16 @@ export function ExerciseList({
   onRowClick,
   onReload,
   onOpenCreate,
+  showExamMembership = false,
 }: Props) {
   const S = useS();
   const { courseId, moduleId, skillKind, mockTestId, text } = filters;
 
   const moduleMap = useMemo(() => new Map(modules.map((m) => [m.id, m])), [modules]);
+  const examMembershipByExercise = useMemo(
+    () => buildExamExerciseMembershipIndex(mockTests),
+    [mockTests],
+  );
 
   const mtExerciseIds = useMemo(
     () => mockTestId
@@ -102,6 +112,9 @@ export function ExerciseList({
   }
 
   const hasFilter = !!(courseId || moduleId || skillKind || mockTestId || text);
+  const gridTemplateColumns = showExamMembership
+    ? 'minmax(240px, 2fr) minmax(110px, 0.8fr) minmax(190px, 1fr) 150px 220px'
+    : '2fr 1fr 200px 240px';
 
   return (
     <section
@@ -195,7 +208,7 @@ export function ExerciseList({
         </div>
       </div>
 
-      {/* Filter bar — cascade: Course → Module → Skill → Mock test */}
+      {/* Filter bar — cascade for course pool; skill + mock test for exam pool. */}
       <div
         style={{
           padding: '12px 24px',
@@ -207,39 +220,47 @@ export function ExerciseList({
           background: 'var(--surface-alt)',
         }}
       >
-        {/* Course */}
-        <select
-          value={courseId}
-          onChange={(e) => onFilterChange({ courseId: e.target.value, moduleId: '', skillKind: '', mockTestId: '' })}
-          style={filterSelectStyle(!!courseId)}
-        >
-          <option value="">Khóa học</option>
-          {courses.map((c) => (
-            <option key={c.id} value={c.id}>{c.title}</option>
-          ))}
-        </select>
+        {!showExamMembership && (
+          <>
+            {/* Course */}
+            <select
+              value={courseId}
+              onChange={(e) => onFilterChange({ courseId: e.target.value, moduleId: '', skillKind: '', mockTestId: '' })}
+              style={filterSelectStyle(!!courseId)}
+            >
+              <option value="">Khóa học</option>
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>{c.title}</option>
+              ))}
+            </select>
 
-        <span style={{ color: 'var(--ink-4)', fontSize: 14, flexShrink: 0 }}>›</span>
+            <span style={{ color: 'var(--ink-4)', fontSize: 14, flexShrink: 0 }}>›</span>
 
-        {/* Module — cascade from course */}
-        <select
-          value={moduleId}
-          onChange={(e) => onFilterChange({ moduleId: e.target.value, skillKind: '', mockTestId: '' })}
-          style={filterSelectStyle(!!moduleId)}
-          disabled={modulesForCourse.length === 0}
-        >
-          <option value="">Module</option>
-          {modulesForCourse.map((m) => (
-            <option key={m.id} value={m.id}>{m.title}</option>
-          ))}
-        </select>
+            {/* Module — cascade from course */}
+            <select
+              value={moduleId}
+              onChange={(e) => onFilterChange({ moduleId: e.target.value, skillKind: '', mockTestId: '' })}
+              style={filterSelectStyle(!!moduleId)}
+              disabled={modulesForCourse.length === 0}
+            >
+              <option value="">Module</option>
+              {modulesForCourse.map((m) => (
+                <option key={m.id} value={m.id}>{m.title}</option>
+              ))}
+            </select>
 
-        <span style={{ color: 'var(--ink-4)', fontSize: 14, flexShrink: 0 }}>›</span>
+            <span style={{ color: 'var(--ink-4)', fontSize: 14, flexShrink: 0 }}>›</span>
+          </>
+        )}
 
         {/* Skill kind */}
         <select
           value={skillKind}
-          onChange={(e) => onFilterChange({ skillKind: e.target.value, mockTestId: '' })}
+          onChange={(e) => onFilterChange(
+            showExamMembership
+              ? { skillKind: e.target.value }
+              : { skillKind: e.target.value, mockTestId: '' },
+          )}
           style={filterSelectStyle(!!skillKind)}
         >
           <option value="">Kỹ năng</option>
@@ -255,7 +276,11 @@ export function ExerciseList({
         {/* Mock test — independent */}
         <select
           value={mockTestId}
-          onChange={(e) => onFilterChange({ mockTestId: e.target.value, courseId: '', moduleId: '', skillKind: '' })}
+          onChange={(e) => onFilterChange(
+            showExamMembership
+              ? { mockTestId: e.target.value }
+              : { mockTestId: e.target.value, courseId: '', moduleId: '', skillKind: '' },
+          )}
           style={filterSelectStyle(!!mockTestId)}
         >
           <option value="">Đề thi</option>
@@ -333,14 +358,17 @@ export function ExerciseList({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '2fr 1fr 200px 240px',
+          gridTemplateColumns,
           gap: 0,
           padding: '8px 24px',
           background: 'var(--surface-alt)',
           borderBottom: '1px solid var(--border)',
         }}
       >
-        {['Bài tập', 'Kỹ năng', 'Trạng thái', ''].map((h, i) => (
+        {(showExamMembership
+          ? ['Bài tập', 'Kỹ năng', 'Đề thi', 'Trạng thái', '']
+          : ['Bài tập', 'Kỹ năng', 'Trạng thái', '']
+        ).map((h, i) => (
           <span
             key={i}
             style={{
@@ -384,13 +412,14 @@ export function ExerciseList({
           };
           const color = typeColor[kind] ?? 'var(--ink-3)';
           const bg = typeBg[kind] ?? 'var(--surface-alt)';
+          const examMembership = examMembershipByExercise.get(item.id) ?? [];
 
           return (
             <div
               key={item.id}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '2fr 1fr 200px 240px',
+                gridTemplateColumns,
                 gap: 0,
                 padding: '14px 24px',
                 borderBottom: idx < filteredItems.length - 1 ? '1px solid var(--border)' : 'none',
@@ -494,6 +523,56 @@ export function ExerciseList({
                   </span>
                 )}
               </div>
+
+              {showExamMembership && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, paddingRight: 12 }}>
+                  {examMembership.length === 0 ? (
+                    <span
+                      title="Bài pool=exam này chưa được gắn vào Mock Test nào."
+                      style={{
+                        width: 'fit-content',
+                        maxWidth: '100%',
+                        borderRadius: 8,
+                        background: 'var(--needs-bg)',
+                        color: 'var(--needs)',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '3px 8px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Chưa gắn đề
+                    </span>
+                  ) : (
+                    <>
+                      {examMembership.slice(0, 2).map((membership) => (
+                        <span
+                          key={membership.mockTestId}
+                          title={examMembershipLabel(membership)}
+                          style={{
+                            maxWidth: '100%',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            color: 'var(--ink-2)',
+                            fontSize: 12,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {examMembershipLabel(membership)}
+                        </span>
+                      ))}
+                      {examMembership.length > 2 && (
+                        <span style={{ color: 'var(--ink-4)', fontSize: 11 }}>
+                          +{examMembership.length - 2} đề nữa
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Status badge + V23 validation badges */}
               <div style={{

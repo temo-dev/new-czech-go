@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/danieldev/czech-go-system/backend/internal/contracts"
 	"github.com/danieldev/czech-go-system/backend/internal/processing"
@@ -271,6 +272,180 @@ func TestV6_PublishJob_ValidExercises(t *testing.T) {
 	ids := data["exercise_ids"].([]any)
 	if len(ids) != 1 {
 		t.Errorf("expected 1 exercise published, got %d", len(ids))
+	}
+}
+
+func TestV6_GenerationJobBackfillsQuizcardForEveryVocabularyItem(t *testing.T) {
+	repo := store.NewMemoryStore()
+	mockGen := &processing.MockContentGenerator{
+		Payload: &contracts.GeneratedPayload{
+			Exercises: []contracts.GeneratedExercise{
+				{
+					ExerciseType: "quizcard_basic",
+					FrontText:    "chodím",
+					BackText:     "đi bộ",
+					Explanation:  "Card returned by the LLM.",
+				},
+			},
+		},
+	}
+
+	s := &Server{
+		repo:             repo,
+		contentGenerator: mockGen,
+		mux:              http.NewServeMux(),
+	}
+	s.routes()
+	srv := httptest.NewServer(s.withCORS(s.mux))
+	defer srv.Close()
+
+	terms := []string{"chodím", "jedu", "letím", "běžím", "plavu"}
+	items := make([]map[string]any, 0, len(terms))
+	for _, term := range terms {
+		items = append(items, map[string]any{"term": term, "meaning": "nghĩa " + term})
+	}
+	setResp := postJSONWithToken(t, srv, "/v1/admin/vocabulary-sets", adminToken, map[string]any{
+		"title":     "Movement Verbs",
+		"module_id": "module-1",
+		"items":     items,
+	})
+	setID := setResp["data"].(map[string]any)["id"].(string)
+
+	_, jobResp := postJSONAllowErrorWithToken(t, srv, "/v1/admin/content-generation-jobs", adminToken, map[string]any{
+		"source_type":    "vocabulary_set",
+		"source_id":      setID,
+		"module_id":      "module-1",
+		"exercise_types": []string{"quizcard_basic"},
+		"num_per_type":   map[string]any{"quizcard_basic": 5},
+	})
+	jobID := jobResp["data"].(map[string]any)["job_id"].(string)
+
+	var jobData map[string]any
+	for i := 0; i < 50; i++ {
+		_, pollResp := getJSONWithToken(t, srv, "/v1/admin/content-generation-jobs/"+jobID, adminToken)
+		jobData = pollResp["data"].(map[string]any)
+		status := jobData["status"].(string)
+		if status == "generated" || status == "failed" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := jobData["status"]; got != "generated" {
+		t.Fatalf("expected generated job, got %v: %v", got, jobData)
+	}
+
+	payload := jobData["generated_payload"].(map[string]any)
+	exercises := payload["exercises"].([]any)
+	if len(exercises) != len(terms) {
+		t.Fatalf("expected one quizcard per vocab item, got %d exercises: %v", len(exercises), exercises)
+	}
+
+	seen := map[string]bool{}
+	for _, raw := range exercises {
+		ex := raw.(map[string]any)
+		if ex["exercise_type"] == "quizcard_basic" {
+			seen[ex["front_text"].(string)] = true
+		}
+	}
+	for _, term := range terms {
+		if !seen[term] {
+			t.Fatalf("missing quizcard for %q in generated payload: %v", term, exercises)
+		}
+	}
+}
+
+func TestV6_GenerationJobBackfillsGrammarExercisesForEveryRuleForm(t *testing.T) {
+	repo := store.NewMemoryStore()
+	mockGen := &processing.MockContentGenerator{
+		Payload: &contracts.GeneratedPayload{
+			Exercises: []contracts.GeneratedExercise{
+				{
+					ExerciseType:  "fill_blank",
+					Prompt:        "Já ___ doma.",
+					CorrectAnswer: "jsem",
+					Explanation:   "Exercise returned by the LLM.",
+				},
+				{
+					ExerciseType:  "choice_word",
+					Prompt:        "Já ___ doma.",
+					Options:       []string{"jsem", "jsi", "je", "jsme"},
+					CorrectAnswer: "jsem",
+					Explanation:   "Exercise returned by the LLM.",
+				},
+			},
+		},
+	}
+
+	s := &Server{
+		repo:             repo,
+		contentGenerator: mockGen,
+		mux:              http.NewServeMux(),
+	}
+	s.routes()
+	srv := httptest.NewServer(s.withCORS(s.mux))
+	defer srv.Close()
+
+	forms := map[string]any{
+		"já": "jsem",
+		"ty": "jsi",
+		"on": "je",
+		"my": "jsme",
+		"vy": "jste",
+	}
+	ruleResp := postJSONWithToken(t, srv, "/v1/admin/grammar-rules", adminToken, map[string]any{
+		"title":      "Verb být",
+		"module_id":  "module-1",
+		"rule_table": forms,
+	})
+	ruleID := ruleResp["data"].(map[string]any)["id"].(string)
+
+	_, jobResp := postJSONAllowErrorWithToken(t, srv, "/v1/admin/content-generation-jobs", adminToken, map[string]any{
+		"source_type":    "grammar_rule",
+		"source_id":      ruleID,
+		"module_id":      "module-1",
+		"exercise_types": []string{"fill_blank", "choice_word"},
+		"num_per_type":   map[string]any{"fill_blank": 5, "choice_word": 5},
+	})
+	jobID := jobResp["data"].(map[string]any)["job_id"].(string)
+
+	var jobData map[string]any
+	for i := 0; i < 50; i++ {
+		_, pollResp := getJSONWithToken(t, srv, "/v1/admin/content-generation-jobs/"+jobID, adminToken)
+		jobData = pollResp["data"].(map[string]any)
+		status := jobData["status"].(string)
+		if status == "generated" || status == "failed" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := jobData["status"]; got != "generated" {
+		t.Fatalf("expected generated job, got %v: %v", got, jobData)
+	}
+
+	payload := jobData["generated_payload"].(map[string]any)
+	exercises := payload["exercises"].([]any)
+	if len(exercises) != len(forms)*2 {
+		t.Fatalf("expected one fill_blank and one choice_word per form, got %d exercises: %v", len(exercises), exercises)
+	}
+
+	seenByType := map[string]map[string]bool{
+		"fill_blank":  {},
+		"choice_word": {},
+	}
+	for _, raw := range exercises {
+		ex := raw.(map[string]any)
+		exerciseType := ex["exercise_type"].(string)
+		if seen, ok := seenByType[exerciseType]; ok {
+			seen[ex["correct_answer"].(string)] = true
+		}
+	}
+	for _, raw := range forms {
+		form := raw.(string)
+		for exerciseType, seen := range seenByType {
+			if !seen[form] {
+				t.Fatalf("missing %s for grammar form %q in generated payload: %v", exerciseType, form, exercises)
+			}
+		}
 	}
 }
 

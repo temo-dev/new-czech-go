@@ -199,6 +199,10 @@ Create exercises for these Czech vocabulary words at level %s:
 
 Generate %s.
 Rules:
+- Treat the input vocabulary list as mandatory source material; do not focus on only one word when several are provided
+- If quizcard_basic is requested: create exactly %d quizcard_basic exercises, one for each input word; front_text must exactly match the Czech term and back_text must exactly match its meaning
+- For fill_blank and choice_word: cover distinct input words before repeating any word
+- For matching: if the source list has 2-6 words, include every source word as a pair in each matching exercise
 - Use simple, natural Czech sentences appropriate for level %s
 - All explanations must be in %s
 - For matching exercises: provide 4-6 pairs (left=Czech term, right=Vietnamese meaning)
@@ -210,6 +214,7 @@ Rules:
 		input.Level,
 		strings.Join(items, "\n"),
 		strings.Join(typeCounts, ", "),
+		len(input.Items),
 		input.Level,
 		lang,
 		lang,
@@ -221,9 +226,10 @@ Rules:
 // GrammarGenerationPrompt returns the user prompt for generating grammar exercises.
 // Sent to ClaudeContentGenerator with tool_use to enforce JSON output.
 func GrammarGenerationPrompt(input GrammarGenerationInput) string {
-	forms := make([]string, 0, len(input.Forms))
-	for pronoun, form := range input.Forms {
-		forms = append(forms, fmt.Sprintf("%s → %s", pronoun, form))
+	forms := sortedGrammarForms(input.Forms)
+	formLines := make([]string, 0, len(forms))
+	for _, form := range forms {
+		formLines = append(formLines, fmt.Sprintf("%s → %s", form.Cue, form.Form))
 	}
 
 	typeCounts := make([]string, 0)
@@ -247,6 +253,9 @@ Forms:
 
 Generate %s.
 Rules:
+- Treat every form row as mandatory source material; do not focus on only one form when several are provided
+- For fill_blank and choice_word: cover each form row at least once before repeating any form
+- For matching: each matching exercise must include every form row when the table has 2-6 rows
 - Each exercise targets exactly one grammatical form from the table
 - For fill_blank: sentence must contain exactly ___ where the correct form goes
 - For choice_word: provide exactly 4 options; the correct form plus 3 plausible distractors from the same paradigm
@@ -257,7 +266,7 @@ Rules:
 		input.Title,
 		input.Level,
 		input.ExplanationVI,
-		strings.Join(forms, "\n"),
+		strings.Join(formLines, "\n"),
 		strings.Join(typeCounts, ", "),
 		constraints,
 	)

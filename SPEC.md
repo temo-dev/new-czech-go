@@ -69,6 +69,7 @@ the archive — it is a historical record.
 | V42.5 | 2026-05-17 | Placement Level Popup — Flutter now uses `PlacementCompleteResult.assigned_level/current_level` after scoring and shows a modal popup: congratulations with level for pass, encouragement with current A0 level otherwise | (CHANGELOG entry — hotfix, no separate spec) |
 | V42.6 | 2026-05-17 | Psaní 2 dynamic email prompts — CMS authoring now accepts 1+ topic/image prompts instead of exactly five, with validation only rejecting empty topic lists | (CHANGELOG entry — hotfix, no separate spec) |
 | V42.7 | 2026-05-17 | Psaní 1 dynamic form questions — CMS authoring now accepts 1+ form questions instead of max three; backend text submission accepts one answer per authored question | (CHANGELOG entry — hotfix, no separate spec) |
+| V42.9 | 2026-05-19 | CMS exam exercise visibility — Exam Pool rows show Mock Test membership and Mock Test cards list concrete section exercises | (CHANGELOG entry — CMS hotfix, no separate spec) |
 
 ## Stable contracts
 
