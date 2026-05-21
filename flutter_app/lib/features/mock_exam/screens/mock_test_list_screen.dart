@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../../shared/widgets/app_notification.dart';
 import 'mock_test_intro_screen.dart';
 
 // Card color palette — same vivid block + accent strip pattern used by the
@@ -82,7 +83,7 @@ class _MockTestListScreenState extends State<MockTestListScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_error!, textAlign: TextAlign.center),
+              AppNotification.error(message: _error!),
               const SizedBox(height: AppSpacing.x3),
               FilledButton(onPressed: _load, child: Text(l.retry)),
             ],
@@ -171,7 +172,8 @@ class _MockTestCard extends StatelessWidget {
     // upload bitmaps in memory for every card.
     final dpr = MediaQuery.of(context).devicePixelRatio;
     final cardW =
-        MediaQuery.of(context).size.width - 2 * AppSpacing.pagePaddingH(context);
+        MediaQuery.of(context).size.width -
+        2 * AppSpacing.pagePaddingH(context);
     final imageCacheWidth = (cardW * dpr).round().clamp(200, 1600);
 
     return Padding(
@@ -223,13 +225,16 @@ class _MockTestCard extends StatelessWidget {
                     fit: BoxFit.cover,
                     cacheWidth: imageCacheWidth,
                     errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    loadingBuilder: (_, child, progress) =>
-                        progress == null ? child : const SizedBox.shrink(),
+                    loadingBuilder:
+                        (_, child, progress) =>
+                            progress == null ? child : const SizedBox.shrink(),
                   ),
 
                 // Bottom darkening gradient
                 Positioned(
-                  left: 0, right: 0, bottom: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
                   child: IgnorePointer(
                     child: Container(
                       height: 140,
@@ -246,7 +251,8 @@ class _MockTestCard extends StatelessWidget {
 
                 // Top-left brand pill — "MOCK 01"
                 Positioned(
-                  top: 18, left: 22,
+                  top: 18,
+                  left: 22,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -270,7 +276,9 @@ class _MockTestCard extends StatelessWidget {
 
                 // Title + subtitle bottom-left
                 Positioned(
-                  left: 22, right: 80, bottom: 28,
+                  left: 22,
+                  right: 80,
+                  bottom: 28,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -303,9 +311,11 @@ class _MockTestCard extends StatelessWidget {
 
                 // White circular chevron CTA bottom-right
                 Positioned(
-                  right: 20, bottom: 26,
+                  right: 20,
+                  bottom: 26,
                   child: Container(
-                    width: 36, height: 36,
+                    width: 36,
+                    height: 36,
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
@@ -320,7 +330,9 @@ class _MockTestCard extends StatelessWidget {
 
                 // Accent strip pinned to bottom edge
                 Positioned(
-                  left: 0, right: 0, bottom: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
                   child: Container(height: 6, color: accentColor),
                 ),
               ],

@@ -7,6 +7,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../../shared/widgets/app_notification.dart';
 import 'vocab_type_list_screen.dart';
 
 /// Groups vocab/grammar exercises by exerciseType and lets the learner pick
@@ -31,10 +32,30 @@ class TypeGroupScreen extends StatefulWidget {
 
 class _TypeGroupScreenState extends State<TypeGroupScreen> {
   static const _typeOrder = [
-    _TypeMeta(type: 'quizcard_basic', labelKey: 'flashcard', icon: Icons.style_rounded,     bgColor: Color(0xFFFFE5D2)),
-    _TypeMeta(type: 'matching',       labelKey: 'matching',  icon: Icons.compare_arrows_rounded, bgColor: Color(0xFFD9E5E3)),
-    _TypeMeta(type: 'fill_blank',     labelKey: 'fillBlank', icon: Icons.edit_rounded,       bgColor: Color(0xFFF8EAC9)),
-    _TypeMeta(type: 'choice_word',    labelKey: 'choiceWord', icon: Icons.check_circle_outline_rounded, bgColor: Color(0xFFEDE9FE)),
+    _TypeMeta(
+      type: 'quizcard_basic',
+      labelKey: 'flashcard',
+      icon: Icons.style_rounded,
+      bgColor: Color(0xFFFFE5D2),
+    ),
+    _TypeMeta(
+      type: 'matching',
+      labelKey: 'matching',
+      icon: Icons.compare_arrows_rounded,
+      bgColor: Color(0xFFD9E5E3),
+    ),
+    _TypeMeta(
+      type: 'fill_blank',
+      labelKey: 'fillBlank',
+      icon: Icons.edit_rounded,
+      bgColor: Color(0xFFF8EAC9),
+    ),
+    _TypeMeta(
+      type: 'choice_word',
+      labelKey: 'choiceWord',
+      icon: Icons.check_circle_outline_rounded,
+      bgColor: Color(0xFFEDE9FE),
+    ),
   ];
 
   Map<String, List<ExerciseSummary>> _grouped = {};
@@ -48,24 +69,34 @@ class _TypeGroupScreenState extends State<TypeGroupScreen> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final raw = await widget.client.listModuleExercises(
         widget.moduleId,
         skillKind: widget.skillKind,
       );
-      final exercises = raw
-          .map((e) => ExerciseSummary.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final exercises =
+          raw
+              .map((e) => ExerciseSummary.fromJson(e as Map<String, dynamic>))
+              .toList();
       final grouped = <String, List<ExerciseSummary>>{};
       for (final ex in exercises) {
         grouped.putIfAbsent(ex.exerciseType, () => []).add(ex);
       }
       if (!mounted) return;
-      setState(() { _grouped = grouped; _loading = false; });
+      setState(() {
+        _grouped = grouped;
+        _loading = false;
+      });
     } catch (err) {
       if (!mounted) return;
-      setState(() { _error = err.toString(); _loading = false; });
+      setState(() {
+        _error = err.toString();
+        _loading = false;
+      });
     }
   }
 
@@ -74,10 +105,10 @@ class _TypeGroupScreenState extends State<TypeGroupScreen> {
 
   String _typeLabel(AppLocalizations l, String key) => switch (key) {
     'flashcard' => l.exerciseTypeFlashcard,
-    'matching'  => l.exerciseTypeMatching,
+    'matching' => l.exerciseTypeMatching,
     'fillBlank' => l.exerciseTypeFillBlank,
     'choiceWord' => l.exerciseTypeChoiceWord,
-    _           => key,
+    _ => key,
   };
 
   @override
@@ -94,12 +125,14 @@ class _TypeGroupScreenState extends State<TypeGroupScreen> {
             // ── App bar ──────────────────────────────────────────────────
             Padding(
               padding: EdgeInsets.fromLTRB(h, AppSpacing.x3, h, 0),
-              child: Row(children: [
-                GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: const Icon(Icons.arrow_back, size: 22),
-                ),
-              ]),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const Icon(Icons.arrow_back, size: 22),
+                  ),
+                ],
+              ),
             ),
             // ── Header ───────────────────────────────────────────────────
             Padding(
@@ -107,33 +140,46 @@ class _TypeGroupScreenState extends State<TypeGroupScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.moduleTitle,
-                      style: AppTypography.bodySmall
-                          .copyWith(color: AppColors.onSurfaceVariant)),
+                  Text(
+                    widget.moduleTitle,
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Text(_skillTitle(l), style: AppTypography.headlineMedium),
                   const SizedBox(height: 4),
-                  Text(l.typeGroupSubtitle,
-                      style: AppTypography.bodySmall
-                          .copyWith(color: AppColors.onSurfaceVariant)),
+                  Text(
+                    l.typeGroupSubtitle,
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
             ),
             // ── Body ─────────────────────────────────────────────────────
             Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
+              child:
+                  _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _error != null
                       ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.x5),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(_error!, textAlign: TextAlign.center),
-                              const SizedBox(height: 12),
-                              TextButton(onPressed: _load, child: Text(AppLocalizations.of(context).retry)),
+                              AppNotification.error(message: _error!),
+                              const SizedBox(height: AppSpacing.x3),
+                              TextButton(
+                                onPressed: _load,
+                                child: Text(AppLocalizations.of(context).retry),
+                              ),
                             ],
                           ),
-                        )
+                        ),
+                      )
                       : _buildGrid(l, h),
             ),
           ],
@@ -143,15 +189,19 @@ class _TypeGroupScreenState extends State<TypeGroupScreen> {
   }
 
   Widget _buildGrid(AppLocalizations l, double h) {
-    final available = _typeOrder
-        .where((m) => (_grouped[m.type]?.isNotEmpty ?? false))
-        .toList();
+    final available =
+        _typeOrder
+            .where((m) => (_grouped[m.type]?.isNotEmpty ?? false))
+            .toList();
 
     if (available.isEmpty) {
       return Center(
-        child: Text(l.emptyExerciseList,
-            style: AppTypography.bodyMedium
-                .copyWith(color: AppColors.onSurfaceVariant)),
+        child: Text(
+          l.emptyExerciseList,
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.onSurfaceVariant,
+          ),
+        ),
       );
     }
 
@@ -162,23 +212,28 @@ class _TypeGroupScreenState extends State<TypeGroupScreen> {
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
         childAspectRatio: 1.1,
-        children: available.map((meta) {
-          final exercises = _grouped[meta.type]!;
-          return _TypeCard(
-            meta: meta,
-            count: exercises.length,
-            label: _typeLabel(l, meta.labelKey),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => VocabTypeListScreen(
-                client: widget.client,
-                moduleId: widget.moduleId,
-                exerciseType: meta.type,
-                typeLabel: _typeLabel(l, meta.labelKey),
-                exercises: exercises,
-              ),
-            )),
-          );
-        }).toList(),
+        children:
+            available.map((meta) {
+              final exercises = _grouped[meta.type]!;
+              return _TypeCard(
+                meta: meta,
+                count: exercises.length,
+                label: _typeLabel(l, meta.labelKey),
+                onTap:
+                    () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder:
+                            (_) => VocabTypeListScreen(
+                              client: widget.client,
+                              moduleId: widget.moduleId,
+                              exerciseType: meta.type,
+                              typeLabel: _typeLabel(l, meta.labelKey),
+                              exercises: exercises,
+                            ),
+                      ),
+                    ),
+              );
+            }).toList(),
       ),
     );
   }
@@ -242,17 +297,27 @@ class _TypeCard extends StatelessWidget {
                   child: Icon(meta.icon, size: 22, color: Colors.black87),
                 ),
                 const Spacer(),
-                const Icon(Icons.chevron_right, size: 18, color: AppColors.outline),
+                const Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: AppColors.outline,
+                ),
               ],
             ),
             const Spacer(),
-            Text(label,
-                style: AppTypography.titleSmall
-                    .copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              label,
+              style: AppTypography.titleSmall.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 2),
-            Text('$count bài',
-                style: AppTypography.bodySmall
-                    .copyWith(color: AppColors.onSurfaceVariant)),
+            Text(
+              '$count bài',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/auth/auth_models.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/app_notification.dart';
 import '../widgets/apple_sign_in_button.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/password_field.dart';
@@ -104,7 +105,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   hint: 'ban@example.com',
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
-                  autofillHints: const [AutofillHints.username, AutofillHints.email],
+                  autofillHints: const [
+                    AutofillHints.username,
+                    AutofillHints.email,
+                  ],
                   autofocus: true,
                 ),
                 const SizedBox(height: 16),
@@ -119,27 +123,20 @@ class _LoginScreenState extends State<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: _busy
-                        ? null
-                        : () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                    onPressed:
+                        _busy
+                            ? null
+                            : () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const ForgotPasswordScreen(),
+                              ),
                             ),
                     child: const Text('Quên mật khẩu?'),
                   ),
                 ),
                 const SizedBox(height: 8),
                 if (_serverError != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.errorContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _serverError!,
-                      style: const TextStyle(color: AppColors.onErrorContainer),
-                    ),
-                  ),
+                  AppNotification.error(message: _serverError!),
                   const SizedBox(height: 16),
                 ],
                 FilledButton(
@@ -147,30 +144,45 @@ class _LoginScreenState extends State<LoginScreen> {
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.onPrimary,
                     minimumSize: const Size.fromHeight(52),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: _canSubmit ? _submit : null,
-                  child: _busy
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
-                        )
-                      : const Text('Đăng nhập', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  child:
+                      _busy
+                          ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.onPrimary,
+                            ),
+                          )
+                          : const Text(
+                            'Đăng nhập',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                 ),
                 const OrDivider(),
                 AppleSignInButton(
                   authService: _service,
-                  onSuccess: () =>
-                      Navigator.of(context).popUntil((r) => r.isFirst),
+                  onSuccess:
+                      () => Navigator.of(context).popUntil((r) => r.isFirst),
                 ),
                 const SizedBox(height: 16),
                 TextButton(
-                  onPressed: _busy
-                      ? null
-                      : () => Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(builder: (_) => const SignupScreen()),
-                        ),
+                  onPressed:
+                      _busy
+                          ? null
+                          : () => Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => const SignupScreen(),
+                            ),
+                          ),
                   child: const Text('Chưa có tài khoản? Đăng ký miễn phí'),
                 ),
               ],

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/auth/auth_models.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/app_notification.dart';
 import '../widgets/apple_sign_in_button.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/password_field.dart';
@@ -143,7 +144,8 @@ class _SignupScreenState extends State<SignupScreen> {
                   textInputAction: TextInputAction.next,
                   autofillHints: const [AutofillHints.name],
                   autofocus: true,
-                  onValidate: (v) => v.trim().isEmpty ? 'Vui lòng nhập tên.' : null,
+                  onValidate:
+                      (v) => v.trim().isEmpty ? 'Vui lòng nhập tên.' : null,
                 ),
                 const SizedBox(height: 16),
                 AuthTextField(
@@ -159,7 +161,8 @@ class _SignupScreenState extends State<SignupScreen> {
                 PasswordField(
                   controller: _password,
                   label: 'Mật khẩu',
-                  helper: 'Tối thiểu 8 ký tự, gồm ít nhất 1 chữ số hoặc ký tự đặc biệt.',
+                  helper:
+                      'Tối thiểu 8 ký tự, gồm ít nhất 1 chữ số hoặc ký tự đặc biệt.',
                   autofillHints: const [AutofillHints.newPassword],
                   textInputAction: TextInputAction.done,
                   onValidate: _validatePassword,
@@ -167,17 +170,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 const SizedBox(height: 24),
                 if (_serverError != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.errorContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _serverError!,
-                      style: const TextStyle(color: AppColors.onErrorContainer),
-                    ),
-                  ),
+                  AppNotification.error(message: _serverError!),
                   const SizedBox(height: 16),
                 ],
                 FilledButton(
@@ -185,30 +178,45 @@ class _SignupScreenState extends State<SignupScreen> {
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.onPrimary,
                     minimumSize: const Size.fromHeight(52),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: _canSubmit ? _submit : null,
-                  child: _busy
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
-                        )
-                      : const Text('Tạo tài khoản', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  child:
+                      _busy
+                          ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.onPrimary,
+                            ),
+                          )
+                          : const Text(
+                            'Tạo tài khoản',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                 ),
                 const OrDivider(),
                 AppleSignInButton(
                   authService: _service,
-                  onSuccess: () =>
-                      Navigator.of(context).popUntil((r) => r.isFirst),
+                  onSuccess:
+                      () => Navigator.of(context).popUntil((r) => r.isFirst),
                 ),
                 const SizedBox(height: 16),
                 TextButton(
-                  onPressed: _busy
-                      ? null
-                      : () => Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
-                        ),
+                  onPressed:
+                      _busy
+                          ? null
+                          : () => Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => const LoginScreen(),
+                            ),
+                          ),
                   child: const Text('Đã có tài khoản? Đăng nhập'),
                 ),
               ],
@@ -230,7 +238,8 @@ class AuthServiceProvider extends InheritedNotifier<AuthService> {
   }) : super(notifier: service);
 
   static AuthService of(BuildContext context) {
-    final provider = context.dependOnInheritedWidgetOfExactType<AuthServiceProvider>();
+    final provider =
+        context.dependOnInheritedWidgetOfExactType<AuthServiceProvider>();
     assert(provider != null, 'AuthServiceProvider missing from widget tree');
     return provider!.notifier!;
   }

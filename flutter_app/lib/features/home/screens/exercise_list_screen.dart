@@ -14,6 +14,7 @@ import '../../exercise/screens/reading_exercise_screen.dart';
 import '../../exercise/screens/vocab_grammar_exercise_screen.dart';
 import '../../exercise/screens/dictation_exercise_screen.dart';
 import '../../exercise/screens/writing_exercise_screen.dart';
+import '../../../shared/widgets/app_notification.dart';
 
 class ExerciseListScreen extends StatefulWidget {
   const ExerciseListScreen({
@@ -37,27 +38,48 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
   String? _filterTag; // null = all, '1'/'2'/'3'/'4' = filter by uloha
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final raw = await widget.client.listModuleExercises(widget.moduleId, skillKind: widget.skillKind);
+      final raw = await widget.client.listModuleExercises(
+        widget.moduleId,
+        skillKind: widget.skillKind,
+      );
       if (!mounted) return;
       setState(() {
-        _exercises = raw.map((e) => ExerciseSummary.fromJson(e as Map<String, dynamic>)).toList();
+        _exercises =
+            raw
+                .map((e) => ExerciseSummary.fromJson(e as Map<String, dynamic>))
+                .toList();
         _loading = false;
       });
     } catch (err) {
       if (!mounted) return;
-      setState(() { _error = err.toString(); _loading = false; });
+      setState(() {
+        _error = err.toString();
+        _loading = false;
+      });
     }
   }
 
-  Future<void> _openExercise(BuildContext context, ExerciseSummary exercise, {bool replace = false}) async {
+  Future<void> _openExercise(
+    BuildContext context,
+    ExerciseSummary exercise, {
+    bool replace = false,
+  }) async {
     final ExerciseDetail detail;
     try {
-      detail = ExerciseDetail.fromJson(await widget.client.getExercise(exercise.id));
+      detail = ExerciseDetail.fromJson(
+        await widget.client.getExercise(exercise.id),
+      );
     } catch (_) {
       if (!mounted) return;
       // ignore: use_build_context_synchronously
@@ -72,17 +94,24 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
     // Compute the next exercise in the filtered list so daily-sprint queue
     // can chain across types. Done early so all branches below can reuse it.
     final idxOuter = _exercises.indexOf(exercise);
-    final nextOuter = (idxOuter >= 0 && idxOuter + 1 < _exercises.length) ? _exercises[idxOuter + 1] : null;
+    final nextOuter =
+        (idxOuter >= 0 && idxOuter + 1 < _exercises.length)
+            ? _exercises[idxOuter + 1]
+            : null;
 
     // Route reading exercises to ReadingExerciseScreen.
     if (detail.isCteni) {
       // ignore: use_build_context_synchronously
       final route = MaterialPageRoute(
-        builder: (ctx) => ReadingExerciseScreen(
-          client: widget.client,
-          detail: detail,
-          onOpenNext: nextOuter == null ? null : () => _openExercise(ctx, nextOuter, replace: true),
-        ),
+        builder:
+            (ctx) => ReadingExerciseScreen(
+              client: widget.client,
+              detail: detail,
+              onOpenNext:
+                  nextOuter == null
+                      ? null
+                      : () => _openExercise(ctx, nextOuter, replace: true),
+            ),
       );
       // ignore: use_build_context_synchronously
       if (replace) {
@@ -99,11 +128,15 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
     if (detail.isPoslech) {
       // ignore: use_build_context_synchronously
       final route = MaterialPageRoute(
-        builder: (ctx) => ListeningExerciseScreen(
-          client: widget.client,
-          detail: detail,
-          onOpenNext: nextOuter == null ? null : () => _openExercise(ctx, nextOuter, replace: true),
-        ),
+        builder:
+            (ctx) => ListeningExerciseScreen(
+              client: widget.client,
+              detail: detail,
+              onOpenNext:
+                  nextOuter == null
+                      ? null
+                      : () => _openExercise(ctx, nextOuter, replace: true),
+            ),
       );
       // ignore: use_build_context_synchronously
       if (replace) {
@@ -121,7 +154,9 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
       // ignore: use_build_context_synchronously
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => WritingExerciseScreen(client: widget.client, detail: detail),
+          builder:
+              (_) =>
+                  WritingExerciseScreen(client: widget.client, detail: detail),
         ),
       );
       return;
@@ -132,17 +167,19 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
       // ignore: use_build_context_synchronously
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => DictationExerciseScreen(
-            client: widget.client,
-            detail: detail,
-          ),
+          builder:
+              (_) => DictationExerciseScreen(
+                client: widget.client,
+                detail: detail,
+              ),
         ),
       );
       return;
     }
 
     final idx = _exercises.indexOf(exercise);
-    final next = (idx >= 0 && idx + 1 < _exercises.length) ? _exercises[idx + 1] : null;
+    final next =
+        (idx >= 0 && idx + 1 < _exercises.length) ? _exercises[idx + 1] : null;
 
     // Route V6 vocab/grammar exercises to VocabGrammarExerciseScreen.
     // Use pushReplacement for subsequent exercises so the stack stays flat:
@@ -152,11 +189,15 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
     if (detail.isVocabGrammar) {
       if (!mounted) return;
       final route = MaterialPageRoute(
-        builder: (ctx) => VocabGrammarExerciseScreen(
-          client: widget.client,
-          detail: detail,
-          onOpenNext: next == null ? null : () => _openExercise(ctx, next, replace: true),
-        ),
+        builder:
+            (ctx) => VocabGrammarExerciseScreen(
+              client: widget.client,
+              detail: detail,
+              onOpenNext:
+                  next == null
+                      ? null
+                      : () => _openExercise(ctx, next, replace: true),
+            ),
       );
       // ignore: use_build_context_synchronously
       if (replace) {
@@ -172,11 +213,12 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
     // ignore: use_build_context_synchronously
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (ctx) => exercise_feature.ExerciseScreen(
-          client: widget.client,
-          detail: detail,
-          onOpenNext: next == null ? null : () => _openExercise(ctx, next),
-        ),
+        builder:
+            (ctx) => exercise_feature.ExerciseScreen(
+              client: widget.client,
+              detail: detail,
+              onOpenNext: next == null ? null : () => _openExercise(ctx, next),
+            ),
       ),
     );
   }
@@ -190,28 +232,42 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
   }
 
   // Fallback for exercises without stored skill_kind.
-  static bool _exerciseMatchesSkillKindByType(String exerciseType, String skillKind) {
+  static bool _exerciseMatchesSkillKindByType(
+    String exerciseType,
+    String skillKind,
+  ) {
     switch (skillKind) {
-      case 'noi':  return exerciseType.startsWith('uloha_');
-      case 'viet': return exerciseType.startsWith('psani_');
-      case 'nghe': return exerciseType.startsWith('poslech_');
-      case 'doc':  return exerciseType.startsWith('cteni_');
-      default:     return false;
+      case 'noi':
+        return exerciseType.startsWith('uloha_');
+      case 'viet':
+        return exerciseType.startsWith('psani_');
+      case 'nghe':
+        return exerciseType.startsWith('poslech_');
+      case 'doc':
+        return exerciseType.startsWith('cteni_');
+      default:
+        return false;
     }
   }
 
   List<ExerciseSummary> get _filtered {
     // Known exercise_type prefixes are authoritative; stale skill_kind values
     // should not hide poslech/cteni/psani items from their skill tabs.
-    final kindFiltered = _exercises.where((e) {
-      final inferred = skillKindForExerciseType(e.exerciseType);
-      if (inferred.isNotEmpty) return inferred == widget.skillKind;
-      if (e.skillKind.isNotEmpty) return e.skillKind == widget.skillKind;
-      return _exerciseMatchesSkillKindByType(e.exerciseType, widget.skillKind);
-    }).toList();
+    final kindFiltered =
+        _exercises.where((e) {
+          final inferred = skillKindForExerciseType(e.exerciseType);
+          if (inferred.isNotEmpty) return inferred == widget.skillKind;
+          if (e.skillKind.isNotEmpty) return e.skillKind == widget.skillKind;
+          return _exerciseMatchesSkillKindByType(
+            e.exerciseType,
+            widget.skillKind,
+          );
+        }).toList();
     if (_filterTag == null) return kindFiltered;
     if (widget.skillKind == 'noi') {
-      return kindFiltered.where((e) => e.exerciseType.startsWith('uloha_$_filterTag')).toList();
+      return kindFiltered
+          .where((e) => e.exerciseType.startsWith('uloha_$_filterTag'))
+          .toList();
     }
     // vocab/grammar: filter by exact exercise type
     return kindFiltered.where((e) => e.exerciseType == _filterTag).toList();
@@ -279,18 +335,24 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
             // ── Header ──────────────────────────────────────────────────────
             Padding(
               padding: EdgeInsets.fromLTRB(h, AppSpacing.x3, h, 0),
-              child: Row(children: [
-                GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: const Icon(Icons.arrow_back, size: 22),
-                ),
-                const Spacer(),
-                // Only show speaking progress link for noi skill
-                if (widget.skillKind == 'noi')
-                  Text(l.exerciseListProgressLink,
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const Icon(Icons.arrow_back, size: 22),
+                  ),
+                  const Spacer(),
+                  // Only show speaking progress link for noi skill
+                  if (widget.skillKind == 'noi')
+                    Text(
+                      l.exerciseListProgressLink,
                       style: AppTypography.bodySmall.copyWith(
-                          color: AppColors.primary, fontWeight: FontWeight.w600)),
-              ]),
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
             ),
 
             Padding(
@@ -300,22 +362,37 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
                 children: [
                   if (widget.skillKind == 'noi')
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.primaryFixed,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Text(l.exerciseListFlowBadge,
-                          style: AppTypography.labelUppercase.copyWith(
-                              color: AppColors.primary, fontSize: 10)),
+                      child: Text(
+                        l.exerciseListFlowBadge,
+                        style: AppTypography.labelUppercase.copyWith(
+                          color: AppColors.primary,
+                          fontSize: 10,
+                        ),
+                      ),
                     ),
                   const SizedBox(height: AppSpacing.x2),
-                  Text(skillLabel(l, widget.skillKind),
-                      style: AppTypography.titleLarge.copyWith(
-                          fontSize: 30, fontWeight: FontWeight.w700)),
+                  Text(
+                    skillLabel(l, widget.skillKind),
+                    style: AppTypography.titleLarge.copyWith(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   const SizedBox(height: AppSpacing.x1),
-                  Text(l.exerciseListSubtitle,
-                      style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant)),
+                  Text(
+                    l.exerciseListSubtitle,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -330,14 +407,20 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
                   scrollDirection: Axis.horizontal,
                   padding: EdgeInsets.symmetric(horizontal: h),
                   children: [
-                    _FilterPill(label: 'Tất cả', active: _filterTag == null,
-                        onTap: () => setState(() => _filterTag = null)),
+                    _FilterPill(
+                      label: 'Tất cả',
+                      active: _filterTag == null,
+                      onTap: () => setState(() => _filterTag = null),
+                    ),
                     const SizedBox(width: AppSpacing.x2),
                     for (final n in ['1', '2', '3', '4']) ...[
                       _FilterPill(
                         label: 'Úloha $n',
                         active: _filterTag == n,
-                        onTap: () => setState(() => _filterTag = _filterTag == n ? null : n),
+                        onTap:
+                            () => setState(
+                              () => _filterTag = _filterTag == n ? null : n,
+                            ),
                       ),
                       if (n != '4') const SizedBox(width: AppSpacing.x2),
                     ],
@@ -353,8 +436,11 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
                   scrollDirection: Axis.horizontal,
                   padding: EdgeInsets.symmetric(horizontal: h),
                   children: [
-                    _FilterPill(label: 'Tất cả', active: _filterTag == null,
-                        onTap: () => setState(() => _filterTag = null)),
+                    _FilterPill(
+                      label: 'Tất cả',
+                      active: _filterTag == null,
+                      onTap: () => setState(() => _filterTag = null),
+                    ),
                     const SizedBox(width: AppSpacing.x2),
                     for (final entry in [
                       if (widget.skillKind == 'tu_vung')
@@ -366,7 +452,12 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
                       _FilterPill(
                         label: entry.$2,
                         active: _filterTag == entry.$1,
-                        onTap: () => setState(() => _filterTag = _filterTag == entry.$1 ? null : entry.$1),
+                        onTap:
+                            () => setState(
+                              () =>
+                                  _filterTag =
+                                      _filterTag == entry.$1 ? null : entry.$1,
+                            ),
                       ),
                       const SizedBox(width: AppSpacing.x2),
                     ],
@@ -378,41 +469,69 @@ class _ExerciseListScreenState extends State<ExerciseListScreen> {
 
             // ── List ─────────────────────────────────────────────────────────
             Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          Text(_error!),
-                          FilledButton(onPressed: _load, child: Text(l.retry)),
-                        ]))
+              child:
+                  _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _error != null
+                      ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.x5),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AppNotification.error(message: _error!),
+                              const SizedBox(height: AppSpacing.x3),
+                              FilledButton(
+                                onPressed: _load,
+                                child: Text(l.retry),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
                       : _filtered.isEmpty
-                          ? Center(child: Padding(
-                              padding: EdgeInsets.all(AppSpacing.x5),
-                              child: Text('Chưa có bài tập nào.',
-                                  style: AppTypography.bodyMedium.copyWith(
-                                      color: AppColors.onSurfaceVariant),
-                                  textAlign: TextAlign.center),
-                            ))
-                          : ListView.separated(
-                              padding: EdgeInsets.symmetric(horizontal: h, vertical: 0),
-                              itemCount: _filtered.length + 1,
-                              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.x3),
-                              itemBuilder: (context, i) {
-                                if (i == _filtered.length) {
-                                  return _DailySprintCard(
-                                    onTap: _filtered.isEmpty ? null : () => _openExercise(context, _filtered.first),
-                                  );
-                                }
-                                final ex = _filtered[i];
-                                return _ExerciseCard(
-                                  exercise: ex,
-                                  ulohaTag: _ulohaTag(ex.exerciseType),
-                                  estimatedMin: _estimatedMin(ex),
-                                  skillKind: widget.skillKind,
-                                  onTap: () => _openExercise(context, ex),
-                                );
-                              },
+                      ? Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(AppSpacing.x5),
+                          child: Text(
+                            'Chưa có bài tập nào.',
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: AppColors.onSurfaceVariant,
                             ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                      : ListView.separated(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: h,
+                          vertical: 0,
+                        ),
+                        itemCount: _filtered.length + 1,
+                        separatorBuilder:
+                            (_, __) => const SizedBox(height: AppSpacing.x3),
+                        itemBuilder: (context, i) {
+                          if (i == _filtered.length) {
+                            return _DailySprintCard(
+                              onTap:
+                                  _filtered.isEmpty
+                                      ? null
+                                      : () => _openExercise(
+                                        context,
+                                        _filtered.first,
+                                      ),
+                            );
+                          }
+                          final ex = _filtered[i];
+                          return _ExerciseCard(
+                            exercise: ex,
+                            ulohaTag: _ulohaTag(ex.exerciseType),
+                            estimatedMin: _estimatedMin(ex),
+                            skillKind: widget.skillKind,
+                            onTap: () => _openExercise(context, ex),
+                          );
+                        },
+                      ),
             ),
           ],
         ),
@@ -439,9 +558,10 @@ class _ExerciseCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isVocabGrammar = skillKind == 'tu_vung' || skillKind == 'ngu_phap';
-    final typeStyle = isVocabGrammar
-        ? _ExerciseListScreenState._typeStyle(exercise.exerciseType)
-        : null;
+    final typeStyle =
+        isVocabGrammar
+            ? _ExerciseListScreenState._typeStyle(exercise.exerciseType)
+            : null;
 
     final iconColor = typeStyle?.color ?? AppColors.primary;
     final iconBg = typeStyle?.bg ?? AppColors.primaryFixed;
@@ -474,38 +594,68 @@ class _ExerciseCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: iconBg,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(badgeLabel,
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: iconBg,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          badgeLabel,
                           style: AppTypography.labelUppercase.copyWith(
-                              fontSize: 9, color: iconColor)),
-                    ),
-                    const Spacer(),
-                    const Icon(Icons.timer_outlined, size: 12, color: AppColors.onSurfaceVariant),
-                    const SizedBox(width: 2),
-                    Text('$estimatedMin min',
+                            fontSize: 9,
+                            color: iconColor,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(
+                        Icons.timer_outlined,
+                        size: 12,
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '$estimatedMin min',
                         style: AppTypography.bodySmall.copyWith(
-                            fontSize: 11, color: AppColors.onSurfaceVariant)),
-                  ]),
+                          fontSize: 11,
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: AppSpacing.x1),
-                  Text(exercise.title,
-                      style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w600)),
+                  Text(
+                    exercise.title,
+                    style: AppTypography.titleSmall.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   if (exercise.shortInstruction.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.x1),
-                    Text(exercise.shortInstruction,
-                        style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant),
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(
+                      exercise.shortInstruction,
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ],
               ),
             ),
             const SizedBox(width: AppSpacing.x2),
-            const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.onSurfaceVariant),
+            const Icon(
+              Icons.arrow_forward_ios,
+              size: 14,
+              color: AppColors.onSurfaceVariant,
+            ),
           ],
         ),
       ),
@@ -514,17 +664,21 @@ class _ExerciseCard extends StatelessWidget {
 }
 
 IconData _skillIcon(String skillKind) => switch (skillKind) {
-  'noi'      => Icons.mic_rounded,
-  'nghe'     => Icons.headphones_rounded,
-  'viet'     => Icons.edit_rounded,
-  'doc'      => Icons.menu_book_rounded,
-  'tu_vung'  => Icons.style_rounded,
+  'noi' => Icons.mic_rounded,
+  'nghe' => Icons.headphones_rounded,
+  'viet' => Icons.edit_rounded,
+  'doc' => Icons.menu_book_rounded,
+  'tu_vung' => Icons.style_rounded,
   'ngu_phap' => Icons.school_rounded,
-  _          => Icons.mic_rounded,
+  _ => Icons.mic_rounded,
 };
 
 class _FilterPill extends StatelessWidget {
-  const _FilterPill({required this.label, required this.active, required this.onTap});
+  const _FilterPill({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
   final String label;
   final bool active;
   final VoidCallback onTap;
@@ -575,17 +729,29 @@ class _DailySprintCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l.exerciseListDailySprintLabel,
-              style: AppTypography.labelUppercase.copyWith(
-                  color: AppColors.inverseOnSurfaceLight.withAlpha(160), fontSize: 10)),
+          Text(
+            l.exerciseListDailySprintLabel,
+            style: AppTypography.labelUppercase.copyWith(
+              color: AppColors.inverseOnSurfaceLight.withAlpha(160),
+              fontSize: 10,
+            ),
+          ),
           const SizedBox(height: AppSpacing.x2),
-          Text(l.exerciseListDailySprintTitle,
-              style: AppTypography.titleLarge.copyWith(
-                  color: AppColors.inverseOnSurfaceLight, fontWeight: FontWeight.w700, fontSize: 22)),
+          Text(
+            l.exerciseListDailySprintTitle,
+            style: AppTypography.titleLarge.copyWith(
+              color: AppColors.inverseOnSurfaceLight,
+              fontWeight: FontWeight.w700,
+              fontSize: 22,
+            ),
+          ),
           const SizedBox(height: AppSpacing.x1),
-          Text(l.exerciseListDailySprintSubtitle,
-              style: AppTypography.bodySmall.copyWith(
-                  color: AppColors.inverseOnSurfaceLight.withAlpha(200))),
+          Text(
+            l.exerciseListDailySprintSubtitle,
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.inverseOnSurfaceLight.withAlpha(200),
+            ),
+          ),
           const SizedBox(height: AppSpacing.x4),
           SizedBox(
             width: double.infinity,

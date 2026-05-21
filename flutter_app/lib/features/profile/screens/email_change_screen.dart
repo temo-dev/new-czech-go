@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/auth/auth_models.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/app_notification.dart';
 import '../../auth/screens/signup_screen.dart' show AuthServiceProvider;
 import '../../auth/widgets/auth_text_field.dart';
 import '../../auth/widgets/password_field.dart';
@@ -23,7 +24,8 @@ class _EmailChangeScreenState extends State<EmailChangeScreen> {
   String? _error;
   bool _done = false;
 
-  AuthService get _service => widget.authServiceOverride ?? AuthServiceProvider.of(context);
+  AuthService get _service =>
+      widget.authServiceOverride ?? AuthServiceProvider.of(context);
 
   @override
   void initState() {
@@ -107,12 +109,20 @@ class _EmailChangeScreenState extends State<EmailChangeScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 32),
-        const Icon(Icons.mark_email_read_outlined, size: 64, color: AppColors.secondary),
+        const Icon(
+          Icons.mark_email_read_outlined,
+          size: 64,
+          color: AppColors.secondary,
+        ),
         const SizedBox(height: 16),
         const Text(
           'Đã cập nhật email',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.secondary),
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.secondary,
+          ),
         ),
         const SizedBox(height: 12),
         const Text(
@@ -126,10 +136,15 @@ class _EmailChangeScreenState extends State<EmailChangeScreen> {
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.onPrimary,
             minimumSize: const Size.fromHeight(52),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Quay lại', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          child: const Text(
+            'Quay lại',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
         ),
       ],
     );
@@ -162,14 +177,7 @@ class _EmailChangeScreenState extends State<EmailChangeScreen> {
         ),
         const SizedBox(height: 16),
         if (_error != null) ...[
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.errorContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(_error!, style: const TextStyle(color: AppColors.onErrorContainer)),
-          ),
+          AppNotification.error(message: _error!),
           const SizedBox(height: 16),
         ],
         FilledButton(
@@ -177,15 +185,25 @@ class _EmailChangeScreenState extends State<EmailChangeScreen> {
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.onPrimary,
             minimumSize: const Size.fromHeight(52),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           onPressed: _canSubmit ? _submit : null,
-          child: _busy
-              ? const SizedBox(
-                  width: 22, height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
-                )
-              : const Text('Đổi email', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          child:
+              _busy
+                  ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.onPrimary,
+                    ),
+                  )
+                  : const Text(
+                    'Đổi email',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
         ),
       ],
     );

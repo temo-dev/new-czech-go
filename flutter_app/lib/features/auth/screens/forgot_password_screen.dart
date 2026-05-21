@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/auth/auth_models.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/app_notification.dart';
 import '../widgets/auth_text_field.dart';
 import 'signup_screen.dart' show AuthServiceProvider;
 
@@ -89,12 +90,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 32),
-        const Icon(Icons.mark_email_read_outlined, size: 64, color: AppColors.secondary),
+        const Icon(
+          Icons.mark_email_read_outlined,
+          size: 64,
+          color: AppColors.secondary,
+        ),
         const SizedBox(height: 16),
         const Text(
           'Đã gửi link đặt lại mật khẩu',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.secondary),
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.secondary,
+          ),
         ),
         const SizedBox(height: 12),
         const Text(
@@ -108,10 +117,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.onPrimary,
             minimumSize: const Size.fromHeight(52),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Quay lại đăng nhập', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          child: const Text(
+            'Quay lại đăng nhập',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
         ),
       ],
     );
@@ -139,23 +153,32 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: Text(_error!, style: const TextStyle(color: AppColors.error)),
+            child: AppNotification.error(message: _error!),
           ),
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.onPrimary,
             minimumSize: const Size.fromHeight(52),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           onPressed: _busy ? null : _submit,
-          child: _busy
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
-                )
-              : const Text('Gửi link đặt lại', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          child:
+              _busy
+                  ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.onPrimary,
+                    ),
+                  )
+                  : const Text(
+                    'Gửi link đặt lại',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
         ),
       ],
     );

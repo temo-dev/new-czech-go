@@ -10,6 +10,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../../shared/widgets/app_notification.dart';
 import '../../../shared/widgets/info_pill.dart';
 import '../../exercise/screens/dictation_exercise_screen.dart';
 import '../../exercise/screens/exercise_screen.dart' as exercise_feature;
@@ -855,7 +856,7 @@ class _MockExamScreenState extends State<MockExamScreen> {
         ],
         if (err != null) ...[
           const SizedBox(height: AppSpacing.x3),
-          Text(err, style: AppTypography.bodySmall.copyWith(color: Colors.red)),
+          AppNotification.error(message: err),
         ],
       ],
     );

@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../../shared/widgets/app_notification.dart';
 import 'interview_session_screen.dart';
 
 /// Entry point when navigating from InterviewListScreen.
@@ -84,15 +85,19 @@ class _InterviewIntroScreenState extends State<InterviewIntroScreen> {
     if (_error != null) {
       return Scaffold(
         body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_error!),
-              FilledButton(
-                onPressed: _loadDetail,
-                child: const Text('Thử lại'),
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.x5),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppNotification.error(message: _error!),
+                const SizedBox(height: AppSpacing.x3),
+                FilledButton(
+                  onPressed: _loadDetail,
+                  child: const Text('Thử lại'),
+                ),
+              ],
+            ),
           ),
         ),
       );

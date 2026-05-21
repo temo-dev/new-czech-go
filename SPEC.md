@@ -70,6 +70,7 @@ the archive — it is a historical record.
 | V42.6 | 2026-05-17 | Psaní 2 dynamic email prompts — CMS authoring now accepts 1+ topic/image prompts instead of exactly five, with validation only rejecting empty topic lists | (CHANGELOG entry — hotfix, no separate spec) |
 | V42.7 | 2026-05-17 | Psaní 1 dynamic form questions — CMS authoring now accepts 1+ form questions instead of max three; backend text submission accepts one answer per authored question | (CHANGELOG entry — hotfix, no separate spec) |
 | V42.9 | 2026-05-19 | CMS exam exercise visibility — Exam Pool rows show Mock Test membership and Mock Test cards list concrete section exercises | (CHANGELOG entry — CMS hotfix, no separate spec) |
+| V42.10 | 2026-05-20 | Flutter notification banners — shared semantic notification widget replaces plain red learner-facing errors/warnings across key screens | (CHANGELOG entry — Flutter UX hotfix, no separate spec) |
 
 ## Stable contracts
 

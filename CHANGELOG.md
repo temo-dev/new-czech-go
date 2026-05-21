@@ -10,6 +10,26 @@ contract or convention, the canonical home is its own spec under
 
 ---
 
+## V42.10 — Flutter Notification Banners — 2026-05-20
+
+Flutter UX polish for learner-facing errors and warnings. Added a shared
+`AppNotification` banner with semantic tones (`error`, `warning`, `info`,
+`success`), icon treatment, optional title/action, and live-region semantics.
+Replaced plain red inline error text across auth, home/course loading states,
+exercise submit/polling flows, audio playback, mock exam, interview, paywall,
+and profile credential screens. Kept red treatment only for non-notification
+states such as destructive actions and objective correctness markers.
+
+### Verification
+
+- Flutter: `rtk flutter test` green (457 passed).
+- Flutter: targeted notification/auth/exercise regression test run green.
+- Flutter: `rtk flutter analyze` still reports 2 pre-existing warnings:
+  unused `_now` in `promotion_result_screen.dart`, and unused
+  `iap_models.dart` import in `profile_screen_test.dart`.
+
+---
+
 ## V42.9 — CMS Exam Exercise Visibility — 2026-05-19
 
 CMS usability upgrade for exam-pool content management. The Exercise dashboard

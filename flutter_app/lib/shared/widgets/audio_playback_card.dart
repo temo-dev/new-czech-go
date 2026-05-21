@@ -10,6 +10,7 @@ import '../../core/theme/app_typography.dart';
 import '../../core/api/api_client.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../models/models.dart';
+import 'app_notification.dart';
 
 /// Audio playback card for a submitted attempt.
 /// Streams from a backend-signed URL — no full download.
@@ -176,7 +177,7 @@ class _AttemptAudioPlaybackCardState extends State<AttemptAudioPlaybackCard> {
           ),
           const SizedBox(height: AppSpacing.x3),
           if (_error != null)
-            Text(_error!, style: TextStyle(color: AppColors.error))
+            AppNotification.error(message: _error!)
           else ...[
             Row(
               children: [
@@ -396,7 +397,7 @@ class _ReviewAudioPlaybackCardState extends State<ReviewAudioPlaybackCard> {
           ),
           const SizedBox(height: AppSpacing.x3),
           if (_error != null)
-            Text(_error!, style: TextStyle(color: AppColors.error))
+            AppNotification.error(message: _error!)
           else ...[
             Row(
               children: [

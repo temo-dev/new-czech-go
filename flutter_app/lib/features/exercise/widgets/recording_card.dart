@@ -8,7 +8,7 @@ import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
-
+import '../../../shared/widgets/app_notification.dart';
 
 /// Recording state card — Stitch-inspired layout.
 /// Large timer, animated waveform, prominent stop/analyze actions.
@@ -71,32 +71,45 @@ class RecordingCard extends StatelessWidget {
             fontSize: 64,
             fontWeight: FontWeight.w900,
             letterSpacing: 4,
-            color: _isRecording ? AppColors.onSurface : AppColors.onSurfaceVariant,
+            color:
+                _isRecording ? AppColors.onSurface : AppColors.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: AppSpacing.x2),
         if (_isRecording)
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            _RecordingDot(),
-            const SizedBox(width: 6),
-            Text('NAHRÁVÁNÍ',
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _RecordingDot(),
+              const SizedBox(width: 6),
+              Text(
+                'NAHRÁVÁNÍ',
                 style: AppTypography.labelUppercase.copyWith(
-                    color: AppColors.rec, fontSize: 11, letterSpacing: 1.5)),
-          ])
+                  color: AppColors.rec,
+                  fontSize: 11,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          )
         else
           Text(
             _statusLabel(l, status),
             style: AppTypography.labelUppercase.copyWith(
-                color: AppColors.onSurfaceVariant, fontSize: 11, letterSpacing: 1.2),
+              color: AppColors.onSurfaceVariant,
+              fontSize: 11,
+              letterSpacing: 1.2,
+            ),
           ),
 
         // ── Waveform ──────────────────────────────────────────────────────────
         const SizedBox(height: AppSpacing.x6),
         SizedBox(
           height: 64,
-          child: _isRecording
-              ? const _AnimatedWaveform()
-              : _StaticWaveform(filled: _isStopped),
+          child:
+              _isRecording
+                  ? const _AnimatedWaveform()
+                  : _StaticWaveform(filled: _isStopped),
         ),
         const SizedBox(height: AppSpacing.x6),
 
@@ -104,8 +117,12 @@ class RecordingCard extends StatelessWidget {
         if (_isProcessing) ...[
           const CircularProgressIndicator(),
           const SizedBox(height: AppSpacing.x3),
-          Text(l.recordHintUploading,
-              style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant)),
+          Text(
+            l.recordHintUploading,
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.onSurfaceVariant,
+            ),
+          ),
         ] else if (_canStart) ...[
           // Start recording button
           _BigRoundButton(
@@ -114,9 +131,14 @@ class RecordingCard extends StatelessWidget {
             onTap: onStart,
           ),
           const SizedBox(height: AppSpacing.x2),
-          Text(l.recordHintTapToStart,
-              style: AppTypography.labelUppercase.copyWith(
-                  color: AppColors.onSurfaceVariant, fontSize: 10, letterSpacing: 1.2)),
+          Text(
+            l.recordHintTapToStart,
+            style: AppTypography.labelUppercase.copyWith(
+              color: AppColors.onSurfaceVariant,
+              fontSize: 10,
+              letterSpacing: 1.2,
+            ),
+          ),
         ] else if (_isRecording) ...[
           // Stop button
           _BigRoundButton(
@@ -125,15 +147,19 @@ class RecordingCard extends StatelessWidget {
             onTap: onStop,
           ),
           const SizedBox(height: AppSpacing.x2),
-          Text(l.recordHintTapToStop,
-              style: AppTypography.labelUppercase.copyWith(
-                  color: AppColors.onSurfaceVariant, fontSize: 10, letterSpacing: 1.2)),
+          Text(
+            l.recordHintTapToStop,
+            style: AppTypography.labelUppercase.copyWith(
+              color: AppColors.onSurfaceVariant,
+              fontSize: 10,
+              letterSpacing: 1.2,
+            ),
+          ),
         ],
 
         if (error != null) ...[
           const SizedBox(height: AppSpacing.x3),
-          Text(error!, style: AppTypography.bodySmall.copyWith(color: AppColors.error),
-              textAlign: TextAlign.center),
+          AppNotification.error(message: error!),
         ],
 
         // ── Stopped actions ───────────────────────────────────────────────────
@@ -144,89 +170,132 @@ class RecordingCard extends StatelessWidget {
           // Bottom action bar
           Container(
             padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.x4, vertical: AppSpacing.x3),
+              horizontal: AppSpacing.x4,
+              vertical: AppSpacing.x3,
+            ),
             decoration: BoxDecoration(
               color: AppColors.surfaceContainerLow,
               borderRadius: AppRadius.lgAll,
             ),
             child: Column(
               children: [
-                Row(children: [
-                  const Icon(Icons.check_circle_outline, size: 14, color: AppColors.success),
-                  const SizedBox(width: 6),
-                  Text('NAHRÁVKA PŘIPRAVENA',
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_outline,
+                      size: 14,
+                      color: AppColors.success,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'NAHRÁVKA PŘIPRAVENA',
                       style: AppTypography.labelUppercase.copyWith(
-                          fontSize: 10, color: AppColors.success, letterSpacing: 1)),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: onRerecord,
-                    child: Text(l.recordCtaRerecord,
+                        fontSize: 10,
+                        color: AppColors.success,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: onRerecord,
+                      child: Text(
+                        l.recordCtaRerecord,
                         style: AppTypography.bodySmall.copyWith(
-                            color: AppColors.primary, fontWeight: FontWeight.w600)),
-                  ),
-                ]),
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: AppSpacing.x3),
-                Row(children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: playbackPath != null && playbackError == null
-                          ? onTogglePlayback
-                          : null,
-                      icon: Icon(
-                          player.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                          size: 18),
-                      label: Text(l.playbackTitle),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        side: const BorderSide(color: AppColors.outlineVariant),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed:
+                            playbackPath != null && playbackError == null
+                                ? onTogglePlayback
+                                : null,
+                        icon: Icon(
+                          player.playing
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          size: 18,
+                        ),
+                        label: Text(l.playbackTitle),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: const BorderSide(
+                            color: AppColors.outlineVariant,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: AppSpacing.x3),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: onAnalyze,
-                      icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-                      label: Text(l.recordCtaAnalyze),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                    const SizedBox(width: AppSpacing.x3),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: onAnalyze,
+                        icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                        label: Text(l.recordCtaAnalyze),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
                       ),
                     ),
-                  ),
-                ]),
+                  ],
+                ),
               ],
             ),
           ),
           // Playback slider
           if (playbackPath != null && playbackDuration != null) ...[
             const SizedBox(height: AppSpacing.x2),
-            Row(children: [
-              Text(_fmt(playbackPosition),
+            Row(
+              children: [
+                Text(
+                  _fmt(playbackPosition),
                   style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.onSurfaceVariant, fontSize: 11)),
-              Expanded(
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 3,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-                  ),
-                  child: Slider(
-                    min: 0,
-                    max: playbackDuration!.inMilliseconds.toDouble().clamp(1, double.infinity),
-                    value: playbackPosition.inMilliseconds
-                        .clamp(0, playbackDuration!.inMilliseconds)
-                        .toDouble(),
-                    onChanged: (v) => onSeek(v),
-                    activeColor: AppColors.primary,
-                    inactiveColor: AppColors.outlineVariant,
+                    color: AppColors.onSurfaceVariant,
+                    fontSize: 11,
                   ),
                 ),
-              ),
-              Text(_fmt(playbackDuration!),
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 3,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 6,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 14,
+                      ),
+                    ),
+                    child: Slider(
+                      min: 0,
+                      max: playbackDuration!.inMilliseconds.toDouble().clamp(
+                        1,
+                        double.infinity,
+                      ),
+                      value:
+                          playbackPosition.inMilliseconds
+                              .clamp(0, playbackDuration!.inMilliseconds)
+                              .toDouble(),
+                      onChanged: (v) => onSeek(v),
+                      activeColor: AppColors.primary,
+                      inactiveColor: AppColors.outlineVariant,
+                    ),
+                  ),
+                ),
+                Text(
+                  _fmt(playbackDuration!),
                   style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.onSurfaceVariant, fontSize: 11)),
-            ]),
+                    color: AppColors.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
           ],
         ],
 
@@ -239,7 +308,11 @@ class RecordingCard extends StatelessWidget {
 // ── Big round action button ──────────────────────────────────────────────────
 
 class _BigRoundButton extends StatelessWidget {
-  const _BigRoundButton({required this.color, required this.icon, required this.onTap});
+  const _BigRoundButton({
+    required this.color,
+    required this.icon,
+    required this.onTap,
+  });
   final Color color;
   final IconData icon;
   final VoidCallback onTap;
@@ -254,7 +327,13 @@ class _BigRoundButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: color.withAlpha(60), blurRadius: 20, spreadRadius: 4)],
+          boxShadow: [
+            BoxShadow(
+              color: color.withAlpha(60),
+              blurRadius: 20,
+              spreadRadius: 4,
+            ),
+          ],
         ),
         child: Icon(icon, color: Colors.white, size: 36),
       ),
@@ -282,8 +361,10 @@ class _AnimatedWaveformState extends State<_AnimatedWaveform>
   void initState() {
     super.initState();
     _phases = List.generate(_bars, (i) => _rng.nextDouble() * math.pi * 2);
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
-      ..repeat();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
   }
 
   @override
@@ -310,9 +391,10 @@ class _AnimatedWaveformState extends State<_AnimatedWaveform>
               height: height,
               margin: const EdgeInsets.symmetric(horizontal: 2),
               decoration: BoxDecoration(
-                color: isCenter
-                    ? AppColors.primary
-                    : AppColors.primary.withAlpha(120),
+                color:
+                    isCenter
+                        ? AppColors.primary
+                        : AppColors.primary.withAlpha(120),
                 borderRadius: BorderRadius.circular(2),
               ),
             );
@@ -328,8 +410,30 @@ class _StaticWaveform extends StatelessWidget {
   final bool filled;
 
   static const _heights = [
-    0.3, 0.5, 0.8, 0.6, 0.9, 0.7, 0.4, 0.8, 1.0, 0.7, 0.5, 0.9,
-    0.6, 0.8, 0.4, 0.7, 1.0, 0.6, 0.8, 0.5, 0.9, 0.6, 0.4, 0.3,
+    0.3,
+    0.5,
+    0.8,
+    0.6,
+    0.9,
+    0.7,
+    0.4,
+    0.8,
+    1.0,
+    0.7,
+    0.5,
+    0.9,
+    0.6,
+    0.8,
+    0.4,
+    0.7,
+    1.0,
+    0.6,
+    0.8,
+    0.5,
+    0.9,
+    0.6,
+    0.4,
+    0.3,
   ];
 
   @override
@@ -344,9 +448,10 @@ class _StaticWaveform extends StatelessWidget {
           height: 8 + h * 48,
           margin: const EdgeInsets.symmetric(horizontal: 2),
           decoration: BoxDecoration(
-            color: filled
-                ? AppColors.outlineVariant
-                : AppColors.surfaceContainerHigh,
+            color:
+                filled
+                    ? AppColors.outlineVariant
+                    : AppColors.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(2),
           ),
         );
@@ -372,19 +477,33 @@ class _CoachTip extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.lightbulb_outline_rounded, color: AppColors.primary, size: 20),
+          const Icon(
+            Icons.lightbulb_outline_rounded,
+            color: AppColors.primary,
+            size: 20,
+          ),
           const SizedBox(width: AppSpacing.x2),
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(AppLocalizations.of(context).recordingCoachTip,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppLocalizations.of(context).recordingCoachTip,
                   style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.primary, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 2),
-              Text(text,
-                  style: AppTypography.bodySmall.copyWith(color: AppColors.onPrimaryFixed)),
-            ],
-          )),
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  text,
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.onPrimaryFixed,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -406,25 +525,35 @@ class _RecordingDotState extends State<_RecordingDot>
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))
-      ..repeat(reverse: true);
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..repeat(reverse: true);
     _anim = Tween<double>(begin: 0.2, end: 1.0).animate(_ctrl);
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) => Opacity(
-        opacity: _anim.value,
-        child: Container(
-          width: 8, height: 8,
-          decoration: const BoxDecoration(color: AppColors.rec, shape: BoxShape.circle),
-        ),
-      ),
+      builder:
+          (_, __) => Opacity(
+            opacity: _anim.value,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: AppColors.rec,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
     );
   }
 }
@@ -432,16 +561,15 @@ class _RecordingDotState extends State<_RecordingDot>
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 String _statusLabel(AppLocalizations l, String status) => switch (status) {
-  'ready'      => l.recordStatusReady,
-  'recording'  => l.recordStatusRecording,
-  'stopped'    => l.recordStatusStopped,
-  'uploading'  => l.recordStatusUploading,
+  'ready' => l.recordStatusReady,
+  'recording' => l.recordStatusRecording,
+  'stopped' => l.recordStatusStopped,
+  'uploading' => l.recordStatusUploading,
   'processing' => l.recordStatusProcessing,
-  'completed'  => l.recordStatusCompleted,
-  'failed'     => l.recordStatusFailed,
-  _            => status.toUpperCase(),
+  'completed' => l.recordStatusCompleted,
+  'failed' => l.recordStatusFailed,
+  _ => status.toUpperCase(),
 };
-
 
 String _fmt(Duration d) {
   final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');

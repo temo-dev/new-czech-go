@@ -8,6 +8,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../../shared/widgets/app_notification.dart';
 import '../objective_submit_error.dart';
 import '../widgets/ano_ne_widget.dart';
 import '../widgets/exercise_context_image.dart';
@@ -203,10 +204,7 @@ class _ReadingExerciseScreenState extends State<ReadingExerciseScreen> {
 
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.x2),
-              Text(
-                _error!,
-                style: AppTypography.bodySmall.copyWith(color: AppColors.error),
-              ),
+              AppNotification.error(message: _error!),
             ],
             const SizedBox(height: AppSpacing.x6),
             FilledButton(

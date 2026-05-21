@@ -6,6 +6,7 @@ import '../../../core/config/legal_urls.dart';
 import '../../../core/iap/iap_models.dart';
 import '../../../core/iap/iap_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/app_notification.dart';
 import '../../auth/screens/signup_screen.dart' show AuthServiceProvider;
 import 'pro_success_screen.dart';
 
@@ -122,7 +123,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
       // transaction id so multiple submits are safe.
       for (final p in purchases) {
         await _authService.apiClientForScreens.verifyAppleReceiptV17(
-          receipt: p.receipt, productId: p.productId,
+          receipt: p.receipt,
+          productId: p.productId,
         );
       }
       await _authService.refresh();
@@ -161,10 +163,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
               _ComparisonTable(),
               const SizedBox(height: 16),
               if (_products == null)
-                const Center(child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ))
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  ),
+                )
               else
                 _ProductPicker(
                   products: _products!,
@@ -173,18 +177,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.errorContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _error!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.onErrorContainer),
-                  ),
-                ),
+                AppNotification.error(message: _error!),
               ],
               const SizedBox(height: 16),
               const _SubscriptionDisclosure(),
@@ -194,15 +187,28 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.onPrimary,
                   minimumSize: const Size.fromHeight(52),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 onPressed: _products == null || _busy ? null : _buy,
-                child: _busy
-                    ? const SizedBox(
-                        width: 22, height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
-                      )
-                    : const Text('Nâng cấp Pro', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                child:
+                    _busy
+                        ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.onPrimary,
+                          ),
+                        )
+                        : const Text(
+                          'Nâng cấp Pro',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
               ),
               TextButton(
                 onPressed: _busy ? null : _restore,
@@ -249,7 +255,11 @@ class _SubscriptionDisclosure extends StatelessWidget {
                 children: [
                   const Padding(
                     padding: EdgeInsets.only(top: 6, right: 8),
-                    child: Icon(Icons.circle, size: 4, color: AppColors.onSurfaceVariant),
+                    child: Icon(
+                      Icons.circle,
+                      size: 4,
+                      color: AppColors.onSurfaceVariant,
+                    ),
                   ),
                   Expanded(
                     child: Text(
@@ -296,10 +306,7 @@ class _LegalLinksRow extends StatelessWidget {
           onPressed: () => launcher(Uri.parse(LegalUrls.eula)),
           child: const Text('Điều khoản'),
         ),
-        const Text(
-          '·',
-          style: TextStyle(color: AppColors.onSurfaceVariant),
-        ),
+        const Text('·', style: TextStyle(color: AppColors.onSurfaceVariant)),
         TextButton(
           key: const Key('paywall_privacy_button'),
           style: compact,
@@ -319,12 +326,19 @@ class _Header extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const Icon(Icons.workspace_premium_outlined, size: 56, color: AppColors.primary),
+        const Icon(
+          Icons.workspace_premium_outlined,
+          size: 56,
+          color: AppColors.primary,
+        ),
         const SizedBox(height: 8),
         Text(
           'Mở khoá toàn bộ tính năng',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w800),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: AppColors.secondary,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 6),
         const Text(
@@ -359,8 +373,28 @@ class _ComparisonTable extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(child: SizedBox()),
-                SizedBox(width: 60, child: Text('Free', textAlign: TextAlign.center, style: TextStyle(color: AppColors.onSurfaceVariant, fontWeight: FontWeight.w600))),
-                SizedBox(width: 60, child: Text('Pro', textAlign: TextAlign.center, style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700))),
+                SizedBox(
+                  width: 60,
+                  child: Text(
+                    'Free',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 60,
+                  child: Text(
+                    'Pro',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -371,8 +405,25 @@ class _ComparisonTable extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(child: Text(row.$1)),
-                  SizedBox(width: 60, child: Text(row.$2, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.onSurfaceVariant))),
-                  SizedBox(width: 60, child: Text(row.$3, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700))),
+                  SizedBox(
+                    width: 60,
+                    child: Text(
+                      row.$2,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.onSurfaceVariant),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 60,
+                    child: Text(
+                      row.$3,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -411,7 +462,11 @@ class _ProductPicker extends StatelessWidget {
 }
 
 class _ProductTile extends StatelessWidget {
-  const _ProductTile({required this.product, required this.selected, required this.onTap});
+  const _ProductTile({
+    required this.product,
+    required this.selected,
+    required this.onTap,
+  });
 
   final IAPProduct product;
   final bool selected;
@@ -420,7 +475,10 @@ class _ProductTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? AppColors.primaryContainer : AppColors.surfaceContainerLowest,
+      color:
+          selected
+              ? AppColors.primaryContainer
+              : AppColors.surfaceContainerLowest,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -438,7 +496,8 @@ class _ProductTile extends StatelessWidget {
             children: [
               Icon(
                 selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                color: selected ? AppColors.primary : AppColors.onSurfaceVariant,
+                color:
+                    selected ? AppColors.primary : AppColors.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -447,7 +506,10 @@ class _ProductTile extends StatelessWidget {
                   children: [
                     Text(
                       product.title,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -459,14 +521,21 @@ class _ProductTile extends StatelessWidget {
               ),
               if (product.isYearly)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.successContainer,
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: const Text(
                     'Tiết kiệm 17%',
-                    style: TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      color: AppColors.success,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
             ],

@@ -4,6 +4,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../core/auth/auth_models.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/app_notification.dart';
 
 /// V25 — Sign-in-with-Apple CTA. Wraps the package widget with a
 /// busy spinner + inline error band so each consumer screen does not
@@ -56,7 +57,9 @@ class _AppleSignInButtonState extends State<AppleSignInButton> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = 'Đăng nhập với Apple thất bại. Vui lòng thử lại.');
+      setState(
+        () => _error = 'Đăng nhập với Apple thất bại. Vui lòng thử lại.',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -116,17 +119,7 @@ class _AppleSignInButtonState extends State<AppleSignInButton> {
           ),
         if (_error != null) ...[
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.errorContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              _error!,
-              style: const TextStyle(color: AppColors.onErrorContainer),
-            ),
-          ),
+          AppNotification.error(message: _error!),
         ],
       ],
     );

@@ -11,6 +11,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../../shared/widgets/app_notification.dart';
 import '../widgets/czech_keyboard_chips.dart';
 import '../widgets/dictation_audio_card.dart';
 import '../widgets/dictation_ocr_preview_card.dart';
@@ -401,10 +402,7 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
             ],
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.x3),
-              Text(
-                _error!,
-                style: AppTypography.bodySmall.copyWith(color: AppColors.error),
-              ),
+              AppNotification.error(message: _error!),
             ],
             const SizedBox(height: AppSpacing.x6),
             Row(
@@ -483,10 +481,7 @@ class _DictationExerciseScreenState extends State<DictationExerciseScreen> {
             ),
             if (_ocrFailedBanner[i] != null) ...[
               const SizedBox(height: AppSpacing.x2),
-              Text(
-                _ocrFailedBanner[i]!,
-                style: AppTypography.bodySmall.copyWith(color: AppColors.error),
-              ),
+              AppNotification.warning(message: _ocrFailedBanner[i]!),
             ],
           ],
         );
@@ -703,11 +698,7 @@ class _DictationResultPollerState extends State<_DictationResultPoller> {
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.x4),
-            child: Text(
-              _error!,
-              style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
-              textAlign: TextAlign.center,
-            ),
+            child: AppNotification.error(message: _error!),
           ),
         ),
       );

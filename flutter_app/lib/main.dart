@@ -20,11 +20,15 @@ import 'core/theme/app_theme.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'core/api/level_api.dart';
 import 'features/auth/screens/signup_screen.dart' show AuthServiceProvider;
-import 'features/auth/screens/welcome_screen.dart' as auth_welcome show WelcomeScreen;
+import 'features/auth/screens/welcome_screen.dart'
+    as auth_welcome
+    show WelcomeScreen;
 import 'features/exercise/screens/exercise_screen.dart' as exercise_feature;
 import 'features/onboarding/cefr_auth_gate.dart';
 import 'features/onboarding/placement_test_screen.dart';
-import 'features/onboarding/welcome_screen.dart' as onboarding_welcome show WelcomeScreen;
+import 'features/onboarding/welcome_screen.dart'
+    as onboarding_welcome
+    show WelcomeScreen;
 import 'features/exercise/screens/listening_exercise_screen.dart';
 import 'features/exercise/screens/reading_exercise_screen.dart';
 import 'features/exercise/screens/vocab_grammar_exercise_screen.dart';
@@ -35,6 +39,7 @@ import 'features/mock_exam/screens/mock_test_list_screen.dart';
 import 'features/profile/screens/profile_screen.dart';
 import 'models/models.dart';
 import 'shared/widgets/app_bottom_nav.dart';
+import 'shared/widgets/app_notification.dart';
 
 /// V17 self-serve auth is opt-in via the build flag so the legacy
 /// dev-fixture login path keeps working unchanged for development +
@@ -61,7 +66,10 @@ IAPService _buildIAPService(AuthService? authService) {
     return StubIAPService();
   }
   return RealIAPService(
-    verifyReceipt: ({required String receipt, required String productId}) async {
+    verifyReceipt: ({
+      required String receipt,
+      required String productId,
+    }) async {
       await authService.apiClientForScreens.verifyAppleReceiptV17(
         receipt: receipt,
         productId: productId,
@@ -87,11 +95,13 @@ Future<void> main() async {
 
   final iapService = _buildIAPService(authService);
 
-  runApp(MluveniSprintApp(
-    localeProvider: localeProvider,
-    authService: authService,
-    iapService: iapService,
-  ));
+  runApp(
+    MluveniSprintApp(
+      localeProvider: localeProvider,
+      authService: authService,
+      iapService: iapService,
+    ),
+  );
 }
 
 class MluveniSprintApp extends StatefulWidget {
@@ -136,9 +146,10 @@ class _MluveniSprintAppState extends State<MluveniSprintApp> {
 
   @override
   Widget build(BuildContext context) {
-    final home = widget.authService != null
-        ? _V17AuthGate(service: widget.authService!)
-        : const LearnerShell();
+    final home =
+        widget.authService != null
+            ? _V17AuthGate(service: widget.authService!)
+            : const LearnerShell();
     final app = LocaleScope(
       notifier: widget.localeProvider,
       child: AnimatedBuilder(
@@ -155,7 +166,10 @@ class _MluveniSprintAppState extends State<MluveniSprintApp> {
                   child: child,
                 );
                 return widget.authService != null
-                    ? AuthServiceProvider(service: widget.authService!, child: wrapped)
+                    ? AuthServiceProvider(
+                      service: widget.authService!,
+                      child: wrapped,
+                    )
                     : wrapped;
               },
               locale: Locale(widget.localeProvider.code),
@@ -292,6 +306,7 @@ class _LearnerShellState extends State<LearnerShell> {
     }
     return ApiClient();
   }
+
   VoicePreferenceService? _voiceService;
   InterviewPreferenceService? _interviewService;
   bool _loading = true;
@@ -421,7 +436,7 @@ class _LearnerShellState extends State<LearnerShell> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_error!, textAlign: TextAlign.center),
+              AppNotification.error(message: _error!),
               const SizedBox(height: 12),
               FilledButton(onPressed: _bootstrap, child: Text(l.retry)),
             ],

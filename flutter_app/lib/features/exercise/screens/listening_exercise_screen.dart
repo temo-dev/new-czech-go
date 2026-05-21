@@ -9,6 +9,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../../shared/widgets/app_notification.dart';
 import '../objective_submit_error.dart';
 import '../widgets/ano_ne_widget.dart';
 import '../widgets/exercise_context_image.dart';
@@ -255,10 +256,7 @@ class _ListeningExerciseScreenState extends State<ListeningExerciseScreen> {
 
             if (_submitError != null) ...[
               const SizedBox(height: AppSpacing.x2),
-              Text(
-                _submitError!,
-                style: AppTypography.bodySmall.copyWith(color: AppColors.error),
-              ),
+              AppNotification.error(message: _submitError!),
             ],
 
             const SizedBox(height: AppSpacing.x6),
@@ -562,6 +560,15 @@ class _AudioBarShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    if (error) {
+      return AppNotification.error(
+        message: l.audioError,
+        actionLabel: onRetry == null ? null : l.retry,
+        onAction: onRetry,
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.x3),
       decoration: BoxDecoration(
@@ -575,30 +582,10 @@ class _AudioBarShell extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child:
-                error
-                    ? Text(
-                      AppLocalizations.of(context).audioError,
-                      style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.error,
-                      ),
-                    )
-                    : loading
-                    ? Text(
-                      AppLocalizations.of(context).audioLoading,
-                      style: AppTypography.bodySmall,
-                    )
-                    : Text(
-                      AppLocalizations.of(context).audioHint,
-                      style: AppTypography.bodySmall,
-                    ),
+                loading
+                    ? Text(l.audioLoading, style: AppTypography.bodySmall)
+                    : Text(l.audioHint, style: AppTypography.bodySmall),
           ),
-          if (error && onRetry != null)
-            IconButton(
-              icon: const Icon(Icons.refresh_rounded),
-              color: AppColors.secondary,
-              tooltip: 'Thử lại',
-              onPressed: onRetry,
-            ),
           if (!error && !loading)
             IconButton(
               icon: Icon(

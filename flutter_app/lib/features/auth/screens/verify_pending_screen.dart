@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../core/auth/auth_models.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/app_notification.dart';
 import 'signup_screen.dart' show AuthServiceProvider;
 
 /// Shown after signup (and inside the AppShell as a banner when grace is
@@ -28,7 +29,8 @@ class _VerifyPendingScreenState extends State<VerifyPendingScreen> {
   String? _info;
   String? _error;
 
-  AuthService get _service => widget.authServiceOverride ?? AuthServiceProvider.of(context);
+  AuthService get _service =>
+      widget.authServiceOverride ?? AuthServiceProvider.of(context);
 
   @override
   void dispose() {
@@ -68,9 +70,10 @@ class _VerifyPendingScreenState extends State<VerifyPendingScreen> {
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.code == 'cooldown'
-            ? 'Vui lòng chờ ít giây trước khi gửi lại.'
-            : e.message;
+        _error =
+            e.code == 'cooldown'
+                ? 'Vui lòng chờ ít giây trước khi gửi lại.'
+                : e.message;
       });
     } catch (_) {
       if (!mounted) return;
@@ -100,65 +103,64 @@ class _VerifyPendingScreenState extends State<VerifyPendingScreen> {
             children: [
               const SizedBox(height: 32),
               const Center(
-                child: Icon(Icons.mark_email_unread_outlined, size: 80, color: AppColors.secondary),
+                child: Icon(
+                  Icons.mark_email_unread_outlined,
+                  size: 80,
+                  color: AppColors.secondary,
+                ),
               ),
               const SizedBox(height: 24),
               const Text(
                 'Xác minh email của bạn',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.secondary),
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.secondary,
+                ),
               ),
               const SizedBox(height: 12),
               Text(
                 'Đã gửi link xác minh đến\n$email\n\nMở email và click link để mở khóa toàn bộ tính năng.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.onSurfaceVariant, height: 1.5),
+                style: const TextStyle(
+                  color: AppColors.onSurfaceVariant,
+                  height: 1.5,
+                ),
               ),
               const SizedBox(height: 24),
-              if (_info != null)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.successContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _info!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.success),
-                  ),
-                ),
-              if (_error != null)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.errorContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _error!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.onErrorContainer),
-                  ),
-                ),
+              if (_info != null) AppNotification.success(message: _info!),
+              if (_error != null) AppNotification.error(message: _error!),
               const Spacer(),
               FilledButton(
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.onPrimary,
                   minimumSize: const Size.fromHeight(52),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 onPressed: canResend ? _resend : null,
-                child: _busy
-                    ? const SizedBox(
-                        width: 22, height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
-                      )
-                    : Text(
-                        _remaining > 0 ? 'Gửi lại sau ${_remaining}s' : 'Gửi lại email',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                      ),
+                child:
+                    _busy
+                        ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.onPrimary,
+                          ),
+                        )
+                        : Text(
+                          _remaining > 0
+                              ? 'Gửi lại sau ${_remaining}s'
+                              : 'Gửi lại email',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
               ),
               const SizedBox(height: 12),
               TextButton(

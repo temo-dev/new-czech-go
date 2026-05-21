@@ -10,6 +10,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../../shared/widgets/app_notification.dart';
 import '../widgets/exercise_context_image.dart';
 import '../widgets/result_card.dart';
 
@@ -187,10 +188,7 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
             if (d.isPsani2) ..._buildPsani2Fields(d),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.x2),
-              Text(
-                _error!,
-                style: AppTypography.bodySmall.copyWith(color: Colors.red),
-              ),
+              AppNotification.error(message: _error!),
             ],
             const SizedBox(height: AppSpacing.x6),
             FilledButton(
@@ -258,7 +256,7 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
                       ),
                       suffixText: '$words/${d.writingMinWords} từ',
                       suffixStyle: TextStyle(
-                        color: enough ? AppColors.secondary : Colors.red,
+                        color: enough ? AppColors.secondary : AppColors.warning,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
                       ),
@@ -329,7 +327,7 @@ class _WritingExerciseScreenState extends State<WritingExerciseScreen> {
                 ),
                 suffixText: '$words/${d.writingMinWords} từ',
                 suffixStyle: TextStyle(
-                  color: enough ? AppColors.secondary : Colors.red,
+                  color: enough ? AppColors.secondary : AppColors.warning,
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
                 ),
@@ -373,18 +371,21 @@ class _Psani2TopicRow extends StatelessWidget {
                   client.exerciseAssetUri(exerciseId, asset!.id).toString(),
                   headers: client.authHeaders,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: const Color(0xFFF5F0EA),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.broken_image_outlined,
-                      size: 18,
-                      color: Colors.black26,
-                    ),
-                  ),
-                  loadingBuilder: (_, child, progress) => progress == null
-                      ? child
-                      : Container(color: const Color(0xFFF5F0EA)),
+                  errorBuilder:
+                      (_, __, ___) => Container(
+                        color: const Color(0xFFF5F0EA),
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.broken_image_outlined,
+                          size: 18,
+                          color: Colors.black26,
+                        ),
+                      ),
+                  loadingBuilder:
+                      (_, child, progress) =>
+                          progress == null
+                              ? child
+                              : Container(color: const Color(0xFFF5F0EA)),
                 ),
               ),
             ),
@@ -491,9 +492,9 @@ class _WritingResultPollerState extends State<_WritingResultPoller> {
       return Scaffold(
         backgroundColor: AppColors.surface,
         body: Center(
-          child: Text(
-            _error!,
-            style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.x4),
+            child: AppNotification.error(message: _error!),
           ),
         ),
       );

@@ -22,16 +22,37 @@ import '../../promotion/promotion_exam_flow.dart';
 import '../../progress/screens/progress_detail_screen.dart';
 import '../../progress/skill_labels.dart';
 import '../../progress/widgets/home_progress_card.dart';
+import '../../../shared/widgets/app_notification.dart';
 import 'course_detail_screen.dart';
 
 // Card color palette — vivid block bg + contrasting accent strip on bottom edge.
 // Each tuple = (card body color, bottom accent strip color, foreground text color).
 const _cardColors = [
-  (bg: Color(0xFF7C3AED), accent: Color(0xFFF97316), text: Colors.white), // purple / orange strip
-  (bg: Color(0xFFFB923C), accent: Color(0xFFB91C1C), text: Colors.white), // orange / red strip
-  (bg: Color(0xFF22C55E), accent: Color(0xFFEAB308), text: Colors.white), // green  / amber strip
-  (bg: Color(0xFF3B82F6), accent: Color(0xFFA855F7), text: Colors.white), // blue   / violet strip
-  (bg: Color(0xFFEC4899), accent: Color(0xFFF59E0B), text: Colors.white), // pink   / amber strip
+  (
+    bg: Color(0xFF7C3AED),
+    accent: Color(0xFFF97316),
+    text: Colors.white,
+  ), // purple / orange strip
+  (
+    bg: Color(0xFFFB923C),
+    accent: Color(0xFFB91C1C),
+    text: Colors.white,
+  ), // orange / red strip
+  (
+    bg: Color(0xFF22C55E),
+    accent: Color(0xFFEAB308),
+    text: Colors.white,
+  ), // green  / amber strip
+  (
+    bg: Color(0xFF3B82F6),
+    accent: Color(0xFFA855F7),
+    text: Colors.white,
+  ), // blue   / violet strip
+  (
+    bg: Color(0xFFEC4899),
+    accent: Color(0xFFF59E0B),
+    text: Colors.white,
+  ), // pink   / amber strip
 ];
 
 class CourseListScreen extends StatefulWidget {
@@ -93,9 +114,9 @@ class _CourseListScreenState extends State<CourseListScreen> {
   void _openPaywall(BuildContext context) {
     final iap = IAPServiceProvider.maybeOf(context);
     if (iap == null) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => PaywallScreen(iap: iap)),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => PaywallScreen(iap: iap)));
   }
 
   Future<void> _refreshLevelProgress() async {
@@ -163,10 +184,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder:
-            (_) => CourseDetailScreen(
-              client: widget.client,
-              course: course,
-            ),
+            (_) => CourseDetailScreen(client: widget.client, course: course),
       ),
     );
   }
@@ -175,42 +193,52 @@ class _CourseListScreenState extends State<CourseListScreen> {
     final api = _progressApi;
     if (api == null) return;
     final l = AppLocalizations.of(context);
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ProgressDetailScreen(
-        fetcher: api.fetch,
-        labels: ProgressDetailLabels(
-          titleAll: l.progressDetailTitle,
-          titleForSkill: (kind) => skillKindLabel(l, kind),
-          moduleLabelFor: (id) => id,
-          skillLabelFor: (kind) => skillKindLabel(l, kind),
-          attemptsCountLabel: (n) => l.progressDetailAttemptsLabel(n),
-          overallLabel: l.progressOverallTitle,
-          emptyTitle: l.progressEmptyTitle,
-          emptyMessage: '',
-          emptyCtaLabel: l.progressEmptyCta,
-          errorTitle: l.progressErrorTitle,
-          errorMessage: '',
-          retryLabel: l.progressErrorRetry,
-          offlineLabel: l.progressOfflineChip,
-        ),
-        skillKind: skillKind,
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (_) => ProgressDetailScreen(
+              fetcher: api.fetch,
+              labels: ProgressDetailLabels(
+                titleAll: l.progressDetailTitle,
+                titleForSkill: (kind) => skillKindLabel(l, kind),
+                moduleLabelFor: (id) => id,
+                skillLabelFor: (kind) => skillKindLabel(l, kind),
+                attemptsCountLabel: (n) => l.progressDetailAttemptsLabel(n),
+                overallLabel: l.progressOverallTitle,
+                emptyTitle: l.progressEmptyTitle,
+                emptyMessage: '',
+                emptyCtaLabel: l.progressEmptyCta,
+                errorTitle: l.progressErrorTitle,
+                errorMessage: '',
+                retryLabel: l.progressErrorRetry,
+                offlineLabel: l.progressOfflineChip,
+              ),
+              skillKind: skillKind,
+            ),
       ),
-    ));
+    );
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final raw = await widget.client.listCourses();
       if (!mounted) return;
       setState(() {
-        _courses = raw.map((e) => Course.fromJson(e as Map<String, dynamic>)).toList()
-          ..sort((a, b) => a.sequenceNo.compareTo(b.sequenceNo));
+        _courses =
+            raw.map((e) => Course.fromJson(e as Map<String, dynamic>)).toList()
+              ..sort((a, b) => a.sequenceNo.compareTo(b.sequenceNo));
         _loading = false;
       });
     } catch (err) {
       if (!mounted) return;
-      setState(() { _error = err.toString(); _loading = false; });
+      setState(() {
+        _error = err.toString();
+        _loading = false;
+      });
     }
   }
 
@@ -231,14 +259,19 @@ class _CourseListScreenState extends State<CourseListScreen> {
     }
 
     if (_error != null) {
-      return Center(child: Padding(
-        padding: EdgeInsets.all(AppSpacing.x5),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(_error!, textAlign: TextAlign.center),
-          const SizedBox(height: AppSpacing.x3),
-          FilledButton(onPressed: _load, child: Text(l.retry)),
-        ]),
-      ));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.x5),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppNotification.error(message: _error!),
+              const SizedBox(height: AppSpacing.x3),
+              FilledButton(onPressed: _load, child: Text(l.retry)),
+            ],
+          ),
+        ),
+      );
     }
 
     return ListView(
@@ -292,7 +325,9 @@ class _CourseListScreenState extends State<CourseListScreen> {
         const SizedBox(height: AppSpacing.x1),
         Text(
           'Lộ trình học tập chuyên sâu cho người Việt tại Séc.',
-          style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant),
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: AppSpacing.x4),
 
@@ -322,8 +357,13 @@ class _CourseListScreenState extends State<CourseListScreen> {
         if (_courses.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.x8),
-            child: Text(l.courseListEmpty, textAlign: TextAlign.center,
-                style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant)),
+            child: Text(
+              l.courseListEmpty,
+              textAlign: TextAlign.center,
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
           )
         else
           ...List.generate(_courses.length, (i) {
@@ -365,11 +405,15 @@ class _CourseListScreenState extends State<CourseListScreen> {
                 textColor: colors.text,
                 isFeatured: i == 0,
                 onTap: () async {
-                  await Navigator.of(context).push(MaterialPageRoute(
-                    builder:
-                        (_) =>
-                            CourseDetailScreen(client: widget.client, course: c),
-                  ));
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder:
+                          (_) => CourseDetailScreen(
+                            client: widget.client,
+                            course: c,
+                          ),
+                    ),
+                  );
                   // D4: refresh progress after pop-back.
                   await _progressKey.currentState?.refresh();
                   await _refreshLevelProgress();
@@ -426,7 +470,8 @@ class _CourseCard extends StatelessWidget {
     // upload bitmaps in memory for every card.
     final dpr = MediaQuery.of(context).devicePixelRatio;
     final cardW =
-        MediaQuery.of(context).size.width - 2 * AppSpacing.pagePaddingH(context);
+        MediaQuery.of(context).size.width -
+        2 * AppSpacing.pagePaddingH(context);
     final imageCacheWidth = (cardW * dpr).round().clamp(200, 1600);
 
     return GestureDetector(
@@ -434,7 +479,8 @@ class _CourseCard extends StatelessWidget {
       child: Opacity(
         opacity: _isDraft ? 0.55 : 1.0,
         child: AspectRatio(
-          aspectRatio: 1.05, // ~square, slightly portrait — matches reference proportion
+          aspectRatio:
+              1.05, // ~square, slightly portrait — matches reference proportion
           child: ClipRRect(
             borderRadius: BorderRadius.circular(28),
             child: Stack(
@@ -482,13 +528,16 @@ class _CourseCard extends StatelessWidget {
                     fit: BoxFit.cover,
                     cacheWidth: imageCacheWidth,
                     errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    loadingBuilder: (_, child, progress) =>
-                        progress == null ? child : const SizedBox.shrink(),
+                    loadingBuilder:
+                        (_, child, progress) =>
+                            progress == null ? child : const SizedBox.shrink(),
                   ),
 
                 // Bottom darkening gradient so title stays readable on any art
                 Positioned(
-                  left: 0, right: 0, bottom: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
                   child: IgnorePointer(
                     child: Container(
                       height: 140,
@@ -507,7 +556,8 @@ class _CourseCard extends StatelessWidget {
                 // "SẮP RA MẮT" for draft. Hidden otherwise.
                 if (pill != null)
                   Positioned(
-                    top: 18, left: 22,
+                    top: 18,
+                    left: 22,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -531,7 +581,9 @@ class _CourseCard extends StatelessWidget {
 
                 // Title + subtitle anchored bottom-left
                 Positioned(
-                  left: 22, right: 80, bottom: 28,
+                  left: 22,
+                  right: 80,
+                  bottom: 28,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -562,9 +614,11 @@ class _CourseCard extends StatelessWidget {
 
                 // White circular chevron CTA bottom-right
                 Positioned(
-                  right: 20, bottom: 26,
+                  right: 20,
+                  bottom: 26,
                   child: Container(
-                    width: 36, height: 36,
+                    width: 36,
+                    height: 36,
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
@@ -579,7 +633,9 @@ class _CourseCard extends StatelessWidget {
 
                 // Accent strip pinned to bottom edge — replaces the old progress bar.
                 Positioned(
-                  left: 0, right: 0, bottom: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
                   child: Container(height: 6, color: accentColor),
                 ),
               ],

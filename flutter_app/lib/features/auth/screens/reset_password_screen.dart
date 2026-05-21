@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/auth/auth_models.dart';
 import '../../../core/auth/auth_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/app_notification.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/password_field.dart';
 import 'login_screen.dart';
@@ -13,7 +14,11 @@ import 'signup_screen.dart' show AuthServiceProvider;
 /// during the V17 cutover); the form also accepts a manually-pasted
 /// token for desktop browsers and edge cases.
 class ResetPasswordScreen extends StatefulWidget {
-  const ResetPasswordScreen({super.key, this.initialToken, this.authServiceOverride});
+  const ResetPasswordScreen({
+    super.key,
+    this.initialToken,
+    this.authServiceOverride,
+  });
 
   final String? initialToken;
   final AuthService? authServiceOverride;
@@ -29,7 +34,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   String? _error;
   bool _done = false;
 
-  AuthService get _service => widget.authServiceOverride ?? AuthServiceProvider.of(context);
+  AuthService get _service =>
+      widget.authServiceOverride ?? AuthServiceProvider.of(context);
 
   @override
   void initState() {
@@ -113,12 +119,20 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 32),
-        const Icon(Icons.check_circle_outline, size: 64, color: AppColors.success),
+        const Icon(
+          Icons.check_circle_outline,
+          size: 64,
+          color: AppColors.success,
+        ),
         const SizedBox(height: 16),
         const Text(
           'Đã đặt lại mật khẩu',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.secondary),
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.secondary,
+          ),
         ),
         const SizedBox(height: 12),
         const Text(
@@ -132,13 +146,19 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.onPrimary,
             minimumSize: const Size.fromHeight(52),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
-          onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const LoginScreen()),
-            (route) => route.isFirst,
+          onPressed:
+              () => Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => route.isFirst,
+              ),
+          child: const Text(
+            'Đăng nhập',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
-          child: const Text('Đăng nhập', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
         ),
       ],
     );
@@ -163,19 +183,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         PasswordField(
           controller: _password,
           label: 'Mật khẩu mới',
-          helper: 'Tối thiểu 8 ký tự, gồm ít nhất 1 chữ số hoặc ký tự đặc biệt.',
+          helper:
+              'Tối thiểu 8 ký tự, gồm ít nhất 1 chữ số hoặc ký tự đặc biệt.',
           autofillHints: const [AutofillHints.newPassword],
         ),
         const SizedBox(height: 16),
         if (_error != null) ...[
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.errorContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(_error!, style: const TextStyle(color: AppColors.onErrorContainer)),
-          ),
+          AppNotification.error(message: _error!),
           const SizedBox(height: 16),
         ],
         FilledButton(
@@ -183,15 +197,25 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.onPrimary,
             minimumSize: const Size.fromHeight(52),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           onPressed: _canSubmit ? _submit : null,
-          child: _busy
-              ? const SizedBox(
-                  width: 22, height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
-                )
-              : const Text('Đặt lại mật khẩu', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          child:
+              _busy
+                  ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.onPrimary,
+                    ),
+                  )
+                  : const Text(
+                    'Đặt lại mật khẩu',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
         ),
       ],
     );

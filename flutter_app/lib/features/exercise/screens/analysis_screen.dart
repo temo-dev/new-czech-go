@@ -10,6 +10,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../../shared/widgets/app_notification.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../widgets/result_card.dart';
 
@@ -140,12 +141,13 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
               client: widget.client,
               result: result,
               onRetry: () => Navigator.of(context).pop(),
-              onNext: widget.onOpenNext == null
-                  ? null
-                  : () {
-                      Navigator.of(context).pop();
-                      widget.onOpenNext!();
-                    },
+              onNext:
+                  widget.onOpenNext == null
+                      ? null
+                      : () {
+                        Navigator.of(context).pop();
+                        widget.onOpenNext!();
+                      },
             )
           else if (showFailure)
             _FailureBlock(
@@ -226,24 +228,25 @@ class _OrbitingRingState extends State<_OrbitingRing>
       height: 160,
       child: AnimatedBuilder(
         animation: _ctrl,
-        builder: (_, __) => CustomPaint(
-          painter: _RingPainter(rotation: _ctrl.value * 2 * math.pi),
-          child: Center(
-            child: Container(
-              width: 76,
-              height: 76,
-              decoration: const BoxDecoration(
-                color: AppColors.primaryContainer,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.psychology_rounded,
-                color: AppColors.primary,
-                size: 36,
+        builder:
+            (_, __) => CustomPaint(
+              painter: _RingPainter(rotation: _ctrl.value * 2 * math.pi),
+              child: Center(
+                child: Container(
+                  width: 76,
+                  height: 76,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.psychology_rounded,
+                    color: AppColors.primary,
+                    size: 36,
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
       ),
     );
   }
@@ -329,9 +332,10 @@ class _StepRow extends StatelessWidget {
           child: Text(
             label,
             style: AppTypography.bodyMedium.copyWith(
-              color: state == _StepState.pending
-                  ? AppColors.outline
-                  : AppColors.onSurface,
+              color:
+                  state == _StepState.pending
+                      ? AppColors.outline
+                      : AppColors.onSurface,
             ),
           ),
         ),
@@ -344,14 +348,14 @@ class _StepRow extends StatelessWidget {
   }
 
   String _statusText(_StepState s) => switch (s) {
-    _StepState.done    => 'Hoàn tất',
-    _StepState.active  => 'Đang xử lý...',
+    _StepState.done => 'Hoàn tất',
+    _StepState.active => 'Đang xử lý...',
     _StepState.pending => 'Chờ',
   };
 
   Color _statusColor(_StepState s) => switch (s) {
-    _StepState.done    => AppColors.success,
-    _StepState.active  => AppColors.primary,
+    _StepState.done => AppColors.success,
+    _StepState.active => AppColors.primary,
     _StepState.pending => AppColors.outline,
   };
 }
@@ -378,9 +382,10 @@ class _StepIconState extends State<_StepIcon>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
-    _scale = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
-    );
+    _scale = Tween<double>(
+      begin: 0.85,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut));
     _syncAnimation();
   }
 
@@ -446,10 +451,7 @@ class _StepIconState extends State<_StepIcon>
       height: 24,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(
-          color: AppColors.outlineVariant,
-          width: 1.5,
-        ),
+        border: Border.all(color: AppColors.outlineVariant, width: 1.5),
       ),
     );
   }
@@ -474,11 +476,8 @@ class _FailureBlock extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title,
-            style: AppTypography.titleLarge.copyWith(color: AppColors.error)),
+        AppNotification.error(title: title, message: body),
         const SizedBox(height: AppSpacing.x3),
-        Text(body, style: AppTypography.bodyMedium),
-        const SizedBox(height: AppSpacing.x5),
         PrimaryButton(
           label: retryLabel,
           icon: Icons.arrow_back,

@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../../shared/widgets/app_notification.dart';
 import '../widgets/exercise_context_image.dart';
 import '../widgets/matching_widget.dart';
 import '../widgets/multiple_choice_widget.dart';
@@ -29,10 +30,12 @@ class VocabGrammarExerciseScreen extends StatefulWidget {
   final VoidCallback? onOpenNext;
 
   @override
-  State<VocabGrammarExerciseScreen> createState() => _VocabGrammarExerciseScreenState();
+  State<VocabGrammarExerciseScreen> createState() =>
+      _VocabGrammarExerciseScreenState();
 }
 
-class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen> {
+class _VocabGrammarExerciseScreenState
+    extends State<VocabGrammarExerciseScreen> {
   final Map<String, String> _answers = {};
   bool _submitting = false;
   String? _submitError;
@@ -49,30 +52,52 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
 
   // quizcard: always score 1/1, store known/review
   Future<void> _submitQuizcard(String choice) async {
-    setState(() { _submitting = true; _submitError = null; });
+    setState(() {
+      _submitting = true;
+      _submitError = null;
+    });
     try {
-      final attempt = await widget.client.createAttempt(widget.detail.id, locale: 'vi');
+      final attempt = await widget.client.createAttempt(
+        widget.detail.id,
+        locale: 'vi',
+      );
       final attemptId = attempt['id'] as String;
       final raw = await widget.client.submitAnswers(attemptId, {'1': choice});
       if (!mounted) return;
       setState(() => _result = AttemptResult.fromJson(raw));
     } catch (e) {
-      if (mounted) setState(() { _submitting = false; _submitError = e.toString(); });
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+          _submitError = e.toString();
+        });
+      }
     }
   }
 
   // matching / fill_blank / choice_word
   Future<void> _submit() async {
     if (_submitting) return;
-    setState(() { _submitting = true; _submitError = null; });
+    setState(() {
+      _submitting = true;
+      _submitError = null;
+    });
     try {
-      final attempt = await widget.client.createAttempt(widget.detail.id, locale: 'vi');
+      final attempt = await widget.client.createAttempt(
+        widget.detail.id,
+        locale: 'vi',
+      );
       final attemptId = attempt['id'] as String;
       final raw = await widget.client.submitAnswers(attemptId, _answers);
       if (!mounted) return;
       setState(() => _result = AttemptResult.fromJson(raw));
     } catch (e) {
-      if (mounted) setState(() { _submitting = false; _submitError = e.toString(); });
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+          _submitError = e.toString();
+        });
+      }
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -82,9 +107,10 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
   /// Admin-uploaded context_image (from exercise assets) takes priority over
   /// vocab-injected flashcardImageAssetId (set at generation publish time).
   String? _quizcardImageUrl(ExerciseDetail d) {
-    final contextAsset = d.assets
-        .where((a) => a.assetKind == 'context_image' && a.isImage)
-        .firstOrNull;
+    final contextAsset =
+        d.assets
+            .where((a) => a.assetKind == 'context_image' && a.isImage)
+            .firstOrNull;
     if (contextAsset != null) {
       return widget.client.exerciseAssetUri(d.id, contextAsset.id).toString();
     }
@@ -123,9 +149,17 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('✓', style: TextStyle(fontSize: 64, color: Color(0xFF1F8A4D))),
+              const Text(
+                '✓',
+                style: TextStyle(fontSize: 64, color: Color(0xFF1F8A4D)),
+              ),
               const SizedBox(height: 12),
-              Text(l.vocabDone, style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.w700)),
+              Text(
+                l.vocabDone,
+                style: AppTypography.titleLarge.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 24),
               if (widget.onOpenNext != null)
                 FilledButton(
@@ -160,13 +194,22 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
               children: [
                 ObjectiveResultCard(
                   result: _result!,
-                  onRetry: () => setState(() { _result = null; _answers.clear(); _fillController.clear(); }),
+                  onRetry:
+                      () => setState(() {
+                        _result = null;
+                        _answers.clear();
+                        _fillController.clear();
+                      }),
                 ),
                 // Show explanation if available
-                if (d.fillBlankExplanation.isNotEmpty || d.choiceWordExplanation.isNotEmpty) ...[
+                if (d.fillBlankExplanation.isNotEmpty ||
+                    d.choiceWordExplanation.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.x4),
                   _ExplanationCard(
-                    explanation: d.isFillBlank ? d.fillBlankExplanation : d.choiceWordExplanation,
+                    explanation:
+                        d.isFillBlank
+                            ? d.fillBlankExplanation
+                            : d.choiceWordExplanation,
                     note: d.isChoiceWord ? d.choiceWordGrammarNote : null,
                     l: l,
                   ),
@@ -175,18 +218,19 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
                 // Next exercise OR done button — always visible so user can exit
                 SizedBox(
                   width: double.infinity,
-                  child: widget.onOpenNext != null
-                      ? FilledButton(
-                          onPressed: widget.onOpenNext,
-                          child: const Text('Bài tiếp theo →'),
-                        )
-                      : FilledButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF1F8A4D),
+                  child:
+                      widget.onOpenNext != null
+                          ? FilledButton(
+                            onPressed: widget.onOpenNext,
+                            child: const Text('Bài tiếp theo →'),
+                          )
+                          : FilledButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF1F8A4D),
+                            ),
+                            child: const Text('Hoàn thành ✓'),
                           ),
-                          child: const Text('Hoàn thành ✓'),
-                        ),
                 ),
               ],
             ),
@@ -201,7 +245,12 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
         backgroundColor: AppColors.surface,
         elevation: 0,
         leading: BackButton(onPressed: () => Navigator.of(context).pop()),
-        title: Text(d.title, style: AppTypography.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Text(
+          d.title,
+          style: AppTypography.titleMedium,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -210,20 +259,28 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Context image only shown for non-quizcard types — quizcard renders it inside the card
-              if (!d.isQuizcard) ExerciseContextImage(detail: d, client: widget.client),
+              if (!d.isQuizcard)
+                ExerciseContextImage(detail: d, client: widget.client),
 
               // Quizcard
               if (d.isQuizcard)
                 QuizcardWidget(
                   front: d.flashcardFront,
                   back: d.flashcardBack,
-                  example: d.flashcardExample.isNotEmpty ? d.flashcardExample : null,
-                  exampleTranslation: d.flashcardExampleTranslation.isNotEmpty ? d.flashcardExampleTranslation : null,
+                  example:
+                      d.flashcardExample.isNotEmpty ? d.flashcardExample : null,
+                  exampleTranslation:
+                      d.flashcardExampleTranslation.isNotEmpty
+                          ? d.flashcardExampleTranslation
+                          : null,
                   // Priority: admin-uploaded context_image > vocab-injected flashcardImageAssetId
                   imageUrl: _quizcardImageUrl(d),
-                  audioUrl: d.flashcardAudioStorageKey.isNotEmpty
-                      ? widget.client.mediaUri(d.flashcardAudioStorageKey).toString()
-                      : null,
+                  audioUrl:
+                      d.flashcardAudioStorageKey.isNotEmpty
+                          ? widget.client
+                              .mediaUri(d.flashcardAudioStorageKey)
+                              .toString()
+                          : null,
                   authHeaders: widget.client.authHeaders,
                   submitting: _submitting,
                   onChoice: _submitQuizcard,
@@ -231,22 +288,38 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
 
               // Matching
               if (d.isMatching) ...[
-                Text(l.vocabMatchInstruction, style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant)),
+                Text(
+                  l.vocabMatchInstruction,
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.x4),
                 MatchingWidget(
                   pairs: d.matchingPairs,
                   answers: _answers,
-                  onChanged: (leftId, rightId) => setState(() => _answers[leftId] = rightId),
+                  onChanged:
+                      (leftId, rightId) =>
+                          setState(() => _answers[leftId] = rightId),
                   mediaUri: widget.client.mediaUri,
                   authHeaders: widget.client.authHeaders,
                 ),
                 const SizedBox(height: AppSpacing.x4),
-                _SubmitButton(canSubmit: _canSubmit, submitting: _submitting, onSubmit: _submit),
+                _SubmitButton(
+                  canSubmit: _canSubmit,
+                  submitting: _submitting,
+                  onSubmit: _submit,
+                ),
               ],
 
               // Fill blank
               if (d.isFillBlank) ...[
-                Text(l.vocabFillInstruction, style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant)),
+                Text(
+                  l.vocabFillInstruction,
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.x3),
                 _FillBlankInput(
                   sentence: d.fillBlankSentence,
@@ -254,7 +327,11 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
                   onChanged: (v) => setState(() => _answers['1'] = v),
                 ),
                 const SizedBox(height: AppSpacing.x4),
-                _SubmitButton(canSubmit: _canSubmit, submitting: _submitting, onSubmit: _submit),
+                _SubmitButton(
+                  canSubmit: _canSubmit,
+                  submitting: _submitting,
+                  onSubmit: _submit,
+                ),
               ],
 
               // Choice word
@@ -266,16 +343,37 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
                     decoration: BoxDecoration(
                       color: AppColors.secondary.withAlpha(18),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.secondary.withAlpha(60)),
+                      border: Border.all(
+                        color: AppColors.secondary.withAlpha(60),
+                      ),
                     ),
-                    child: Row(children: [
-                      const Icon(Icons.info_outline, size: 16, color: AppColors.secondary),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(d.choiceWordGrammarNote, style: AppTypography.bodySmall.copyWith(color: AppColors.secondary))),
-                    ]),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: AppColors.secondary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            d.choiceWordGrammarNote,
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.secondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                Text(d.choiceWordStem.isNotEmpty ? d.choiceWordStem : l.vocabChoiceInstruction,
-                    style: AppTypography.titleSmall.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  d.choiceWordStem.isNotEmpty
+                      ? d.choiceWordStem
+                      : l.vocabChoiceInstruction,
+                  style: AppTypography.titleSmall.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.x4),
                 MultipleChoiceWidget(
                   questionNo: 1,
@@ -286,13 +384,17 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
                   authHeaders: widget.client.authHeaders,
                 ),
                 const SizedBox(height: AppSpacing.x4),
-                _SubmitButton(canSubmit: _canSubmit, submitting: _submitting, onSubmit: _submit),
+                _SubmitButton(
+                  canSubmit: _canSubmit,
+                  submitting: _submitting,
+                  onSubmit: _submit,
+                ),
               ],
 
               if (_submitError != null)
                 Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.x3),
-                  child: Text(_submitError!, style: const TextStyle(color: Color(0xFFC03A28), fontSize: 13)),
+                  child: AppNotification.error(message: _submitError!),
                 ),
             ],
           ),
@@ -303,7 +405,11 @@ class _VocabGrammarExerciseScreenState extends State<VocabGrammarExerciseScreen>
 }
 
 class _SubmitButton extends StatelessWidget {
-  const _SubmitButton({required this.canSubmit, required this.submitting, required this.onSubmit});
+  const _SubmitButton({
+    required this.canSubmit,
+    required this.submitting,
+    required this.onSubmit,
+  });
   final bool canSubmit;
   final bool submitting;
   final VoidCallback onSubmit;
@@ -314,14 +420,22 @@ class _SubmitButton extends StatelessWidget {
       width: double.infinity,
       child: FilledButton(
         onPressed: canSubmit && !submitting ? onSubmit : null,
-        child: Text(submitting ? 'Đang nộp...' : AppLocalizations.of(context).submitAnswersCta),
+        child: Text(
+          submitting
+              ? 'Đang nộp...'
+              : AppLocalizations.of(context).submitAnswersCta,
+        ),
       ),
     );
   }
 }
 
 class _FillBlankInput extends StatelessWidget {
-  const _FillBlankInput({required this.sentence, required this.hint, required this.onChanged});
+  const _FillBlankInput({
+    required this.sentence,
+    required this.hint,
+    required this.onChanged,
+  });
   final String sentence;
   final String hint;
   final ValueChanged<String> onChanged;
@@ -335,15 +449,20 @@ class _FillBlankInput extends StatelessWidget {
         if (parts.length > 1)
           RichText(
             text: TextSpan(
-              style: AppTypography.bodyLarge.copyWith(color: AppColors.onSurface),
+              style: AppTypography.bodyLarge.copyWith(
+                color: AppColors.onSurface,
+              ),
               children: [
                 TextSpan(text: parts[0]),
                 WidgetSpan(
                   child: Container(
-                    width: 80, height: 2,
+                    width: 80,
+                    height: 2,
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     decoration: BoxDecoration(
-                      border: Border(bottom: BorderSide(color: AppColors.primary, width: 2)),
+                      border: Border(
+                        bottom: BorderSide(color: AppColors.primary, width: 2),
+                      ),
                     ),
                   ),
                 ),
@@ -362,7 +481,10 @@ class _FillBlankInput extends StatelessWidget {
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
           ),
         ),
       ],
@@ -371,7 +493,11 @@ class _FillBlankInput extends StatelessWidget {
 }
 
 class _ExplanationCard extends StatelessWidget {
-  const _ExplanationCard({required this.explanation, this.note, required this.l});
+  const _ExplanationCard({
+    required this.explanation,
+    this.note,
+    required this.l,
+  });
   final String explanation;
   final String? note;
   final AppLocalizations l;
@@ -387,12 +513,23 @@ class _ExplanationCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l.vocabExplanation, style: AppTypography.labelUppercase.copyWith(color: AppColors.primary, fontSize: 10)),
+          Text(
+            l.vocabExplanation,
+            style: AppTypography.labelUppercase.copyWith(
+              color: AppColors.primary,
+              fontSize: 10,
+            ),
+          ),
           const SizedBox(height: 6),
           Text(explanation, style: AppTypography.bodyMedium),
           if (note != null && note!.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text(note!, style: AppTypography.bodySmall.copyWith(color: AppColors.onSurfaceVariant)),
+            Text(
+              note!,
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
           ],
         ],
       ),

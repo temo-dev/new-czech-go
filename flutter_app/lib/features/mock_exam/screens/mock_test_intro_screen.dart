@@ -7,6 +7,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../../shared/widgets/app_notification.dart';
 import 'mock_exam_screen.dart';
 
 class MockTestIntroScreen extends StatefulWidget {
@@ -147,46 +148,17 @@ class _MockTestIntroScreenState extends State<MockTestIntroScreen> {
 
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.x3),
-              Text(
-                _error!,
-                style: AppTypography.bodySmall.copyWith(color: AppColors.error),
-              ),
+              AppNotification.error(message: _error!),
             ],
 
             const SizedBox(height: AppSpacing.x4),
 
             // V39 — no-pause warning. Mirrors the real exam: timer keeps
             // running when the app is backgrounded.
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.warningContainer,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.warning),
-              ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.x4,
-                vertical: AppSpacing.x3,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.warning_amber_rounded,
-                    color: AppColors.warning,
-                    size: 22,
-                  ),
-                  const SizedBox(width: AppSpacing.x3),
-                  Expanded(
-                    child: Text(
-                      'Timer KHÔNG dừng khi rời app — giống đề thi thật. '
-                      'Hết giờ bài sẽ tự nộp.',
-                      style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.warning,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            const AppNotification.warning(
+              message:
+                  'Timer KHÔNG dừng khi rời app — giống đề thi thật. '
+                  'Hết giờ bài sẽ tự nộp.',
             ),
 
             const SizedBox(height: AppSpacing.x4),

@@ -8,12 +8,17 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../models/models.dart';
+import '../../../shared/widgets/app_notification.dart';
 import '../../exercise/screens/type_group_screen.dart';
 import '../../interview/screens/interview_list_screen.dart';
 import 'exercise_list_screen.dart';
 
 class ModuleDetailScreen extends StatefulWidget {
-  const ModuleDetailScreen({super.key, required this.client, required this.module});
+  const ModuleDetailScreen({
+    super.key,
+    required this.client,
+    required this.module,
+  });
   final ApiClient client;
   final ModuleSummary module;
 
@@ -27,34 +32,49 @@ class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
   String? _error;
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final raw = await widget.client.listModuleSkills(widget.module.id);
       if (!mounted) return;
       setState(() {
-        _skills = raw
-            .map((e) => SkillSummary.fromJson(e as Map<String, dynamic>, widget.module.id))
-            .toList();
+        _skills =
+            raw
+                .map(
+                  (e) => SkillSummary.fromJson(
+                    e as Map<String, dynamic>,
+                    widget.module.id,
+                  ),
+                )
+                .toList();
         _loading = false;
       });
     } catch (err) {
       if (!mounted) return;
-      setState(() { _error = err.toString(); _loading = false; });
+      setState(() {
+        _error = err.toString();
+        _loading = false;
+      });
     }
   }
 
   String _skillDesc(String kind, AppLocalizations l) => switch (kind) {
-    'noi'       => 'Luyện nói và phát âm tiếng Czech tự nhiên.',
-    'nghe'      => 'Nghe hiểu trong các tình huống thực tế A2.',
-    'doc'       => 'Đọc và hiểu văn bản từ tin nhắn đến bài báo.',
-    'viet'      => 'Viết email và điền biểu mẫu tiếng Czech.',
-    'tu_vung'   => 'Xây dựng vốn từ cho cuộc sống tại CH Séc.',
-    'ngu_phap'  => 'Nắm vững ngữ pháp, cách và thì động từ A2.',
+    'noi' => 'Luyện nói và phát âm tiếng Czech tự nhiên.',
+    'nghe' => 'Nghe hiểu trong các tình huống thực tế A2.',
+    'doc' => 'Đọc và hiểu văn bản từ tin nhắn đến bài báo.',
+    'viet' => 'Viết email và điền biểu mẫu tiếng Czech.',
+    'tu_vung' => 'Xây dựng vốn từ cho cuộc sống tại CH Séc.',
+    'ngu_phap' => 'Nắm vững ngữ pháp, cách và thì động từ A2.',
     'interview' => l.interviewSkillDesc,
-    _           => '',
+    _ => '',
   };
 
   @override
@@ -71,95 +91,157 @@ class _ModuleDetailScreenState extends State<ModuleDetailScreen> {
             // ── Custom app bar ─────────────────────────────────────────────
             Padding(
               padding: EdgeInsets.fromLTRB(h, AppSpacing.x3, h, 0),
-              child: Row(children: [
-                GestureDetector(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: const Icon(Icons.arrow_back, size: 22),
-                ),
-              ]),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const Icon(Icons.arrow_back, size: 22),
+                  ),
+                ],
+              ),
             ),
 
             Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          Text(_error!),
-                          FilledButton(onPressed: _load, child: Text(l.retry)),
-                        ]))
-                      : ListView(
-                          padding: EdgeInsets.symmetric(horizontal: h),
-                          children: [
-                            const SizedBox(height: AppSpacing.x4),
-                            // Section label
-                            Text(l.skillModulesLabel,
-                                style: AppTypography.labelUppercase.copyWith(
-                                    color: AppColors.primary, fontSize: 11, letterSpacing: 1.2)),
-                            const SizedBox(height: AppSpacing.x2),
-                            Text(l.skillModulesTitle,
-                                style: AppTypography.titleLarge.copyWith(fontSize: 26, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: AppSpacing.x1),
-                            Text(
-                              l.skillModulesSubtitle,
-                              style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant),
-                            ),
-                            const SizedBox(height: AppSpacing.x5),
-
-                            // ── Skill grid (2 columns) ───────────────────────
-                            if (_skills.isEmpty)
-                              Text(l.skillListTitle,
-                                  style: AppTypography.bodyMedium.copyWith(color: AppColors.onSurfaceVariant))
-                            else
-                              GridView.count(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: AppSpacing.x3,
-                                mainAxisSpacing: AppSpacing.x3,
-                                childAspectRatio: 1.05,
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                children: _skills.map((sk) => _SkillCard(
-                                  skill: sk,
-                                  label: skillLabel(l, sk.skillKind),
-                                  description: _skillDesc(sk.skillKind, l),
-                                  icon: skillIcon(sk.skillKind),
-                                  comingSoon: l.skillComingSoon,
-                                  onTap: sk.isImplemented ? () {
-                                    final isVocabGrammar =
-                                        sk.skillKind == 'tu_vung' ||
-                                        sk.skillKind == 'ngu_phap';
-                                    final isInterview = sk.skillKind == 'interview';
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => isVocabGrammar
-                                            ? TypeGroupScreen(
-                                                client: widget.client,
-                                                moduleId: sk.moduleId,
-                                                skillKind: sk.skillKind,
-                                                moduleTitle: widget.module.title,
-                                              )
-                                            : isInterview
-                                                ? InterviewListScreen(
-                                                    client: widget.client,
-                                                    moduleId: sk.moduleId,
-                                                  )
-                                                : ExerciseListScreen(
-                                                    client: widget.client,
-                                                    moduleId: sk.moduleId,
-                                                    skillKind: sk.skillKind,
-                                                  ),
-                                      ),
-                                    );
-                                  } : null,
-                                )).toList(),
+              child:
+                  _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _error != null
+                      ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.x5),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AppNotification.error(message: _error!),
+                              const SizedBox(height: AppSpacing.x3),
+                              FilledButton(
+                                onPressed: _load,
+                                child: Text(l.retry),
                               ),
-
-                            // ── Mock test teaser ─────────────────────────────
-                            const SizedBox(height: AppSpacing.x3),
-                            _MockTeaser(),
-
-                            const SizedBox(height: AppSpacing.x8),
-                          ],
+                            ],
+                          ),
                         ),
+                      )
+                      : ListView(
+                        padding: EdgeInsets.symmetric(horizontal: h),
+                        children: [
+                          const SizedBox(height: AppSpacing.x4),
+                          // Section label
+                          Text(
+                            l.skillModulesLabel,
+                            style: AppTypography.labelUppercase.copyWith(
+                              color: AppColors.primary,
+                              fontSize: 11,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.x2),
+                          Text(
+                            l.skillModulesTitle,
+                            style: AppTypography.titleLarge.copyWith(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.x1),
+                          Text(
+                            l.skillModulesSubtitle,
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: AppColors.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.x5),
+
+                          // ── Skill grid (2 columns) ───────────────────────
+                          if (_skills.isEmpty)
+                            Text(
+                              l.skillListTitle,
+                              style: AppTypography.bodyMedium.copyWith(
+                                color: AppColors.onSurfaceVariant,
+                              ),
+                            )
+                          else
+                            GridView.count(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: AppSpacing.x3,
+                              mainAxisSpacing: AppSpacing.x3,
+                              childAspectRatio: 1.05,
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              children:
+                                  _skills
+                                      .map(
+                                        (sk) => _SkillCard(
+                                          skill: sk,
+                                          label: skillLabel(l, sk.skillKind),
+                                          description: _skillDesc(
+                                            sk.skillKind,
+                                            l,
+                                          ),
+                                          icon: skillIcon(sk.skillKind),
+                                          comingSoon: l.skillComingSoon,
+                                          onTap:
+                                              sk.isImplemented
+                                                  ? () {
+                                                    final isVocabGrammar =
+                                                        sk.skillKind ==
+                                                            'tu_vung' ||
+                                                        sk.skillKind ==
+                                                            'ngu_phap';
+                                                    final isInterview =
+                                                        sk.skillKind ==
+                                                        'interview';
+                                                    Navigator.of(context).push(
+                                                      MaterialPageRoute(
+                                                        builder:
+                                                            (_) =>
+                                                                isVocabGrammar
+                                                                    ? TypeGroupScreen(
+                                                                      client:
+                                                                          widget
+                                                                              .client,
+                                                                      moduleId:
+                                                                          sk.moduleId,
+                                                                      skillKind:
+                                                                          sk.skillKind,
+                                                                      moduleTitle:
+                                                                          widget
+                                                                              .module
+                                                                              .title,
+                                                                    )
+                                                                    : isInterview
+                                                                    ? InterviewListScreen(
+                                                                      client:
+                                                                          widget
+                                                                              .client,
+                                                                      moduleId:
+                                                                          sk.moduleId,
+                                                                    )
+                                                                    : ExerciseListScreen(
+                                                                      client:
+                                                                          widget
+                                                                              .client,
+                                                                      moduleId:
+                                                                          sk.moduleId,
+                                                                      skillKind:
+                                                                          sk.skillKind,
+                                                                    ),
+                                                      ),
+                                                    );
+                                                  }
+                                                  : null,
+                                        ),
+                                      )
+                                      .toList(),
+                            ),
+
+                          // ── Mock test teaser ─────────────────────────────
+                          const SizedBox(height: AppSpacing.x3),
+                          _MockTeaser(),
+
+                          const SizedBox(height: AppSpacing.x8),
+                        ],
+                      ),
             ),
           ],
         ),
@@ -197,9 +279,10 @@ class _SkillCard extends StatelessWidget {
           color: AppColors.surfaceContainerLowest,
           borderRadius: AppRadius.lgAll,
           border: Border.all(
-            color: enabled
-                ? AppColors.primary.withAlpha(50)
-                : AppColors.outlineVariant.withAlpha(100),
+            color:
+                enabled
+                    ? AppColors.primary.withAlpha(50)
+                    : AppColors.outlineVariant.withAlpha(100),
             width: 1,
           ),
         ),
@@ -211,9 +294,10 @@ class _SkillCard extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: enabled
-                    ? AppColors.primaryContainer
-                    : AppColors.surfaceContainerHigh,
+                color:
+                    enabled
+                        ? AppColors.primaryContainer
+                        : AppColors.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: Icon(
@@ -230,7 +314,8 @@ class _SkillCard extends StatelessWidget {
               style: AppTypography.titleSmall.copyWith(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: enabled ? AppColors.onSurface : AppColors.onSurfaceVariant,
+                color:
+                    enabled ? AppColors.onSurface : AppColors.onSurfaceVariant,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -255,9 +340,10 @@ class _SkillCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: enabled
-                    ? AppColors.primaryContainer
-                    : AppColors.surfaceContainerHigh,
+                color:
+                    enabled
+                        ? AppColors.primaryContainer
+                        : AppColors.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(AppRadius.full),
               ),
               child: Text(
@@ -266,7 +352,8 @@ class _SkillCard extends StatelessWidget {
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.3,
-                  color: enabled ? AppColors.primary : AppColors.onSurfaceVariant,
+                  color:
+                      enabled ? AppColors.primary : AppColors.onSurfaceVariant,
                 ),
               ),
             ),
@@ -302,8 +389,11 @@ class _MockTeaser extends StatelessWidget {
               color: AppColors.primaryContainer,
               borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
-            child: const Icon(Icons.emoji_events_rounded,
-                color: AppColors.primary, size: 20),
+            child: const Icon(
+              Icons.emoji_events_rounded,
+              color: AppColors.primary,
+              size: 20,
+            ),
           ),
           const SizedBox(width: AppSpacing.x3),
           Expanded(
@@ -317,13 +407,18 @@ class _MockTeaser extends StatelessWidget {
                 Text(
                   'Kiểm tra trình độ với đề thi thử A2.',
                   style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.onSurfaceVariant, fontSize: 11),
+                    color: AppColors.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.lock_outline_rounded,
-              size: 18, color: AppColors.outline),
+          const Icon(
+            Icons.lock_outline_rounded,
+            size: 18,
+            color: AppColors.outline,
+          ),
         ],
       ),
     );
